@@ -45,11 +45,11 @@ def parse_duration(duration_str: str) -> float | None:
     if len(parts) == 3:
         hours = int(parts[0])
         minutes = int(parts[1])
-        seconds = int(parts[2])
+        seconds = float(parts[2])
         return hours * 3600 + minutes * 60 + seconds
     elif len(parts) == 2:
         minutes = int(parts[0])
-        seconds = int(parts[1])
+        seconds = float(parts[1])
         return minutes * 60 + seconds
     elif len(parts) == 1:
         return float(parts[0])

@@ -2,7 +2,7 @@ import shutil
 import uuid
 from feedparser import FeedParserDict
 from urllib.parse import urljoin
-from datetime import datetime
+from datetime import datetime, timezone
 from dateutil import parser
 from xml.dom import minidom
 from diskcache import Cache
@@ -51,7 +51,9 @@ def upload_thumbnail(thumbnail_url: str, author: str, id: str) -> str | None:
         response = requests.get(thumbnail_url, timeout=30)
         content_type = response.headers.get("Content-Type", "")
         ext = mimetypes.guess_extension(content_type) or ".bin"
-        assert ext != ".bin" and ext != ""
+        if ext in {".bin", ""}:
+            print(f"WARNING: Unrecognised Content-Type for thumbnail {id}: {content_type!r}")
+            return None
 
         with tempfile.TemporaryDirectory() as temp_dir:
             staging_file = Path(temp_dir) / f"{create_slug(id)}{ext}"
@@ -140,7 +142,9 @@ def parse_rss_entry(entry: FeedParserDict) -> RssEpisode:
     assert content is not None, "No valid audio content URL found"
 
     pub_date_str = getattr(entry, "published", getattr(entry, "pubDate", ""))
-    pub_date: datetime = parser.parse(pub_date_str)
+    pub_date = parser.parse(pub_date_str)
+    if pub_date.tzinfo is None:
+        pub_date = pub_date.replace(tzinfo=timezone.utc)
 
     duration = getattr(entry, "itunes_duration", None)
     if duration is not None:

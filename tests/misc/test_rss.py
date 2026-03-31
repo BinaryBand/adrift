@@ -81,6 +81,22 @@ class TestUploadThumbnail(unittest.TestCase):
 
         self.assertIsNone(result)
 
+    @patch("src.web.rss.exists")
+    @patch("src.web.rss.requests.get")
+    def test_unknown_mime_type_returns_none(self, mock_get, mock_exists):
+        """B4 fix: unrecognised Content-Type must return None, not raise AssertionError."""
+        mock_exists.return_value = None
+        mock_response = Mock()
+        mock_response.content = b"binary blob"
+        mock_response.headers = {"Content-Type": "application/octet-stream"}
+        mock_get.return_value = mock_response
+
+        result = upload_thumbnail(
+            "https://example.com/thumb.bin", "Test Author", "test_456"
+        )
+
+        self.assertIsNone(result)
+
 
 class TestExtractImageUrl(unittest.TestCase):
     """Test _extract_image_url helper function."""
@@ -268,6 +284,16 @@ class TestParseDuration(unittest.TestCase):
 
         self.assertEqual(result, 58.0)
 
+    def test_parses_hhmmss_with_float_seconds(self):
+        """B2 fix: iTunes feeds often send fractional seconds like 1:02:30.5."""
+        result = parse_duration("1:02:30.5")
+        self.assertAlmostEqual(result, 3750.5)
+
+    def test_parses_mmss_with_float_seconds(self):
+        """B2 fix: MM:SS.f variant."""
+        result = parse_duration("02:30.5")
+        self.assertAlmostEqual(result, 150.5)
+
 
 class TestExtractContentUrl(unittest.TestCase):
     """Test _extract_content_url helper function."""
@@ -356,6 +382,46 @@ class TestParseRssEntry(unittest.TestCase):
         self.assertEqual(result.id, "episode_456")
         self.assertEqual(result.title, "Minimal Episode")
         self.assertIsNone(result.duration)
+
+    def test_naive_pub_date_gets_utc_timezone(self):
+        """B3 fix: feeds with no timezone should produce a tz-aware datetime."""
+        from datetime import timezone
+
+        entry = Mock()
+        entry.id = "ep_tz"
+        entry.title = "TZ Test"
+        entry.author = ""
+        entry.description = ""
+        entry.published = "Mon, 18 Dec 2023 10:30:00"  # No TZ
+        entry.enclosures = [{"href": "https://example.com/ep.mp3"}]
+        delattr(entry, "itunes_duration")
+        delattr(entry, "itunes_image")
+        delattr(entry, "image")
+
+        result = parse_rss_entry(entry)
+
+        self.assertIsNotNone(result.pub_date.tzinfo)
+        self.assertEqual(result.pub_date.tzinfo, timezone.utc)
+
+    def test_explicit_timezone_is_preserved(self):
+        """B3 fix: entries with an explicit offset should keep it."""
+        entry = Mock()
+        entry.id = "ep_tz2"
+        entry.title = "TZ Test 2"
+        entry.author = ""
+        entry.description = ""
+        entry.published = "Mon, 18 Dec 2023 10:30:00 +0500"
+        entry.enclosures = [{"href": "https://example.com/ep.mp3"}]
+        delattr(entry, "itunes_duration")
+        delattr(entry, "itunes_image")
+        delattr(entry, "image")
+
+        result = parse_rss_entry(entry)
+
+        self.assertIsNotNone(result.pub_date.tzinfo)
+        # Offset should be +5 hours, not zeroed to UTC
+        import datetime
+        self.assertEqual(result.pub_date.utcoffset(), datetime.timedelta(hours=5))
 
 
 class TestGetRssEpisodes(unittest.TestCase):

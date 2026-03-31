@@ -62,7 +62,7 @@ def retry(attempts: int = 3, backoff_base: int = 2):
                     else:
                         print(f"{label} failed all {attempts} attempts")
 
-            assert last_exception is not None, last_exception
+            raise last_exception  # type: ignore[misc]
 
         return wrapper
 
