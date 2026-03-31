@@ -6,8 +6,7 @@ import unittest
 import sys
 
 sys.path.insert(0, Path(__file__).parent.parent.parent.as_posix())
-from src.youtube.metadata import get_youtube_episodes, _normalize_youtube_link
-from src.youtube import ytdlp
+from src.youtube.metadata import get_youtube_episodes
 from src.models import RssEpisode
 
 

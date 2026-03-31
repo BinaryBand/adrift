@@ -25,11 +25,11 @@ from src.web.rss import RssChannel, RssEpisode, download_direct, podcast_to_rss
 from src.web.sponsorblock import fetch_sponsor_segments, remove_sponsors
 from src.youtube.downloader import BotDetectionError, download_video
 import src.youtube.downloader as yt_downloader
+from src.youtube.metadata import get_video_info
 
 # Ask the YouTube downloader to propagate bot-detection errors so this
 # runbook can stop further YouTube downloads when detection occurs.
 yt_downloader.PROPAGATE_BOT_DETECTION = True
-from src.youtube.metadata import get_video_info
 
 
 DF_TARGETS = ["config/podcasts.toml", "config/youtube.toml"]

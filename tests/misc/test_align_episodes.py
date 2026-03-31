@@ -15,7 +15,6 @@ os.environ.setdefault("S3_REGION", "us-east-1")
 
 from src.catalog import sim_date, align_episodes, merge_episode, _best_thumbnail
 from src.models.metadata import RssEpisode
-from src.models.output import EpisodeData
 
 
 def _dt(year: int, month: int, day: int) -> datetime:

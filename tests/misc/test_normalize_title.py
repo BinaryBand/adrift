@@ -5,7 +5,7 @@ import unittest
 import sys
 
 sys.path.insert(0, Path(__file__).parent.parent.parent.as_posix())
-from src.app_runner import normalize_title, _TITLE_CACHE
+from src.app_runner import normalize_title
 
 
 class TestNormalizeTitleUnknownShow(unittest.TestCase):

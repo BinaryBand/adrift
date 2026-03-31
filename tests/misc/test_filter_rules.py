@@ -1,11 +1,12 @@
 """Tests for the FilterRules model and RRULE schedule matching."""
 
+import importlib
 import os
 import re
+import sys
 import unittest
 from pathlib import Path
 from unittest.mock import patch
-import sys
 
 sys.path.insert(0, Path(__file__).parent.parent.parent.as_posix())
 
@@ -17,18 +18,21 @@ os.environ.setdefault("S3_SECRET_KEY", "_test")
 os.environ.setdefault("S3_ENDPOINT", "http://localhost")
 os.environ.setdefault("S3_REGION", "us-east-1")
 
-from src.app_common import FilterRules, _schedule_matches_today  # noqa: E402
+app_common = importlib.import_module("src.app_common")
+SourceFilter = app_common.SourceFilter
+_get_deterministic_day = app_common._get_deterministic_day
+_schedule_matches_today = app_common._schedule_matches_today
 
 
 class TestFilterRulesToRegex(unittest.TestCase):
     """Tests for FilterRules.to_regex()."""
 
     def test_empty_rules_return_none(self):
-        rules = FilterRules()
+        rules = SourceFilter()
         self.assertIsNone(rules.to_regex())
 
     def test_exclude_only(self):
-        rules = FilterRules(exclude=["bonus", "preview"])
+        rules = SourceFilter(exclude=["bonus", "preview"])
         regex_str = rules.to_regex()
         self.assertIsNotNone(regex_str)
         regex = re.compile(regex_str)  # type: ignore[arg-type]
@@ -38,7 +42,7 @@ class TestFilterRulesToRegex(unittest.TestCase):
         self.assertIsNotNone(regex.search("Regular Episode 42"))
 
     def test_include_only(self):
-        rules = FilterRules(include=["Last Week Tonight"])
+        rules = SourceFilter(include=["Last Week Tonight"])
         regex_str = rules.to_regex()
         self.assertIsNotNone(regex_str)
         regex = re.compile(regex_str)  # type: ignore[arg-type]
@@ -47,7 +51,7 @@ class TestFilterRulesToRegex(unittest.TestCase):
         self.assertIsNone(regex.search("Some Other Show"))
 
     def test_include_and_exclude(self):
-        rules = FilterRules(
+        rules = SourceFilter(
             include=["Stuff You Should Know"],
             exclude=["sysk", "selects:"],
         )
@@ -62,7 +66,7 @@ class TestFilterRulesToRegex(unittest.TestCase):
 
     def test_exclude_start_anchored(self):
         """Exclude patterns starting with ^ should only match at string start."""
-        rules = FilterRules(exclude=["^Dateline presents:"])
+        rules = SourceFilter(exclude=["^Dateline presents:"])
         regex_str = rules.to_regex()
         self.assertIsNotNone(regex_str)
         regex = re.compile(regex_str)  # type: ignore[arg-type]
@@ -73,7 +77,7 @@ class TestFilterRulesToRegex(unittest.TestCase):
         self.assertIsNotNone(regex.search("NBC Dateline presents: Special"))
 
     def test_case_insensitive_matching(self):
-        rules = FilterRules(exclude=["bonus"])
+        rules = SourceFilter(exclude=["bonus"])
         regex_str = rules.to_regex()
         self.assertIsNotNone(regex_str)
         regex = re.compile(regex_str)  # type: ignore[arg-type]
@@ -84,7 +88,7 @@ class TestFilterRulesToRegex(unittest.TestCase):
 
     def test_to_regex_produces_valid_regex(self):
         """to_regex() output should always be compilable."""
-        rules = FilterRules(
+        rules = SourceFilter(
             include=["Stuff You Should Know"],
             exclude=["sysk", "this day in history", "^Dateline presents:"],
         )
@@ -97,7 +101,7 @@ class TestFilterRulesToRegex(unittest.TestCase):
 
     def test_multiple_include_alternatives(self):
         """include acts as an OR – any matching pattern admits the episode."""
-        rules = FilterRules(include=["Episode One", "Episode Two"])
+        rules = SourceFilter(include=["Episode One", "Episode Two"])
         regex_str = rules.to_regex()
         self.assertIsNotNone(regex_str)
         regex = re.compile(regex_str)  # type: ignore[arg-type]
@@ -130,8 +134,6 @@ class TestScheduleMatchesToday(unittest.TestCase):
 
     def test_no_byday_uses_deterministic_day(self):
         """FREQ=WEEKLY without BYDAY falls back to the deterministic per-title day."""
-        from src.app_common import _get_deterministic_day
-
         title = "Coffeezilla"
         expected_day = _get_deterministic_day(title)
 

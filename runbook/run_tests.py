@@ -68,7 +68,7 @@ def main() -> int:
     tests_passed, test_failures, test_errors = run_tests(args.test_target)
 
     if tests_passed:
-        print(f"Unit tests:\t✓ PASSED")
+        print("Unit tests:\t✓ PASSED")
     else:
         failure_count = len(test_failures)
         error_count = len(test_errors)

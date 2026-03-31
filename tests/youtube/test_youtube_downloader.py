@@ -1,7 +1,7 @@
 """Tests for YouTube downloader functionality."""
 
 from pathlib import Path
-from unittest.mock import Mock, patch, MagicMock
+from unittest.mock import patch, MagicMock
 import unittest
 import sys
 

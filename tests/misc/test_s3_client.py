@@ -1,4 +1,4 @@
-from unittest.mock import patch, call
+from unittest.mock import patch
 from pathlib import Path
 import unittest
 import sys

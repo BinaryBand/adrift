@@ -12,6 +12,7 @@ import xml.etree.ElementTree as ET
 import feedparser
 import functools
 import mimetypes
+import pandas as pd
 import requests
 import tempfile
 import sys
@@ -151,7 +152,7 @@ def parse_rss_entry(entry: FeedParserDict) -> RssEpisode:
         duration = parse_duration(duration)
 
     image = getattr(entry, "itunes_image", getattr(entry, "image", None))
-    if image is not None and type(image) != str:
+    if image is not None and not isinstance(image, str):
         image = image.get("href", None) or image.get("url", None)
 
     return RssEpisode(
@@ -290,9 +291,6 @@ def podcast_to_rss(channel: RssChannel, episodes: list[RssEpisode]) -> str:
     rough_string = ET.tostring(rss, "utf-8")
     re_parsed = minidom.parseString(rough_string)
     return re_parsed.toprettyxml(indent="\t")
-
-
-import pandas as pd
 
 
 def rss_to_df(episodes: list[RssEpisode]) -> pd.DataFrame:

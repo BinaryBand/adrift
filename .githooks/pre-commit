@@ -1,0 +1,19 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+repo_root="$(git rev-parse --show-toplevel)"
+cd "$repo_root"
+
+mapfile -t py_files < <(git diff --cached --name-only --diff-filter=ACMR | grep -E '\.py$' || true)
+
+if [[ ${#py_files[@]} -eq 0 ]]; then
+    exit 0
+fi
+
+ruff_bin="ruff"
+if [[ -x "$repo_root/.venv/bin/ruff" ]]; then
+    ruff_bin="$repo_root/.venv/bin/ruff"
+fi
+
+echo "Running Ruff on staged Python files..."
+"$ruff_bin" check "${py_files[@]}"

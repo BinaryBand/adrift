@@ -4,7 +4,7 @@ from botocore.client import Config
 from mypy_boto3_s3 import S3Client
 
 from dotenv import load_dotenv, find_dotenv
-from urllib.parse import urljoin, urlparse
+from urllib.parse import urljoin
 from functools import cache, wraps
 from diskcache import Cache
 from threading import Lock
@@ -12,7 +12,6 @@ from pathlib import Path
 from typing import cast
 
 import mimetypes
-import socket
 import boto3
 import time
 import sys
@@ -69,18 +68,31 @@ def retry(attempts: int = 3, backoff_base: int = 2):
     return decorator
 
 
-def _is_endpoint_reachable(url: str, timeout: float = 0.25) -> bool:
-    """Return True if the endpoint host:port is reachable."""
+def _is_endpoint_reachable(url: str, timeout: float = 2.0) -> bool:
+    """Return True if an actual S3 API call succeeds against the endpoint.
+
+    A plain HTTP GET (or TCP probe) is not sufficient — a reverse proxy may
+    return 200 for GET / while the underlying S3 backend is still unreachable,
+    causing every real S3 operation to get a 502 Bad Gateway.  We probe with
+    list_buckets() so the check exercises the same code-path as normal usage.
+    """
     try:
-        parsed = urlparse(url)
-        host = parsed.hostname
-        port = parsed.port or (443 if parsed.scheme == "https" else 80)
-        if not host:
-            return False
-
-        with socket.create_connection((host, port), timeout=timeout):
-            return True
-
+        cfg = Config(
+            signature_version="s3v4",
+            connect_timeout=timeout,
+            read_timeout=timeout,
+            retries={"max_attempts": 1},
+        )
+        client = boto3.client(
+            "s3",
+            aws_access_key_id=S3_USERNAME,
+            aws_secret_access_key=S3_SECRET_KEY,
+            endpoint_url=url,
+            config=cfg,
+            region_name=S3_REGION,
+        )
+        client.list_buckets()
+        return True
     except Exception:
         return False
 

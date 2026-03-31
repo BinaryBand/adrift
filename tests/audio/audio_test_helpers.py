@@ -43,7 +43,7 @@ def download_test_audio():
     try:
         subprocess.run(cmd, check=True)
         return OUTPUT_FILE
-    except subprocess.CalledProcessError as e:
+    except subprocess.CalledProcessError:
         sys.exit(1)
 
 

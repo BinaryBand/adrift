@@ -1,4 +1,3 @@
-from typing import Literal, cast
 from pydantic import BaseModel
 from rapidfuzz import fuzz
 from pathlib import Path
@@ -16,7 +15,6 @@ from src.web.rss import (
     RssEpisode,
     get_rss_channel,
     get_rss_episodes,
-    rss_to_df,
 )
 from src.utils.text import normalize_text, create_slug, is_youtube_channel
 from src.youtube.metadata import get_youtube_channel, get_youtube_episodes
@@ -272,7 +270,7 @@ def _collect_episodes(
 
 def process_channel(config: PodcastConfig) -> RssChannel:
     feed_channel: RssChannel = RssChannel(
-        title=config.title,
+        title=config.name,
         author="",
         subtitle="",
         description="",
@@ -284,7 +282,7 @@ def process_channel(config: PodcastConfig) -> RssChannel:
         feed_url = fs.url
         channel_rss: RssChannel
         if is_youtube_channel(feed_url):
-            channel_rss = get_youtube_channel(feed_url, config.title)
+            channel_rss = get_youtube_channel(feed_url, config.name)
         else:
             channel_rss = get_rss_channel(feed_url)
 
@@ -320,7 +318,7 @@ def process_sources(
     callback: Callback | None = None,
 ) -> list[RssEpisode]:
     """Collect and deduplicate download-side episodes (thin wrapper)."""
-    episodes = _collect_episodes(config.downloads, config.title, False, callback)
+    episodes = _collect_episodes(config.downloads, config.name, False, callback)
     if callback:
         callback(len(episodes), len(episodes))
     return episodes
@@ -330,10 +328,7 @@ def process_feeds(
     config: PodcastConfig, callback: Callback | None = None
 ) -> list[RssEpisode]:
     """Collect and deduplicate reference-side episodes (thin wrapper)."""
-    title = config.title
+    title = config.name
     source_episodes = _collect_episodes(config.references, title, True, callback)
-
-    df = rss_to_df(source_episodes)
-    print(f"DataFrame: {create_slug(title)}_catalog")
 
     return source_episodes

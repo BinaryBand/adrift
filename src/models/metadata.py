@@ -1,7 +1,9 @@
+from typing import Any, Callable, TypedDict
 from dotenv import load_dotenv, find_dotenv
 from abc import ABC, abstractmethod
 from datetime import datetime
 from pathlib import Path
+from pydantic import BaseModel
 
 import pydantic
 import sys
@@ -66,11 +68,6 @@ class MediaMetadata(S3Metadata):
             "sponsors_removed": "true" if self.sponsors_removed else "false",
             "uploader": self.uploader if self.uploader is not None else "unknown",
         }
-
-
-from typing import Any, Callable, TypedDict
-from pydantic import BaseModel
-from datetime import datetime
 
 
 class YtDlpParams(TypedDict, total=False):

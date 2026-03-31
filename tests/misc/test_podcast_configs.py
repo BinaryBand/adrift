@@ -4,7 +4,7 @@ from pathlib import Path
 import sys
 
 sys.path.insert(0, Path(__file__).parent.parent.parent.as_posix())
-from src.app_common import SourceFilter, PodcastConfig, load_podcasts_config
+from src.app_common import SourceFilter, PodcastConfig
 from src.utils.regex import (
     LINK_REGEX,
     YT_CHANNEL_SHORTHAND,

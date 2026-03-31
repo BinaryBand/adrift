@@ -6,7 +6,6 @@ from typing import Any, cast
 from pathlib import Path
 
 import yt_dlp
-import random
 import sys
 
 sys.path.insert(0, Path(__file__).parent.parent.as_posix())

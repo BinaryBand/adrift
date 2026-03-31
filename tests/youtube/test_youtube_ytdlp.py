@@ -1,6 +1,6 @@
 """Tests for YouTube yt-dlp module with focus on caching and error handling."""
 
-from unittest.mock import MagicMock, patch, call
+from unittest.mock import MagicMock, patch
 from datetime import datetime
 from pathlib import Path
 import unittest
