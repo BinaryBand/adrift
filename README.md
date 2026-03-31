@@ -1,4 +1,4 @@
-# PodSmith
+# adrift
 
 A podcast aggregation and ad-removal platform that downloads episodes from RSS feeds and YouTube, filters content, removes ads/sponsors, and manages custom RSS feeds with S3 storage.
 
