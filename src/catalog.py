@@ -8,7 +8,7 @@ import pandas as pd
 import sys
 
 sys.path.insert(0, Path(__file__).parent.parent.as_posix())
-from src.app_common import DAY_OF_WEEK, MATCH_TOLERANCE, MatchData, PodcastData, PodcastConfig, FeedSource
+from src.app_common import DAY_OF_WEEK, MATCH_TOLERANCE, MatchData, PodcastConfig, FeedSource
 from src.app_runner import normalize_title
 from src.utils.progress import Callback
 from src.web.rss import (
@@ -47,18 +47,6 @@ def _update_logs(title: str, match: list):
     df_label = f"{create_slug(title)}_match"
     print(f"DataFrame: {df_label}")
 
-
-def similarity(a: str, b: str) -> float:
-    ac = normalize_text(a)
-    bc = normalize_text(b)
-
-    base = 0.0
-    r = fuzz.ratio(ac, bc) / 100.0
-    ts = fuzz.token_sort_ratio(ac, bc) / 100.0
-    tset = fuzz.token_set_ratio(ac, bc) / 100.0
-    base = r * 0.4 + ts * 0.3 + tset * 0.3
-
-    return base
 
 
 def _similarity_clean(ac: str, bc: str) -> float:

@@ -1,35 +1,232 @@
-"""
-& .venv/Scripts/python.exe runbook/download.py --skip-install --skip-update config/podcasts.json config/youtube.json
-"""
-
+from datetime import datetime
+from random import shuffle
 from pathlib import Path
-import subprocess
+from tqdm import tqdm
+
+import tempfile
 import argparse
 import dotenv
 import sys
 
 sys.path.insert(0, Path(dotenv.find_dotenv()).parent.as_posix())
-from runbook.podcasts.download_podcasts import DF_TARGETS
+dotenv.load_dotenv()
+
+from src.app_common import PodcastConfig, load_podcasts_config
+from src.app_runner import get_s3_files, normalize_title
+from src.catalog import match, process_channel, process_feeds, process_sources
+from src.files.audio import get_duration, is_audio
+from src.files.s3 import exists, upload_file, download_file
+from src.models import DEVICE, MediaMetadata
+from src.utils.progress import get_callback
+from src.utils.regex import YOUTUBE_VIDEO_REGEX
+from src.web.rss import RssChannel, RssEpisode, download_direct, podcast_to_rss
+from src.web.sponsorblock import fetch_sponsor_segments, remove_sponsors
+from src.youtube.downloader import BotDetectionError, download_video
+import src.youtube.downloader as yt_downloader
+
+# Ask the YouTube downloader to propagate bot-detection errors so this
+# runbook can stop further YouTube downloads when detection occurs.
+yt_downloader.PROPAGATE_BOT_DETECTION = True
+from src.youtube.metadata import get_video_info
+
+
+DF_TARGETS = ["config/podcasts.toml", "config/youtube.toml"]
+YOUTUBE_BOT_DETECTED = False
+
+
+# ---------------------------------------------------------------------------
+# Download phase helpers
+# ---------------------------------------------------------------------------
+
+
+def _get_metadata(ep: RssEpisode, bucket: str, prefix: Path) -> MediaMetadata | None:
+    try:
+        duration: float | None = ep.duration
+        upload_date: datetime | None = ep.pub_date
+        source: str | None = ep.content
+        assert isinstance(source, str), "No source URL in episode"
+
+        youtube_match = YOUTUBE_VIDEO_REGEX.match(source)
+        if youtube_match and (vid_id := youtube_match.group(4)):
+            youtube_info = get_video_info(vid_id)
+            assert youtube_info is not None, "Failed to fetch YouTube video info"
+
+            duration = youtube_info.duration
+            upload_date = youtube_info.upload_date
+
+        if not isinstance(duration, float) or not isinstance(upload_date, datetime):
+            with tempfile.TemporaryDirectory() as temp_dir:
+                suffix = prefix.suffix
+                staging_file = Path(temp_dir) / f"temp_audio{suffix}"
+                download_file(bucket, prefix.as_posix(), staging_file)
+
+                duration = get_duration(staging_file)
+                upload_date = ep.pub_date
+
+        assert isinstance(duration, float), "Incomplete metadata extracted"
+        assert isinstance(upload_date, datetime), "Incomplete metadata extracted"
+
+        return MediaMetadata(
+            duration=duration, upload_date=upload_date, source=source, uploader=DEVICE
+        )
+
+    except Exception as e:
+        print(f"ERROR: _get_metadata: Failed to get metadata for {bucket}: {e}")
+        return None
+
+
+def _download_youtube(vid_id: str, title: str, dest: Path) -> tuple[Path, bool]:
+    """Download from YouTube."""
+    url = f"https://www.youtube.com/watch?v={vid_id}"
+
+    with tqdm(desc=f"↓ Downloading {title}", total=1) as progress:
+        staging_file = download_video(url, dest, get_callback(progress))
+        assert staging_file is not None, f"Failed to download: {url}"
+        progress.set_description(f"✓ Downloaded {title}")
+
+    sponsors_removed = False
+    if (segments := fetch_sponsor_segments(vid_id)) and len(segments) > 0:
+        with tqdm(desc=f"↘ Removing sponsors: {title}", total=len(segments)) as p_bar:
+            remove_sponsors(staging_file, vid_id, get_callback(p_bar))
+            sponsors_removed = True
+
+    return staging_file, sponsors_removed
+
+
+def _download_episode(
+    config: PodcastConfig, episode: RssEpisode, bucket: str, prefix: Path
+) -> None:
+    file_title = normalize_title(config.name, episode.title)
+    file_path = prefix / file_title
+
+    if not exists(bucket, file_path.as_posix()):
+        with tempfile.TemporaryDirectory() as temp:
+            dest, sponsored = Path(temp), False
+
+            if youtube_match := YOUTUBE_VIDEO_REGEX.match(episode.content):
+                vid_id = youtube_match.group(4)
+                global YOUTUBE_BOT_DETECTED
+                if YOUTUBE_BOT_DETECTED:
+                    print(f"WARNING: Skipping due to bot detection: {episode.title}")
+                    return
+
+                try:
+                    stage, sponsored = _download_youtube(vid_id, episode.title, dest)
+                except BotDetectionError as e:
+                    YOUTUBE_BOT_DETECTED = True
+                    print(f"ERROR: Bot detected, skipping YouTube downloads: {e}")
+                    return
+            else:
+                stage, sponsored = download_direct(episode.content, dest)
+
+            metadata = _get_metadata(episode, bucket, file_path)
+            if sponsored and metadata is not None:
+                metadata.sponsors_removed = True
+                print(f"Sponsors removed for episode: {episode.title}")
+
+            key = file_path.with_suffix(stage.suffix).as_posix()
+            with tqdm(desc=f"↑ Uploading {episode.title}", total=1) as progress:
+                upload_file(bucket, key, stage, metadata, get_callback(progress))
+                print(f"Uploaded episode to {bucket}/{key}")
+
+
+def _download_series(config: PodcastConfig) -> None:
+    """Download all episodes from download sources for a podcast series."""
+    upload_path = Path(config.path)
+    bucket = upload_path.parts[1]
+    prefix = Path(*upload_path.parts[2:])
+
+    if not config.downloads:
+        return
+
+    with tqdm(desc=f"⟳ Finding {config.name} episodes", total=1) as p_bar:
+        episodes = process_sources(config, get_callback(p_bar))
+        p_bar.set_description(f"✓ Found {len(episodes)} episodes")
+
+    shuffle(episodes)
+    for ep in tqdm(episodes, desc=f"↓ Downloading {config.name}"):
+        try:
+            _download_episode(config, ep, bucket, prefix)
+        except Exception as e:
+            print(f"ERROR: Error downloading episode {ep.title}: {e}")
+
+
+# ---------------------------------------------------------------------------
+# Update (RSS feed rebuild) phase helpers
+# ---------------------------------------------------------------------------
+
+
+def _upload_feed(
+    channel: RssChannel, episodes: list[RssEpisode], bucket: str, key: str
+) -> str | None:
+    key = (Path(key) / "feed.rss").as_posix()
+    rss: str = podcast_to_rss(channel, episodes)
+
+    with tempfile.TemporaryDirectory() as temp_dir:
+        temp_path = Path(temp_dir) / "feed.rss"
+        with open(temp_path, "w", encoding="utf-8") as temp_file:
+            temp_file.write(rss)
+        return upload_file(bucket, key, temp_path)
+
+
+def _update_series(config: PodcastConfig) -> None:
+    """Rebuild the RSS feed for a podcast series."""
+    path = Path(config.path)
+    bucket = path.parts[1]
+    prefix = Path(*path.parts[2:]).as_posix()
+
+    with tqdm(desc=f"⟳ Collecting {config.name} episodes", total=1) as progress:
+        channel: RssChannel = process_channel(config)
+        episodes: list[RssEpisode] = process_feeds(config, get_callback(progress))
+        progress.set_description(f"✓ Processed {config.name} feed")
+
+    with tqdm(desc="↓ Fetching audio files", total=1) as progress:
+        files = [f for f in get_s3_files(bucket, prefix) if is_audio(f)]
+        file_names = [Path(f).name for f in files]
+        episode_names = [ep.title for ep in episodes]
+        progress.set_description("* Matching episodes")
+
+        matches = match(file_names, episode_names, config.name, get_callback(progress))
+        rss_episodes = []
+        for f_idx, e_idx in matches:
+            episodes[e_idx].content = files[f_idx]
+            rss_episodes.append(episodes[e_idx])
+
+        _upload_feed(channel, rss_episodes, bucket, prefix)
+        progress.set_description("✓ Uploaded RSS feed")
+
+
+# ---------------------------------------------------------------------------
+# Entry point
+# ---------------------------------------------------------------------------
 
 
 def main() -> None:
-    dotenv.load_dotenv()
-
     parser = argparse.ArgumentParser(description="Download and update podcasts.")
-    parser.add_argument("files", nargs="*", default=DF_TARGETS, help="Included files")
+    parser.add_argument("--include", nargs="*", default=DF_TARGETS, help="Config files to include")
     parser.add_argument("--skip-download", action="store_true", default=False)
     parser.add_argument("--skip-update", action="store_true", default=False)
     args = parser.parse_args()
 
-    if not args.skip_download:
-        download = [sys.executable, "runbook/podcasts/download_podcasts.py"]
-        download += ["--include"] + args.files
-        subprocess.run(download, check=True)
+    configs: list[PodcastConfig] = load_podcasts_config(include=args.include)
+    print(f"Processing {len(configs)} podcast(s)")
 
-    if not args.skip_update:
-        update = [sys.executable, "runbook/podcasts/update_podcasts.py"]
-        update += ["--include"] + args.files
-        subprocess.run(update, check=True)
+    for config in configs:
+        if not args.skip_download:
+            try:
+                print(f"Downloading series: {config.name}")
+                _download_series(config)
+                print(f"Successfully downloaded series: {config.name}")
+            except Exception as e:
+                print(f"ERROR: Failed to download series {config.name}: {e}")
+
+        if not args.skip_update:
+            try:
+                print(f"Updating series: {config.name}")
+                _update_series(config)
+                print(f"Successfully updated series: {config.name}")
+            except Exception as e:
+                print(f"ERROR: Failed to update series {config.name}: {e}")
 
 
 if __name__ == "__main__":

@@ -1,7 +1,7 @@
-from pydantic import BaseModel, computed_field, model_validator
+from pydantic import BaseModel, computed_field
 from urllib.parse import urljoin
 from functools import cache
-from typing import Literal, Any
+from typing import Literal
 from pathlib import Path
 
 import tomllib
@@ -86,10 +86,6 @@ class SourceFilter(BaseModel):
         return "".join(parts)
 
 
-# Backward-compat alias — existing imports of FilterRules continue to work.
-FilterRules = SourceFilter
-
-
 class FeedSource(BaseModel):
     """A single URL source with optional per-source filter rules."""
 
@@ -109,59 +105,6 @@ class PodcastConfig(BaseModel):
     # ["FREQ=WEEKLY;BYDAY=WE,FR"].  Empty list = always run.
     schedule: list[str] = []
 
-    @model_validator(mode="before")
-    @classmethod
-    def _migrate_legacy_fields(cls, data: Any) -> Any:
-        """Map flat legacy TOML fields to the new nested format."""
-        if not isinstance(data, dict):
-            return data
-
-        data = dict(data)
-
-        # title → name
-        if "title" in data and "name" not in data:
-            data["name"] = data.pop("title")
-
-        # schedule: str → list[str]
-        if isinstance(data.get("schedule"), str):
-            data["schedule"] = [data["schedule"]]
-
-        # Build SourceFilter from top-level filters table
-        def _sf(raw: dict | None) -> SourceFilter:
-            if not raw:
-                return SourceFilter()
-            return SourceFilter.model_validate(raw)
-
-        default_filters = _sf(data.pop("filters", None))
-        feed_filters = _sf(data.pop("feed_filters", None)) if "feed_filters" in data else None
-        source_filters = _sf(data.pop("source_filters", None)) if "source_filters" in data else None
-
-        # feeds / sources → references / downloads (FeedSource objects)
-        if "feeds" in data and "references" not in data:
-            feeds_raw: list[Any] = data.pop("feeds")
-            ref_filter = feed_filters or default_filters
-            data["references"] = [
-                FeedSource(url=u, filters=ref_filter) if isinstance(u, str)
-                else FeedSource.model_validate(u)
-                for u in feeds_raw
-            ]
-
-        if "sources" in data and "downloads" not in data:
-            sources_raw: list[Any] = data.pop("sources")
-            dl_filter = source_filters or default_filters
-            data["downloads"] = [
-                FeedSource(url=u, filters=dl_filter) if isinstance(u, str)
-                else FeedSource.model_validate(u)
-                for u in sources_raw
-            ]
-
-        return data
-
-    @property
-    def title(self) -> str:
-        """Backward-compat alias for ``name``."""
-        return self.name
-
     @computed_field(return_type=str)
     def link(self) -> str:
         return urljoin(S3_ENDPOINT, self.path + ".rss")
@@ -170,39 +113,11 @@ class PodcastConfig(BaseModel):
     def log_data(self) -> list[MatchData]:
         return get_match_data(self.name)
 
-    # ------------------------------------------------------------------
-    # Backward-compat properties so call sites using .feeds / .sources keep working
-    # ------------------------------------------------------------------
-
-    @property
-    def feeds(self) -> list[str]:
-        return [fs.url for fs in self.references]
-
-    @property
-    def sources(self) -> list[str]:
-        return [fs.url for fs in self.downloads]
-
-    @property
-    def filters(self) -> SourceFilter:
-        return self.references[0].filters if self.references else SourceFilter()
-
-    @property
-    def feed_filters(self) -> SourceFilter | None:
-        return None
-
-    @property
-    def source_filters(self) -> SourceFilter | None:
-        return None
-
-
-# Backward-compat alias — existing imports of PodcastData continue to work.
-PodcastData = PodcastConfig
-
 
 def get_match_data(title: str) -> list[MatchData]:
     df_label = f"{create_slug(title)}_match"
     match_path = (
-        Path(".log") / DEVICE / datetime.now().strftime("%Y-%m-%d") / f"{df_label}.csv"
+        Path(".logs") / DEVICE / datetime.now().strftime("%Y-%m-%d") / f"{df_label}.csv"
     )
 
     if not match_path.exists():

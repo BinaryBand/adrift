@@ -66,11 +66,11 @@ class AuditConfigs(unittest.TestCase):
             # Validate filter rules for each FeedSource
             for fs in podcast.references:
                 _assert_filter_rules_valid(
-                    self, fs.filters, f"{podcast.title} reference {fs.url} filters"
+                    self, fs.filters, f"{podcast.name} reference {fs.url} filters"
                 )
             for fs in podcast.downloads:
                 _assert_filter_rules_valid(
-                    self, fs.filters, f"{podcast.title} download {fs.url} filters"
+                    self, fs.filters, f"{podcast.name} download {fs.url} filters"
                 )
 
             # Validate schedule is a list of FREQ= strings when present
@@ -78,7 +78,7 @@ class AuditConfigs(unittest.TestCase):
                 self.assertIsInstance(rule, str)
                 self.assertTrue(
                     rule.startswith("FREQ="),
-                    f"{podcast.title}: schedule rule should start with FREQ=, got {rule!r}",
+                    f"{podcast.name}: schedule rule should start with FREQ=, got {rule!r}",
                 )
 
 

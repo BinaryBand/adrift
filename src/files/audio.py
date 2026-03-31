@@ -1,10 +1,5 @@
-from scipy.spatial.distance import cosine, euclidean
-from scipy.signal import spectrogram
-from cachetools import LRUCache
-from diskcache import Cache
 from pathlib import Path
 
-import numpy as np
 import subprocess
 import tempfile
 import shutil
@@ -14,31 +9,12 @@ import os
 
 
 sys.path.insert(0, Path(__file__).parent.parent.parent.as_posix())
-from src.utils.crypto import get_file_hash
 from src.utils.progress import Callback
-from src.utils.regex import re_compile
-
-
-_NOISE_DB = -30  # dB
-_SAMPLE_RATE = 8000  # Hz
-
-LAX_SIMILARITY = 0.9999
-LAX_EUCLIDEAN = 0.8
-STRICT_SIMILARITY = 0.99999
-STRICT_EUCLIDEAN = 0.5
-
-_MAX_CACHED_FILES = 4
-_FULL_AUDIO_CACHE: LRUCache = LRUCache(maxsize=_MAX_CACHED_FILES)
-_FEATS_CACHE = Cache(".cache/feats")
-_SILENCE_CACHE = Cache(".cache/silence")
 
 
 Segment = tuple[float, float]
-FeatArgs = tuple[float, float, Path]
 
 MIN_LENGTH = 0.1  # seconds
-MIN_AD_LENGTH = 10  # seconds
-MIN_BLOCK_LENGTH = 25  # seconds
 
 AUDIO_EXTENSIONS = {".mp3", ".m4a", ".aac", ".wav", ".flac", ".ogg", ".mp4"}
 
@@ -53,166 +29,6 @@ def handle_subprocess_error(
         f"Exit code: {e.returncode}\n"
         f"Error output: {stderr}"
     )
-
-
-def _trim_audio_silence(audio_data: np.ndarray) -> np.ndarray:
-    """Trim leading and trailing silence from audio data based on a dB threshold."""
-    if audio_data.size == 0:
-        return np.array([])
-
-    threshold = 10 ** (_NOISE_DB / 20) * np.max(np.abs(audio_data))
-    above = np.where(np.abs(audio_data) >= threshold)[0]
-
-    if above.size == 0:
-        return np.array([])
-
-    start_index = above[0]
-    end_index = above[-1] + 1
-
-    return audio_data[start_index:end_index]
-
-
-def _get_feats(file: Path, start: float | None, end: float | None) -> np.ndarray:
-    key = str(file)
-
-    if key in _FULL_AUDIO_CACHE:
-        full = _FULL_AUDIO_CACHE[key]
-        if start is None and end is None:
-            return full.copy()
-
-        start_sample = int((start or 0.0) * _SAMPLE_RATE)
-        end_sample = int((end or (len(full) / _SAMPLE_RATE)) * _SAMPLE_RATE)
-        return full[start_sample:end_sample].copy()
-
-    cmd = [
-        "ffmpeg",
-        "-i",
-        key,
-        "-f",
-        "s16le",
-        "-ac",
-        "1",
-        "-ar",
-        str(_SAMPLE_RATE),
-        "-",
-    ]
-
-    if start is not None:
-        cmd[1:1] = ["-ss", str(start)]
-    if end is not None:
-        cmd[1:1] = ["-to", str(end)]
-
-    try:
-        res = subprocess.run(
-            cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, check=True
-        )
-
-        raw_data = np.frombuffer(res.stdout, dtype=np.int16).astype(np.float32)
-        if start is None and end is None:
-            _FULL_AUDIO_CACHE[key] = raw_data
-
-        return raw_data
-
-    except Exception as e:
-        if isinstance(e, subprocess.CalledProcessError):
-            raise handle_subprocess_error(e, cmd, file)
-        raise RuntimeError(f"Failed to concat segments for {file}: {e}")
-
-
-def calc_feat_distance(lhs: np.ndarray, rhs: np.ndarray) -> tuple[float, float]:
-    """Calculate cosine similarity and euclidean distance between two segments"""
-    if len(lhs) == 0 or len(rhs) == 0:
-        return 0.0, float("inf")
-
-    max_len = max(len(lhs), len(rhs))
-    if len(lhs) < max_len:
-        lhs = np.pad(lhs, (0, max_len - len(lhs)))
-    if len(rhs) < max_len:
-        rhs = np.pad(rhs, (0, max_len - len(rhs)))
-
-    cos_sim = 1 - cosine(lhs, rhs)
-    eucl_dist = euclidean(lhs, rhs)
-    return cos_sim, eucl_dist
-
-
-def get_feats(
-    file: Path, start: float | None = None, end: float | None = None
-) -> np.ndarray:
-    file_hash = get_file_hash(file)
-
-    cache_key = f"audio_feat:{file_hash}:start={start},end={end}"
-    if (cached := _FEATS_CACHE.get(cache_key)) is not None:
-        return cached
-
-    audio_data = _get_feats(file, start, end)
-    if audio_data.size == 0:
-        feature = np.array([])
-    else:
-        audio_data = audio_data / (np.max(np.abs(audio_data)) + 1e-6)  # Normalize
-
-        # SciPy will clamp nperseg to len(audio_data) if the sample is short.
-        # If noverlap is not also clamped, it can raise:
-        #   ValueError: noverlap must be less than nperseg
-        if audio_data.size < 2:
-            feature = np.array([])
-        else:
-            nperseg = min(256, int(audio_data.size))
-            noverlap = min(128, max(0, nperseg - 1))
-
-            _, _, Sxx = spectrogram(
-                audio_data, _SAMPLE_RATE, nperseg=nperseg, noverlap=noverlap
-            )
-            feats = np.log(np.abs(Sxx) + 1e-6)
-            feature_vector = np.mean(feats, axis=1)
-            feature = _trim_audio_silence(feature_vector)
-
-    _FEATS_CACHE.set(cache_key, feature)
-    return feature
-
-
-def prefetch_full_audio(file: Path) -> None:
-    """Decode and cache the full audio stream in memory.
-
-    This lets subsequent windowed `get_feats(file, start, end)` calls slice from
-    the cached raw audio instead of re-running ffmpeg each time.
-
-    Note: for very long files this can use substantial RAM.
-    """
-    _get_feats(file, None, None)
-
-
-def find_silent_segments(file: Path) -> list[Segment]:
-    assert os.path.exists(file), f"Audio file does not exist: {file}"
-
-    file_hash = get_file_hash(file)
-    cache_key = f"silence:{file_hash}:noise={_NOISE_DB}:min={MIN_LENGTH}"
-    if (cached := _SILENCE_CACHE.get(cache_key)) is not None:
-        return cached
-
-    detect = f"silencedetect=noise={_NOISE_DB}dB:duration={MIN_LENGTH}"
-    cmd = ["ffmpeg", "-i", str(file), "-af", detect, "-f", "null", "-"]
-
-    try:
-        res = subprocess.run(
-            cmd, capture_output=True, text=True, encoding="utf-8", errors="replace"
-        )
-
-        start_pattern = re_compile(r"silence_start: ([\d.]+)")
-        end_pattern = re_compile(r"silence_end: ([\d.]+) \| silence_duration: ([\d.]+)")
-        starts = [float(x) for x in start_pattern.findall(res.stderr)]
-        ends = [float(end) for end, _ in end_pattern.findall(res.stderr)]
-
-        silence_segments: list[Segment] = []
-        for start, end in zip(starts, ends):
-            silence_segments.append((round(start, 2), round(end, 2)))
-
-        _SILENCE_CACHE.set(cache_key, silence_segments)
-        return silence_segments
-
-    except Exception as e:
-        if isinstance(e, subprocess.CalledProcessError):
-            raise handle_subprocess_error(e, cmd, file)
-        raise RuntimeError(f"Failed to concat segments for {file}: {e}")
 
 
 def is_audio(filename: Path | str) -> bool:
@@ -270,106 +86,6 @@ def get_duration(file: Path) -> float | None:
     except Exception as e:
         print(f"WARNING: Failed to get duration for {file}: {e}")
         return None
-
-
-def extract_segment(file: Path, start: float, end: float, dest: Path) -> Path:
-    dest.parent.mkdir(parents=True, exist_ok=True)
-    dest.unlink(missing_ok=True)
-
-    # Handle invalid time range - create empty file instead of calling ffmpeg
-    if end <= start:
-        print(
-            f"WARNING: Invalid time range: start={start}, end={end}. Creating empty file."
-        )
-        dest.touch()
-        return dest
-
-    end -= start
-    base = [
-        "ffmpeg",
-        "-i",
-        str(file),
-        "-ss",
-        str(start),
-        "-t",
-        str(end),
-        "-y",
-        str(dest),
-    ]
-    strategies = [base, base + ["-c", "copy"]]
-
-    errors: list[Exception] = []
-    for cmd in strategies:
-        try:
-            subprocess.run(cmd, check=True, capture_output=True)
-            return dest
-        except subprocess.CalledProcessError as e:
-            errors.append(e)
-            # Try next strategy
-            continue
-        except Exception as e:
-            errors.append(e)
-            continue
-
-    # If all strategies failed, re-raise the first CalledProcessError if present
-    # This allows tests to catch specific ffmpeg errors
-    for error in errors:
-        if isinstance(error, subprocess.CalledProcessError):
-            raise error
-
-    raise Exception("All strategies failed.", "\n".join(str(e) for e in errors))
-
-
-# cspell:words libmp3lame asetpts STARTPTS
-def copy_segments(
-    file: Path,
-    segments: list[FeatArgs],
-    batch_size: int = 30,
-    callback: Callback | None = None,
-) -> None:
-    segments = [s for s in segments.copy() if not Path(s[2]).exists()]
-    if len(segments) == 0:
-        return None
-
-    ext = file.suffix.lower()
-    codec = "libmp3lame" if ext == ".mp3" else "aac"
-
-    for h in enumerate(segments[::batch_size]):
-        batch = segments[h[0] * batch_size : h[0] * batch_size + batch_size]
-
-        normalized: list[FeatArgs] = []
-        for s, e, out in batch:
-            if s > e:
-                s, e = e, s
-            normalized.append((s, e, out))
-        normalized.sort(key=lambda x: x[0])
-
-        filters = []
-        maps = []
-
-        begin = normalized[0][0]
-        for i, (start, end, out) in enumerate(normalized):
-            rel_start = start - begin
-            rel_end = end - begin
-
-            filter = f"[0:a]atrim=start={rel_start:.1f}:end={rel_end:.1f},asetpts=PTS-STARTPTS[a{i}]"
-            filters.append(filter)
-            maps.append((f"[a{i}]", out))
-
-        filter_complex = "; ".join(filters)
-        cmd = ["ffmpeg", "-hide_banner", "-loglevel", "error", "-threads", "0"]
-        if begin > 0:
-            cmd += ["-ss", str(begin)]
-        cmd += ["-i", str(file), "-vn", "-filter_complex", filter_complex]
-        for map_spec, out_path in maps:
-            cmd += ["-map", map_spec, "-c:a", codec, str(out_path)]
-        cmd += ["-y"]
-        subprocess.run(cmd, check=True, capture_output=True)
-
-        if callback:
-            callback(min((h[0] + 1) * batch_size, len(segments)), len(segments))
-
-    return None
 
 
 def invert_segments(file: Path, segments: list[Segment]) -> list[Segment]:

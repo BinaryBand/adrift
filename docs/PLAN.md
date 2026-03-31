@@ -1,268 +1,170 @@
-# Plan: Merge live code with SPECS.md logic
+# Plan: Consolidate runbooks, kill compat shims, prune dead audio code
 
 ## Context
 
-The codebase is a working but organically grown Python podcast pipeline. The spec in `docs/SPECS.md` formalizes a cleaner architecture for the same domain. The goal is to adopt the spec's better-designed abstractions — particularly the config model, cross-alignment algorithm, and merge rules — while keeping the working download/S3/ffmpeg infrastructure untouched.
+The SPECS.md migration is complete: configs are fully migrated to the new TOML format
+(`name`/`references`/`downloads`), and the new matching/merge logic is in place.
+Three cleanup tasks remain:
 
-Key improvements from the spec:
-1. **Cleaner config model**: `references`/`downloads` as `FeedSource` objects with per-source filters, vs. flat `feeds`/`sources` lists with awkward dict-based per-source overrides.
-2. **Richer matching**: Weighted 4-signal scorer (ID + date + title + description) vs. title-only fuzzy matching for cross-aligning reference and download episode lists.
-3. **Explicit merge rules**: Field-level resolution when combining reference + download episodes.
-
----
-
-## Critical files
-
-| File | Role |
-|---|---|
-| `src/app_common.py` | Config models — `PodcastData`, `FilterRules`, `load_podcasts_config` |
-| `src/catalog.py` | Episode matching/alignment — `match()`, `process_feeds()`, `process_sources()` |
-| `src/models/metadata.py` | Data models — `RssEpisode`, `RssChannel` |
-| `runbook/podcasts/update_podcasts.py` | Feed generation runbook |
-| `runbook/podcasts/download_podcasts.py` | Audio download runbook |
-| `config/podcasts.toml`, `config/youtube.toml` | TOML podcast configs |
-| `tests/misc/test_podcast_configs.py` | Config validation tests |
-| `tests/misc/test_filter_rules.py` | FilterRules tests |
+1. The three-file runbook structure (`download.py` → subprocess → `podcasts/download_podcasts.py`
+   → subprocess → `podcasts/update_podcasts.py`) is needlessly split. Merge into a single
+   `runbook/download.py`.
+2. Backward-compat shims in `src/app_common.py` (model validator, aliases, legacy properties)
+   exist only to support the old TOML format, which is fully migrated. Remove them.
+3. The scipy/numpy audio feature-extraction pipeline (`get_feats`, `calc_feat_distance`,
+   `find_silent_segments`, etc.) was experimental dead code — never called from production paths.
+   Remove it and its unused dependencies.
 
 ---
 
-## Phase 1 — Config model refactor (`src/app_common.py`)
+## Phase 1 — Merge runbooks into `runbook/download.py`
 
-### 1a. Introduce `SourceFilter` and `FeedSource`
+### Current structure
 
-Replace `FilterRules` with `SourceFilter` (same fields: `include`, `exclude`, `publish_days`; same `to_regex()` logic — just renamed). Add `FeedSource`:
-
-```python
-class SourceFilter(BaseModel):
-    include: list[str] = []
-    exclude: list[str] = []
-    publish_days: list[DAY_OF_WEEK] = []
-
-    def to_regex(self) -> str | None: ...  # same logic as FilterRules.to_regex()
-
-class FeedSource(BaseModel):
-    url: str
-    filters: SourceFilter = SourceFilter()
+```text
+runbook/download.py          — orchestrator: calls the two below as subprocesses
+runbook/podcasts/
+  download_podcasts.py       — audio download logic
+  update_podcasts.py         — RSS feed rebuild logic
 ```
 
-Keep `FilterRules = SourceFilter` as an alias to avoid breaking tests.
+### Target structure
 
-### 1b. Rename `PodcastData` → `PodcastConfig`
+```text
+runbook/download.py          — single file with all logic, no subprocess calls
+```
 
-New fields: `name` (alias `title`), `references: list[FeedSource]`, `downloads: list[FeedSource]`, `schedule: list[str]`.
+### What to do
 
-Add a `model_validator(mode="before")` backward-compat shim that maps old flat TOML fields:
-- `"title"` → `"name"`
-- `"feeds": [url, ...]` + `"filters"/"feed_filters"` → `"references": [FeedSource(url, filters), ...]`
-- `"sources": [url, ...]` + `"filters"/"source_filters"` → `"downloads": [FeedSource(url, filters), ...]`
-- `"schedule": str` → `"schedule": [str]`
+Inline both scripts into `runbook/download.py`. The result runs in one process:
 
-Add `title` property returning `self.name` so all call sites stay compatible.
+1. Parse `--include` args, default to `DF_TARGETS = ["config/podcasts.toml", "config/youtube.toml"]`
+2. Call `load_podcasts_config(include=...)` once
+3. For each `PodcastConfig`: call `_download_series(config)` then `_update_series(config)`
 
-### 1c. Update `_schedule_matches_today` and `load_podcasts_config`
+Keep `--skip-download` / `--skip-update` flags so the two phases can be run independently.
 
-`_schedule_matches_today` now iterates `config.schedule` (a `list[str]`). Empty list = no schedule = always run.
+The subprocess invocations in the current `download.py` are replaced with direct function calls.
+Remove the `sys.path` hacks and relative imports that exist only because of the subprocess split.
+
+**Delete**: `runbook/podcasts/download_podcasts.py`, `runbook/podcasts/update_podcasts.py`, and
+the now-empty `runbook/podcasts/` directory.
 
 ---
 
-## Phase 2 — Output models (`src/models/output.py` — new file)
+## Phase 2 — Kill backward-compat shims in `src/app_common.py`
 
-```python
-class EpisodeData(BaseModel):
-    id: str
-    title: str
-    description: str
-    source: list[str]          # union of source URLs
-    thumbnail: str | None = None
-    upload_date: datetime | None = None
+The TOML files are fully migrated. No legacy-format input paths remain.
 
-class PodcastFeed(BaseModel):  # avoids collision with existing PodcastData config name
-    id: str
-    title: str
-    author: str
-    description: str
-    source: str
-    thumbnail: str | None = None
-    episodes: list[EpisodeData] = []
-```
+### Remove
 
-Export from `src/models/__init__.py`. Keep `RssEpisode` and `RssChannel` untouched — they remain the internal RSS layer types.
+1. `model_validator(mode="before")` `_migrate_legacy_fields` — the entire method
+2. `FilterRules = SourceFilter` alias
+3. `PodcastData = PodcastConfig` alias
+4. `.title` property (`return self.name`)
+5. `.feeds` property (`return [fs.url for fs in self.references]`)
+6. `.sources` property (`return [fs.url for fs in self.downloads]`)
+7. `.filters` property
+8. `.feed_filters` property (always returned `None`)
+9. `.source_filters` property (always returned `None`)
 
-> **Naming note**: The spec calls the output `PodcastData`, but that name is already taken by the config model (being renamed to `PodcastConfig`). Use `PodcastFeed` for the output to avoid confusion during the migration.
+### Update callers
 
----
+After the runbook merge in Phase 1, grep for any remaining `.title` / `.feeds` / `.sources`
+accesses and update to `.name` / `.references` / `.downloads`.
 
-## Phase 3 — New alignment algorithm (`src/catalog.py`)
+`src/catalog.py`: `process_channel()` already uses `config.references` — verify no `.feeds`
+references remain.
 
-### 3a. Add `sim_date()`
+### Fix stale log path
 
-```python
-def sim_date(a: datetime | None, b: datetime | None) -> float:
-    if a is None or b is None: return 0.0
-    delta = abs((a - b).days)
-    if delta <= 2:  return 1.00
-    if delta <= 10: return 0.70
-    if delta <= 35: return 0.15
-    return 0.00
-```
-
-### 3b. Add `align_episodes()`
-
-Replaces the cross-list matching in `process_feeds()`. Takes `references: list[RssEpisode]` and `downloads: list[RssEpisode]`. Uses spec weights:
-
-```
-W_ID=0.10, W_DATE=0.30, W_TITLE=0.50, W_DESC=0.10, θ=MATCH_TOLERANCE(0.75)
-
-score = W_ID*sim_id + W_DATE*sim_date + W_TITLE*sim_title + W_DESC*sim_desc
-```
-
-Where:
-- `sim_id`: binary `1.0` if `ref.id == dl.id`, else `0.0`
-- `sim_date`: `sim_date(ref.pub_date, dl.pub_date)`
-- `sim_title`: `_similarity_clean(normalize_text(ref.title), normalize_text(dl.title))` (reuses existing helper)
-- `sim_desc`: `_similarity_clean(normalize_text(ref.description or ""), normalize_text(dl.description or ""))`
-
-Greedy matching is identical to existing `match()`. Returns `list[tuple[int, int]]`.
-
-### 3c. Add `merge_episode()`
-
-```python
-def merge_episode(ref: RssEpisode, dl: RssEpisode) -> EpisodeData:
-    # id: prefer non-URL id (YouTube IDs are short alphanumeric; RSS GUIDs are often URLs)
-    id = ref.id if not ref.id.startswith("http") else dl.id
-    title = max([ref.title, dl.title], key=lambda t: (len(t), t.count(":")))
-    upload_date = min(filter(None, [ref.pub_date, dl.pub_date]), default=None)
-    description = max([ref.description or "", dl.description or ""], key=len) or ""
-    thumbnail = _best_thumbnail(ref.image, dl.image)
-    source = list({u for u in [ref.content, dl.content] if u})
-    return EpisodeData(id=id, title=title, description=description,
-                       source=source, thumbnail=thumbnail, upload_date=upload_date)
-```
-
-`_best_thumbnail`: rank by resolution keyword in URL (`maxres` > `hq` > `mq` > `sq` > default).
-
-### 3d. Refactor `process_feeds()` / `process_sources()` → `_collect_episodes()`
-
-Single function replacing both:
-
-```python
-def _collect_episodes(
-    sources: list[FeedSource],
-    title: str,
-    is_reference: bool,
-    callback: Callback | None = None,
-) -> list[RssEpisode]:
-```
-
-Iterates `FeedSource` objects instead of bare URLs, uses `fs.filters.to_regex()` and `fs.filters.publish_days`. Deduplicates across multiple same-side sources using existing title-only `match()` (appropriate since these are same-platform episodes).
-
-Keep `process_feeds()` and `process_sources()` as thin wrappers calling `_collect_episodes(config.references, ...)` and `_collect_episodes(config.downloads, ...)` so runbooks need minimal changes.
-
-### 3e. Update `process_channel()`
-
-Change `for feed_url in config.feeds:` → `for fs in config.references: feed_url = fs.url`.
+`LOG_PATH = Path(".logs") / DEVICE` but `get_match_data` uses `Path(".log") / DEVICE` (missing `s`).
+Normalize to `.logs`.
 
 ---
 
-## Phase 4 — Runbook updates
+## Phase 3 — Prune `src/files/audio.py`
 
-### `runbook/podcasts/update_podcasts.py`
+### Remove (dead feature-extraction pipeline)
 
-`update_series(config: PodcastConfig)` — rename parameter type only. Body stays the same because `process_feeds`/`process_sources` wrappers are preserved. The file→episode `match()` step is kept as-is (title-only is correct here — matching S3 filenames to episode titles, not cross-platform episodes).
+All of these have no production callers (only dead tests):
 
-### `runbook/podcasts/download_podcasts.py`
+| Symbol | Reason |
+| --- | --- |
+| `_NOISE_DB`, `_SAMPLE_RATE` | Only used by removed functions |
+| `LAX_SIMILARITY`, `LAX_EUCLIDEAN`, `STRICT_SIMILARITY`, `STRICT_EUCLIDEAN` | Never used anywhere |
+| `MIN_AD_LENGTH`, `MIN_BLOCK_LENGTH` | Never used anywhere |
+| `_FULL_AUDIO_CACHE` (LRU) | Only used by `_get_feats` |
+| `_FEATS_CACHE` (diskcache) | Only used by `get_feats` |
+| `_SILENCE_CACHE` (diskcache) | Only used by `find_silent_segments` |
+| `_trim_audio_silence(audio_data)` | Only used by `get_feats` |
+| `_get_feats(file, start, end)` | Only used by `get_feats`, `prefetch_full_audio` |
+| `calc_feat_distance(lhs, rhs)` | No production caller |
+| `get_feats(file, start, end)` | No production caller |
+| `prefetch_full_audio(file)` | No caller at all |
+| `find_silent_segments(file)` | No production caller |
+| `copy_segments(file, segments, ...)` | No caller at all |
+| `extract_segment(file, start, end, dest)` | No production caller |
 
-Change `config.sources` → `[fs.url for fs in config.downloads]` in the download loop. The `.title` property means `config.title` still works.
+Also remove `import scipy...` and `import numpy as np`.
 
-### `runbook/validate_configs.py`
+### Keep (active in production pipeline)
 
-`PodcastData` → `PodcastConfig` in import and usage.
+`handle_subprocess_error`, `is_audio`, `parse_duration`, `get_duration`, `invert_segments`,
+`_cut_segments`, `cut_segments`, `MIN_LENGTH`, `AUDIO_EXTENSIONS`.
 
----
+### Delete test files for removed functions
 
-## Phase 5 — TOML migration (`config/podcasts.toml`, `config/youtube.toml`)
+- `tests/audio/test_audio_matching.py`
+- `tests/audio/test_extract_features.py`
+- `tests/audio/test_silence_detection.py`
+- `tests/audio/test_extract_segment.py`
 
-Migrate all entries from flat format to new nested format. The backward-compat shim (Phase 1b) means the system keeps working before and after.
-
-Old:
-```toml
-[[podcasts]]
-title = "Behind the Bastards"
-path  = "/media/podcasts/behind-the-bastards"
-feeds = ["https://...rss"]
-sources = ["yt://@BehindTheBastards"]
-schedule = "FREQ=WEEKLY;BYDAY=WE,FR"
-```
-
-New:
-```toml
-[[podcasts]]
-name = "Behind the Bastards"
-path = "/media/podcasts/behind-the-bastards"
-schedule = ["FREQ=WEEKLY;BYDAY=WE,FR"]
-
-[[podcasts.references]]
-url = "https://...rss"
-
-[[podcasts.downloads]]
-url = "yt://@BehindTheBastards"
-```
-
-For shows with per-side filters, attach `[podcasts.references.filters]` / `[podcasts.downloads.filters]` under their respective `[[...]]` block.
-
-After all TOML files are migrated, remove the `_migrate_legacy_fields` validator from `PodcastConfig`.
+Keep `tests/audio/test_cut_segments.py` — tests `cut_segments` / `invert_segments` which are active.
 
 ---
 
-## Phase 6 — Test updates
+## Phase 4 — Prune `requirements.txt`
 
-### Files to update in-place
+All of the following have zero imports anywhere in the codebase (confirmed by grep):
 
-- `tests/misc/test_podcast_configs.py`: `PodcastData` → `PodcastConfig`, `podcast.feeds` → `[fs.url for fs in podcast.references]`, `podcast.sources` → `[fs.url for fs in podcast.downloads]`, schedule assertion updated for list type.
-- `tests/misc/test_filter_rules.py`: `FilterRules` → `SourceFilter` (or keep alias — both work).
-
-### New test file: `tests/misc/test_align_episodes.py`
-
-Cover:
-- `sim_date()` — each tier, `None` inputs
-- `_weighted_score()` — cross-platform pair (sim_id=0), same-platform pair (sim_id=1)
-- `align_episodes()` — basic match, greedy tie-breaking, threshold cutoff
-- `merge_episode()` — ID preference, title longest-wins, description longest-wins, earliest date, source union
-
----
-
-## What stays untouched
-
-- `src/files/` — audio processing, S3 operations
-- `src/web/rss.py` — RSS parsing and XML generation
-- `src/youtube/` — yt-dlp download stack
-- `src/utils/` — text normalization, cache, crypto
-- `similarity()` / `_similarity_clean()` in `catalog.py` — reused as `sim_title`/`sim_desc`
-- `match()` greedy algorithm — kept for file↔episode (S3 filename) matching
-- `normalize_title()` show-specific cleaners in `app_runner.py`
-- RSS XML output format
+| Package | Reason |
+| --- | --- |
+| `annoy` | Zero imports |
+| `optuna` | Zero imports |
+| `scipy` | Only used in removed audio feature pipeline |
+| `scipy-stubs` | Type stubs for removed scipy |
+| `numpy` | Only used in removed audio feature pipeline |
+| `scrapy` | Zero imports |
+| `portion` | Zero imports |
+| `flask` | Zero imports |
+| `tabulate` | Zero imports |
 
 ---
 
-## Execution order (dependencies)
+## Phase 5 — Catalog cleanup
 
-```
-Phase 1 (app_common.py)
-├── Phase 5 (TOML migration) — can run any time after Phase 1
-└── Phase 2 (output.py) — can run in parallel with Phase 1
-         ↓
-    Phase 3 (catalog.py new matcher)
-         ↓
-    Phase 4 (runbook updates)
-         ↓
-    Phase 6 (tests)
-```
+Remove `similarity(a, b)` from `src/catalog.py` — superseded by `_similarity_clean` (pre-normalized
+inputs). No external callers.
+
+`align_episodes` and `merge_episode` are implemented but not yet wired into any production call
+path. Leave them — they are the spec's cross-alignment logic pending a `process_podcast()`
+orchestrator. Do not remove.
+
+---
+
+## Execution order
+
+Phases 3, 4, and 5 are independent and can be done in any order or in parallel.
+Phase 1 (runbook merge) should come before Phase 2 (kill shims), since the runbook
+is the primary caller of the legacy `.title` / `.feeds` / `.sources` properties.
 
 ---
 
 ## Verification
 
-1. `python runbook/validate_configs.py` — all TOML entries load cleanly under new schema
-2. `pytest tests/` — existing tests pass; new `test_align_episodes.py` passes
+1. `python runbook/validate_configs.py` — all TOML entries load correctly
+2. `pytest tests/` — remaining tests pass; deleted test files are gone
 3. `mypy src/ runbook/` — no new type errors
-4. Dry-run download for one podcast: `python runbook/download.py --include podcasts` — completes without errors, uploads correct `feed.rss` to S3
+4. `python runbook/download.py --skip-download --include config/podcasts.toml` — RSS update
+   completes without errors
