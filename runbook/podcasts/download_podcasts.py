@@ -8,7 +8,7 @@ import argparse
 import sys
 
 sys.path.insert(0, Path(__file__).parent.parent.parent.as_posix())
-from src.app_common import PodcastData, load_podcasts_config
+from src.app_common import PodcastConfig, PodcastData, load_podcasts_config
 from src.app_runner import normalize_title
 from src.catalog import process_sources
 from src.files.audio import get_duration
@@ -88,7 +88,7 @@ def _download_youtube(vid_id: str, title: str, dest: Path) -> tuple[Path, bool]:
 
 
 def _download_episode(
-    config: PodcastData, episode: RssEpisode, bucket: str, prefix: Path
+    config: PodcastConfig, episode: RssEpisode, bucket: str, prefix: Path
 ):
     file_title = normalize_title(config.title, episode.title)
     file_path = prefix / file_title
@@ -125,13 +125,13 @@ def _download_episode(
                 print(f"Uploaded episode to {bucket}/{key}")
 
 
-def _download_series(config: PodcastData, upload_path: Path) -> int:
+def _download_series(config: PodcastConfig, upload_path: Path) -> int:
     """Download all episodes from sources for a podcast series."""
     bucket = upload_path.parts[1]
     prefix = Path(*upload_path.parts[2:])
 
     episodes: list[RssEpisode] = []
-    if config.sources is not None and len(config.sources) > 0:
+    if config.downloads:
         with tqdm(desc=f"⟳ Finding {config.title} episodes", total=1) as p_bar:
             episodes = process_sources(config, get_callback(p_bar))
             p_bar.set_description(f"✓ Found {len(episodes)} episodes")
@@ -146,7 +146,7 @@ def _download_series(config: PodcastData, upload_path: Path) -> int:
     return len(episodes)
 
 
-def update_series(config: PodcastData) -> None:
+def update_series(config: PodcastConfig) -> None:
     """Update a complete podcast series: download episodes and generate RSS feed."""
     print(f"Downloading series: {config.title}")
     try:
@@ -162,7 +162,7 @@ if __name__ == "__main__":
     args = parser.parse_args()
 
     print("Downloading podcast series based on configuration")
-    configs: list[PodcastData] = load_podcasts_config(include=args.include)
+    configs: list[PodcastConfig] = load_podcasts_config(include=args.include)
     for config in configs:
         update_series(config)
 

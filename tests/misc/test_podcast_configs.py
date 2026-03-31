@@ -4,7 +4,7 @@ from pathlib import Path
 import sys
 
 sys.path.insert(0, Path(__file__).parent.parent.parent.as_posix())
-from src.app_common import FilterRules, PodcastData, load_podcasts_config
+from src.app_common import SourceFilter, PodcastConfig, load_podcasts_config
 from src.utils.regex import (
     LINK_REGEX,
     YT_CHANNEL_SHORTHAND,
@@ -21,8 +21,8 @@ def is_valid_url(url: str) -> bool:
     )
 
 
-def _assert_filter_rules_valid(tc: unittest.TestCase, rules: FilterRules, label: str) -> None:
-    """Validate a FilterRules instance: patterns must compile and to_regex() must compile."""
+def _assert_filter_rules_valid(tc: unittest.TestCase, rules: SourceFilter, label: str) -> None:
+    """Validate a SourceFilter instance: patterns must compile and to_regex() must compile."""
     for pattern in rules.include + rules.exclude:
         try:
             re.compile(pattern)
@@ -44,44 +44,41 @@ class AuditConfigs(unittest.TestCase):
         # all entries regardless of day – load from both files without filtering.
         from src.app_common import _load_config
 
-        configs: list[PodcastData] = []
+        configs: list[PodcastConfig] = []
         for name in ("podcasts", "youtube"):
             configs.extend(_load_config(name))
 
         self.assertGreater(len(configs), 0, "No podcast configs found")
 
         for podcast in configs:
-            self.assertIsInstance(podcast, PodcastData)
+            self.assertIsInstance(podcast, PodcastConfig)
 
-            for feed in podcast.feeds:
-                self.assertIsInstance(feed, str)
-                self.assertTrue(is_valid_url(feed), f"Invalid feed URL: {feed}")
+            for fs in podcast.references:
+                self.assertIsInstance(fs.url, str)
+                self.assertTrue(is_valid_url(fs.url), f"Invalid reference URL: {fs.url}")
 
-            for source in podcast.sources:
-                self.assertIsInstance(source, str)
+            for fs in podcast.downloads:
+                self.assertIsInstance(fs.url, str)
                 self.assertTrue(
-                    is_valid_url(source), f"Invalid source URL: {source}"
+                    is_valid_url(fs.url), f"Invalid download URL: {fs.url}"
                 )
 
-            # Validate filter rules for each filter set present
-            _assert_filter_rules_valid(
-                self, podcast.filters, f"{podcast.title} filters"
-            )
-            if podcast.feed_filters is not None:
+            # Validate filter rules for each FeedSource
+            for fs in podcast.references:
                 _assert_filter_rules_valid(
-                    self, podcast.feed_filters, f"{podcast.title} feed_filters"
+                    self, fs.filters, f"{podcast.title} reference {fs.url} filters"
                 )
-            if podcast.source_filters is not None:
+            for fs in podcast.downloads:
                 _assert_filter_rules_valid(
-                    self, podcast.source_filters, f"{podcast.title} source_filters"
+                    self, fs.filters, f"{podcast.title} download {fs.url} filters"
                 )
 
-            # Validate schedule is a non-empty string when present
-            if podcast.schedule is not None:
-                self.assertIsInstance(podcast.schedule, str)
+            # Validate schedule is a list of FREQ= strings when present
+            for rule in podcast.schedule:
+                self.assertIsInstance(rule, str)
                 self.assertTrue(
-                    podcast.schedule.startswith("FREQ="),
-                    f"{podcast.title}: schedule should start with FREQ=, got {podcast.schedule!r}",
+                    rule.startswith("FREQ="),
+                    f"{podcast.title}: schedule rule should start with FREQ=, got {rule!r}",
                 )
 
 

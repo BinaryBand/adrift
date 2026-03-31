@@ -5,6 +5,7 @@ This module re-exports names from the legacy `metadata` module so that both
 `DEVICE`/`PROJECT` constants and public model classes.
 """
 from .metadata import *
+from .output import EpisodeData, PodcastFeed
 
 __all__ = [
     "DEVICE",
@@ -15,4 +16,6 @@ __all__ = [
     "YtDlpParams",
     "RssChannel",
     "RssEpisode",
+    "EpisodeData",
+    "PodcastFeed",
 ]

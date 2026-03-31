@@ -7,7 +7,7 @@ import sys
 
 sys.path.insert(0, Path(__file__).parent.parent.parent.as_posix())
 from runbook.podcasts.download_podcasts import DF_TARGETS
-from src.app_common import PodcastData, load_podcasts_config
+from src.app_common import PodcastConfig, PodcastData, load_podcasts_config
 from src.app_runner import get_s3_files
 from src.catalog import match, process_channel, process_feeds
 from src.files.audio import is_audio
@@ -31,7 +31,7 @@ def _upload_feed(
     return None
 
 
-def update_series(config: PodcastData) -> None:
+def update_series(config: PodcastConfig) -> None:
     """Update a complete podcast series: download episodes and generate RSS feed."""
     title = config.title
     path = Path(config.path)
@@ -65,7 +65,7 @@ if __name__ == "__main__":
     args = parser.parse_args()
 
     print("Updating podcast series based on configuration")
-    configs: list[PodcastData] = load_podcasts_config(include=args.include)
+    configs: list[PodcastConfig] = load_podcasts_config(include=args.include)
     for config in configs:
         try:
             print(f"Updating series: {config.title}")

@@ -2,12 +2,13 @@ from typing import Literal, cast
 from pydantic import BaseModel
 from rapidfuzz import fuzz
 from pathlib import Path
+from datetime import datetime
 
 import pandas as pd
 import sys
 
 sys.path.insert(0, Path(__file__).parent.parent.as_posix())
-from src.app_common import DAY_OF_WEEK, MATCH_TOLERANCE, MatchData, PodcastData
+from src.app_common import DAY_OF_WEEK, MATCH_TOLERANCE, MatchData, PodcastData, PodcastConfig, FeedSource
 from src.app_runner import normalize_title
 from src.utils.progress import Callback
 from src.web.rss import (
@@ -19,6 +20,7 @@ from src.web.rss import (
 )
 from src.utils.text import normalize_text, create_slug, is_youtube_channel
 from src.youtube.metadata import get_youtube_channel, get_youtube_episodes
+from src.models.output import EpisodeData
 
 
 def _update_logs(title: str, match: list):
@@ -116,7 +118,171 @@ def match(
     return [m for m in matches if scores[m] >= MATCH_TOLERANCE]
 
 
-def process_channel(config: PodcastData) -> RssChannel:
+# ---------------------------------------------------------------------------
+# Stage 1 — Similarity helpers (spec §"Stage 1 — Similarity Scoring")
+# ---------------------------------------------------------------------------
+
+_THUMBNAIL_RANK = {"maxres": 4, "hq": 3, "mq": 2, "sq": 1}
+
+W_ID = 0.10
+W_DATE = 0.30
+W_TITLE = 0.50
+W_DESC = 0.10
+
+
+def sim_date(a: datetime | None, b: datetime | None) -> float:
+    """Tiered date similarity per the spec."""
+    if a is None or b is None:
+        return 0.0
+    delta = abs((a - b).days)
+    if delta <= 2:
+        return 1.00
+    if delta <= 10:
+        return 0.70
+    if delta <= 35:
+        return 0.15
+    return 0.00
+
+
+def _weighted_score(ref: RssEpisode, dl: RssEpisode) -> float:
+    """4-signal weighted similarity score between two episodes."""
+    s_id = 1.0 if ref.id and dl.id and ref.id == dl.id else 0.0
+    s_date = sim_date(ref.pub_date, dl.pub_date)
+    s_title = _similarity_clean(normalize_text(ref.title), normalize_text(dl.title))
+    s_desc = _similarity_clean(
+        normalize_text(ref.description or ""),
+        normalize_text(dl.description or ""),
+    )
+    return W_ID * s_id + W_DATE * s_date + W_TITLE * s_title + W_DESC * s_desc
+
+
+def align_episodes(
+    references: list[RssEpisode], downloads: list[RssEpisode]
+) -> list[tuple[int, int]]:
+    """Greedy cross-alignment of reference and download episode lists.
+
+    Returns a list of ``(ref_idx, dl_idx)`` index pairs for matched episodes
+    with score ≥ MATCH_TOLERANCE (θ = 0.75 by default).
+    """
+    scores: dict[tuple[int, int], float] = {}
+    for r_idx, ref in enumerate(references):
+        for d_idx, dl in enumerate(downloads):
+            scores[(r_idx, d_idx)] = _weighted_score(ref, dl)
+
+    pairs = sorted(scores.items(), key=lambda x: x[1], reverse=True)
+    matches: list[tuple[int, int]] = []
+    used_refs: set[int] = set()
+    used_dls: set[int] = set()
+
+    for (r_idx, d_idx), score in pairs:
+        if score < MATCH_TOLERANCE:
+            break
+        if r_idx not in used_refs and d_idx not in used_dls:
+            matches.append((r_idx, d_idx))
+            used_refs.add(r_idx)
+            used_dls.add(d_idx)
+
+    return matches
+
+
+def _best_thumbnail(a: str | None, b: str | None) -> str | None:
+    """Return the higher-resolution thumbnail inferred from URL keywords."""
+    def _rank(url: str | None) -> int:
+        if not url:
+            return 0
+        for kw, rank in _THUMBNAIL_RANK.items():
+            if kw in url:
+                return rank
+        return 0  # generic URL, lowest priority above None
+
+    if a is None and b is None:
+        return None
+    if a is None:
+        return b
+    if b is None:
+        return a
+    return a if _rank(a) >= _rank(b) else b
+
+
+def merge_episode(ref: RssEpisode, dl: RssEpisode) -> EpisodeData:
+    """Merge a reference + download episode pair into canonical EpisodeData."""
+    # id: prefer non-URL id (YouTube IDs are short alphanumeric)
+    id = ref.id if not ref.id.startswith("http") else dl.id
+
+    # title: longest / most punctuated wins
+    title = max([ref.title, dl.title], key=lambda t: (len(t), t.count(":")))
+
+    # upload_date: earliest
+    upload_date = min(
+        (d for d in [ref.pub_date, dl.pub_date] if d is not None), default=None
+    )
+
+    # description: longest non-empty
+    description = max([ref.description or "", dl.description or ""], key=len)
+
+    thumbnail = _best_thumbnail(ref.image, dl.image)
+
+    # source: union of all non-empty URLs
+    source = list({u for u in [ref.content, dl.content] if u})
+
+    return EpisodeData(
+        id=id,
+        title=title,
+        description=description,
+        source=source,
+        thumbnail=thumbnail,
+        upload_date=upload_date,
+    )
+
+
+# ---------------------------------------------------------------------------
+# Episode collection helpers
+# ---------------------------------------------------------------------------
+
+
+def _collect_episodes(
+    sources: list[FeedSource],
+    title: str,
+    is_reference: bool,
+    callback: Callback | None = None,
+) -> list[RssEpisode]:
+    """Fetch and deduplicate episodes from a list of FeedSource objects."""
+    albums: list[list[RssEpisode]] = []
+    for fs in sources:
+        filter_regex = fs.filters.to_regex()
+        publish_days = fs.filters.publish_days or None
+
+        eps: list[RssEpisode] = []
+        if is_youtube_channel(fs.url):
+            eps = get_youtube_episodes(fs.url, title, filter_regex, is_reference, callback)
+        else:
+            eps = get_rss_episodes(fs.url, filter_regex, publish_days, callback)
+        albums.append(eps)
+
+    if not albums:
+        return []
+
+    merged: list[RssEpisode] = albums[0]
+    for album in albums[1:]:
+        existing_titles = [ep.title for ep in merged]
+        new_titles = [ep.title for ep in album]
+
+        normalized_new = [normalize_title(title, t) for t in new_titles]
+        normalized_existing = [normalize_title(title, t) for t in existing_titles]
+
+        matched_indices = match(
+            normalized_new, normalized_existing, create_slug(title), callback
+        )
+
+        duplicate_indices = {f_idx for f_idx, _ in matched_indices}
+        for i, episode in enumerate(album):
+            if i not in duplicate_indices:
+                merged.append(episode)
+
+    return merged
+
+
+def process_channel(config: PodcastConfig) -> RssChannel:
     feed_channel: RssChannel = RssChannel(
         title=config.title,
         author="",
@@ -126,7 +292,8 @@ def process_channel(config: PodcastData) -> RssChannel:
         image="",
     )
 
-    for feed_url in config.feeds:
+    for fs in config.references:
+        feed_url = fs.url
         channel_rss: RssChannel
         if is_youtube_channel(feed_url):
             channel_rss = get_youtube_channel(feed_url, config.title)
@@ -161,75 +328,22 @@ def _process_source(
 
 
 def process_sources(
-    config: PodcastData,
+    config: PodcastConfig,
     callback: Callback | None = None,
 ) -> list[RssEpisode]:
-    active = config.source_filters or config.filters
-    filter_regex = active.to_regex()
-    publish_days = active.publish_days or None
-
-    episodes_by_source: list[list[RssEpisode]] = []
-    for source in config.sources:
-        eps = _process_source(
-            source,
-            config.title,
-            filter_regex,
-            publish_days,
-            callback,
-        )
-        episodes_by_source.append(eps)
-    episodes = [ep for episodes in episodes_by_source for ep in episodes]
-
+    """Collect and deduplicate download-side episodes (thin wrapper)."""
+    episodes = _collect_episodes(config.downloads, config.title, False, callback)
     if callback:
         callback(len(episodes), len(episodes))
-
     return episodes
 
 
 def process_feeds(
-    config: PodcastData, callback: Callback | None = None
+    config: PodcastConfig, callback: Callback | None = None
 ) -> list[RssEpisode]:
+    """Collect and deduplicate reference-side episodes (thin wrapper)."""
     title = config.title
-    active = config.feed_filters or config.filters
-    filter = active.to_regex()
-    feed_day_of_week_filter = active.publish_days or None
-
-    albums: list[list[RssEpisode]] = []
-    for source in config.feeds:
-        print(f"Processing feed source: {source}")
-        episodes: list[RssEpisode] = []
-        if is_youtube_channel(source):
-            episodes = get_youtube_episodes(source, title, filter, True, callback)
-        else:
-            episodes = get_rss_episodes(
-                source, filter, feed_day_of_week_filter, callback
-            )
-        albums.append(episodes)
-
-    if not albums:
-        return []
-
-    source_episodes: list[RssEpisode] = albums[0]
-    for album in albums[1:]:
-        existing_titles = [ep.title for ep in source_episodes]
-        new_titles = [ep.title for ep in album]
-
-        # Normalize titles before matching to ensure consistent scoring
-        normalized_new = [normalize_title(title, t) for t in new_titles]
-        normalized_existing = [normalize_title(title, t) for t in existing_titles]
-
-        matched_indices = match(
-            normalized_new, normalized_existing, create_slug(title), callback
-        )
-
-        # Only add non-duplicate episodes
-        duplicate_indices = set({f_idx for f_idx, _ in matched_indices})
-        for i, episode in enumerate(album):
-            if i not in duplicate_indices:
-                source_episodes.append(episode)
-
-        if callback:
-            callback(len(source_episodes), sum(len(a) for a in albums))
+    source_episodes = _collect_episodes(config.references, title, True, callback)
 
     df = rss_to_df(source_episodes)
     print(f"DataFrame: {create_slug(title)}_catalog")

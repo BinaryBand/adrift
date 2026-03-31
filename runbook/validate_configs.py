@@ -15,7 +15,7 @@ import tomllib
 import argparse
 
 sys.path.insert(0, Path(__file__).parent.parent.as_posix())
-from src.app_common import PodcastData  # type: ignore
+from src.app_common import PodcastConfig  # type: ignore
 from pydantic import ValidationError
 
 
@@ -58,7 +58,7 @@ def validate_file(path: Path, problems: bool = False) -> int:
     exit_code = 0
     for i, entry in enumerate(podcasts):
         try:
-            PodcastData.model_validate(entry)
+            PodcastConfig.model_validate(entry)
         except ValidationError as e:
             exit_code = 1
             if problems:

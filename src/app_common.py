@@ -1,7 +1,7 @@
-from pydantic import BaseModel, computed_field
+from pydantic import BaseModel, computed_field, model_validator
 from urllib.parse import urljoin
 from functools import cache
-from typing import Literal
+from typing import Literal, Any
 from pathlib import Path
 
 import tomllib
@@ -41,7 +41,7 @@ class MatchData(BaseModel):
     score: float
 
 
-class FilterRules(BaseModel):
+class SourceFilter(BaseModel):
     """Structured filter rules for podcast episode selection.
 
     Patterns in ``include`` and ``exclude`` are standard Python regex
@@ -86,25 +86,81 @@ class FilterRules(BaseModel):
         return "".join(parts)
 
 
-class PodcastData(BaseModel):
+# Backward-compat alias — existing imports of FilterRules continue to work.
+FilterRules = SourceFilter
+
+
+class FeedSource(BaseModel):
+    """A single URL source with optional per-source filter rules."""
+
+    url: str
+    filters: SourceFilter = SourceFilter()
+
+
+class PodcastConfig(BaseModel):
     """Configuration for a single podcast series."""
 
-    title: str
+    name: str
     path: str
-    feeds: list[str]
-    sources: list[str]
+    references: list[FeedSource] = []
+    downloads: list[FeedSource] = []
 
-    # Structured filter rules (replace the old flat regex string fields).
-    # ``filters`` is the default applied to both feeds and sources.
-    # ``feed_filters`` / ``source_filters`` override ``filters`` when set.
-    filters: FilterRules = FilterRules()
-    feed_filters: FilterRules | None = None
-    source_filters: FilterRules | None = None
+    # iCalendar RRULE strings that control when downloads run, e.g.
+    # ["FREQ=WEEKLY;BYDAY=WE,FR"].  Empty list = always run.
+    schedule: list[str] = []
 
-    # iCalendar RRULE string that controls when downloads run, e.g.
-    # "FREQ=WEEKLY;BYDAY=WE,FR".  Omit BYDAY to use a deterministic
-    # per-show day derived from the title hash.
-    schedule: str | None = None
+    @model_validator(mode="before")
+    @classmethod
+    def _migrate_legacy_fields(cls, data: Any) -> Any:
+        """Map flat legacy TOML fields to the new nested format."""
+        if not isinstance(data, dict):
+            return data
+
+        data = dict(data)
+
+        # title → name
+        if "title" in data and "name" not in data:
+            data["name"] = data.pop("title")
+
+        # schedule: str → list[str]
+        if isinstance(data.get("schedule"), str):
+            data["schedule"] = [data["schedule"]]
+
+        # Build SourceFilter from top-level filters table
+        def _sf(raw: dict | None) -> SourceFilter:
+            if not raw:
+                return SourceFilter()
+            return SourceFilter.model_validate(raw)
+
+        default_filters = _sf(data.pop("filters", None))
+        feed_filters = _sf(data.pop("feed_filters", None)) if "feed_filters" in data else None
+        source_filters = _sf(data.pop("source_filters", None)) if "source_filters" in data else None
+
+        # feeds / sources → references / downloads (FeedSource objects)
+        if "feeds" in data and "references" not in data:
+            feeds_raw: list[Any] = data.pop("feeds")
+            ref_filter = feed_filters or default_filters
+            data["references"] = [
+                FeedSource(url=u, filters=ref_filter) if isinstance(u, str)
+                else FeedSource.model_validate(u)
+                for u in feeds_raw
+            ]
+
+        if "sources" in data and "downloads" not in data:
+            sources_raw: list[Any] = data.pop("sources")
+            dl_filter = source_filters or default_filters
+            data["downloads"] = [
+                FeedSource(url=u, filters=dl_filter) if isinstance(u, str)
+                else FeedSource.model_validate(u)
+                for u in sources_raw
+            ]
+
+        return data
+
+    @property
+    def title(self) -> str:
+        """Backward-compat alias for ``name``."""
+        return self.name
 
     @computed_field(return_type=str)
     def link(self) -> str:
@@ -112,7 +168,35 @@ class PodcastData(BaseModel):
 
     @computed_field(return_type=list[MatchData])
     def log_data(self) -> list[MatchData]:
-        return get_match_data(self.title)
+        return get_match_data(self.name)
+
+    # ------------------------------------------------------------------
+    # Backward-compat properties so call sites using .feeds / .sources keep working
+    # ------------------------------------------------------------------
+
+    @property
+    def feeds(self) -> list[str]:
+        return [fs.url for fs in self.references]
+
+    @property
+    def sources(self) -> list[str]:
+        return [fs.url for fs in self.downloads]
+
+    @property
+    def filters(self) -> SourceFilter:
+        return self.references[0].filters if self.references else SourceFilter()
+
+    @property
+    def feed_filters(self) -> SourceFilter | None:
+        return None
+
+    @property
+    def source_filters(self) -> SourceFilter | None:
+        return None
+
+
+# Backward-compat alias — existing imports of PodcastData continue to work.
+PodcastData = PodcastConfig
 
 
 def get_match_data(title: str) -> list[MatchData]:
@@ -174,7 +258,7 @@ def get_match_data(title: str) -> list[MatchData]:
     return out
 
 
-def _load_config(name_or_path: str) -> list[PodcastData]:
+def _load_config(name_or_path: str) -> list[PodcastConfig]:
     """Load podcast configurations from a TOML file.
 
     Accepts either a bare config name (e.g. ``"podcasts"``) which is
@@ -190,7 +274,7 @@ def _load_config(name_or_path: str) -> list[PodcastData]:
         data = tomllib.load(f)
 
     podcasts_raw: list[dict] = data.get("podcasts", [])
-    configs = [PodcastData.model_validate(entry) for entry in podcasts_raw]
+    configs = [PodcastConfig.model_validate(entry) for entry in podcasts_raw]
     random.shuffle(configs)
     return configs
 
@@ -238,22 +322,27 @@ def _schedule_matches_today(schedule: str, title: str) -> bool:
     return today == _get_deterministic_day(title)
 
 
-def load_podcasts_config(include: list[str]) -> list[PodcastData]:
+def _config_schedule_matches_today(config: "PodcastConfig") -> bool:
+    """Return True if any RRULE in config.schedule matches today, or if schedule is empty."""
+    if not config.schedule:
+        return True
+    return any(_schedule_matches_today(rule, config.name) for rule in config.schedule)
+
+
+def load_podcasts_config(include: list[str]) -> list[PodcastConfig]:
     """Load and schedule-filter podcast configurations.
 
     *include* is a list of config names or file paths passed to
     :func:`_load_config`.  Entries whose ``schedule`` RRULE does not
     match today are excluded.
     """
-    configs: list[PodcastData] = []
+    configs: list[PodcastConfig] = []
     for target in include:
         configs.extend(_load_config(target))
 
-    filtered: list[PodcastData] = []
+    filtered: list[PodcastConfig] = []
     for it in configs:
-        if it.schedule is not None and not _schedule_matches_today(
-            it.schedule, it.title
-        ):
+        if not _config_schedule_matches_today(it):
             continue
         filtered.append(it)
 
