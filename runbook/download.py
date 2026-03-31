@@ -6,6 +6,8 @@ from tqdm import tqdm
 import tempfile
 import argparse
 import dotenv
+import random
+import time
 import sys
 
 sys.path.insert(0, Path(dotenv.find_dotenv()).parent.as_posix())
@@ -31,7 +33,6 @@ from src.youtube.metadata import get_video_info
 
 
 DF_TARGETS = ["config/podcasts.toml", "config/youtube.toml"]
-YOUTUBE_BOT_DETECTED = False
 
 
 # ---------------------------------------------------------------------------
@@ -95,7 +96,8 @@ def _download_youtube(vid_id: str, title: str, dest: Path) -> tuple[Path, bool]:
 
 def _download_episode(
     config: PodcastConfig, episode: RssEpisode, bucket: str, prefix: Path
-) -> None:
+) -> bool:
+    """Download an episode if not already on S3. Returns True if a new file was uploaded."""
     file_title = normalize_title(config.name, episode.title)
     file_path = prefix / file_title
 
@@ -105,17 +107,7 @@ def _download_episode(
 
             if youtube_match := YOUTUBE_VIDEO_REGEX.match(episode.content):
                 vid_id = youtube_match.group(4)
-                global YOUTUBE_BOT_DETECTED
-                if YOUTUBE_BOT_DETECTED:
-                    print(f"WARNING: Skipping due to bot detection: {episode.title}")
-                    return
-
-                try:
-                    stage, sponsored = _download_youtube(vid_id, episode.title, dest)
-                except BotDetectionError as e:
-                    YOUTUBE_BOT_DETECTED = True
-                    print(f"ERROR: Bot detected, skipping YouTube downloads: {e}")
-                    return
+                stage, sponsored = _download_youtube(vid_id, episode.title, dest)
             else:
                 stage, sponsored = download_direct(episode.content, dest)
 
@@ -128,27 +120,56 @@ def _download_episode(
             with tqdm(desc=f"↑ Uploading {episode.title}", total=1) as progress:
                 upload_file(bucket, key, stage, metadata, get_callback(progress))
                 print(f"Uploaded episode to {bucket}/{key}")
+        return True
+
+    return False
 
 
-def _download_series(config: PodcastConfig) -> None:
-    """Download all episodes from download sources for a podcast series."""
+def _download_series(config: PodcastConfig, budget: int | None = None) -> int:
+    """Download episodes for a podcast series.
+
+    Args:
+        budget: Maximum number of new downloads; None means unlimited.
+
+    Returns:
+        Number of episodes actually downloaded.
+    """
     upload_path = Path(config.path)
     bucket = upload_path.parts[1]
     prefix = Path(*upload_path.parts[2:])
 
     if not config.downloads:
-        return
+        return 0
 
     with tqdm(desc=f"⟳ Finding {config.name} episodes", total=1) as p_bar:
         episodes = process_sources(config, get_callback(p_bar))
         p_bar.set_description(f"✓ Found {len(episodes)} episodes")
 
     shuffle(episodes)
-    for ep in tqdm(episodes, desc=f"↓ Downloading {config.name}"):
+    downloaded = 0
+    for i, ep in enumerate(tqdm(episodes, desc=f"↓ Downloading {config.name}")):
+        if budget is not None and downloaded >= budget:
+            break
         try:
-            _download_episode(config, ep, bucket, prefix)
+            did_download = _download_episode(config, ep, bucket, prefix)
+        except BotDetectionError as e:
+            print(f"ERROR: Bot detected for {config.name}, stopping series: {e}")
+            break
         except Exception as e:
             print(f"ERROR: Error downloading episode {ep.title}: {e}")
+            continue
+
+        if did_download:
+            downloaded += 1
+            remaining = len(episodes) - i - 1
+            if remaining > 0 and YOUTUBE_VIDEO_REGEX.match(ep.content or ""):
+                delay = random.randint(30, 120)
+                for _ in tqdm(
+                    range(delay), desc="⏳ Spacing downloads", unit="s", leave=False
+                ):
+                    time.sleep(1)
+
+    return downloaded
 
 
 # ---------------------------------------------------------------------------
@@ -206,17 +227,30 @@ def main() -> None:
     parser.add_argument("--include", nargs="*", default=DF_TARGETS, help="Config files to include")
     parser.add_argument("--skip-download", action="store_true", default=False)
     parser.add_argument("--skip-update", action="store_true", default=False)
+    parser.add_argument(
+        "--max-downloads",
+        type=int,
+        default=None,
+        metavar="N",
+        help="Maximum total number of new episode downloads across all series (default: unlimited)",
+    )
     args = parser.parse_args()
 
     configs: list[PodcastConfig] = load_podcasts_config(include=args.include)
     print(f"Processing {len(configs)} podcast(s)")
 
+    remaining = args.max_downloads
     for config in configs:
         if not args.skip_download:
+            if remaining is not None and remaining <= 0:
+                print("Download budget exhausted; skipping remaining series.")
+                break
             try:
                 print(f"Downloading series: {config.name}")
-                _download_series(config)
-                print(f"Successfully downloaded series: {config.name}")
+                n = _download_series(config, budget=remaining)
+                print(f"Successfully downloaded series: {config.name} ({n} new)")
+                if remaining is not None:
+                    remaining -= n
             except Exception as e:
                 print(f"ERROR: Failed to download series {config.name}: {e}")
 

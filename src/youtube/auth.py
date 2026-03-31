@@ -14,9 +14,9 @@ def get_ydl_opts() -> YtDlpParams:
         "no_warnings": True,
         "extract_flat": False,
         "socket_timeout": 30,
-        "sleep_interval": 1,
-        "max_sleep_interval": 3,
-        "sleep_interval_requests": 2,
+        "sleep_interval": 3,
+        "max_sleep_interval": 8,
+        "sleep_interval_requests": 1,
         "extractor_args": {"youtube": {"skip": ["js"]}},  # Skip JS-dependent formats
     }
 
@@ -32,6 +32,7 @@ def get_auth_ydl_opts(
             False prefer exporting a `cookies.txt` file via `browser_cookie3`.
     """
     opts = get_ydl_opts()
+    opts["ratelimit"] = 2 * 1024 * 1024  # 2 MB/s — throttle media downloads only
 
     # Prefer an explicitly set cookie file via env var
     env_cookie = os.getenv("YT_COOKIES_FILE")

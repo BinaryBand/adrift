@@ -5,7 +5,6 @@ boto3
 feedparser
 Pillow
 python-dotenv
-pytubefix
 requests
 tqdm
 yt-dlp

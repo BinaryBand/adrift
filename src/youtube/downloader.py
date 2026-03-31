@@ -2,14 +2,11 @@
 YouTube video downloader with pytubefix and yt-dlp fallback support.
 """
 
-from pytubefix import YouTube
 from typing import Any, cast
 from pathlib import Path
-from tqdm import tqdm
 
 import yt_dlp
 import random
-import time
 import sys
 
 sys.path.insert(0, Path(__file__).parent.parent.as_posix())
@@ -23,16 +20,9 @@ class BotDetectionError(Exception):
 
 
 # When True the downloader will raise BotDetectionError on detection so
-# callers can handle it; otherwise the downloader will perform the previous
-# cooldown behavior (wait) and continue. Tests rely on the default cooldown
-# behavior so keep this False by default.
+# callers can handle it; otherwise it logs and returns None.
+# Tests rely on the default non-raising behavior so keep this False by default.
 PROPAGATE_BOT_DETECTION = False
-
-
-# Constants
-_TRY_DOWNLOAD_AGE_RESTRICTED = True
-_BOT_COOLDOWN_MIN = 3600  # 1 hour
-_BOT_COOLDOWN_MAX = 7200  # 2 hours
 
 _BOT_INDICATORS = [
     "This request was detected as a bot",
@@ -54,55 +44,6 @@ def _extract_video_id(url: str) -> str | None:
 def _is_bot_detection_error(error_message: str) -> bool:
     """Check if error indicates bot detection or rate limiting."""
     return any(indicator in error_message for indicator in _BOT_INDICATORS)
-
-
-def _wait_with_progress(seconds: int, reason: str = "Error recovery") -> None:
-    """Wait with a progress bar showing minutes elapsed."""
-    for _ in tqdm(range(seconds // 60), desc=f"✗ {reason} - Waiting", unit="minutes"):
-        time.sleep(60)
-
-
-def _create_progress_callback(callback: Callback | None):
-    """Create a progress callback for pytubefix."""
-    if not callback:
-        return None
-
-    def _on_progress(stream, _, bytes_remaining) -> None:
-        try:
-            total = getattr(stream, "filesize", getattr(stream, "filesize_approx", 0))
-            downloaded = total - bytes_remaining
-            callback(downloaded, total)
-        except Exception:
-            pass
-
-    return _on_progress
-
-
-def _pytubefix_download(url: str, dir: Path, callback: Callback | None) -> Path | None:
-    """Download video using pytubefix library."""
-    yt = YouTube(url)
-
-    # Register progress callback if provided
-    progress_callback = _create_progress_callback(callback)
-    if progress_callback:
-        try:
-            cast(Any, yt).register_on_progress_callback(progress_callback)
-        except Exception:
-            pass
-
-    # Get best audio stream
-    streams = yt.streams.filter(only_audio=True).order_by("abr").desc()
-    audio_stream = streams.first()
-
-    # Fallback to any stream with audio if no audio-only streams
-    if not audio_stream:
-        audio_stream = yt.streams.filter().order_by("abr").desc().first()
-
-    if audio_stream:
-        downloaded_file = audio_stream.download(dir.as_posix())
-        return Path(downloaded_file)
-
-    return None
 
 
 def _ytdlp_download(
@@ -167,6 +108,9 @@ def _ytdlp_download(
                         return None
 
     except Exception as e:
+        error_msg = str(e)
+        if _is_bot_detection_error(error_msg) and PROPAGATE_BOT_DETECTION:
+            raise BotDetectionError(error_msg)
         print(f"WARNING: yt-dlp download failed for {id}: {e}")
         raise
 
@@ -176,7 +120,7 @@ def _ytdlp_download(
 def download_video(
     url: str, dir: Path, callback: Callback | None = None
 ) -> Path | None:
-    """Download a YouTube video as audio with error handling and fallback.
+    """Download a YouTube video as audio.
 
     Args:
         url: YouTube video URL
@@ -188,45 +132,19 @@ def download_video(
     """
     dir.mkdir(parents=True, exist_ok=True)
 
-    # Try pytubefix first
-    bot_cooldown_triggered = False
-    try:
-        if result := _pytubefix_download(url, dir, callback):
-            return result
+    video_id = _extract_video_id(url)
+    if not video_id:
+        print(f"WARNING: Could not extract video ID from {url}")
+        return None
 
+    try:
+        return _ytdlp_download(video_id, dir, callback)
+    except BotDetectionError:
+        raise
     except Exception as e:
         error_msg = str(e)
-        print(f"ERROR: pytubefix error for {url}: {error_msg}")
-
-        # Handle bot detection: either perform cooldown (back-compat) or
-        # raise a dedicated exception when callers request propagation.
         if _is_bot_detection_error(error_msg):
             if PROPAGATE_BOT_DETECTION:
                 raise BotDetectionError(error_msg)
-            cooldown = random.randint(_BOT_COOLDOWN_MIN, _BOT_COOLDOWN_MAX)
-            _wait_with_progress(cooldown, "Bot detection")
-            bot_cooldown_triggered = True
-        else:
-            print(f"WARNING: pytubefix failed for {url}: {e}")
-
-    video_id = _extract_video_id(url)
-    if video_id and _TRY_DOWNLOAD_AGE_RESTRICTED:
-        try:
-            return _ytdlp_download(video_id, dir, callback)
-        except BotDetectionError:
-            # Propagate if requested
-            raise
-        except Exception as e:
-            error_msg = str(e)
-            # If yt-dlp reports a bot-detection-like message, propagate or log
-            if _is_bot_detection_error(error_msg):
-                if PROPAGATE_BOT_DETECTION:
-                    raise BotDetectionError(error_msg)
-                if not bot_cooldown_triggered:
-                    cooldown = random.randint(_BOT_COOLDOWN_MIN, _BOT_COOLDOWN_MAX)
-                    _wait_with_progress(cooldown, "Bot detection")
-                    bot_cooldown_triggered = True
-            else:
-                print(f"WARNING: yt-dlp fallback failed for {video_id}: {e}")
-
-    return None
+        print(f"WARNING: download failed for {url}: {e}")
+        return None
