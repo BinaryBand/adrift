@@ -1,0 +1,47 @@
+{
+  "cSpell.words": [
+    "adless",
+    "aselect",
+    "atrim",
+    "BYDAY",
+    "chunksize",
+    "cookiefile",
+    "cookiesfrombrowser",
+    "Darknet",
+    "dateutil",
+    "dotenv",
+    "eucl",
+    "ffprobe",
+    "flac",
+    "frombuffer",
+    "ignoreerrors",
+    "muxer",
+    "noverlap",
+    "nperseg",
+    "outtmpl",
+    "overscan",
+    "playlistend",
+    "playlistreverse",
+    "playliststart",
+    "postprocessors",
+    "pytubefix",
+    "randn",
+    "reencode",
+    "RRULE",
+    "selfpromo",
+    "sponsorblock",
+    "tobytes",
+    "usecwd",
+    "ytdlp",
+    "ytvideo"
+  ],
+  "python.testing.pytestArgs": [
+    "tests"
+  ],
+  "python.testing.unittestEnabled": false,
+  "python.testing.pytestEnabled": true
+  ,
+  "emeraldwalk.runonsave": {
+    "**/*.toml": "command:workbench.action.tasks.runTask Validate TOML"
+  }
+}

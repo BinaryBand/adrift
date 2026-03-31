@@ -1,0 +1,33 @@
+{
+    "version": "2.0.0",
+    "tasks": [
+        {
+            "label": "Validate TOML",
+            "type": "shell",
+            "command": "${workspaceFolder}/.venv/bin/python",
+            "args": [
+                "runbook/validate_configs.py",
+                "--problems",
+                "${file}"
+            ],
+            "group": "build",
+            "presentation": {
+                "echo": true,
+                "reveal": "always",
+                "panel": "shared",
+                "showReuseMessage": false,
+                "clear": true
+            },
+            "problemMatcher": [
+                {
+                    "owner": "toml-validator",
+                    "pattern": {
+                        "regexp": "^(.*?):(\\d+):\\s*(.*?):\\s*(.*)$",
+                        "file": 1,
+                        "message": 4
+                    }
+                }
+            ]
+        }
+    ]
+}

@@ -1,0 +1,206 @@
+# YouTube-first podcast series.
+# Each [[podcasts]] entry may include optional [podcasts.filters],
+# [podcasts.feed_filters], and [podcasts.source_filters] sub-tables.
+#
+# Filter rules
+# ------------
+#   include   - Title must match at least one pattern (re.search, case-insensitive).
+#   exclude   - Title must NOT match any pattern.
+#   publish_days - Only include episodes published on these days of the week.
+#
+# Schedule (RRULE)
+# ----------------
+#   schedule = "FREQ=WEEKLY;BYDAY=<days>"
+#   BYDAY values: MO TU WE TH FR SA SU  (comma-separated for multiple days)
+#   Omit BYDAY to use a deterministic per-show day based on the title hash.
+
+[[podcasts]]
+title    = "Alyssa Grenfell"
+path     = "/media/podcasts/alyssa-grenfell"
+feeds    = ["yt://@alyssadgrenfell"]
+sources  = ["yt://@alyssadgrenfell"]
+schedule = "FREQ=WEEKLY;BYDAY=MO"
+
+
+[[podcasts]]
+title = "Behind the Bastards"
+path = "/media/podcasts/behind-the-bastards"
+feeds = ["https://www.omnycontent.com/d/playlist/e73c998e-6e60-432f-8610-ae210140c5b1/e5f91208-cc7e-4726-a312-ae280140ad11/d64f756d-6d5e-4fae-b24f-ae280140ad36/podcast.rss"]
+sources = ["yt://@BehindTheBastards"]
+schedule = "FREQ=WEEKLY;BYDAY=WE,FR"
+
+
+[[podcasts]]
+title    = "Camp Gagnon"
+path     = "/media/podcasts/camp-gagnon"
+feeds    = ["https://anchor.fm/s/fc9f8628/podcast/rss"]
+sources  = ["yt://@CampGagnon"]
+schedule = "FREQ=WEEKLY;BYDAY=WE,FR"
+
+
+[[podcasts]]
+title    = "Coffeezilla"
+path     = "/media/podcasts/coffeezilla"
+feeds    = ["yt://@Coffeezilla"]
+sources  = ["yt://@Coffeezilla"]
+schedule = "FREQ=WEEKLY"
+
+
+[[podcasts]]
+title    = "CreepCast"
+path     = "/media/podcasts/creepcast"
+feeds    = ["https://feeds.megaphone.fm/creepcast"]
+sources  = ["yt://@CreepPodcast"]
+schedule = "FREQ=WEEKLY;BYDAY=MO"
+
+
+[[podcasts]]
+title    = "Darknet Diaries"
+path     = "/media/podcasts/darknet-diaries"
+feeds    = ["https://podcast.darknetdiaries.com"]
+sources  = ["yt://@JackRhysider"]
+schedule = "FREQ=WEEKLY"
+
+
+[[podcasts]]
+title    = "Financial Audit"
+path     = "/media/podcasts/financial-audit"
+feeds    = ["https://feeds.megaphone.fm/ROOSTER4571910246"]
+sources  = ["yt://@CalebHammer"]
+schedule = "FREQ=WEEKLY"
+
+[podcasts.filters]
+exclude = [
+    "exclusive",
+    "post show",
+    "check up",
+    "hammer it out",
+    "behind the scenes",
+    "financial update",
+    "audit update",
+    "breaking down",
+    "member's financial",
+    "dating audit",
+    "fat & fatter",
+]
+
+
+[[podcasts]]
+title   = "Heather Cox Richardson"
+path    = "/media/podcasts/heather-cox-richardson"
+feeds   = ["yt://@HeatherCoxRichardson"]
+sources = ["yt://@HeatherCoxRichardson"]
+
+
+[[podcasts]]
+title    = "Jay Bird"
+path     = "/media/podcasts/jay-bird"
+feeds    = ["yt://@jaybird160"]
+sources  = ["yt://@jaybird160"]
+schedule = "FREQ=WEEKLY"
+
+
+[[podcasts]]
+title    = "Last Week Tonight With John Oliver"
+path     = "/media/podcasts/last-week-tonight-with-john-oliver"
+feeds    = ["yt://@LastWeekTonight"]
+sources  = ["yt://@LastWeekTonight"]
+schedule = "FREQ=WEEKLY"
+
+[podcasts.source_filters]
+include = ["Last Week Tonight With John Oliver"]
+
+
+[[podcasts]]
+title = "Lisa Sonni"
+path = "/media/podcasts/lisa-sonni"
+feeds = ["yt://@lisasonni"]
+sources = ["yt://@lisasonni"]
+schedule = "FREQ=WEEKLY"
+
+
+[[podcasts]]
+title    = "Legal Eagle"
+path     = "/media/podcasts/legal-eagle"
+feeds    = ["yt://@LegalEagle"]
+sources  = ["yt://@LegalEagle"]
+schedule = "FREQ=WEEKLY"
+
+
+[[podcasts]]
+title    = "Morbid"
+path     = "/media/podcasts/morbid"
+feeds    = ["https://feeds.simplecast.com/ohmVlJZQ"]
+sources  = ["yt://@morbidpodcast"]
+schedule = "FREQ=WEEKLY"
+
+
+[[podcasts]]
+title    = "Smosh Reads Reddit Stories"
+path     = "/media/podcasts/smosh-reads-reddit-stories"
+feeds    = ["https://audioboom.com/channels/5148149.rss"]
+sources  = ["yt://@smoshpit"]
+schedule = "FREQ=WEEKLY;BYDAY=MO"
+
+[podcasts.source_filters]
+include = ["Reading Reddit Stories"]
+
+
+[[podcasts]]
+title    = "Stuff You Should Know"
+path     = "/media/podcasts/stuff-you-should-know"
+feeds    = [
+    "https://www.omnycontent.com/d/playlist/e73c998e-6e60-432f-8610-ae210140c5b1/a91018a4-ea4f-4130-bf55-ae270180c327/44710ecc-10bb-48d1-93c7-ae270180c33e/podcast.rss",
+]
+sources  = ["yt://@stuffyoushouldknow"]
+schedule = "FREQ=WEEKLY"
+
+[podcasts.filters]
+exclude = [
+    "sysk",
+    "this day in history",
+    "studio show notes",
+    "behind the scenes",
+    "outtakes and bloopers",
+    "selects:",
+]
+
+[podcasts.source_filters]
+exclude = [
+    "sysk",
+    "this day in history",
+    "studio show notes",
+    "behind the scenes",
+    "outtakes and bloopers",
+    "selects:",
+]
+include = ["Stuff You Should Know"]
+
+
+[[podcasts]]
+title    = "Swindled"
+path     = "/media/podcasts/swindled"
+feeds    = ["https://feeds.megaphone.fm/swindled"]
+sources  = ["yt://@SwindledPodcast"]
+schedule = "FREQ=WEEKLY"
+
+[podcasts.source_filters]
+exclude = ["rerun", "documentary"]
+
+
+[[podcasts]]
+title    = "The Weekly Show with Jon Stewart"
+path     = "/media/podcasts/the-weekly-show-with-jon-stewart"
+feeds    = ["https://feeds.megaphone.fm/BVLLC2163264914"]
+sources  = ["yt://@WeeklyShowPodcast"]
+schedule = "FREQ=WEEKLY;BYDAY=FR"
+
+
+[[podcasts]]
+title   = "YV Edit"
+path    = "/media/podcasts/yv-edit"
+feeds   = ["yt://@yv_edit"]
+sources = ["yt://@yv_edit"]
+
+[podcasts.filters]
+exclude = ["it could happen here", "behind the bastards presents", "czm rewind"]

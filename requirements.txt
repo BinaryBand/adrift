@@ -1,0 +1,36 @@
+# Core dependencies
+attrs
+pydantic
+boto3
+feedparser
+numpy
+Pillow
+python-dotenv
+pytubefix
+requests
+scrapy
+tqdm
+yt-dlp
+browser-cookie3
+mypy-boto3-s3
+boto3-stubs[s3]
+rapidfuzz
+scipy
+unidecode
+cachetools
+diskcache
+yarl
+annoy
+portion
+types-tqdm
+types-cachetools
+types-yt-dlp
+scipy-stubs
+pandas
+pandas-stubs
+tabulate
+types-python-dateutil
+optuna
+
+# Web framework
+flask
