@@ -1,3 +1,5 @@
+# ruff: noqa: E402
+
 from datetime import datetime
 from random import shuffle
 from pathlib import Path
