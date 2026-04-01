@@ -7,7 +7,13 @@ import pandas as pd
 import sys
 
 sys.path.insert(0, Path(__file__).parent.parent.as_posix())
-from src.app_common import DAY_OF_WEEK, MATCH_TOLERANCE, MatchData, PodcastConfig, FeedSource
+from src.app_common import (
+    DAY_OF_WEEK,
+    MATCH_TOLERANCE,
+    MatchData,
+    PodcastConfig,
+    FeedSource,
+)
 from src.app_runner import normalize_title
 from src.utils.progress import Callback
 from src.web.rss import (
@@ -44,7 +50,6 @@ def _update_logs(title: str, match: list):
 
     df_label = f"{create_slug(title)}_match"
     print(f"DataFrame: {df_label}")
-
 
 
 def _similarity_clean(ac: str, bc: str) -> float:
@@ -173,6 +178,7 @@ def align_episodes(
 
 def _best_thumbnail(a: str | None, b: str | None) -> str | None:
     """Return the higher-resolution thumbnail inferred from URL keywords."""
+
     def _rank(url: str | None) -> int:
         if not url:
             return 0
@@ -240,7 +246,9 @@ def _collect_episodes(
 
         eps: list[RssEpisode] = []
         if is_youtube_channel(fs.url):
-            eps = get_youtube_episodes(fs.url, title, filter_regex, is_reference, callback)
+            eps = get_youtube_episodes(
+                fs.url, title, filter_regex, is_reference, callback
+            )
         else:
             eps = get_rss_episodes(fs.url, filter_regex, publish_days, callback)
         albums.append(eps)

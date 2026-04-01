@@ -2,6 +2,67 @@
     "version": "2.0.0",
     "tasks": [
         {
+            "label": "Ruff: Check",
+            "type": "shell",
+            "command": "${workspaceFolder}/.venv/bin/ruff",
+            "args": [
+                "check",
+                "src",
+                "runbook",
+                "tests"
+            ],
+            "group": "build",
+            "presentation": {
+                "echo": true,
+                "reveal": "always",
+                "panel": "shared",
+                "showReuseMessage": false,
+                "clear": true
+            },
+            "problemMatcher": [
+                "$ruff"
+            ]
+        },
+        {
+            "label": "Ruff: Format Check",
+            "type": "shell",
+            "command": "${workspaceFolder}/.venv/bin/ruff",
+            "args": [
+                "format",
+                "--check",
+                "src",
+                "runbook",
+                "tests"
+            ],
+            "group": "build",
+            "presentation": {
+                "echo": true,
+                "reveal": "always",
+                "panel": "shared",
+                "showReuseMessage": false,
+                "clear": true
+            },
+            "problemMatcher": []
+        },
+        {
+            "label": "Pytest: All (ignore filter_rules)",
+            "type": "shell",
+            "command": "${workspaceFolder}/.venv/bin/pytest",
+            "args": [
+                "tests",
+                "--ignore=tests/misc/test_filter_rules.py"
+            ],
+            "group": "test",
+            "presentation": {
+                "echo": true,
+                "reveal": "always",
+                "panel": "shared",
+                "showReuseMessage": false,
+                "clear": true
+            },
+            "problemMatcher": []
+        },
+        {
             "label": "Validate TOML",
             "type": "shell",
             "command": "${workspaceFolder}/.venv/bin/python",

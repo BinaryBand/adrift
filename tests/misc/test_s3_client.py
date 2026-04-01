@@ -34,6 +34,7 @@ class TestRetryDecorator(unittest.TestCase):
 
     def _make_retry(self):
         from src.files.s3 import retry
+
         return retry
 
     def test_succeeds_on_first_attempt_no_sleep(self):

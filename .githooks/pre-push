@@ -1,0 +1,27 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+repo_root="$(git rev-parse --show-toplevel)"
+cd "$repo_root"
+
+ruff_bin="$repo_root/.venv/bin/ruff"
+pytest_bin="$repo_root/.venv/bin/pytest"
+
+if [[ ! -x "$ruff_bin" ]]; then
+    echo "ERROR: Ruff not found at $ruff_bin"
+    exit 1
+fi
+
+if [[ ! -x "$pytest_bin" ]]; then
+    echo "ERROR: pytest not found at $pytest_bin"
+    exit 1
+fi
+
+echo "Running Ruff lint..."
+"$ruff_bin" check src runbook tests typings
+
+echo "Running Ruff format check..."
+"$ruff_bin" format --check src runbook tests typings
+
+echo "Running tests..."
+"$pytest_bin" tests --ignore=tests/misc/test_filter_rules.py

@@ -53,7 +53,9 @@ def upload_thumbnail(thumbnail_url: str, author: str, id: str) -> str | None:
         content_type = response.headers.get("Content-Type", "")
         ext = mimetypes.guess_extension(content_type) or ".bin"
         if ext in {".bin", ""}:
-            print(f"WARNING: Unrecognised Content-Type for thumbnail {id}: {content_type!r}")
+            print(
+                f"WARNING: Unrecognised Content-Type for thumbnail {id}: {content_type!r}"
+            )
             return None
 
         with tempfile.TemporaryDirectory() as temp_dir:

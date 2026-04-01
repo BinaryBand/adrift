@@ -14,9 +14,7 @@ def re_compile(regex: str) -> re.Pattern:
 
 LINK_REGEX = re_compile(r"https?://\S+")
 
-YT_CHANNEL = re_compile(
-    r"^https?://(www\.)?youtube\.com/@([A-Za-z0-9_\-]+)(/videos)?$"
-)
+YT_CHANNEL = re_compile(r"^https?://(www\.)?youtube\.com/@([A-Za-z0-9_\-]+)(/videos)?$")
 
 YOUTUBE_PLAYLIST_REGEX = re_compile(
     r"^https?://(www\.)?youtube\.com/playlist\?list=([A-Za-z0-9_\-]+)$"

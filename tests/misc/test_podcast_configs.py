@@ -21,7 +21,9 @@ def is_valid_url(url: str) -> bool:
     )
 
 
-def _assert_filter_rules_valid(tc: unittest.TestCase, rules: SourceFilter, label: str) -> None:
+def _assert_filter_rules_valid(
+    tc: unittest.TestCase, rules: SourceFilter, label: str
+) -> None:
     """Validate a SourceFilter instance: patterns must compile and to_regex() must compile."""
     for pattern in rules.include + rules.exclude:
         try:
@@ -55,13 +57,13 @@ class AuditConfigs(unittest.TestCase):
 
             for fs in podcast.references:
                 self.assertIsInstance(fs.url, str)
-                self.assertTrue(is_valid_url(fs.url), f"Invalid reference URL: {fs.url}")
+                self.assertTrue(
+                    is_valid_url(fs.url), f"Invalid reference URL: {fs.url}"
+                )
 
             for fs in podcast.downloads:
                 self.assertIsInstance(fs.url, str)
-                self.assertTrue(
-                    is_valid_url(fs.url), f"Invalid download URL: {fs.url}"
-                )
+                self.assertTrue(is_valid_url(fs.url), f"Invalid download URL: {fs.url}")
 
             # Validate filter rules for each FeedSource
             for fs in podcast.references:

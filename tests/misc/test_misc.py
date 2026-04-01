@@ -21,10 +21,10 @@ def test_upload_thumbnail_returns_valid_url_format():
     from src.web.rss import upload_thumbnail
 
     # Mock the S3 operations
-    with patch("src.web.rss.exists") as mock_exists, patch(
-        "src.web.rss.S3_ENDPOINT", "https://s3.example.com/"
+    with (
+        patch("src.web.rss.exists") as mock_exists,
+        patch("src.web.rss.S3_ENDPOINT", "https://s3.example.com/"),
     ):
-
         # Simulate an existing file (the common case)
         mock_exists.return_value = "test-id.jpg"
 
@@ -51,14 +51,13 @@ def test_upload_thumbnail_new_file_returns_valid_url():
     """
     from src.web.rss import upload_thumbnail
 
-    with patch("src.web.rss.exists") as mock_exists, patch(
-        "src.web.rss.requests.get"
-    ) as mock_get, patch("src.web.rss.upload_file") as mock_upload_file, patch(
-        "src.web.rss.make_square_image"
-    ), patch(
-        "builtins.open", mock_open()
+    with (
+        patch("src.web.rss.exists") as mock_exists,
+        patch("src.web.rss.requests.get") as mock_get,
+        patch("src.web.rss.upload_file") as mock_upload_file,
+        patch("src.web.rss.make_square_image"),
+        patch("builtins.open", mock_open()),
     ):
-
         # Simulate no existing file
         mock_exists.return_value = None
 
@@ -94,10 +93,10 @@ def test_upload_thumbnail_handles_special_characters_in_author():
     """
     from src.web.rss import upload_thumbnail
 
-    with patch("src.web.rss.exists") as mock_exists, patch(
-        "src.web.rss.S3_ENDPOINT", "https://s3.example.com/"
+    with (
+        patch("src.web.rss.exists") as mock_exists,
+        patch("src.web.rss.S3_ENDPOINT", "https://s3.example.com/"),
     ):
-
         mock_exists.return_value = "test-id.jpg"
 
         # Test with author name containing spaces and special characters

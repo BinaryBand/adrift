@@ -421,6 +421,7 @@ class TestParseRssEntry(unittest.TestCase):
         self.assertIsNotNone(result.pub_date.tzinfo)
         # Offset should be +5 hours, not zeroed to UTC
         import datetime
+
         self.assertEqual(result.pub_date.utcoffset(), datetime.timedelta(hours=5))
 
 

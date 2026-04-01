@@ -1,6 +1,6 @@
 # Minimal type stubs for browser_cookie3 used in this project
 from http.cookiejar import CookieJar
-from typing import Any, Optional
+from typing import Optional
 
 def firefox(domain_name: Optional[str] = ...) -> CookieJar: ...
 def chrome(domain_name: Optional[str] = ...) -> CookieJar: ...

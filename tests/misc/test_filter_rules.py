@@ -118,18 +118,14 @@ class TestScheduleMatchesToday(unittest.TestCase):
         """If BYDAY contains today's code the function returns True."""
         with patch("src.app_common.pd") as mock_pd:
             mock_pd.Timestamp.now.return_value.strftime.return_value = "Wed"
-            result = _schedule_matches_today(
-                "FREQ=WEEKLY;BYDAY=WE,FR", "Some Show"
-            )
+            result = _schedule_matches_today("FREQ=WEEKLY;BYDAY=WE,FR", "Some Show")
         self.assertTrue(result)
 
     def test_byday_does_not_match_today(self):
         """If BYDAY does not contain today's code the function returns False."""
         with patch("src.app_common.pd") as mock_pd:
             mock_pd.Timestamp.now.return_value.strftime.return_value = "Mon"
-            result = _schedule_matches_today(
-                "FREQ=WEEKLY;BYDAY=WE,FR", "Some Show"
-            )
+            result = _schedule_matches_today("FREQ=WEEKLY;BYDAY=WE,FR", "Some Show")
         self.assertFalse(result)
 
     def test_no_byday_uses_deterministic_day(self):
@@ -138,9 +134,9 @@ class TestScheduleMatchesToday(unittest.TestCase):
         expected_day = _get_deterministic_day(title)
 
         with patch("src.app_common.pd") as mock_pd:
-            mock_pd.Timestamp.now.return_value.strftime.return_value = (
-                expected_day[:3].capitalize()
-            )
+            mock_pd.Timestamp.now.return_value.strftime.return_value = expected_day[
+                :3
+            ].capitalize()
             result = _schedule_matches_today("FREQ=WEEKLY", title)
 
         self.assertTrue(result)

@@ -1,4 +1,4 @@
-from typing import Iterator, Union, TypeVar, overload
+from typing import Iterator, Union, TypeVar
 
 _T = TypeVar("_T", int, float)
 

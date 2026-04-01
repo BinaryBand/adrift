@@ -226,7 +226,9 @@ def _update_series(config: PodcastConfig) -> None:
 
 def main() -> None:
     parser = argparse.ArgumentParser(description="Download and update podcasts.")
-    parser.add_argument("--include", nargs="*", default=DF_TARGETS, help="Config files to include")
+    parser.add_argument(
+        "--include", nargs="*", default=DF_TARGETS, help="Config files to include"
+    )
     parser.add_argument("--skip-download", action="store_true", default=False)
     parser.add_argument("--skip-update", action="store_true", default=False)
     parser.add_argument(
