@@ -60,9 +60,8 @@ def _ytdlp_download(
                 pass
 
     opts: YtDlpParams = get_auth_ydl_opts(use_browser_fallback=True)
-    opts["format"] = "bestaudio[ext=m4a]/bestaudio/best"
+    opts["format"] = "bestaudio/best"
     opts["outtmpl"] = (dir / f"{id}.%(ext)s").as_posix()
-    opts["remote_components"] = ["ejs:github"]
     opts["postprocessors"] = [
         {
             "key": "FFmpegExtractAudio",
@@ -71,14 +70,13 @@ def _ytdlp_download(
         }
     ]
 
-    # Enable remote components for JS challenge solving and remove JS skip
-    extractor_args: Any = opts.get("extractor_args", {})
-    if isinstance(extractor_args, dict):
-        youtube_args: Any = extractor_args.get("youtube", {})
-        if isinstance(youtube_args, dict):
-            youtube_args.pop("skip", None)
-            extractor_args["youtube"] = youtube_args
-            opts["extractor_args"] = extractor_args
+    # Override extractor_args for downloads: use player clients that expose
+    # audio-only streams without needing a PoToken.
+    # - android_music: YouTube Music client; best for audio-only formats
+    # - web: uses browser cookies for authenticated access as fallback
+    # (The base opts carry skip:["js"] intended for fast metadata-only fetches;
+    # we replace it here so JS-gated formats are included in the download.)
+    opts["extractor_args"] = {"youtube": {"player_client": ["android_music", "web"]}}
 
     if callback:
         opts["progress_hooks"] = [_progress_hook]

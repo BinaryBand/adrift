@@ -33,6 +33,10 @@ def get_auth_ydl_opts(
     """
     opts = get_ydl_opts()
     opts["ratelimit"] = 2 * 1024 * 1024  # 2 MB/s — throttle media downloads only
+    # Enable the Node.js JS challenge solver so yt-dlp can decrypt n-signature
+    # URLs.  Without this, any video whose stream URL requires the n-parameter
+    # transform will show "Requested format is not available".
+    opts["js_runtimes"] = {"node": {}}
 
     # Prefer an explicitly set cookie file via env var
     env_cookie = os.getenv("YT_COOKIES_FILE")

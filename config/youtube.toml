@@ -31,9 +31,13 @@ schedule = ["FREQ=WEEKLY;BYDAY=WE,FR"]
 
 [[podcasts.references]]
 url = "https://www.omnycontent.com/d/playlist/e73c998e-6e60-432f-8610-ae210140c5b1/e5f91208-cc7e-4726-a312-ae280140ad11/d64f756d-6d5e-4fae-b24f-ae280140ad36/podcast.rss"
+[podcasts.references.filters]
+exclude = ["it could happen here", "behind the bastards presents", "czm rewind"]
 
 [[podcasts.downloads]]
 url = "yt://@BehindTheBastards"
+[podcasts.downloads.filters]
+exclude = ["it could happen here", "behind the bastards presents", "czm rewind"]
 
 
 [[podcasts]]
@@ -275,9 +279,7 @@ path = "/media/podcasts/yv-edit"
 [[podcasts.references]]
 url = "yt://@yv_edit"
 [podcasts.references.filters]
-exclude = ["it could happen here", "behind the bastards presents", "czm rewind"]
 
 [[podcasts.downloads]]
 url = "yt://@yv_edit"
 [podcasts.downloads.filters]
-exclude = ["it could happen here", "behind the bastards presents", "czm rewind"]

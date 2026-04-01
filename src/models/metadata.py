@@ -95,6 +95,7 @@ class YtDlpParams(TypedDict, total=False):
     playlistend: int | None
     extractor_args: Any
     remote_components: Any
+    js_runtimes: dict[str, dict]
 
 
 class RssChannel(BaseModel):
