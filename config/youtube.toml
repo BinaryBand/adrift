@@ -11,6 +11,8 @@
 #   include   - Title must match at least one pattern (re.search, case-insensitive).
 #   exclude   - Title must NOT match any pattern.
 #   publish_days - Only include episodes published on these days of the week.
+# 
+# cspell:disable
 
 [[podcasts]]
 name     = "Alyssa Grenfell"

@@ -13,10 +13,48 @@ import sys
 from pathlib import Path
 import tomllib
 import argparse
+import re
+import time
 
 sys.path.insert(0, Path(__file__).parent.parent.as_posix())
 from src.app_common import PodcastConfig  # type: ignore
 from pydantic import ValidationError
+
+
+_BEGIN_MARKER = "[toml-validator] Scanning..."
+_END_MARKER = "[toml-validator] Done."
+_ROOT = Path(__file__).parent.parent.resolve()
+
+
+def _diag_path(path: Path) -> str:
+    resolved = path.resolve()
+    try:
+        return resolved.relative_to(_ROOT).as_posix()
+    except ValueError:
+        return resolved.as_posix()
+
+
+def _podcast_entry_spans(lines: list[str]) -> list[tuple[int, int]]:
+    starts = [
+        i for i, line in enumerate(lines, start=1) if line.strip() == "[[podcasts]]"
+    ]
+    if not starts:
+        return []
+    spans: list[tuple[int, int]] = []
+    for idx, start in enumerate(starts):
+        end = starts[idx + 1] - 1 if idx + 1 < len(starts) else len(lines)
+        spans.append((start, end))
+    return spans
+
+
+def _find_key_line(
+    lines: list[str], start: int, end: int, key: str, default_line: int
+) -> int:
+    key_pattern = re.compile(rf"^\s*{re.escape(key)}\s*=")
+    for line_no in range(start, end + 1):
+        if key_pattern.search(lines[line_no - 1]):
+            return line_no
+    return default_line
 
 
 def validate_file(path: Path, problems: bool = False) -> int:
@@ -25,18 +63,26 @@ def validate_file(path: Path, problems: bool = False) -> int:
     When *problems* is True emit machine-parseable lines suitable for a
     VS Code problem matcher with the form:
 
-        <path>:<entry_index>:<field>: <message>
+        <path>:<line>:<field>: <message>
 
-    This intentionally omits line numbers (not available from the Pydantic
-    model) but allows the Problems panel to show file-level diagnostics.
+    Line numbers are inferred from the affected [[podcasts]] table when possible.
     """
-    print(f"Validating {path}")
+    if not problems:
+        print(f"Validating {path}")
+    diag_path = _diag_path(path)
+
+    try:
+        lines = path.read_text(encoding="utf-8").splitlines()
+    except Exception:
+        lines = []
+
     try:
         with path.open("rb") as f:
             raw = tomllib.load(f)
     except Exception as e:
         if problems:
-            print(f"{path}:0:parse: {e}")
+            line_no = int(getattr(e, "lineno", 1) or 1)
+            print(f"{diag_path}:{line_no}:parse: {e}")
         else:
             print(f"  ERROR: failed to parse TOML: {e}")
         return 1
@@ -44,17 +90,18 @@ def validate_file(path: Path, problems: bool = False) -> int:
     podcasts = raw.get("podcasts")
     if podcasts is None:
         if problems:
-            print(f"{path}:0:parse: no [podcasts] table found")
+            print(f"{diag_path}:1:parse: no [podcasts] table found")
         else:
             print("  ERROR: no [podcasts] table found")
         return 1
     if not isinstance(podcasts, list):
         if problems:
-            print(f"{path}:0:parse: [podcasts] must be an array of tables")
+            print(f"{diag_path}:1:parse: [podcasts] must be an array of tables")
         else:
             print("  ERROR: [podcasts] must be an array of tables")
         return 1
 
+    entry_spans = _podcast_entry_spans(lines)
     exit_code = 0
     for i, entry in enumerate(podcasts):
         try:
@@ -62,10 +109,19 @@ def validate_file(path: Path, problems: bool = False) -> int:
         except ValidationError as e:
             exit_code = 1
             if problems:
+                start_line, end_line = (
+                    entry_spans[i] if i < len(entry_spans) else (1, max(len(lines), 1))
+                )
                 for err in e.errors():
                     loc = ".".join(map(str, err.get("loc", []))) or "<root>"
                     msg = err.get("msg", "")
-                    print(f"{path}:{i}:{loc}: {msg}")
+                    key = str(err.get("loc", [""])[0]) if err.get("loc") else ""
+                    line_no = (
+                        _find_key_line(lines, start_line, end_line, key, start_line)
+                        if lines and key
+                        else start_line
+                    )
+                    print(f"{diag_path}:{line_no}:{loc}: {msg}")
             else:
                 print(f"  ENTRY {i} invalid:")
                 print(e)
@@ -75,11 +131,34 @@ def validate_file(path: Path, problems: bool = False) -> int:
     return exit_code
 
 
+def _scan_files(files: list[Path], problems: bool) -> int:
+    overall = 0
+    for p in files:
+        if not p.exists():
+            if not problems:
+                print(f"Skipping missing file: {p}")
+            continue
+        rc = validate_file(p, problems=problems)
+        overall = overall or rc
+    return overall
+
+
 def main():
     parser = argparse.ArgumentParser(description="Validate TOML podcast configs")
     parser.add_argument("files", nargs="*", help="TOML config files to validate")
     parser.add_argument(
         "--problems", action="store_true", help="Emit problem-matcher-friendly output"
+    )
+    parser.add_argument(
+        "--watch",
+        action="store_true",
+        help="Run continuously and re-validate on a fixed interval",
+    )
+    parser.add_argument(
+        "--interval",
+        type=int,
+        default=3,
+        help="Watch interval in seconds (default: 3)",
     )
     args = parser.parse_args()
 
@@ -88,15 +167,14 @@ def main():
         [Path(p) for p in args.files] if args.files else list(cfg_dir.glob("*.toml"))
     )
 
-    overall = 0
-    for p in files:
-        if not p.exists():
-            print(f"Skipping missing file: {p}")
-            continue
-        rc = validate_file(p, problems=args.problems)
-        overall = overall or rc
+    if not args.watch:
+        sys.exit(_scan_files(files, problems=args.problems))
 
-    sys.exit(overall)
+    while True:
+        print(_BEGIN_MARKER, flush=True)
+        _scan_files(files, problems=args.problems)
+        print(_END_MARKER, flush=True)
+        time.sleep(max(1, args.interval))
 
 
 if __name__ == "__main__":

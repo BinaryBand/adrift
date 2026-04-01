@@ -89,6 +89,81 @@
             }
         },
         {
+            "label": "Dead Code: Vulture Check",
+            "type": "shell",
+            "command": "${workspaceFolder}/.venv/bin/python",
+            "args": [
+                "runbook/check_dead_code.py",
+                "src"
+            ],
+            "group": "build",
+            "presentation": {
+                "echo": true,
+                "reveal": "always",
+                "panel": "shared",
+                "showReuseMessage": false,
+                "clear": true
+            },
+            "problemMatcher": [
+                {
+                    "owner": "vulture",
+                    "fileLocation": [
+                        "relative",
+                        "${workspaceFolder}"
+                    ],
+                    "pattern": {
+                        "regexp": "^(.*?):(\\d+):\\s+(error|warning):\\s+(.*)$",
+                        "file": 1,
+                        "line": 2,
+                        "severity": 3,
+                        "message": 4
+                    }
+                }
+            ]
+        },
+        {
+            "label": "Dead Code: Vulture Watch",
+            "type": "shell",
+            "command": "${workspaceFolder}/.venv/bin/python",
+            "args": [
+                "runbook/check_dead_code.py",
+                "src",
+                "--watch"
+            ],
+            "group": "build",
+            "isBackground": true,
+            "presentation": {
+                "echo": false,
+                "reveal": "never",
+                "panel": "dedicated",
+                "showReuseMessage": false
+            },
+            "problemMatcher": [
+                {
+                    "owner": "vulture",
+                    "fileLocation": [
+                        "relative",
+                        "${workspaceFolder}"
+                    ],
+                    "background": {
+                        "activeOnStart": true,
+                        "beginsPattern": "^\\[vulture\\] Scanning\\.\\.\\.$",
+                        "endsPattern": "^\\[vulture\\] Done\\.$"
+                    },
+                    "pattern": {
+                        "regexp": "^(.*?):(\\d+):\\s+(error|warning):\\s+(.*)$",
+                        "file": 1,
+                        "line": 2,
+                        "severity": 3,
+                        "message": 4
+                    }
+                }
+            ],
+            "runOptions": {
+                "runOn": "folderOpen"
+            }
+        },
+        {
             "label": "Pytest: All (ignore filter_rules)",
             "type": "shell",
             "command": "${workspaceFolder}/.venv/bin/pytest",
@@ -126,13 +201,53 @@
             "problemMatcher": [
                 {
                     "owner": "toml-validator",
+                    "fileLocation": "autoDetect",
                     "pattern": {
                         "regexp": "^(.*?):(\\d+):\\s*(.*?):\\s*(.*)$",
                         "file": 1,
+                        "line": 2,
                         "message": 4
                     }
                 }
             ]
+        },
+        {
+            "label": "Validate TOML Watch",
+            "type": "shell",
+            "command": "${workspaceFolder}/.venv/bin/python",
+            "args": [
+                "runbook/validate_configs.py",
+                "--problems",
+                "--watch"
+            ],
+            "group": "build",
+            "isBackground": true,
+            "presentation": {
+                "echo": false,
+                "reveal": "never",
+                "panel": "dedicated",
+                "showReuseMessage": false
+            },
+            "problemMatcher": [
+                {
+                    "owner": "toml-validator",
+                    "fileLocation": "autoDetect",
+                    "background": {
+                        "activeOnStart": true,
+                        "beginsPattern": "^\\[toml-validator\\] Scanning\\.\\.\\.$",
+                        "endsPattern": "^\\[toml-validator\\] Done\\.$"
+                    },
+                    "pattern": {
+                        "regexp": "^(.*?):(\\d+):\\s*(.*?):\\s*(.*)$",
+                        "file": 1,
+                        "line": 2,
+                        "message": 4
+                    }
+                }
+            ],
+            "runOptions": {
+                "runOn": "folderOpen"
+            }
         }
     ]
 }

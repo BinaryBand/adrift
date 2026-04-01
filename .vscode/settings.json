@@ -40,8 +40,4 @@
   ],
   "python.testing.unittestEnabled": false,
   "python.testing.pytestEnabled": true
-  ,
-  "emeraldwalk.runonsave": {
-    "**/*.toml": "command:workbench.action.tasks.runTask Validate TOML"
-  }
 }

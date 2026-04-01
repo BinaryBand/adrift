@@ -1,4 +1,4 @@
-from pydantic import BaseModel, computed_field
+from pydantic import BaseModel, ConfigDict, computed_field
 from urllib.parse import urljoin
 from pathlib import Path
 from dateutil.rrule import rrulestr
@@ -46,6 +46,8 @@ class SourceFilter(BaseModel):
     published on the given days of the week.
     """
 
+    model_config = ConfigDict(extra="forbid")
+
     include: list[str] = []
     exclude: list[str] = []
     publish_days: list[str] = []
@@ -78,12 +80,16 @@ class SourceFilter(BaseModel):
 class FeedSource(BaseModel):
     """A single URL source with optional per-source filter rules."""
 
+    model_config = ConfigDict(extra="forbid")
+
     url: str
     filters: SourceFilter = SourceFilter()
 
 
 class PodcastConfig(BaseModel):
     """Configuration for a single podcast series."""
+
+    model_config = ConfigDict(extra="forbid")
 
     name: str
     path: str

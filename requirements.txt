@@ -21,3 +21,4 @@ types-cachetools
 types-yt-dlp
 types-python-dateutil
 lizard
+vulture
