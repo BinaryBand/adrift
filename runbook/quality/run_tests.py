@@ -22,7 +22,8 @@ def run_tests(test_target: TEST_TARGET = DF_TEST_TARGET) -> tuple[bool, list, li
     """
     os.environ.setdefault("PODSMITH_SKIP_VIDEO_INFO", "1")
 
-    tests_dir = Path(__file__).parent.parent / "tests"
+    root = Path(__file__).parent.parent.parent
+    tests_dir = root / "tests"
     top_level_dir = tests_dir.parent.as_posix()
 
     # Determine which directory to scan

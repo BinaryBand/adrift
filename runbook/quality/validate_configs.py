@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Validate TOML podcast config files using the project's Pydantic models.
 
-Usage: runbook/validate_configs.py [files...]
+Usage: runbook/quality/validate_configs.py [files...]
 If no files are provided, all `config/*.toml` files will be validated.
 
 Exits with status 0 when all files validate, or 1 on validation errors.
@@ -16,14 +16,12 @@ import argparse
 import re
 import time
 
-sys.path.insert(0, Path(__file__).parent.parent.as_posix())
-from src.app_common import PodcastConfig  # type: ignore
-from pydantic import ValidationError
+_ROOT = Path(__file__).parent.parent.parent.resolve()
+sys.path.insert(0, _ROOT.as_posix())
 
 
 _BEGIN_MARKER = "[toml-validator] Scanning..."
 _END_MARKER = "[toml-validator] Done."
-_ROOT = Path(__file__).parent.parent.resolve()
 
 
 def _diag_path(path: Path) -> str:
@@ -102,6 +100,9 @@ def validate_file(path: Path, problems: bool = False) -> int:
         return 1
 
     entry_spans = _podcast_entry_spans(lines)
+    from pydantic import ValidationError
+    from src.app_common import PodcastConfig  # type: ignore
+
     exit_code = 0
     for i, entry in enumerate(podcasts):
         try:
@@ -162,7 +163,7 @@ def main():
     )
     args = parser.parse_args()
 
-    cfg_dir = Path(__file__).parent.parent / "config"
+    cfg_dir = _ROOT / "config"
     files = (
         [Path(p) for p in args.files] if args.files else list(cfg_dir.glob("*.toml"))
     )

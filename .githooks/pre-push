@@ -30,7 +30,7 @@ echo "Running Ruff format check..."
 "$ruff_bin" format --check src runbook tests typings
 
 echo "Running complexity checks (advisory mode)..."
-"$python_bin" runbook/check_complexity.py src --ccn 5 --length 25 --params 4
+"$python_bin" runbook/quality/check_complexity.py src --ccn 5 --length 25 --params 4
 
 echo "Running tests..."
 "$pytest_bin" tests --ignore=tests/misc/test_filter_rules.py

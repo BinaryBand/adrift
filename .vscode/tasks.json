@@ -51,7 +51,7 @@
             "type": "shell",
             "command": "${workspaceFolder}/.venv/bin/python",
             "args": [
-                "runbook/check_complexity.py",
+                "runbook/quality/check_complexity.py",
                 "src",
                 "--ccn",
                 "5",
@@ -93,7 +93,7 @@
             "type": "shell",
             "command": "${workspaceFolder}/.venv/bin/python",
             "args": [
-                "runbook/check_dead_code.py",
+                "runbook/quality/check_dead_code.py",
                 "src"
             ],
             "group": "build",
@@ -126,7 +126,7 @@
             "type": "shell",
             "command": "${workspaceFolder}/.venv/bin/python",
             "args": [
-                "runbook/check_dead_code.py",
+                "runbook/quality/check_dead_code.py",
                 "src",
                 "--watch"
             ],
@@ -186,7 +186,7 @@
             "type": "shell",
             "command": "${workspaceFolder}/.venv/bin/python",
             "args": [
-                "runbook/validate_configs.py",
+                "runbook/quality/validate_configs.py",
                 "--problems",
                 "${file}"
             ],
@@ -216,7 +216,7 @@
             "type": "shell",
             "command": "${workspaceFolder}/.venv/bin/python",
             "args": [
-                "runbook/validate_configs.py",
+                "runbook/quality/validate_configs.py",
                 "--problems",
                 "--watch"
             ],
