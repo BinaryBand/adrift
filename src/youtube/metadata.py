@@ -1,4 +1,5 @@
 from urllib.parse import urljoin
+from dataclasses import dataclass, field
 from pathlib import Path
 import sys
 import os
@@ -104,38 +105,46 @@ def _maybe_update_thumbnail(episode: RssEpisode, info: ytdlp.VideoInfo, author: 
         pass
 
 
+def _filter_episodes(episodes: list[RssEpisode], pattern_str: str) -> list[RssEpisode]:
+    pattern = re_compile(pattern_str)
+    filtered = [ep for ep in episodes if pattern.search(ep.title)]
+    print(f"Filtered {len(filtered)} episodes using pattern: {pattern_str}")
+    return filtered
+
+
+def _enrich_episodes(
+    episodes: list[RssEpisode], author: str, callback: Callback | None
+) -> list[RssEpisode]:
+    print("Adding detailed metadata to episodes...")
+    result = []
+    for i, ep in enumerate(episodes):
+        result.append(_add_episode_metadata(ep, author))
+        if callback:
+            callback(i + 1, len(episodes))
+    return result
+
+
+@dataclass
+class YtFetchOptions:
+    filter: str | None = ""
+    detailed: bool = True
+    callback: Callback | None = field(default=None)
+
+
 def get_youtube_episodes(
-    url: str,
-    author: str,
-    filter: str | None = "",
-    detailed=True,
-    callback: Callback | None = None,
+    url: str, author: str, opts: YtFetchOptions = YtFetchOptions()
 ) -> list[RssEpisode]:
     """Fetch RSS episodes from a given URL."""
     normalized_url = _normalize_youtube_link(url)
-
-    episodes = ytdlp.get_youtube_videos(normalized_url, author, callback)
+    episodes = ytdlp.get_youtube_videos(normalized_url, author, opts.callback)
     print(f"Fetched {len(episodes)} episodes from {url}")
 
-    # Apply filter if provided
-    if filter is not None and filter != "":
-        pattern = re_compile(filter)
-        episodes = [ep for ep in episodes if pattern.search(ep.title)]
-        print(f"Filtered {len(episodes)} episodes using pattern: {filter}")
-
-    # Add detailed metadata (pub_date, thumbnails) if requested
-    if detailed:
-        print("Adding detailed metadata to episodes...")
-        _episodes = []
-        for i, ep in enumerate(episodes):
-            _episodes.append(_add_episode_metadata(ep, author))
-            if callback:
-                callback(i + 1, len(episodes))
-        episodes = _episodes
-
-    # Final callback to indicate completion
-    if callback:
-        callback(len(episodes), len(episodes))
+    if opts.filter is not None and opts.filter != "":
+        episodes = _filter_episodes(episodes, opts.filter)
+    if opts.detailed:
+        episodes = _enrich_episodes(episodes, author, opts.callback)
+    if opts.callback:
+        opts.callback(len(episodes), len(episodes))
 
     return episodes
 

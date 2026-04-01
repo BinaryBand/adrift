@@ -33,64 +33,139 @@ def _rss_cache() -> Cache:
 
 
 def upload_thumbnail(thumbnail_url: str, author: str, id: str) -> str | None:
-    """Download the remote thumbnail, make it square, upload to S3 and return the final URL."""
+    """Top-level wrapper that runs the thumbnail upload pipeline.
+
+    Keeps a small, replaceable root so the heavy-lifting lives in testable
+    helpers below.
+    """
     try:
-        author_slug = create_slug(author)
-        path_base = Path(f"podcasts/{author_slug}/thumbnails")
-        image_path = (path_base / id).as_posix()
-
-        existing_file = exists("media", image_path, True)
-        if existing_file:
-            return urljoin(
-                S3_ENDPOINT, ("media" / path_base / existing_file).as_posix()
-            )
-
-        print(f"Uploading thumbnail for {id} from {thumbnail_url}")
-
-        response = requests.get(thumbnail_url, timeout=30)
-        content_type = response.headers.get("Content-Type", "")
-        ext = mimetypes.guess_extension(content_type) or ".bin"
-        if ext in {".bin", ""}:
-            print(
-                f"WARNING: Unrecognised Content-Type for thumbnail {id}: {content_type!r}"
-            )
-            return None
-
-        with tempfile.TemporaryDirectory() as temp_dir:
-            staging_file = Path(temp_dir) / f"{create_slug(id)}{ext}"
-            with open(staging_file, "wb") as f:
-                f.write(response.content)
-
-            make_square_image(staging_file)
-            return upload_file("media", f"{image_path}{ext}", staging_file)
-
+        return _upload_thumbnail_pipeline(thumbnail_url, author, id)
     except Exception as e:
         print(f"WARNING: Failed to upload thumbnail for {id}: {e}")
         return None
 
 
+def _existing_thumbnail_s3_path(path_base: Path, image_path: str) -> str | None:
+    """Return a public URL for an existing thumbnail, or None."""
+    existing_file = exists("media", image_path, True)
+    if not existing_file:
+        return None
+    s3_path = (Path("media") / path_base / existing_file).as_posix()
+    return urljoin(S3_ENDPOINT, s3_path)
+
+
+def _download_thumbnail_bytes(
+    thumbnail_url: str, timeout: int = 30
+) -> tuple[bytes, str]:
+    resp = requests.get(thumbnail_url, timeout=timeout)
+    resp.raise_for_status()
+    content_type = resp.headers.get("Content-Type", "")
+    return resp.content, content_type
+
+
+def _ext_for_content_type(content_type: str) -> str | None:
+    ext = mimetypes.guess_extension(content_type) or ".bin"
+    if ext in {".bin", ""}:
+        return None
+    return ext
+
+
+def _stage_thumbnail_bytes(data: bytes, id: str, ext: str) -> Path:
+    """Write bytes to a temporary file, make it square, and return Path."""
+    temp_dir = tempfile.mkdtemp()
+    staging_file = Path(temp_dir) / f"{create_slug(id)}{ext}"
+    with open(staging_file, "wb") as f:
+        f.write(data)
+    make_square_image(staging_file)
+    return staging_file
+
+
+def _upload_thumbnail_pipeline(thumbnail_url: str, author: str, id: str) -> str | None:
+    """Pipeline implementation for thumbnail upload (replaceable stages)."""
+    author_slug = create_slug(author)
+    path_base = Path(f"podcasts/{author_slug}/thumbnails")
+    image_path = (path_base / id).as_posix()
+
+    existing = _existing_thumbnail_s3_path(path_base, image_path)
+    if existing:
+        return existing
+
+    data, content_type = _download_thumbnail_bytes(thumbnail_url)
+    ext = _ext_for_content_type(content_type)
+    if ext is None:
+        return None
+
+    staging_file = _stage_thumbnail_bytes(data, id, ext)
+    return upload_file("media", f"{image_path}{ext}", staging_file)
+
+
 def _extract_image_url(channel: FeedParserDict) -> str:
-    """Extract image URL from various possible locations in the feed"""
-    if hasattr(channel, "image") and hasattr(channel.get("image"), "href"):
-        assert isinstance(channel.get("image", {}).get("href"), str)
-        return channel.get("image", {}).get("href")
-    elif hasattr(channel, "image") and hasattr(channel.get("image"), "url"):
-        assert isinstance(channel.get("image", {}).get("url"), str)
-        return channel.get("image", {}).get("url")
-    elif hasattr(channel, "itunes_image"):
-        assert isinstance(channel.get("itunes_image"), str)
-        return channel.get("itunes_image", "")
+    """Thin wrapper to keep a small replaceable root for image extraction."""
+    return _extract_image_url_impl(channel)
+
+
+def _extract_image_url_impl(channel: FeedParserDict) -> str:
+    """Extract image URL from various possible locations in the feed.
+
+    Prefer the first non-empty candidate.
+    """
+    val = _extract_image_from(channel.get("image"))
+    if val:
+        return val
+    val = _extract_image_from(channel.get("itunes_image"))
+    if val:
+        return val
+    return ""
+
+
+def _extract_image_from(obj: object) -> str:
+    # Try string-like
+    res = _extract_image_from_str(obj)
+    if res:
+        return res
+    # Try mapping-like objects with .get
+    res = _extract_image_from_get(obj)
+    if res:
+        return res
+    # Try attribute access
+    res = _extract_image_from_attrs(obj)
+    if res:
+        return res
+    return ""
+
+
+def _extract_image_from_str(obj: object) -> str:
+    if isinstance(obj, str) and obj:
+        return obj
+    return ""
+
+
+def _extract_image_from_get(obj: object) -> str:
+    get = getattr(obj, "get", None)
+    if not callable(get):
+        return ""
+    href = get("href", None)
+    if href:
+        return href
+    url = get("url", None)
+    if url:
+        return url
+    return ""
+
+
+def _extract_image_from_attrs(obj: object) -> str:
+    href = getattr(obj, "href", None)
+    if href:
+        return href
+    url = getattr(obj, "url", None)
+    if url:
+        return url
     return ""
 
 
 def get_rss_channel(rss_url: str) -> RssChannel:
     """Fetch and parse an RSS feed from a URL to extract channel information."""
-    cache_key = f"rss:{rss_url}"
-    feed_str: str | None = _rss_cache().get(cache_key)
-    if feed_str is None:
-        response = requests.get(rss_url, timeout=15)
-        feed_str = response.text
-        _rss_cache().set(cache_key, feed_str, expire=3600)  # Cache for 1 hour
+    feed_str = _fetch_channel_feed_str(rss_url)
 
     feed: FeedParserDict = feedparser.parse(feed_str)
     if feed.bozo and hasattr(feed, "bozo_exception"):
@@ -99,61 +174,73 @@ def get_rss_channel(rss_url: str) -> RssChannel:
 
     channel: FeedParserDict = feed.feed
     return RssChannel(
-        title=getattr(channel, "title", ""),
-        author=getattr(channel, "author", "")
-        or getattr(channel, "itunes_author", "")
-        or getattr(channel, "creator", ""),
-        subtitle=getattr(channel, "subtitle", "")
-        or getattr(channel, "itunes_subtitle", ""),
-        url=getattr(channel, "url", ""),
-        description=getattr(channel, "description", "")
-        or getattr(channel, "summary", ""),
+        title=_pick_channel_field(channel, "title"),
+        author=_pick_channel_field(channel, "author", "itunes_author", "creator"),
+        subtitle=_pick_channel_field(channel, "subtitle", "itunes_subtitle"),
+        url=_pick_channel_field(channel, "url"),
+        description=_pick_channel_field(channel, "description", "summary"),
         image=_extract_image_url(channel),
     )
 
 
+def _fetch_channel_feed_str(rss_url: str) -> str:
+    cache_key = f"rss:{rss_url}"
+    feed_str: str | None = _rss_cache().get(cache_key)
+    if feed_str is None:
+        response = requests.get(rss_url, timeout=15)
+        feed_str = response.text
+        _rss_cache().set(cache_key, feed_str, expire=3600)
+    return feed_str
+
+
+def _pick_channel_field(channel: FeedParserDict, *names: str) -> str:
+    for n in names:
+        v = getattr(channel, n, None)
+        if v:
+            return v
+    return ""
+
+
 def _extract_content_url(entry: FeedParserDict) -> str | None:
     """Extract content URL from entry enclosures or url."""
-    content = getattr(entry, "enclosures", [])
-    content_urls = []
-    if content and len(content) > 0:
-        for enc in content:
-            string = enc if isinstance(enc, str) else enc.get("href", "")
-            links = LINK_REGEX.findall(string)
-            content_urls.extend(links)
-    elif hasattr(entry, "url"):
-        content_urls.append(entry.get("url", ""))
+    candidates = _collect_enclosure_strings(entry)
+    audio_urls = _filter_audio_urls(candidates)
+    return audio_urls[0] if audio_urls else None
 
-    content_urls = [
-        url
-        for url in content_urls
-        if any(url.lower().find(ext) != -1 for ext in AUDIO_EXTENSIONS)
+
+def _collect_enclosure_strings(entry: FeedParserDict) -> list[str]:
+    content = getattr(entry, "enclosures", [])
+    if content:
+        return sum(
+            (
+                LINK_REGEX.findall(enc if isinstance(enc, str) else enc.get("href", ""))
+                for enc in content
+            ),
+            [],
+        )
+    if hasattr(entry, "url"):
+        return [entry.get("url", "")]
+    return []
+
+
+def _filter_audio_urls(urls: list[str]) -> list[str]:
+    return [
+        u for u in urls if any(u.lower().find(ext) != -1 for ext in AUDIO_EXTENSIONS)
     ]
-    return content_urls[0] if len(content_urls) > 0 else None
 
 
 def parse_rss_entry(entry: FeedParserDict) -> RssEpisode:
     """Parse a single RSS feed entry to extract episode information."""
-    id = getattr(entry, "id", getattr(entry, "guid", ""))
-    title = getattr(entry, "title", "")
-    author = getattr(entry, "author", getattr(entry, "itunes_author", ""))
-    description = getattr(entry, "description", getattr(entry, "summary", ""))
+    id, title, author, description = _entry_basic_fields(entry)
 
     content = _extract_content_url(entry)
     assert content is not None, "No valid audio content URL found"
 
-    pub_date_str = getattr(entry, "published", getattr(entry, "pubDate", ""))
-    pub_date = parser.parse(pub_date_str)
-    if pub_date.tzinfo is None:
-        pub_date = pub_date.replace(tzinfo=timezone.utc)
+    pub_date = _parse_entry_pub_date(entry)
 
-    duration = getattr(entry, "itunes_duration", None)
-    if duration is not None:
-        duration = parse_duration(duration)
+    duration = _parse_entry_duration(entry)
 
-    image = getattr(entry, "itunes_image", getattr(entry, "image", None))
-    if image is not None and not isinstance(image, str):
-        image = image.get("href", None) or image.get("url", None)
+    image = _parse_entry_image(entry)
 
     return RssEpisode(
         id=id,
@@ -165,6 +252,29 @@ def parse_rss_entry(entry: FeedParserDict) -> RssEpisode:
         duration=duration,
         image=image,
     )
+
+
+def _entry_basic_fields(entry: FeedParserDict) -> tuple[str, str, str, str]:
+    return (
+        getattr(entry, "id", getattr(entry, "guid", "")),
+        getattr(entry, "title", ""),
+        getattr(entry, "author", getattr(entry, "itunes_author", "")),
+        getattr(entry, "description", getattr(entry, "summary", "")),
+    )
+
+
+def _parse_entry_duration(entry: FeedParserDict) -> float | None:
+    duration = getattr(entry, "itunes_duration", None)
+    if duration is not None:
+        return parse_duration(duration)
+    return None
+
+
+def _parse_entry_image(entry: FeedParserDict) -> str | None:
+    image = getattr(entry, "itunes_image", getattr(entry, "image", None))
+    if image is not None and not isinstance(image, str):
+        return image.get("href", None) or image.get("url", None)
+    return image
 
 
 def _day_of_week_to_int(dow: str) -> int:
@@ -260,7 +370,10 @@ def _entry_weekday(entry: FeedParserDict) -> int:
 def _parse_entry_pub_date(entry: FeedParserDict) -> datetime | None:
     try:
         pub_date_str = getattr(entry, "published", getattr(entry, "pubDate", ""))
-        return parser.parse(pub_date_str)
+        pub_date = parser.parse(pub_date_str)
+        if pub_date is not None and pub_date.tzinfo is None:
+            return pub_date.replace(tzinfo=timezone.utc)
+        return pub_date
     except (ValueError, TypeError, AttributeError):
         return None
 
@@ -366,17 +479,7 @@ def _serialize_rss(rss: ET.Element) -> str:
 
 def download_direct(url: str, dest: Path) -> tuple[Path, bool]:
     """Download from direct HTTP source."""
-    # Use browser-like headers — some hosts block non-browser clients
-    headers = {
-        "User-Agent": (
-            "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
-            "AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120 Safari/537.36"
-        ),
-        "Accept": "*/*",
-        "Accept-Encoding": "identity, deflate, br",
-        "Connection": "keep-alive",
-        "Referer": url,
-    }
+    headers = _browser_headers_for(url)
 
     # Stream with a timeout and write to a temporary staging file
     with requests.get(url, stream=True, headers=headers, timeout=60) as response:
@@ -393,3 +496,16 @@ def download_direct(url: str, dest: Path) -> tuple[Path, bool]:
             shutil.copyfileobj(response.raw, f)
 
     return staging_file, False
+
+
+def _browser_headers_for(url: str) -> dict:
+    return {
+        "User-Agent": (
+            "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
+            "AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120 Safari/537.36"
+        ),
+        "Accept": "*/*",
+        "Accept-Encoding": "identity, deflate, br",
+        "Connection": "keep-alive",
+        "Referer": url,
+    }

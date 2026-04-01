@@ -19,7 +19,7 @@ from src.web.rss import (
     get_rss_episodes,
 )
 from src.utils.text import normalize_text, create_slug, is_youtube_channel
-from src.youtube.metadata import get_youtube_channel, get_youtube_episodes
+from src.youtube.metadata import get_youtube_channel, get_youtube_episodes, YtFetchOptions
 from src.models.output import EpisodeData
 
 
@@ -98,6 +98,7 @@ W_ID = 0.10
 W_DATE = 0.30
 W_TITLE = 0.50
 W_DESC = 0.10
+DATE_SCORE_TIERS: tuple[tuple[int, float], ...] = ((2, 1.00), (10, 0.70), (35, 0.15))
 
 
 def sim_date(a: datetime | None, b: datetime | None) -> float:
@@ -105,25 +106,58 @@ def sim_date(a: datetime | None, b: datetime | None) -> float:
     if a is None or b is None:
         return 0.0
     delta = abs((a - b).days)
-    if delta <= 2:
-        return 1.00
-    if delta <= 10:
-        return 0.70
-    if delta <= 35:
-        return 0.15
-    return 0.00
+    return next((score for max_days, score in DATE_SCORE_TIERS if delta <= max_days), 0.0)
+
+
+def _id_similarity(ref: RssEpisode, dl: RssEpisode) -> float:
+    return float(bool(ref.id and dl.id and ref.id == dl.id))
+
+
+def _description_similarity(ref: RssEpisode, dl: RssEpisode) -> float:
+    return _similarity_clean(
+        normalize_text(ref.description or ""),
+        normalize_text(dl.description or ""),
+    )
 
 
 def _weighted_score(ref: RssEpisode, dl: RssEpisode) -> float:
     """4-signal weighted similarity score between two episodes."""
-    s_id = 1.0 if ref.id and dl.id and ref.id == dl.id else 0.0
+    s_id = _id_similarity(ref, dl)
     s_date = sim_date(ref.pub_date, dl.pub_date)
     s_title = _similarity_clean(normalize_text(ref.title), normalize_text(dl.title))
-    s_desc = _similarity_clean(
-        normalize_text(ref.description or ""),
-        normalize_text(dl.description or ""),
-    )
+    s_desc = _description_similarity(ref, dl)
     return W_ID * s_id + W_DATE * s_date + W_TITLE * s_title + W_DESC * s_desc
+
+
+def _build_alignment_scores(
+    references: list[RssEpisode], downloads: list[RssEpisode]
+) -> dict[tuple[int, int], float]:
+    scores: dict[tuple[int, int], float] = {}
+    for r_idx, ref in enumerate(references):
+        for d_idx, dl in enumerate(downloads):
+            scores[(r_idx, d_idx)] = _weighted_score(ref, dl)
+    return scores
+
+
+def _sorted_pairs_above_tolerance(
+    scores: dict[tuple[int, int], float],
+) -> list[tuple[tuple[int, int], float]]:
+    ordered_pairs = sorted(scores.items(), key=lambda x: x[1], reverse=True)
+    return [pair for pair in ordered_pairs if pair[1] >= MATCH_TOLERANCE]
+
+
+def _append_match_if_unused(
+    pair: tuple[int, int],
+    matches: list[tuple[int, int]],
+    used_refs: set[int],
+    used_dls: set[int],
+) -> None:
+    r_idx, d_idx = pair
+    if r_idx in used_refs or d_idx in used_dls:
+        return
+    matches.append((r_idx, d_idx))
+    used_refs.add(r_idx)
+    used_dls.add(d_idx)
 
 
 def align_episodes(
@@ -134,75 +168,60 @@ def align_episodes(
     Returns a list of ``(ref_idx, dl_idx)`` index pairs for matched episodes
     with score ≥ MATCH_TOLERANCE (θ = 0.75 by default).
     """
-    scores: dict[tuple[int, int], float] = {}
-    for r_idx, ref in enumerate(references):
-        for d_idx, dl in enumerate(downloads):
-            scores[(r_idx, d_idx)] = _weighted_score(ref, dl)
-
-    pairs = sorted(scores.items(), key=lambda x: x[1], reverse=True)
+    scores = _build_alignment_scores(references, downloads)
     matches: list[tuple[int, int]] = []
     used_refs: set[int] = set()
     used_dls: set[int] = set()
 
-    for (r_idx, d_idx), score in pairs:
-        if score < MATCH_TOLERANCE:
-            break
-        if r_idx not in used_refs and d_idx not in used_dls:
-            matches.append((r_idx, d_idx))
-            used_refs.add(r_idx)
-            used_dls.add(d_idx)
+    for (r_idx, d_idx), _score in _sorted_pairs_above_tolerance(scores):
+        _append_match_if_unused((r_idx, d_idx), matches, used_refs, used_dls)
 
     return matches
 
 
+def _thumbnail_rank(url: str | None) -> int:
+    if not url:
+        return 0
+    return max((rank for kw, rank in _THUMBNAIL_RANK.items() if kw in url), default=0)
+
+
 def _best_thumbnail(a: str | None, b: str | None) -> str | None:
     """Return the higher-resolution thumbnail inferred from URL keywords."""
-
-    def _rank(url: str | None) -> int:
-        if not url:
-            return 0
-        for kw, rank in _THUMBNAIL_RANK.items():
-            if kw in url:
-                return rank
-        return 0  # generic URL, lowest priority above None
-
-    if a is None and b is None:
+    candidates = [url for url in (a, b) if url]
+    if not candidates:
         return None
-    if a is None:
-        return b
-    if b is None:
-        return a
-    return a if _rank(a) >= _rank(b) else b
+    return max(candidates, key=_thumbnail_rank)
+
+
+def _choose_episode_id(ref: RssEpisode, dl: RssEpisode) -> str:
+    return ref.id if not ref.id.startswith("http") else dl.id
+
+
+def _choose_title(ref: RssEpisode, dl: RssEpisode) -> str:
+    return max([ref.title, dl.title], key=lambda t: (len(t), t.count(":")))
+
+
+def _earliest_pub_date(ref: RssEpisode, dl: RssEpisode) -> datetime | None:
+    return min((d for d in (ref.pub_date, dl.pub_date) if d is not None), default=None)
+
+
+def _choose_description(ref: RssEpisode, dl: RssEpisode) -> str:
+    return max([ref.description or "", dl.description or ""], key=len)
+
+
+def _merge_sources(ref: RssEpisode, dl: RssEpisode) -> list[str]:
+    return list({url for url in (ref.content, dl.content) if url})
 
 
 def merge_episode(ref: RssEpisode, dl: RssEpisode) -> EpisodeData:
     """Merge a reference + download episode pair into canonical EpisodeData."""
-    # id: prefer non-URL id (YouTube IDs are short alphanumeric)
-    id = ref.id if not ref.id.startswith("http") else dl.id
-
-    # title: longest / most punctuated wins
-    title = max([ref.title, dl.title], key=lambda t: (len(t), t.count(":")))
-
-    # upload_date: earliest
-    upload_date = min(
-        (d for d in [ref.pub_date, dl.pub_date] if d is not None), default=None
-    )
-
-    # description: longest non-empty
-    description = max([ref.description or "", dl.description or ""], key=len)
-
-    thumbnail = _best_thumbnail(ref.image, dl.image)
-
-    # source: union of all non-empty URLs
-    source = list({u for u in [ref.content, dl.content] if u})
-
     return EpisodeData(
-        id=id,
-        title=title,
-        description=description,
-        source=source,
-        thumbnail=thumbnail,
-        upload_date=upload_date,
+        id=_choose_episode_id(ref, dl),
+        title=_choose_title(ref, dl),
+        description=_choose_description(ref, dl),
+        source=_merge_sources(ref, dl),
+        thumbnail=_best_thumbnail(ref.image, dl.image),
+        upload_date=_earliest_pub_date(ref, dl),
     )
 
 
@@ -243,7 +262,7 @@ def _fetch_source_episodes(
     publish_days = source.filters.publish_days or None
     if is_youtube_channel(source.url):
         return get_youtube_episodes(
-            source.url, title, filter_regex, is_reference, callback
+            source.url, title, YtFetchOptions(filter_regex, is_reference, callback)
         )
     return get_rss_episodes(source.url, filter_regex, publish_days, callback)
 
@@ -289,38 +308,28 @@ def process_channel(config: PodcastConfig) -> RssChannel:
     )
 
     for fs in config.references:
-        feed_url = fs.url
-        channel_rss: RssChannel
-        if is_youtube_channel(feed_url):
-            channel_rss = get_youtube_channel(feed_url, config.name)
-        else:
-            channel_rss = get_rss_channel(feed_url)
-
-        # Prioritize data from the first feed: only fill if currently empty
-        feed_channel.title = feed_channel.title or channel_rss.title
-        feed_channel.author = feed_channel.author or channel_rss.author
-        feed_channel.subtitle = feed_channel.subtitle or channel_rss.subtitle
-        feed_channel.description = feed_channel.description or channel_rss.description
-        feed_channel.url = feed_channel.url or channel_rss.url
-        feed_channel.image = feed_channel.image or channel_rss.image
+        channel_rss = _fetch_channel_data(fs.url, config.name)
+        _fill_channel_blanks(feed_channel, channel_rss)
 
     return feed_channel
 
 
-def _process_source(
-    source: str,
-    title: str,
-    filter: str | None = None,
-    feed_day_of_week_filter: list[str] | None = None,
-    callback: Callback | None = None,
-) -> list[RssEpisode]:
-    episodes: list[RssEpisode] = []
-    if is_youtube_channel(source):
-        episodes = get_youtube_episodes(source, title, filter, False, callback)
-    else:
-        episodes = get_rss_episodes(source, filter, feed_day_of_week_filter, callback)
+def _fetch_channel_data(feed_url: str, title: str) -> RssChannel:
+    if is_youtube_channel(feed_url):
+        return get_youtube_channel(feed_url, title)
+    return get_rss_channel(feed_url)
 
-    return episodes
+
+def _fill_channel_blanks(feed_channel: RssChannel, channel_rss: RssChannel) -> None:
+    # Prioritize data from the first feed: only fill if currently empty.
+    for field_name in ("title", "author", "subtitle", "description", "url", "image"):
+        current_value = getattr(feed_channel, field_name)
+        incoming_value = getattr(channel_rss, field_name)
+        setattr(feed_channel, field_name, _prefer_existing(current_value, incoming_value))
+
+
+def _prefer_existing(current: str, incoming: str) -> str:
+    return current or incoming
 
 
 def process_sources(

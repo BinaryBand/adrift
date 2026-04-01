@@ -191,33 +191,35 @@ def is_slug(text: str) -> bool:
     return re_compile(r"^[a-z0-9]+(-[a-z0-9]+)*$").match(text) is not None
 
 
+def _apply_roman_numerals(text: str) -> str:
+    for roman, num in _CHAR_REPLACEMENTS.get("roman_numerals", {}).items():
+        text = re_compile(rf"(?i)\b{roman}\b").sub(num, text)
+    return text
+
+
+def _apply_special_chars(text: str) -> str:
+    for char, replacement in _CHAR_REPLACEMENTS.get("special_characters", {}).items():
+        text = text.replace(char, replacement)
+    return text
+
+
+def _apply_number_words(text: str) -> str:
+    for word, digit in _CHAR_REPLACEMENTS.get("number_words", {}).items():
+        text = re_compile(rf"(?i)\b{word}\b").sub(digit, text)
+    return text
+
+
 @lru_cache(maxsize=1000)
 def normalize_text(text: str) -> str:
     text = remove_file_extension(text)
     text = unidecode(text)
-
-    # (Pt. II) -> part II
     text = re_compile(r"(?i)\(Pt\.?\s*(I{1,3}|IV|V|\d+)\)").sub(r"part \1", text)
-
-    # Convert Roman numerals to numbers using config
-    roman_numerals = _CHAR_REPLACEMENTS.get("roman_numerals", {})
-    for roman, num in roman_numerals.items():
-        text = re_compile(rf"(?i)\b{roman}\b").sub(num, text)
-
-    # Normalize special characters using config
-    special_chars = _CHAR_REPLACEMENTS.get("special_characters", {})
-    for char, replacement in special_chars.items():
-        text = text.replace(char, replacement)
-
-    # Normalize numbers using config
-    number_words = _CHAR_REPLACEMENTS.get("number_words", {})
-    for word, digit in number_words.items():
-        text = re_compile(rf"(?i)\b{word}\b").sub(digit, text)
-
-    text = re_compile(r"(?i)\b(\d+)(?:st|nd|rd|th)\b").sub(r"\1", text)  # 1st -> 1
-    text = re_compile(r"[^\w\s]").sub(" ", text)  # Remove punctuation
-    text = re_compile(r"\s+").sub(" ", text)  # Normalize whitespace
-
+    text = _apply_roman_numerals(text)
+    text = _apply_special_chars(text)
+    text = _apply_number_words(text)
+    text = re_compile(r"(?i)\b(\d+)(?:st|nd|rd|th)\b").sub(r"\1", text)
+    text = re_compile(r"[^\w\s]").sub(" ", text)
+    text = re_compile(r"\s+").sub(" ", text)
     return text.strip().lower()
 
 

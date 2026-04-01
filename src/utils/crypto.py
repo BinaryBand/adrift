@@ -50,21 +50,20 @@ def sha256(data: str) -> str:
     return hash_obj.hexdigest()
 
 
-def _probe_duration(path: Path) -> float | None:
-    """Return the duration of an audio file in seconds via ffprobe."""
-    cmd = [
-        "ffprobe",
-        "-v",
-        "error",
-        "-show_entries",
-        "format=duration",
-        "-of",
-        "default=noprint_wrappers=1:nokey=1",
+def _build_ffprobe_cmd(path: Path) -> list[str]:
+    return [
+        "ffprobe", "-v", "error",
+        "-show_entries", "format=duration",
+        "-of", "default=noprint_wrappers=1:nokey=1",
         str(path),
     ]
+
+
+def _probe_duration(path: Path) -> float | None:
+    """Return the duration of an audio file in seconds via ffprobe."""
     try:
         res = subprocess.run(
-            cmd,
+            _build_ffprobe_cmd(path),
             stdout=subprocess.PIPE,
             stderr=subprocess.DEVNULL,
             check=True,
@@ -88,31 +87,30 @@ def _compute_sample_times(
     return [(usable * (i + 1) / (num_samples + 1)) for i in range(num_samples)]
 
 
+def _build_ffmpeg_pcm_cmd(
+    file_path: Path, t: float, window: float, sample_rate: int
+) -> list[str]:
+    return [
+        "ffmpeg",
+        "-ss", f"{t:.3f}",
+        "-t", f"{window:.3f}",
+        "-i", str(file_path),
+        "-vn", "-f", "s16le", "-ac", "1", "-ar", str(sample_rate),
+        "-",
+    ]
+
+
 def _hash_audio_samples(
     file_path: Path, sample_times: list[float], window: float, sample_rate: int
 ) -> hashlib.md5:  # type: ignore[type-arg]
     """Hash PCM windows at each sample position. Returns a partially-filled md5."""
     hash_md5 = hashlib.md5()
     for t in sample_times:
-        cmd = [
-            "ffmpeg",
-            "-ss",
-            f"{t:.3f}",
-            "-t",
-            f"{window:.3f}",
-            "-i",
-            str(file_path),
-            "-vn",
-            "-f",
-            "s16le",
-            "-ac",
-            "1",
-            "-ar",
-            str(sample_rate),
-            "-",
-        ]
         res = subprocess.run(
-            cmd, stdout=subprocess.PIPE, stderr=subprocess.DEVNULL, check=True
+            _build_ffmpeg_pcm_cmd(file_path, t, window, sample_rate),
+            stdout=subprocess.PIPE,
+            stderr=subprocess.DEVNULL,
+            check=True,
         )
         if res.stdout:
             hash_md5.update(res.stdout)

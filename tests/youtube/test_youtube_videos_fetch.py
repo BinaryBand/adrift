@@ -6,7 +6,7 @@ import unittest
 import sys
 
 sys.path.insert(0, Path(__file__).parent.parent.parent.as_posix())
-from src.youtube.metadata import get_youtube_episodes
+from src.youtube.metadata import get_youtube_episodes, YtFetchOptions
 from src.models import RssEpisode
 
 
@@ -40,10 +40,8 @@ class TestGetYoutubeVideosCache(unittest.TestCase):
         mock_get_videos.return_value = mock_episodes
 
         result = get_youtube_episodes(
-            "https://youtube.com/@test", "test_author", detailed=False
+            "https://youtube.com/@test", "test_author", YtFetchOptions(detailed=False)
         )
-
-        # Should return the episodes
         self.assertEqual(len(result), 2)
         self.assertEqual(result[0].id, "dQw4w9WgXcQ")
         self.assertEqual(result[1].id, "XqZsoesa55w")
@@ -189,7 +187,7 @@ class TestGetYoutubeVideosFilter(unittest.TestCase):
         mock_get_videos.return_value = mock_episodes
 
         result = get_youtube_episodes(
-            "https://youtube.com/@test", "test_author", filter="test"
+            "https://youtube.com/@test", "test_author", YtFetchOptions(filter="test")
         )
 
         # Should only include videos with "test" in title
@@ -222,7 +220,7 @@ class TestGetYoutubeVideosDetailed(unittest.TestCase):
         mock_add_metadata.return_value = mock_episode
 
         result = get_youtube_episodes(
-            "https://youtube.com/@test", "test_author", detailed=True
+            "https://youtube.com/@test", "test_author", YtFetchOptions(detailed=True)
         )
 
         # Should call _add_episode_metadata for each episode
@@ -246,10 +244,8 @@ class TestGetYoutubeVideosDetailed(unittest.TestCase):
         mock_get_videos.return_value = [mock_episode]
 
         result = get_youtube_episodes(
-            "https://youtube.com/@test", "test_author", detailed=False
+            "https://youtube.com/@test", "test_author", YtFetchOptions(detailed=False)
         )
-
-        # Should return episodes without adding metadata
         self.assertEqual(len(result), 1)
         self.assertEqual(result[0].id, "e_04ZrNroTo")
 

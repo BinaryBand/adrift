@@ -98,6 +98,11 @@ class YtDlpParams(TypedDict, total=False):
     js_runtimes: dict[str, dict]
 
 
+def _extract_image_from_list(data: list) -> str:
+    last = data[-1] if data else None
+    return last.get("url", "") if isinstance(last, dict) else ""
+
+
 class RssChannel(BaseModel):
     title: str
     author: str
@@ -132,8 +137,8 @@ class RssChannel(BaseModel):
         """Extract image URL from avatar/thumbnails data (list or string)."""
         if not data:
             return ""
-        if isinstance(data, list) and data:
-            return data[-1].get("url", "") if isinstance(data[-1], dict) else ""
+        if isinstance(data, list):
+            return _extract_image_from_list(data)
         if isinstance(data, str):
             return data
         return ""
@@ -154,12 +159,7 @@ class RssEpisode(BaseModel):
 
     @classmethod
     def from_ytdlp(cls, data: dict, author: str) -> "RssEpisode":
-        """Create RssEpisode directly from yt-dlp video entry data.
-
-        Args:
-            data: yt-dlp video entry dictionary
-            author: Channel author/uploader name
-        """
+        """Create RssEpisode from yt-dlp video entry dict."""
         video_id = data.get("id", "")
         title = data.get("title", "")
         description = data.get("description")
