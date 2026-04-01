@@ -52,9 +52,13 @@ def sha256(data: str) -> str:
 
 def _build_ffprobe_cmd(path: Path) -> list[str]:
     return [
-        "ffprobe", "-v", "error",
-        "-show_entries", "format=duration",
-        "-of", "default=noprint_wrappers=1:nokey=1",
+        "ffprobe",
+        "-v",
+        "error",
+        "-show_entries",
+        "format=duration",
+        "-of",
+        "default=noprint_wrappers=1:nokey=1",
         str(path),
     ]
 
@@ -92,10 +96,19 @@ def _build_ffmpeg_pcm_cmd(
 ) -> list[str]:
     return [
         "ffmpeg",
-        "-ss", f"{t:.3f}",
-        "-t", f"{window:.3f}",
-        "-i", str(file_path),
-        "-vn", "-f", "s16le", "-ac", "1", "-ar", str(sample_rate),
+        "-ss",
+        f"{t:.3f}",
+        "-t",
+        f"{window:.3f}",
+        "-i",
+        str(file_path),
+        "-vn",
+        "-f",
+        "s16le",
+        "-ac",
+        "1",
+        "-ar",
+        str(sample_rate),
         "-",
     ]
 

@@ -75,9 +75,7 @@ def _apply_env_cookiefile(opts: YtDlpParams) -> bool:
     )
 
 
-def _apply_repo_cookiefile(
-    opts: YtDlpParams, use_browser_fallback: bool
-) -> bool:
+def _apply_repo_cookiefile(opts: YtDlpParams, use_browser_fallback: bool) -> bool:
     if use_browser_fallback:
         return False
     return _apply_cookiefile(

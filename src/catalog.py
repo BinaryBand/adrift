@@ -19,7 +19,11 @@ from src.web.rss import (
     get_rss_episodes,
 )
 from src.utils.text import normalize_text, create_slug, is_youtube_channel
-from src.youtube.metadata import get_youtube_channel, get_youtube_episodes, YtFetchOptions
+from src.youtube.metadata import (
+    get_youtube_channel,
+    get_youtube_episodes,
+    YtFetchOptions,
+)
 from src.models.output import EpisodeData
 
 
@@ -68,7 +72,9 @@ def _score_match_pairs(
     return scores
 
 
-def _select_unique_matches(scores: dict[tuple[int, int], float]) -> list[tuple[int, int]]:
+def _select_unique_matches(
+    scores: dict[tuple[int, int], float],
+) -> list[tuple[int, int]]:
     matches: list[tuple[int, int]] = []
     used_files: set[int] = set()
     used_episodes: set[int] = set()
@@ -106,7 +112,9 @@ def sim_date(a: datetime | None, b: datetime | None) -> float:
     if a is None or b is None:
         return 0.0
     delta = abs((a - b).days)
-    return next((score for max_days, score in DATE_SCORE_TIERS if delta <= max_days), 0.0)
+    return next(
+        (score for max_days, score in DATE_SCORE_TIERS if delta <= max_days), 0.0
+    )
 
 
 def _id_similarity(ref: RssEpisode, dl: RssEpisode) -> float:
@@ -325,7 +333,9 @@ def _fill_channel_blanks(feed_channel: RssChannel, channel_rss: RssChannel) -> N
     for field_name in ("title", "author", "subtitle", "description", "url", "image"):
         current_value = getattr(feed_channel, field_name)
         incoming_value = getattr(channel_rss, field_name)
-        setattr(feed_channel, field_name, _prefer_existing(current_value, incoming_value))
+        setattr(
+            feed_channel, field_name, _prefer_existing(current_value, incoming_value)
+        )
 
 
 def _prefer_existing(current: str, incoming: str) -> str:

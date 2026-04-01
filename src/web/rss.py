@@ -310,7 +310,9 @@ def get_rss_episodes(
     assert LINK_REGEX.match(url), "Invalid RSS feed url or file path"
     normalized_days = _normalize_day_filters(feed_day_of_week_filter)
     feed_str = _load_rss_feed_text(url, filter, normalized_days)
-    entries = _filter_feed_entries(feedparser.parse(feed_str).entries, filter, normalized_days)
+    entries = _filter_feed_entries(
+        feedparser.parse(feed_str).entries, filter, normalized_days
+    )
     return _parse_feed_entries(entries, callback)
 
 
@@ -320,7 +322,9 @@ def _normalize_day_filters(feed_day_of_week_filter: list[str] | None) -> list[st
     return [day.strip().lower()[:3] for day in feed_day_of_week_filter]
 
 
-def _load_rss_feed_text(url: str, filter_value: str | None, normalized_days: list[str]) -> str:
+def _load_rss_feed_text(
+    url: str, filter_value: str | None, normalized_days: list[str]
+) -> str:
     dow_filter_key = ",".join(sorted(normalized_days)) if normalized_days else ""
     cache_key = f"feed:{url}:{filter_value}:{dow_filter_key}"
     feed_str: str | None = _rss_cache().get(cache_key)
