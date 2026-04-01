@@ -22,3 +22,5 @@ types-yt-dlp
 types-python-dateutil
 lizard
 vulture
+grimp
+networkx

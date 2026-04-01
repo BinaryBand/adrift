@@ -10,6 +10,7 @@ import base64
 import json
 import sys
 import os
+import time
 import re
 
 sys.path.insert(0, Path(__file__).parent.parent.parent.as_posix())
@@ -99,11 +100,13 @@ class S3Cache:
 
     _S3_SAFE_RE = re.compile(r"^[A-Za-z0-9_\-]+$")
     _MAX_ENCODED_LENGTH = 200
+    _S3_REQUEST_DELAY = 0.1  # 100ms delay between S3 reads to avoid rate limiting
 
     def __init__(self, directory: str, s3_prefix: str):
         self.local_cache = Cache(directory)
         self.s3_prefix = s3_prefix.strip("/")
         self.bucket = "cache"
+        self._last_s3_request_time = 0
 
     def _get_s3_path(self, key: str) -> str:
         """Generate S3 path: <prefix>/<group>/<encoded>.pickle"""
@@ -139,6 +142,13 @@ class S3Cache:
             print(f"WARNING: Failed to check S3 expiration for {key}: {e}")
             return None
 
+    def _throttle_s3_request(self) -> None:
+        """Enforce minimum delay between S3 requests to avoid rate limiting."""
+        elapsed = time.time() - self._last_s3_request_time
+        if elapsed < self._S3_REQUEST_DELAY:
+            time.sleep(self._S3_REQUEST_DELAY - elapsed)
+        self._last_s3_request_time = time.time()
+
     def _resolve_s3_metadata(self, key: str, s3_path: str) -> CacheMetadata | None:
         """Return valid metadata for an S3 entry, or None if absent/expired/deleted."""
         if not exists(self.bucket, s3_path, False):
@@ -153,6 +163,7 @@ class S3Cache:
         self, s3_path: str, key: str, metadata: CacheMetadata
     ) -> Any | None:
         """Download, deserialize and populate local cache. Returns value or None."""
+        self._throttle_s3_request()
         fd, tmp_str = tempfile.mkstemp(suffix=".pickle")
         tmp_path = Path(tmp_str)
         try:

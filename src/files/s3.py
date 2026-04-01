@@ -144,7 +144,7 @@ class _UploadSpec:
 def _do_s3_upload(spec: _UploadSpec) -> None:
     """Execute the actual S3 multipart upload via boto3."""
     transfer_config = TransferConfig(
-        max_concurrency=10,
+        max_concurrency=4,
         multipart_threshold=8 * 1024 * 1024,
         multipart_chunksize=8 * 1024 * 1024,
         use_threads=True,
@@ -222,6 +222,7 @@ def _build_s3_client() -> S3Client:
     return cast(S3Client, client)
 
 
+@retry(attempts=5, backoff_base=2)
 def download_file(bucket: str, key: str, download_path: Path) -> None:
     """Download file using authenticated S3 client"""
     client = get_s3_client()
@@ -313,6 +314,7 @@ def upload_cache_file(
     return urljoin(S3_ENDPOINT, Path(bucket, key).as_posix())
 
 
+@retry(attempts=3, backoff_base=2)
 def delete_file(bucket: str, key: str) -> None:
     client: S3Client = get_s3_client()
     client.delete_object(Bucket=bucket, Key=key)
