@@ -42,8 +42,8 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument(
         "--min-confidence",
         type=int,
-        default=60,
-        help="Minimum confidence percentage to report (default: 60)",
+        default=80,
+        help="Minimum confidence percentage to report (default: 80)",
     )
     parser.add_argument(
         "--strict",
