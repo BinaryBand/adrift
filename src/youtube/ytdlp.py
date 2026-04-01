@@ -6,7 +6,7 @@ Similar to the sponsorblock module, it uses Pydantic models for type safety.
 """
 
 from pydantic import BaseModel, ValidationError, field_validator
-from typing import Any, cast
+from typing import Any, Callable, cast
 from yt_dlp import YoutubeDL
 from datetime import datetime
 from dateutil import parser
@@ -74,6 +74,39 @@ def _fetch_channel_info_raw(url: str, fetch_videos: bool = False) -> dict | None
         return None
 
 
+def _video_info_url(video_id: str) -> str:
+    return f"https://youtube.com/watch?v={video_id}"
+
+
+def _extract_info(url: str, opts: YtDlpParams) -> dict | None:
+    with YoutubeDL(cast(Any, opts)) as ydl:
+        info = ydl.extract_info(url, download=False)
+        return cast(dict, info) if info else None
+
+
+def _fetch_video_info_attempt(
+    video_id: str,
+    label: str,
+    build_opts: Callable[[], YtDlpParams],
+) -> dict | None:
+    print(f"Fetching video info for {video_id} using {label} yt-dlp")
+    try:
+        return _extract_info(_video_info_url(video_id), build_opts())
+    except Exception as e:
+        print(f"WARNING: {label} attempt failed for {video_id}: {e}")
+        return None
+
+
+def _video_info_attempts() -> list[tuple[str, Callable[[], YtDlpParams]]]:
+    return [
+        ("unauthenticated", get_ydl_opts),
+        (
+            "authenticated",
+            lambda: get_auth_ydl_opts(use_browser_fallback=True),
+        ),
+    ]
+
+
 def get_channel_info(url: str) -> ChannelInfo | None:
     """Get cached channel info or fetch and cache if not present."""
     cache_key = f"get_youtube_channel:{url}"
@@ -103,30 +136,9 @@ def get_channel_info(url: str) -> ChannelInfo | None:
 
 def _fetch_video_info_raw(video_id: str) -> dict | None:
     """Fetch raw video info using yt-dlp with fallback to authenticated."""
-    # Use lazy evaluation to avoid calling get_auth_ydl_opts unless needed
-    url = f"https://youtube.com/watch?v={video_id}"
-
-    # First try unauthenticated
-    print(f"Fetching video info for {video_id} using unauthenticated yt-dlp")
-    try:
-        opts = get_ydl_opts()
-        with YoutubeDL(cast(Any, opts)) as ydl:
-            info = ydl.extract_info(url, download=False)
-            return cast(dict, info)
-    except Exception as e:
-        print(f"WARNING: unauthenticated attempt failed for {video_id}: {e}")
-
-    # Then try authenticated. Request auth options once (allowing a browser
-    # fallback) and attempt to fetch using those options.
-    print(f"Fetching video info for {video_id} using authenticated yt-dlp")
-    try:
-        opts = get_auth_ydl_opts(use_browser_fallback=True)
-        with YoutubeDL(cast(Any, opts)) as ydl:
-            info = ydl.extract_info(url, download=False)
-            return cast(dict, info)
-    except Exception as e:
-        print(f"WARNING: authenticated attempt failed for {video_id}: {e}")
-
+    for label, build_opts in _video_info_attempts():
+        if info := _fetch_video_info_attempt(video_id, label, build_opts):
+            return info
     return None
 
 
@@ -181,37 +193,67 @@ def _fetch_channel_videos_raw(
 BATCHES = [10, 100, None]
 
 
+def _load_cached_episode_map(cache_key: str) -> dict[str, RssEpisode]:
+    return _CACHE.get(cache_key) or {}
+
+
+def _fetch_video_batch(
+    url: str,
+    author: str,
+    batch_index: int,
+    batch_size: int | None,
+) -> list[dict]:
+    print(f"Fetching {author} videos {batch_index} (size={str(batch_size)})...")
+    return _fetch_channel_videos_raw(url, 1, end=batch_size, reverse=False)
+
+
+def _add_new_public_episodes(
+    video_entries: list[dict],
+    author: str,
+    episodes: dict[str, RssEpisode],
+) -> bool:
+    has_new = False
+    for entry in video_entries:
+        episode = RssEpisode.from_ytdlp(entry, author)
+        if not episode.is_public or episode.id in episodes:
+            continue
+        print(f"Found new video: {episode.id}")
+        episodes[episode.id] = episode
+        has_new = True
+    return has_new
+
+
+def _report_video_fetch_progress(
+    callback: Callback | None,
+    batch_size: int | None,
+    episode_count: int,
+) -> None:
+    if callback is None:
+        return
+    callback(0, max(batch_size or 1000, episode_count))
+
+
+def _cache_youtube_videos(cache_key: str, episodes: dict[str, RssEpisode]) -> None:
+    expire = random.randint(25, 35) * 24 * 3600
+    _CACHE.set(cache_key, episodes, expire=expire)
+
+
 def get_youtube_videos(
     url: str,
     author: str,
     callback: Callback | None = None,
 ) -> list[RssEpisode]:
     cache_key = f"get_youtube_videos:{url}:{author}"
-    stale_episodes: dict[str, RssEpisode] = _CACHE.get(cache_key) or {}
+    stale_episodes = _load_cached_episode_map(cache_key)
 
-    for i, batch in enumerate(BATCHES):
-        has_new = False
-        print(f"Fetching {author} videos {i + 1} (size={str(batch)})...")
-
-        # Use ytdlp module to fetch videos
-        video_entries = _fetch_channel_videos_raw(url, 1, end=batch, reverse=False)
-        for entry in video_entries:
-            if (ep := RssEpisode.from_ytdlp(entry, author)).is_public:
-                if ep.id not in stale_episodes:
-                    print(f"Found new video: {ep.id}")
-                    stale_episodes[ep.id] = ep
-                    has_new = True
-
-        if callback:
-            total = max(batch or 1000, len(stale_episodes))
-            callback(0, total)
-
+    for batch_index, batch_size in enumerate(BATCHES, start=1):
+        video_entries = _fetch_video_batch(url, author, batch_index, batch_size)
+        has_new = _add_new_public_episodes(video_entries, author, stale_episodes)
+        _report_video_fetch_progress(callback, batch_size, len(stale_episodes))
         if not has_new:
             break
 
-    expire = random.randint(25, 35) * 24 * 3600
-    _CACHE.set(cache_key, stale_episodes, expire=expire)
-
+    _cache_youtube_videos(cache_key, stale_episodes)
     return list(stale_episodes.values())
 
 

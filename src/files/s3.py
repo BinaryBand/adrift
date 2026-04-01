@@ -9,7 +9,7 @@ from functools import cache, wraps
 from diskcache import Cache
 from threading import Lock
 from pathlib import Path
-from typing import cast
+from typing import cast, Callable
 
 import mimetypes
 import boto3
@@ -68,6 +68,31 @@ def retry(attempts: int = 3, backoff_base: int = 2):
     return decorator
 
 
+def _build_upload_extra_args(file_path: str, metadata_dict: dict | None) -> dict:
+    """Build the ExtraArgs dict for a boto3 upload_file call."""
+    extra_args: dict = {"ACL": "public-read"}
+    if metadata_dict is not None:
+        extra_args["Metadata"] = metadata_dict
+    content_type, _ = mimetypes.guess_type(file_path)
+    extra_args["ContentType"] = content_type or "application/octet-stream"
+    return extra_args
+
+
+def _make_upload_callback(
+    callback: Callback, file_size: int
+) -> "Callable[[int], None]":
+    """Wrap a progress Callback in a thread-safe boto3-compatible callable."""
+    lock = Lock()
+    bytes_transferred = [0]
+
+    def _cb(bytes_chunk: int) -> None:
+        with lock:
+            bytes_transferred[0] += bytes_chunk
+            callback(bytes_transferred[0], file_size)
+
+    return _cb
+
+
 def _is_endpoint_reachable(url: str, timeout: float = 2.0) -> bool:
     """Return True if an actual S3 API call succeeds against the endpoint.
 
@@ -95,6 +120,35 @@ def _is_endpoint_reachable(url: str, timeout: float = 2.0) -> bool:
         return True
     except Exception:
         return False
+
+
+def _do_s3_upload(
+    bucket: str, key: str, file_path: str, extra_args: dict, boto_callback
+) -> None:
+    """Execute the actual S3 multipart upload via boto3."""
+    transfer_config = TransferConfig(
+        max_concurrency=10,
+        multipart_threshold=8 * 1024 * 1024,
+        multipart_chunksize=8 * 1024 * 1024,
+        use_threads=True,
+    )
+    get_s3_client().upload_file(
+        Filename=file_path,
+        Bucket=bucket,
+        Key=key,
+        ExtraArgs=extra_args,
+        Config=transfer_config,
+        Callback=boto_callback,
+    )
+
+
+def _sync_upload_cache(bucket: str, key: str, metadata_dict: dict | None) -> None:
+    """Update the local S3 metadata cache after an upload."""
+    cache_key = f"s3_metadata:{bucket}:{key}"
+    if metadata_dict is not None:
+        _s3_cache().set(cache_key, metadata_dict)
+    else:
+        _s3_cache().delete(cache_key)
 
 
 def _get_effective_s3_endpoint() -> str:
@@ -167,50 +221,20 @@ def upload_file(
 ) -> str | None:
     _file_path = file_path if isinstance(file_path, str) else file_path.as_posix()
     assert os.path.exists(_file_path), f"Local file not found: {file_path}"
-
-    transfer_config = TransferConfig(
-        max_concurrency=10,
-        multipart_threshold=8 * 1024 * 1024,  # 8MB
-        multipart_chunksize=8 * 1024 * 1024,
-        use_threads=True,
+    metadata_dict = metadata.to_dict() if metadata is not None else None
+    boto_callback = (
+        _make_upload_callback(callback, os.path.getsize(_file_path))
+        if callback is not None
+        else None
     )
-
-    extra_args: dict = {"ACL": "public-read"}
-    if metadata is not None:
-        extra_args["Metadata"] = metadata.to_dict()
-
-    content_type, _ = mimetypes.guess_type(_file_path)
-    extra_args["ContentType"] = content_type or "application/octet-stream"
-
-    boto_callback = None
-    if callback is not None:
-        file_size = os.path.getsize(_file_path)
-        lock = Lock()
-        bytes_transferred = [0]
-
-        def thread_safe_callback(bytes_chunk: int) -> None:
-            with lock:
-                bytes_transferred[0] += bytes_chunk
-                callback(bytes_transferred[0], file_size)
-
-        boto_callback = thread_safe_callback
-
-    client: S3Client = get_s3_client()
-    client.upload_file(
-        Filename=_file_path,
-        Bucket=bucket,
-        Key=key,
-        ExtraArgs=extra_args,
-        Config=transfer_config,
-        Callback=boto_callback,
+    _do_s3_upload(
+        bucket,
+        key,
+        _file_path,
+        _build_upload_extra_args(_file_path, metadata_dict),
+        boto_callback,
     )
-
-    cache_key = f"s3_metadata:{bucket}:{key}"
-    if metadata is not None:
-        _s3_cache().set(cache_key, metadata.to_dict())
-    else:
-        _s3_cache().delete(cache_key)
-
+    _sync_upload_cache(bucket, key, metadata_dict)
     return urljoin(S3_ENDPOINT, Path(bucket, key).as_posix())
 
 
@@ -224,50 +248,20 @@ def upload_cache_file(
 ) -> str | None:
     _file_path = file_path if isinstance(file_path, str) else file_path.as_posix()
     assert os.path.exists(_file_path), f"Local file not found: {file_path}"
-
-    transfer_config = TransferConfig(
-        max_concurrency=10,
-        multipart_threshold=8 * 1024 * 1024,  # 8MB
-        multipart_chunksize=8 * 1024 * 1024,
-        use_threads=True,
+    metadata_dict = metadata.to_dict() if metadata is not None else None
+    boto_callback = (
+        _make_upload_callback(callback, os.path.getsize(_file_path))
+        if callback is not None
+        else None
     )
-
-    extra_args: dict = {"ACL": "public-read"}
-    if metadata is not None:
-        extra_args["Metadata"] = metadata.to_dict()
-
-    content_type, _ = mimetypes.guess_type(_file_path)
-    extra_args["ContentType"] = content_type or "application/octet-stream"
-
-    boto_callback = None
-    if callback is not None:
-        file_size = os.path.getsize(_file_path)
-        lock = Lock()
-        bytes_transferred = [0]
-
-        def thread_safe_callback(bytes_chunk: int) -> None:
-            with lock:
-                bytes_transferred[0] += bytes_chunk
-                callback(bytes_transferred[0], file_size)
-
-        boto_callback = thread_safe_callback
-
-    client: S3Client = get_s3_client()
-    client.upload_file(
-        Filename=_file_path,
-        Bucket=bucket,
-        Key=key,
-        ExtraArgs=extra_args,
-        Config=transfer_config,
-        Callback=boto_callback,
+    _do_s3_upload(
+        bucket,
+        key,
+        _file_path,
+        _build_upload_extra_args(_file_path, metadata_dict),
+        boto_callback,
     )
-
-    cache_key = f"s3_metadata:{bucket}:{key}"
-    if metadata is not None:
-        _s3_cache().set(cache_key, metadata.to_dict())
-    else:
-        _s3_cache().delete(cache_key)
-
+    _sync_upload_cache(bucket, key, metadata_dict)
     return urljoin(S3_ENDPOINT, Path(bucket, key).as_posix())
 
 

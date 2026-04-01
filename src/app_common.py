@@ -15,6 +15,28 @@ from datetime import datetime, timedelta
 MATCH_TOLERANCE = 0.75
 
 
+def _exclude_lookahead(pattern: str) -> str:
+    if pattern.startswith("^"):
+        return f"(?!{pattern[1:]})"
+    return f"(?!.*{pattern})"
+
+
+def _include_lookahead(patterns: list[str]) -> str | None:
+    if not patterns:
+        return None
+    return f"(?=.*(?:{'|'.join(patterns)}))"
+
+
+def _day_window(current: datetime) -> tuple[datetime, datetime]:
+    day_start = datetime.combine(current.date(), datetime.min.time())
+    return day_start, day_start + timedelta(days=1)
+
+
+def _next_occurrence_in_window(schedule: str, day_start: datetime) -> datetime | None:
+    rule = rrulestr(schedule, dtstart=day_start)
+    return rule.after(day_start - timedelta(microseconds=1), inc=True)
+
+
 class SourceFilter(BaseModel):
     """Structured filter rules for podcast episode selection.
 
@@ -45,16 +67,9 @@ class SourceFilter(BaseModel):
 
         parts: list[str] = ["(?i)^"]
 
-        for pattern in self.exclude:
-            if pattern.startswith("^"):
-                # Anchored at the start of the title – no leading .*
-                parts.append(f"(?!{pattern[1:]})")
-            else:
-                parts.append(f"(?!.*{pattern})")
-
-        if self.include:
-            inc_parts = "|".join(self.include)
-            parts.append(f"(?=.*(?:{inc_parts}))")
+        parts.extend(_exclude_lookahead(pattern) for pattern in self.exclude)
+        if include_part := _include_lookahead(self.include):
+            parts.append(include_part)
 
         parts.append(".*$")
         return "".join(parts)
@@ -117,15 +132,12 @@ def _schedule_matches_today(
 
         "FREQ=WEEKLY;BYDAY=WE,FR"  →  True on Wednesdays and Fridays
     """
+    del title
     current = today or datetime.now()
-
-    day_start = datetime.combine(current.date(), datetime.min.time())
-    day_end = day_start + timedelta(days=1)
+    day_start, day_end = _day_window(current)
 
     try:
-        rule = rrulestr(schedule, dtstart=day_start)
-        # True when the next occurrence on/after start is still in this day.
-        next_occurrence = rule.after(day_start - timedelta(microseconds=1), inc=True)
+        next_occurrence = _next_occurrence_in_window(schedule, day_start)
         return next_occurrence is not None and next_occurrence < day_end
     except Exception:
         # Fail closed: if RRULE is malformed we skip this schedule.

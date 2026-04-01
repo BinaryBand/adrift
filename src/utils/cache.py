@@ -24,6 +24,37 @@ from src.files.s3 import (
 from src.models import CacheMetadata
 
 
+_PASSTHROUGH_META_KEYS = ("expires_at", "uploader")
+
+
+def _resolve_created_at(raw_meta: dict) -> str | None:
+    """Extract or convert a creation timestamp from raw S3 object metadata."""
+    if "created_at" in raw_meta:
+        return raw_meta["created_at"]
+    try:
+        return datetime.fromtimestamp(
+            float(raw_meta["mtime"]), timezone.utc
+        ).isoformat()
+    except Exception:
+        return None
+
+
+def _normalize_s3_meta(raw_meta: dict) -> dict:
+    """Normalise S3 object metadata into a form CacheMetadata can validate."""
+    norm = {k: raw_meta[k] for k in _PASSTHROUGH_META_KEYS if k in raw_meta}
+    if created_at := _resolve_created_at(raw_meta):
+        norm["created_at"] = created_at
+    return norm or raw_meta
+
+
+def _remaining_ttl(metadata: CacheMetadata) -> int | None:
+    """Return remaining seconds until expiry, or None if no expiry is set."""
+    if not metadata.expires_at:
+        return None
+    remaining = (metadata.expires_at - datetime.now(timezone.utc)).total_seconds()
+    return int(remaining) if remaining > 0 else None
+
+
 def read_s3_json_cache(cache_path: str, item_id: str) -> Any | None:
     """Read JSON data from S3 cache."""
     if not exists("cache", cache_path, False):
@@ -89,35 +120,13 @@ class S3Cache:
         return f"{self.s3_prefix}/{group}/{encoded}.pickle"
 
     def _check_expiration(self, key: str, s3_path: str) -> CacheMetadata | None:
-        """Check if S3 cache entry is expired. Returns metadata if valid, None if expired."""
+        """Read S3 object metadata and return it if the entry has not expired."""
         try:
             client = get_s3_client()
             head = client.head_object(Bucket=self.bucket, Key=s3_path)
-
-            # Normalize metadata from S3 to a form CacheMetadata can validate.
-            raw_meta = head.get("Metadata", {}) or {}
-            norm_meta: dict = {}
-
-            # Older uploads may store an 'mtime' (epoch seconds). Convert it.
-            if "created_at" in raw_meta:
-                norm_meta["created_at"] = raw_meta["created_at"]
-            elif "mtime" in raw_meta:
-                try:
-                    mtime_val = float(raw_meta["mtime"])
-                    norm_meta["created_at"] = datetime.fromtimestamp(
-                        mtime_val, timezone.utc
-                    ).isoformat()
-                except Exception:
-                    # Fall back to raw metadata; validation will handle errors
-                    pass
-
-            if "expires_at" in raw_meta:
-                norm_meta["expires_at"] = raw_meta["expires_at"]
-            if "uploader" in raw_meta:
-                norm_meta["uploader"] = raw_meta["uploader"]
-
-            metadata = CacheMetadata.model_validate(norm_meta or raw_meta)
-
+            metadata = CacheMetadata.model_validate(
+                _normalize_s3_meta(head.get("Metadata", {}) or {})
+            )
             if (
                 metadata.expires_at
                 and datetime.now(timezone.utc) >= metadata.expires_at
@@ -130,74 +139,69 @@ class S3Cache:
             print(f"WARNING: Failed to check S3 expiration for {key}: {e}")
             return None
 
+    def _resolve_s3_metadata(self, key: str, s3_path: str) -> CacheMetadata | None:
+        """Return valid metadata for an S3 entry, or None if absent/expired/deleted."""
+        if not exists(self.bucket, s3_path, False):
+            return None
+        metadata = self._check_expiration(key, s3_path)
+        if metadata is None and exists(self.bucket, s3_path, False):
+            # Entry survived deletion (expiry check failed) – use a stub so fetch proceeds.
+            return CacheMetadata(created_at=datetime.now(timezone.utc))
+        return metadata
+
+    def _download_from_s3(
+        self, s3_path: str, key: str, metadata: CacheMetadata
+    ) -> Any | None:
+        """Download, deserialize and populate local cache. Returns value or None."""
+        fd, tmp_str = tempfile.mkstemp(suffix=".pickle")
+        tmp_path = Path(tmp_str)
+        try:
+            os.close(fd)
+            download_file(self.bucket, s3_path, tmp_path)
+            with open(tmp_path, "rb") as f:
+                value = pickle.load(f)
+            expire_seconds = _remaining_ttl(metadata)
+            self.local_cache.set(key, value, expire=expire_seconds)
+            return value
+        finally:
+            tmp_path.unlink(missing_ok=True)
+
     def get(self, key: str, default: Any = None) -> Any:
-        # Check local cache first (fast path)
+        # Fast path: local cache.
         value = self.local_cache.get(key)
         if value is not None:
             return value
-
-        # Check S3 cache (best-effort - involves network calls)
+        # Slow path: S3 (best-effort).
         s3_path = self._get_s3_path(key)
         try:
-            if not exists(self.bucket, s3_path, False):
+            metadata = self._resolve_s3_metadata(key, s3_path)
+            if metadata is None:
                 return default
-
-            # Check expiration
-            metadata = self._check_expiration(key, s3_path)
-            if metadata is None and exists(self.bucket, s3_path, False):
-                # Expired or metadata check failed, but not deleted - continue anyway
-                metadata = CacheMetadata(created_at=datetime.now(timezone.utc))
-            elif metadata is None:
-                return default
-
-            # Download and cache locally
-            fd, tmp_str = tempfile.mkstemp(suffix=".pickle")
-            tmp_path = Path(tmp_str)
-            try:
-                os.close(fd)
-                download_file(self.bucket, s3_path, tmp_path)
-                with open(tmp_path, "rb") as f:
-                    value = pickle.load(f)
-
-                # Calculate remaining TTL
-                expire_seconds = None
-                if metadata.expires_at:
-                    remaining = (
-                        metadata.expires_at - datetime.now(timezone.utc)
-                    ).total_seconds()
-                    expire_seconds = int(remaining) if remaining > 0 else None
-
-                self.local_cache.set(key, value, expire=expire_seconds)
-                return value
-            finally:
-                tmp_path.unlink(missing_ok=True)
+            return self._download_from_s3(s3_path, key, metadata) or default
         except Exception as e:
             print(f"WARNING: S3 cache read failed for {key}: {e}")
-
         return default
 
+    def _build_cache_metadata(self, expire: int | None) -> CacheMetadata:
+        expires_at = (
+            datetime.now(timezone.utc) + timedelta(seconds=expire) if expire else None
+        )
+        return CacheMetadata(
+            created_at=datetime.now(timezone.utc), expires_at=expires_at
+        )
+
+    def _upload_to_s3(self, key: str, value: Any, metadata: CacheMetadata) -> None:
+        """Serialize value to a temp file then upload to S3."""
+        with tempfile.TemporaryDirectory() as temp_dir:
+            temp_path = Path(temp_dir) / "data.pickle"
+            with open(temp_path, "wb") as f:
+                pickle.dump(value, f)
+            upload_cache_file(self.bucket, self._get_s3_path(key), temp_path, metadata)
+
     def set(self, key: str, value: Any, expire: int | None = None) -> None:
-        # Write to local cache
         self.local_cache.set(key, value, expire=expire)
-
-        # Write to S3 cache (best-effort)
         try:
-            expires_at = (
-                datetime.now(timezone.utc) + timedelta(seconds=expire)
-                if expire
-                else None
-            )
-            metadata = CacheMetadata(
-                created_at=datetime.now(timezone.utc), expires_at=expires_at
-            )
-
-            with tempfile.TemporaryDirectory() as temp_dir:
-                temp_path = Path(temp_dir) / "data.pickle"
-                with open(temp_path, "wb") as f:
-                    pickle.dump(value, f)
-                upload_cache_file(
-                    self.bucket, self._get_s3_path(key), temp_path, metadata
-                )
+            self._upload_to_s3(key, value, self._build_cache_metadata(expire))
         except Exception as e:
             print(f"WARNING: S3 cache write failed for {key}: {e}")
 

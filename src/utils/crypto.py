@@ -50,92 +50,102 @@ def sha256(data: str) -> str:
     return hash_obj.hexdigest()
 
 
+def _probe_duration(path: Path) -> float | None:
+    """Return the duration of an audio file in seconds via ffprobe."""
+    cmd = [
+        "ffprobe",
+        "-v",
+        "error",
+        "-show_entries",
+        "format=duration",
+        "-of",
+        "default=noprint_wrappers=1:nokey=1",
+        str(path),
+    ]
+    try:
+        res = subprocess.run(
+            cmd,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.DEVNULL,
+            check=True,
+            text=True,
+            encoding="utf-8",
+            errors="ignore",
+        )
+        value = (res.stdout or "").strip()
+        return float(value) if value else None
+    except Exception:
+        return None
+
+
+def _compute_sample_times(
+    duration: float | None, num_samples: int, window: float
+) -> list[float]:
+    """Return evenly-distributed sample start positions across the file."""
+    if duration is None or duration <= 0:
+        return [0.0]
+    usable = max(0.0, duration - window)
+    return [(usable * (i + 1) / (num_samples + 1)) for i in range(num_samples)]
+
+
+def _hash_audio_samples(
+    file_path: Path, sample_times: list[float], window: float, sample_rate: int
+) -> hashlib.md5:  # type: ignore[type-arg]
+    """Hash PCM windows at each sample position. Returns a partially-filled md5."""
+    hash_md5 = hashlib.md5()
+    for t in sample_times:
+        cmd = [
+            "ffmpeg",
+            "-ss",
+            f"{t:.3f}",
+            "-t",
+            f"{window:.3f}",
+            "-i",
+            str(file_path),
+            "-vn",
+            "-f",
+            "s16le",
+            "-ac",
+            "1",
+            "-ar",
+            str(sample_rate),
+            "-",
+        ]
+        res = subprocess.run(
+            cmd, stdout=subprocess.PIPE, stderr=subprocess.DEVNULL, check=True
+        )
+        if res.stdout:
+            hash_md5.update(res.stdout)
+    return hash_md5
+
+
+def _fallback_hash_bytes(file_path: Path) -> str:
+    """Hash raw file bytes as a last resort (includes container metadata)."""
+    hash_md5 = hashlib.md5()
+    with open(file_path, "rb") as f:
+        for chunk in iter(lambda: f.read(4096), b""):
+            hash_md5.update(chunk)
+    return hash_md5.hexdigest()
+
+
 def get_audio_content_hash(file_path: Path, sample_rate: int = 8000) -> str:
     cache = _crypto_cache()
     modified_date = os.path.getmtime(file_path)
-
     cache_key = f"audio_hash:file={file_path.absolute().as_posix()},mod={modified_date},sr={sample_rate}"
     if (cached_hash := cache.get(cache_key)) is not None:
         return cached_hash
 
-    # Content-normalized hashing: decode small PCM windows and hash them.
-    # This avoids decoding the entire file to raw PCM, which is very slow.
-    def _get_duration_seconds(path: Path) -> float | None:
-        cmd = [
-            "ffprobe",
-            "-v",
-            "error",
-            "-show_entries",
-            "format=duration",
-            "-of",
-            "default=noprint_wrappers=1:nokey=1",
-            str(path),
-        ]
-        try:
-            res = subprocess.run(
-                cmd,
-                stdout=subprocess.PIPE,
-                stderr=subprocess.DEVNULL,
-                check=True,
-                text=True,
-                encoding="utf-8",
-                errors="ignore",
-            )
-            value = (res.stdout or "").strip()
-            return float(value) if value else None
-        except Exception:
-            return None
-
-    duration = _get_duration_seconds(file_path)
+    sample_window = 0.75
     num_samples = 5
-    sample_window_seconds = 0.75
-
-    hash_md5 = hashlib.md5()
+    duration = _probe_duration(file_path)
+    sample_times = _compute_sample_times(duration, num_samples, sample_window)
 
     try:
-        if duration is None or duration <= 0:
-            # Fallback: sample from the beginning only.
-            sample_times = [0.0]
-        else:
-            # Evenly distributed sample start times, avoiding the very end.
-            usable = max(0.0, duration - sample_window_seconds)
-            sample_times = [
-                (usable * (i + 1) / (num_samples + 1)) for i in range(num_samples)
-            ]
-
-        for t in sample_times:
-            cmd = [
-                "ffmpeg",
-                "-ss",
-                f"{t:.3f}",
-                "-t",
-                f"{sample_window_seconds:.3f}",
-                "-i",
-                str(file_path),
-                "-vn",
-                "-f",
-                "s16le",
-                "-ac",
-                "1",
-                "-ar",
-                str(sample_rate),
-                "-",
-            ]
-            res = subprocess.run(
-                cmd,
-                stdout=subprocess.PIPE,
-                stderr=subprocess.DEVNULL,
-                check=True,
-            )
-            if res.stdout:
-                hash_md5.update(res.stdout)
+        hex_hash = _hash_audio_samples(
+            file_path, sample_times, sample_window, sample_rate
+        ).hexdigest()
     except Exception:
-        # Last-resort fallback: hash raw file bytes (includes metadata).
-        hash_md5 = hashlib.md5()
-        with open(file_path, "rb") as f:
-            for chunk in iter(lambda: f.read(4096), b""):
-                hash_md5.update(chunk)
+        hex_hash = _fallback_hash_bytes(file_path)
 
-    hex_hash = hash_md5.hexdigest()
     cache.set(cache_key, hex_hash)
     return hex_hash
