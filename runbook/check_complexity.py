@@ -11,10 +11,42 @@ Severity rules:
 
 from __future__ import annotations
 
+from dataclasses import dataclass
 from pathlib import Path
 import argparse
 import subprocess
 import sys
+
+
+@dataclass(frozen=True)
+class Ceiling:
+    ccn: int
+    length: int
+    params: int
+
+
+@dataclass(frozen=True)
+class FunctionMetrics:
+    ccn: int
+    params: int
+    length: int
+    start_line: int
+    file_path: str
+
+
+@dataclass(frozen=True)
+class Diagnostic:
+    path: str
+    line: int
+    severity: str
+    message: str
+
+
+@dataclass(frozen=True)
+class MetricCheck:
+    label: str
+    value: int
+    ceiling: int
 
 
 def parse_args() -> argparse.Namespace:
@@ -54,82 +86,143 @@ def run_lizard(path: str, ccn: int, length: int, params: int) -> str:
     return proc.stdout
 
 
-def parse_metric_line(line: str) -> tuple[int, int, int, int, int, int, str] | None:
-    stripped = line.strip()
-    if not stripped or "@" not in stripped or not stripped[0].isdigit():
-        return None
+def _is_metric_candidate(line: str) -> bool:
+    return bool(line and "@" in line and line[0].isdigit())
 
-    parts = stripped.split()
+
+def _parse_metric_values(parts: list[str]) -> tuple[int, int, int, int, int] | None:
     if len(parts) < 6:
         return None
-
     try:
-        nloc = int(parts[0])
-        ccn = int(parts[1])
-        token = int(parts[2])
-        param = int(parts[3])
-        length = int(parts[4])
+        return (
+            int(parts[0]),
+            int(parts[1]),
+            int(parts[2]),
+            int(parts[3]),
+            int(parts[4]),
+        )
     except ValueError:
         return None
 
+
+def _parse_location(parts: list[str]) -> tuple[int, str] | None:
     location_blob = " ".join(parts[5:])
     try:
         _, span, file_path = location_blob.rsplit("@", 2)
         start_line = int(span.split("-", 1)[0])
     except Exception:
         return None
+    return (start_line, file_path)
+
+
+def parse_metric_line(line: str) -> tuple[int, int, int, int, int, int, str] | None:
+    stripped = line.strip()
+    if not _is_metric_candidate(stripped):
+        return None
+
+    parts = stripped.split()
+    metrics = _parse_metric_values(parts)
+    if metrics is None:
+        return None
+    nloc, ccn, token, param, length = metrics
+
+    location = _parse_location(parts)
+    if location is None:
+        return None
+    start_line, file_path = location
 
     return (nloc, ccn, token, param, length, start_line, file_path)
 
 
-def check_metrics(output: str, ccn_max: int, len_max: int, param_max: int) -> int:
-    error_count = 0
+def to_function_metrics(
+    parsed: tuple[int, int, int, int, int, int, str],
+) -> FunctionMetrics:
+    _, ccn, _, params, length, start_line, file_path = parsed
+    return FunctionMetrics(
+        ccn=ccn,
+        params=params,
+        length=length,
+        start_line=start_line,
+        file_path=Path(file_path).as_posix(),
+    )
 
+
+def parse_lizard_output(output: str) -> list[FunctionMetrics]:
+    metrics: list[FunctionMetrics] = []
     for raw_line in output.splitlines():
         parsed = parse_metric_line(raw_line)
         if parsed is None:
             continue
+        metrics.append(to_function_metrics(parsed))
+    return metrics
 
-        _, ccn, _, param, fn_length, start_line, file_path = parsed
-        display_path = Path(file_path).as_posix()
 
-        if ccn > ccn_max:
+def _severity_for(value: int, ceiling: int) -> str | None:
+    if value > ceiling:
+        return "error"
+    if value == ceiling:
+        return "warning"
+    return None
+
+
+def _metric_diagnostic(
+    metrics: FunctionMetrics, check: MetricCheck
+) -> Diagnostic | None:
+    severity = _severity_for(check.value, check.ceiling)
+    if severity is None:
+        return None
+    relation = "exceeds" if severity == "error" else "at"
+    return Diagnostic(
+        path=metrics.file_path,
+        line=metrics.start_line,
+        severity=severity,
+        message=f"{check.label} {check.value} {relation} ceiling {check.ceiling}",
+    )
+
+
+def evaluate_function(metrics: FunctionMetrics, ceiling: Ceiling) -> list[Diagnostic]:
+    checks = [
+        MetricCheck("CCN", metrics.ccn, ceiling.ccn),
+        MetricCheck("function length", metrics.length, ceiling.length),
+        MetricCheck("parameter count", metrics.params, ceiling.params),
+    ]
+    diagnostics: list[Diagnostic] = []
+    for check in checks:
+        diag = _metric_diagnostic(metrics, check)
+        if diag is not None:
+            diagnostics.append(diag)
+    return diagnostics
+
+
+def evaluate_metrics(
+    metrics_list: list[FunctionMetrics], ceiling: Ceiling
+) -> list[Diagnostic]:
+    diagnostics: list[Diagnostic] = []
+    for metrics in metrics_list:
+        diagnostics.extend(evaluate_function(metrics, ceiling))
+    return diagnostics
+
+
+def emit_diagnostics(diagnostics: list[Diagnostic]) -> int:
+    error_count = 0
+    for diag in diagnostics:
+        if diag.severity == "error":
             error_count += 1
-            print(
-                f"{display_path}:{start_line}: error: CCN {ccn} exceeds ceiling {ccn_max}"
-            )
-        elif ccn == ccn_max:
-            print(
-                f"{display_path}:{start_line}: warning: CCN {ccn} at ceiling {ccn_max}"
-            )
-
-        if fn_length > len_max:
-            error_count += 1
-            print(
-                f"{display_path}:{start_line}: error: function length {fn_length} exceeds ceiling {len_max}"
-            )
-        elif fn_length == len_max:
-            print(
-                f"{display_path}:{start_line}: warning: function length {fn_length} at ceiling {len_max}"
-            )
-
-        if param > param_max:
-            error_count += 1
-            print(
-                f"{display_path}:{start_line}: error: parameter count {param} exceeds ceiling {param_max}"
-            )
-        elif param == param_max:
-            print(
-                f"{display_path}:{start_line}: warning: parameter count {param} at ceiling {param_max}"
-            )
-
+        print(f"{diag.path}:{diag.line}: {diag.severity}: {diag.message}")
     return error_count
+
+
+def check_metrics(output: str, ceiling: Ceiling) -> int:
+    metrics_list = parse_lizard_output(output)
+    diagnostics = evaluate_metrics(metrics_list, ceiling)
+    return emit_diagnostics(diagnostics)
 
 
 def main() -> int:
     args = parse_args()
+    ceiling = Ceiling(ccn=args.ccn, length=args.length, params=args.params)
     output = run_lizard(args.path, args.ccn, args.length, args.params)
-    error_count = check_metrics(output, args.ccn, args.length, args.params)
+    error_count = check_metrics(output, ceiling)
     if args.strict and error_count > 0:
         return 1
     return 0

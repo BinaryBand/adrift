@@ -37,29 +37,55 @@ def match(
     title: str,
     callback: Callback | None = None,
 ) -> list[tuple[int, int]]:
+    files_clean, episodes_clean = _prepare_match_inputs(files, episodes, title)
+    scores = _score_match_pairs(files_clean, episodes_clean, callback)
+    matches = _select_unique_matches(scores)
+    return _filter_tolerated_matches(matches, scores)
+
+
+def _prepare_match_inputs(
+    files: list[str], episodes: list[str], title: str
+) -> tuple[list[str], list[str]]:
     files_clean = [normalize_text(f) for f in files]
     episodes_norm = [normalize_title(title, e) for e in episodes]
     episodes_clean = [normalize_text(e) for e in episodes_norm]
+    return files_clean, episodes_clean
 
-    scores = {}
-    for f_idx, ac in enumerate(files_clean):
-        for e_idx, bc in enumerate(episodes_clean):
-            score = _similarity_clean(ac, bc)
-            scores[(f_idx, e_idx)] = score
+
+def _score_match_pairs(
+    files_clean: list[str],
+    episodes_clean: list[str],
+    callback: Callback | None = None,
+) -> dict[tuple[int, int], float]:
+    scores: dict[tuple[int, int], float] = {}
+    for f_idx, file_name in enumerate(files_clean):
+        for e_idx, episode_name in enumerate(episodes_clean):
+            scores[(f_idx, e_idx)] = _similarity_clean(file_name, episode_name)
 
         if callback:
-            callback(f_idx + 1, len(files))
+            callback(f_idx + 1, len(files_clean))
 
-    # Greedily select best matches, ensuring no duplicates
-    matches, used_files, used_episodes = [], set(), set()
+    return scores
+
+
+def _select_unique_matches(scores: dict[tuple[int, int], float]) -> list[tuple[int, int]]:
+    matches: list[tuple[int, int]] = []
+    used_files: set[int] = set()
+    used_episodes: set[int] = set()
     pairs = sorted(scores.items(), key=lambda x: x[1], reverse=True)
-    for (f_idx, e_idx), score in pairs:
-        if f_idx not in used_files and e_idx not in used_episodes:
-            matches.append((f_idx, e_idx))
-            used_files.add(f_idx)
-            used_episodes.add(e_idx)
+    for (f_idx, e_idx), _score in pairs:
+        if f_idx in used_files or e_idx in used_episodes:
+            continue
+        matches.append((f_idx, e_idx))
+        used_files.add(f_idx)
+        used_episodes.add(e_idx)
+    return matches
 
-    return [m for m in matches if scores[m] >= MATCH_TOLERANCE]
+
+def _filter_tolerated_matches(
+    matches: list[tuple[int, int]], scores: dict[tuple[int, int], float]
+) -> list[tuple[int, int]]:
+    return [match for match in matches if scores[match] >= MATCH_TOLERANCE]
 
 
 # ---------------------------------------------------------------------------
@@ -192,41 +218,64 @@ def _collect_episodes(
     callback: Callback | None = None,
 ) -> list[RssEpisode]:
     """Fetch and deduplicate episodes from a list of FeedSource objects."""
-    albums: list[list[RssEpisode]] = []
-    for fs in sources:
-        filter_regex = fs.filters.to_regex()
-        publish_days = fs.filters.publish_days or None
-
-        eps: list[RssEpisode] = []
-        if is_youtube_channel(fs.url):
-            eps = get_youtube_episodes(
-                fs.url, title, filter_regex, is_reference, callback
-            )
-        else:
-            eps = get_rss_episodes(fs.url, filter_regex, publish_days, callback)
-        albums.append(eps)
+    albums = [
+        _fetch_source_episodes(source, title, is_reference, callback)
+        for source in sources
+    ]
 
     if not albums:
         return []
 
     merged: list[RssEpisode] = albums[0]
     for album in albums[1:]:
-        existing_titles = [ep.title for ep in merged]
-        new_titles = [ep.title for ep in album]
-
-        normalized_new = [normalize_title(title, t) for t in new_titles]
-        normalized_existing = [normalize_title(title, t) for t in existing_titles]
-
-        matched_indices = match(
-            normalized_new, normalized_existing, create_slug(title), callback
-        )
-
-        duplicate_indices = {f_idx for f_idx, _ in matched_indices}
-        for i, episode in enumerate(album):
-            if i not in duplicate_indices:
-                merged.append(episode)
+        _merge_episode_album(merged, album, title, callback)
 
     return merged
+
+
+def _fetch_source_episodes(
+    source: FeedSource,
+    title: str,
+    is_reference: bool,
+    callback: Callback | None = None,
+) -> list[RssEpisode]:
+    filter_regex = source.filters.to_regex()
+    publish_days = source.filters.publish_days or None
+    if is_youtube_channel(source.url):
+        return get_youtube_episodes(
+            source.url, title, filter_regex, is_reference, callback
+        )
+    return get_rss_episodes(source.url, filter_regex, publish_days, callback)
+
+
+def _normalized_episode_titles(title: str, episodes: list[RssEpisode]) -> list[str]:
+    return [normalize_title(title, episode.title) for episode in episodes]
+
+
+def _duplicate_album_indices(
+    merged: list[RssEpisode],
+    album: list[RssEpisode],
+    title: str,
+    callback: Callback | None = None,
+) -> set[int]:
+    normalized_new = _normalized_episode_titles(title, album)
+    normalized_existing = _normalized_episode_titles(title, merged)
+    matched_indices = match(
+        normalized_new, normalized_existing, create_slug(title), callback
+    )
+    return {album_idx for album_idx, _ in matched_indices}
+
+
+def _merge_episode_album(
+    merged: list[RssEpisode],
+    album: list[RssEpisode],
+    title: str,
+    callback: Callback | None = None,
+) -> None:
+    duplicate_indices = _duplicate_album_indices(merged, album, title, callback)
+    for index, episode in enumerate(album):
+        if index not in duplicate_indices:
+            merged.append(episode)
 
 
 def process_channel(config: PodcastConfig) -> RssChannel:

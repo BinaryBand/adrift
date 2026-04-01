@@ -12,6 +12,10 @@ from src.utils.text import create_slug, remove_control_chars
 _TITLE_CACHE: LRUCache = LRUCache(2048)
 
 
+def _strip_suffix(pattern: str, episode: str) -> str:
+    return re_compile(pattern).sub("", episode)
+
+
 def _clean_darknet_diaries_title(filename: str) -> str:
     slug_name = create_slug(filename)
     match = re_compile(r"ep\-*(\d{1,3}[\-a-z0-9]+)$").search(slug_name)
@@ -27,40 +31,75 @@ def _clean_swindled_title(filename: str) -> str:
     return title.strip()
 
 
+def _clean_behind_the_bastards_title(episode: str) -> str:
+    return _strip_suffix(r"(?i)\| behind the bastards$", episode)
+
+
+def _clean_coffee_break_swedish_title(episode: str) -> str:
+    return _strip_suffix(r"(?i)\| coffee break swedish podcast$", episode)
+
+
+def _clean_creepcast_title(episode: str) -> str:
+    patterns = [
+        r"(?i)\| creep cast$",
+        r"(?i)\| creepcast$",
+        r"(?i)\| creep tv$",
+    ]
+    for pattern in patterns:
+        episode = _strip_suffix(pattern, episode)
+    return episode
+
+
+def _clean_financial_audit_title(episode: str) -> str:
+    return _strip_suffix(r"(?i)\| financial audit$", episode)
+
+
+def _clean_revisionist_history_title(episode: str) -> str:
+    return _strip_suffix(r"(?i)\| revisionist history malcolm gladwell$", episode)
+
+
+def _clean_smosh_reads_reddit_stories_title(episode: str) -> str:
+    return _strip_suffix(r"(?i)\| smosh reading reddit stories$", episode)
+
+
+def _clean_stuff_they_dont_want_you_to_know_title(episode: str) -> str:
+    return _strip_suffix(r"(?i)\| stuff they don't want you to know$", episode)
+
+
+def _clean_stuff_you_should_know_title(episode: str) -> str:
+    return _strip_suffix(r"(?i)\| stuff you should know$", episode)
+
+
+_TITLE_CLEANERS = {
+    "Behind the Bastards": _clean_behind_the_bastards_title,
+    "Coffee Break Swedish": _clean_coffee_break_swedish_title,
+    "CreepCast": _clean_creepcast_title,
+    "Darknet Diaries": _clean_darknet_diaries_title,
+    "Financial Audit": _clean_financial_audit_title,
+    "Revisionist History": _clean_revisionist_history_title,
+    "Smosh Reads Reddit Stories": _clean_smosh_reads_reddit_stories_title,
+    "Stuff They Don't Want You To Know": _clean_stuff_they_dont_want_you_to_know_title,
+    "Stuff You Should Know": _clean_stuff_you_should_know_title,
+    "Swindled": _clean_swindled_title,
+}
+
+
+def _prepare_episode_title(episode: str) -> str:
+    episode = remove_control_chars(episode)
+    return re_compile(r"__adless").sub("", episode)
+
+
+def _apply_title_cleaner(show: str, episode: str) -> str:
+    cleaner = _TITLE_CLEANERS.get(show)
+    if cleaner is None:
+        return episode
+    return cleaner(episode)
+
+
 @cached(_TITLE_CACHE)
 def normalize_title(show: str, episode: str) -> str:
-    episode = remove_control_chars(episode)
-    episode = re_compile(r"__adless").sub("", episode)
-
-    # cspell:disable
-    if show == "Behind the Bastards":
-        episode = re_compile(r"(?i)\| behind the bastards$").sub("", episode)
-    if show == "Coffee Break Swedish":
-        episode = re_compile(r"(?i)\| coffee break swedish podcast$").sub("", episode)
-    if show == "CreepCast":
-        episode = re_compile(r"(?i)\| creep cast$").sub("", episode)
-        episode = re_compile(r"(?i)\| creepcast$").sub("", episode)
-        episode = re_compile(r"(?i)\| creep tv$").sub("", episode)
-    if show == "Darknet Diaries":
-        episode = _clean_darknet_diaries_title(episode)
-    if show == "Financial Audit":
-        episode = re_compile(r"(?i)\| financial audit$").sub("", episode)
-    if show == "Revisionist History":
-        episode = re_compile(r"(?i)\| revisionist history malcolm gladwell$").sub(
-            "", episode
-        )
-    if show == "Smosh Reads Reddit Stories":
-        episode = re_compile(r"(?i)\| smosh reading reddit stories$").sub("", episode)
-    if show == "Stuff They Don't Want You To Know":
-        episode = re_compile(r"(?i)\| stuff they don't want you to know$").sub(
-            "", episode
-        )
-    if show == "Stuff You Should Know":
-        episode = re_compile(r"(?i)\| stuff you should know$").sub("", episode)
-    if show == "Swindled":
-        episode = _clean_swindled_title(episode)
-    # cspell:enable
-
+    episode = _prepare_episode_title(episode)
+    episode = _apply_title_cleaner(show, episode)
     return create_slug(episode).strip("-")
 
 

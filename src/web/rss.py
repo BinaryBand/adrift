@@ -198,43 +198,79 @@ def get_rss_episodes(
 ) -> list[RssEpisode]:
     """Parse RSS feed and extract episode information for a podcast."""
     assert LINK_REGEX.match(url), "Invalid RSS feed url or file path"
+    normalized_days = _normalize_day_filters(feed_day_of_week_filter)
+    feed_str = _load_rss_feed_text(url, filter, normalized_days)
+    entries = _filter_feed_entries(feedparser.parse(feed_str).entries, filter, normalized_days)
+    return _parse_feed_entries(entries, callback)
 
-    # Normalize day strings (case- and format-insensitive) and build cache key
-    normalized_days: list[str] = []
-    if feed_day_of_week_filter:
-        normalized_days = [d.strip().lower()[:3] for d in feed_day_of_week_filter]
+
+def _normalize_day_filters(feed_day_of_week_filter: list[str] | None) -> list[str]:
+    if not feed_day_of_week_filter:
+        return []
+    return [day.strip().lower()[:3] for day in feed_day_of_week_filter]
+
+
+def _load_rss_feed_text(url: str, filter_value: str | None, normalized_days: list[str]) -> str:
     dow_filter_key = ",".join(sorted(normalized_days)) if normalized_days else ""
-    cache_key = f"feed:{url}:{filter}:{dow_filter_key}"
+    cache_key = f"feed:{url}:{filter_value}:{dow_filter_key}"
     feed_str: str | None = _rss_cache().get(cache_key)
-    if feed_str is None:
-        response = requests.get(url, timeout=15)
-        feed_str = response.text
-        _rss_cache().set(cache_key, feed_str, 1800)  # Cache for 30 minutes
+    if feed_str is not None:
+        return feed_str
 
-    feed = feedparser.parse(feed_str)
-    if filter is not None and filter != "":
-        regex = re_compile(filter)
-        feed.entries = [e for e in feed.entries if regex.search(getattr(e, "title"))]
+    response = requests.get(url, timeout=15)
+    feed_str = response.text
+    _rss_cache().set(cache_key, feed_str, 1800)
+    return feed_str
 
-    if feed_day_of_week_filter is not None and len(feed_day_of_week_filter) > 0:
-        allowed_days = {_day_of_week_to_int(nd) for nd in normalized_days}
 
-        def _is_allowed_day(entry: FeedParserDict) -> bool:
-            try:
-                pub_date_str = getattr(
-                    entry, "published", getattr(entry, "pubDate", "")
-                )
-                pub_date: datetime = parser.parse(pub_date_str)
-                return pub_date.weekday() in allowed_days
-            except (ValueError, TypeError, AttributeError):
-                # If pub_date is missing/invalid, exclude the episode
-                return False
+def _filter_feed_entries(
+    entries: list[FeedParserDict],
+    filter_value: str | None,
+    normalized_days: list[str],
+) -> list[FeedParserDict]:
+    filtered_entries = _apply_title_filter(entries, filter_value)
+    return _apply_day_filter(filtered_entries, normalized_days)
 
-        feed.entries = [e for e in feed.entries if _is_allowed_day(e)]
 
-    total = len(feed.entries)
-    episodes = []
-    for idx, entry in enumerate(feed.entries):
+def _apply_title_filter(
+    entries: list[FeedParserDict], filter_value: str | None
+) -> list[FeedParserDict]:
+    if not filter_value:
+        return entries
+    regex = re_compile(filter_value)
+    return [entry for entry in entries if regex.search(getattr(entry, "title"))]
+
+
+def _apply_day_filter(
+    entries: list[FeedParserDict], normalized_days: list[str]
+) -> list[FeedParserDict]:
+    if not normalized_days:
+        return entries
+    allowed_days = {_day_of_week_to_int(day) for day in normalized_days}
+    return [entry for entry in entries if _entry_weekday(entry) in allowed_days]
+
+
+def _entry_weekday(entry: FeedParserDict) -> int:
+    pub_date = _parse_entry_pub_date(entry)
+    if pub_date is None:
+        return -1
+    return pub_date.weekday()
+
+
+def _parse_entry_pub_date(entry: FeedParserDict) -> datetime | None:
+    try:
+        pub_date_str = getattr(entry, "published", getattr(entry, "pubDate", ""))
+        return parser.parse(pub_date_str)
+    except (ValueError, TypeError, AttributeError):
+        return None
+
+
+def _parse_feed_entries(
+    entries: list[FeedParserDict], callback: Callback | None = None
+) -> list[RssEpisode]:
+    total = len(entries)
+    episodes: list[RssEpisode] = []
+    for idx, entry in enumerate(entries):
         episodes.append(parse_rss_entry(entry))
         if callback:
             callback(idx + 1, total)
@@ -242,52 +278,87 @@ def get_rss_episodes(
 
 
 def podcast_to_rss(channel: RssChannel, episodes: list[RssEpisode]) -> str:
+    rss = _build_rss_root()
+    channel_elem = ET.SubElement(rss, "channel")
+    _append_channel_metadata(channel_elem, channel)
+    for episode in episodes:
+        _append_episode_item(channel_elem, episode)
+    return _serialize_rss(rss)
+
+
+def _build_rss_root() -> ET.Element:
     rss = ET.Element("rss", version="2.0")
     rss.set("xmlns:itunes", "http://www.itunes.com/dtds/podcast-1.0.dtd")
-    channel_elem = ET.SubElement(rss, "channel")
+    return rss
 
-    if channel.title:
-        ET.SubElement(channel_elem, "title").text = channel.title
-    if channel.author:
-        ET.SubElement(channel_elem, "itunes:author").text = channel.author
-    if channel.url:
-        ET.SubElement(channel_elem, "url").text = channel.url
-    if channel.description:
-        ET.SubElement(channel_elem, "description").text = channel.description
-    if channel.subtitle:
-        ET.SubElement(channel_elem, "itunes:subtitle").text = channel.subtitle
-    if channel.image:
-        ET.SubElement(channel_elem, "itunes:image", href=channel.image)
-        image_elem = ET.SubElement(channel_elem, "image")
-        ET.SubElement(image_elem, "url").text = channel.image
-        ET.SubElement(image_elem, "title").text = channel.title or ""
-        ET.SubElement(image_elem, "url").text = channel.url or ""
 
-    for episode in episodes:
-        item = ET.SubElement(channel_elem, "item")
-        if episode.id:
-            ET.SubElement(item, "guid").text = episode.id
-        if episode.title:
-            ET.SubElement(item, "title").text = remove_control_chars(episode.title)
-        if episode.description:
-            ET.SubElement(item, "description").text = episode.description
-        if episode.author:
-            ET.SubElement(item, "itunes:author").text = episode.author
-        if isinstance(episode.pub_date, datetime):
-            ET.SubElement(item, "pubDate").text = episode.pub_date.isoformat()
-        if episode.duration is not None:
-            ET.SubElement(item, "itunes:duration").text = str(int(episode.duration))
+def _set_text_element(parent: ET.Element, tag: str, value: str | None) -> None:
+    if value:
+        ET.SubElement(parent, tag).text = value
 
-        if episode.content:
-            content_type, _ = mimetypes.guess_type(episode.content)
-            enclosure = ET.SubElement(item, "enclosure")
-            enclosure.set("url", episode.content)
-            enclosure.set("type", content_type or "audio/mpeg")
 
-        if episode.image is not None and LINK_REGEX.match(episode.image):
-            ET.SubElement(item, "itunes:image", href=episode.image)
+def _append_channel_metadata(channel_elem: ET.Element, channel: RssChannel) -> None:
+    _set_text_element(channel_elem, "title", channel.title)
+    _set_text_element(channel_elem, "itunes:author", channel.author)
+    _set_text_element(channel_elem, "url", channel.url)
+    _set_text_element(channel_elem, "description", channel.description)
+    _set_text_element(channel_elem, "itunes:subtitle", channel.subtitle)
+    _append_channel_image(channel_elem, channel)
 
-    # Convert to string with pretty formatting
+
+def _append_channel_image(channel_elem: ET.Element, channel: RssChannel) -> None:
+    if not channel.image:
+        return
+    ET.SubElement(channel_elem, "itunes:image", href=channel.image)
+    image_elem = ET.SubElement(channel_elem, "image")
+    ET.SubElement(image_elem, "url").text = channel.image
+    ET.SubElement(image_elem, "title").text = channel.title or ""
+    ET.SubElement(image_elem, "url").text = channel.url or ""
+
+
+def _append_episode_item(channel_elem: ET.Element, episode: RssEpisode) -> None:
+    item = ET.SubElement(channel_elem, "item")
+    _set_text_element(item, "guid", episode.id)
+    _set_text_element(item, "title", _safe_episode_title(episode))
+    _set_text_element(item, "description", episode.description)
+    _set_text_element(item, "itunes:author", episode.author)
+    _append_episode_pub_date(item, episode)
+    _append_episode_duration(item, episode)
+    _append_episode_enclosure(item, episode)
+    _append_episode_image(item, episode)
+
+
+def _safe_episode_title(episode: RssEpisode) -> str | None:
+    if not episode.title:
+        return None
+    return remove_control_chars(episode.title)
+
+
+def _append_episode_pub_date(item: ET.Element, episode: RssEpisode) -> None:
+    if isinstance(episode.pub_date, datetime):
+        ET.SubElement(item, "pubDate").text = episode.pub_date.isoformat()
+
+
+def _append_episode_duration(item: ET.Element, episode: RssEpisode) -> None:
+    if episode.duration is not None:
+        ET.SubElement(item, "itunes:duration").text = str(int(episode.duration))
+
+
+def _append_episode_enclosure(item: ET.Element, episode: RssEpisode) -> None:
+    if not episode.content:
+        return
+    content_type, _ = mimetypes.guess_type(episode.content)
+    enclosure = ET.SubElement(item, "enclosure")
+    enclosure.set("url", episode.content)
+    enclosure.set("type", content_type or "audio/mpeg")
+
+
+def _append_episode_image(item: ET.Element, episode: RssEpisode) -> None:
+    if episode.image is not None and LINK_REGEX.match(episode.image):
+        ET.SubElement(item, "itunes:image", href=episode.image)
+
+
+def _serialize_rss(rss: ET.Element) -> str:
     rough_string = ET.tostring(rss, "utf-8")
     re_parsed = minidom.parseString(rough_string)
     return re_parsed.toprettyxml(indent="\t")

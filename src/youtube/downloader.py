@@ -49,69 +49,95 @@ def _ytdlp_download(
     id: str, dir: Path, callback: Callback | None = None
 ) -> Path | None:
     """Download video using yt-dlp with authentication support."""
+    opts = _build_download_opts(id, dir, callback)
+    url = f"https://www.youtube.com/watch?v={id}"
+    try:
+        info_dict = _extract_download_info(url, opts)
+        return _resolve_download_path(info_dict)
+    except Exception as e:
+        _raise_download_error(id, e)
 
-    def _progress_hook(d: dict[str, Any]) -> None:
-        if d.get("status") == "downloading" and callback:
-            try:
-                progress = d.get("downloaded_bytes", 0)
-                total = d.get("total_bytes") or d.get("total_bytes_estimate")
-                callback(progress, total)
-            except Exception:
-                pass
+    return None
 
+
+def _build_download_opts(
+    id: str, dir: Path, callback: Callback | None = None
+) -> YtDlpParams:
     opts: YtDlpParams = get_auth_ydl_opts(use_browser_fallback=True)
     opts["format"] = "bestaudio/best"
     opts["outtmpl"] = (dir / f"{id}.%(ext)s").as_posix()
-    opts["postprocessors"] = [
-        {
-            "key": "FFmpegExtractAudio",
-            "preferredcodec": "m4a",
-            "preferredquality": "192",
-        }
-    ]
-
-    # Override extractor_args for downloads: use player clients that expose
-    # audio-only streams without needing a PoToken.
-    # - android_music: YouTube Music client; best for audio-only formats
-    # - web: uses browser cookies for authenticated access as fallback
-    # (The base opts carry skip:["js"] intended for fast metadata-only fetches;
-    # we replace it here so JS-gated formats are included in the download.)
+    opts["postprocessors"] = [_audio_postprocessor()]
     opts["extractor_args"] = {"youtube": {"player_client": ["android_music", "web"]}}
 
-    if callback:
-        opts["progress_hooks"] = [_progress_hook]
+    progress_hook = _make_progress_hook(callback)
+    if progress_hook is not None:
+        opts["progress_hooks"] = [progress_hook]
 
-    # Download video
-    url = f"https://www.youtube.com/watch?v={id}"
-    try:
-        with yt_dlp.YoutubeDL(cast(Any, opts)) as ydl:
-            info = ydl.extract_info(url, download=True)
-            info_dict = cast(dict[str, Any], info)
+    return opts
 
-            if info_dict and "requested_downloads" in info_dict:
-                downloads = info_dict["requested_downloads"]
-                if downloads:
-                    downloaded_file = downloads[0]["filepath"]
-                    file_path = Path(downloaded_file)
 
-                    # Check for m4a version (post-processed)
-                    m4a_path = file_path.with_suffix(".m4a")
-                    if m4a_path.exists():
-                        return m4a_path
-                    elif file_path.exists():
-                        return file_path
-                    else:
-                        print(f"WARNING: Downloaded file not found: {file_path}")
-                        return None
+def _audio_postprocessor() -> dict[str, str]:
+    return {
+        "key": "FFmpegExtractAudio",
+        "preferredcodec": "m4a",
+        "preferredquality": "192",
+    }
 
-    except Exception as e:
-        error_msg = str(e)
-        if _is_bot_detection_error(error_msg) and PROPAGATE_BOT_DETECTION:
-            raise BotDetectionError(error_msg)
-        print(f"WARNING: yt-dlp download failed for {id}: {e}")
-        raise
 
+def _make_progress_hook(callback: Callback | None = None):
+    if callback is None:
+        return None
+
+    def progress_hook(download: dict[str, Any]) -> None:
+        if download.get("status") != "downloading":
+            return
+        try:
+            progress = download.get("downloaded_bytes", 0)
+            total = download.get("total_bytes") or download.get("total_bytes_estimate")
+            callback(progress, total)
+        except Exception:
+            pass
+
+    return progress_hook
+
+
+def _extract_download_info(url: str, opts: YtDlpParams) -> dict[str, Any]:
+    with yt_dlp.YoutubeDL(cast(Any, opts)) as ydl:
+        info = ydl.extract_info(url, download=True)
+    return cast(dict[str, Any], info)
+
+
+def _resolve_download_path(info_dict: dict[str, Any]) -> Path | None:
+    file_path = _requested_download_path(info_dict)
+    if file_path is None:
+        return None
+
+    m4a_path = file_path.with_suffix(".m4a")
+    if m4a_path.exists():
+        return m4a_path
+    if file_path.exists():
+        return file_path
+
+    print(f"WARNING: Downloaded file not found: {file_path}")
     return None
+
+
+def _requested_download_path(info_dict: dict[str, Any]) -> Path | None:
+    downloads = info_dict.get("requested_downloads")
+    if not downloads:
+        return None
+    downloaded_file = downloads[0].get("filepath")
+    if not isinstance(downloaded_file, str):
+        return None
+    return Path(downloaded_file)
+
+
+def _raise_download_error(id: str, error: Exception) -> None:
+    error_msg = str(error)
+    if _is_bot_detection_error(error_msg) and PROPAGATE_BOT_DETECTION:
+        raise BotDetectionError(error_msg)
+    print(f"WARNING: yt-dlp download failed for {id}: {error}")
+    raise error
 
 
 def download_video(
@@ -129,9 +155,8 @@ def download_video(
     """
     dir.mkdir(parents=True, exist_ok=True)
 
-    video_id = _extract_video_id(url)
-    if not video_id:
-        print(f"WARNING: Could not extract video ID from {url}")
+    video_id = _validated_video_id(url)
+    if video_id is None:
         return None
 
     try:
@@ -139,9 +164,20 @@ def download_video(
     except BotDetectionError:
         raise
     except Exception as e:
-        error_msg = str(e)
-        if _is_bot_detection_error(error_msg):
-            if PROPAGATE_BOT_DETECTION:
-                raise BotDetectionError(error_msg)
-        print(f"WARNING: download failed for {url}: {e}")
+        return _handle_download_failure(url, e)
+
+
+def _validated_video_id(url: str) -> str | None:
+    video_id = _extract_video_id(url)
+    if not video_id:
+        print(f"WARNING: Could not extract video ID from {url}")
         return None
+    return video_id
+
+
+def _handle_download_failure(url: str, error: Exception) -> None:
+    error_msg = str(error)
+    if _is_bot_detection_error(error_msg) and PROPAGATE_BOT_DETECTION:
+        raise BotDetectionError(error_msg)
+    print(f"WARNING: download failed for {url}: {error}")
+    return None
