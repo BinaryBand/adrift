@@ -57,23 +57,51 @@ def get_youtube_channel(url: str, author: str) -> RssChannel:
 
 def _add_episode_metadata(episode: RssEpisode, author: str) -> RssEpisode:
     """Add pub_date and thumbnail to episode if detailed=True."""
-
     # Allow tests/offline runs to skip network/video-info fetches
-    if os.getenv("PODSMITH_SKIP_VIDEO_INFO"):
-        return episode
-
-    info = ytdlp.get_video_info(episode.id)
+    info = _fetch_video_info(episode.id)
     if info is None:
-        print(f"WARNING: Failed to fetch video info for {episode.id}")
         return episode
 
-    episode.pub_date = info.upload_date or episode.pub_date  # Update pub_date
-
-    if thumbnail := info.thumbnail:  # Update thumbnail
-        if image := upload_thumbnail(thumbnail, author, episode.id) or thumbnail:
-            episode.image = image
+    _maybe_update_pub_date(episode, info)
+    _maybe_update_thumbnail(episode, info, author)
 
     return episode
+
+
+def _fetch_video_info(video_id: str) -> ytdlp.VideoInfo | None:
+    """Wrapper around ytdlp.get_video_info with centralized error handling.
+
+    Honors `PODSMITH_SKIP_VIDEO_INFO` for offline/test runs.
+    """
+    if os.getenv("PODSMITH_SKIP_VIDEO_INFO"):
+        return None
+
+    try:
+        return ytdlp.get_video_info(video_id)
+    except Exception as e:
+        print(f"WARNING: Failed to fetch video info for {video_id}: {e}")
+        return None
+
+
+def _maybe_update_pub_date(episode: RssEpisode, info: ytdlp.VideoInfo) -> None:
+    """Update `episode.pub_date` from video info if available."""
+    try:
+        episode.pub_date = info.upload_date or episode.pub_date
+    except Exception:
+        # Be tolerant of missing fields on the returned info object
+        pass
+
+
+def _maybe_update_thumbnail(episode: RssEpisode, info: ytdlp.VideoInfo, author: str) -> None:
+    """Download/upload thumbnail if present and update `episode.image`."""
+    try:
+        if thumbnail := getattr(info, "thumbnail", None):
+            image = upload_thumbnail(thumbnail, author, episode.id) or thumbnail
+            if image:
+                episode.image = image
+    except Exception:
+        # Non-fatal: do not break the enrichment pipeline for thumbnail errors
+        pass
 
 
 def get_youtube_episodes(

@@ -120,7 +120,12 @@ def _download_episode(
 
             key = file_path.with_suffix(stage.suffix).as_posix()
             with tqdm(desc=f"↑ Uploading {episode.title}", total=1) as progress:
-                upload_file(bucket, key, stage, metadata, get_callback(progress))
+                upload_file(
+                    bucket,
+                    key,
+                    stage,
+                    {"metadata": metadata, "callback": get_callback(progress)},
+                )
                 print(f"Uploaded episode to {bucket}/{key}")
         return True
 

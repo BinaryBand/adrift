@@ -6,6 +6,7 @@ from mypy_boto3_s3 import S3Client
 from dotenv import load_dotenv, find_dotenv
 from urllib.parse import urljoin
 from functools import cache, wraps
+from dataclasses import dataclass
 from diskcache import Cache
 from threading import Lock
 from pathlib import Path
@@ -122,9 +123,16 @@ def _is_endpoint_reachable(url: str, timeout: float = 2.0) -> bool:
         return False
 
 
-def _do_s3_upload(
-    bucket: str, key: str, file_path: str, extra_args: dict, boto_callback
-) -> None:
+@dataclass
+class _UploadSpec:
+    bucket: str
+    key: str
+    file_path: str
+    extra_args: dict
+    boto_callback: Callable | None = None
+
+
+def _do_s3_upload(spec: _UploadSpec) -> None:
     """Execute the actual S3 multipart upload via boto3."""
     transfer_config = TransferConfig(
         max_concurrency=10,
@@ -133,12 +141,12 @@ def _do_s3_upload(
         use_threads=True,
     )
     get_s3_client().upload_file(
-        Filename=file_path,
-        Bucket=bucket,
-        Key=key,
-        ExtraArgs=extra_args,
+        Filename=spec.file_path,
+        Bucket=spec.bucket,
+        Key=spec.key,
+        ExtraArgs=spec.extra_args,
         Config=transfer_config,
-        Callback=boto_callback,
+        Callback=spec.boto_callback,
     )
 
 
@@ -178,27 +186,36 @@ def get_s3_client() -> S3Client:
         if _S3_CLIENT is not None:
             return _S3_CLIENT
 
-        session = boto3.session.Session()
-
-        cfg = Config(
-            signature_version="s3v4",
-            connect_timeout=15,
-            read_timeout=120,
-            retries={"max_attempts": 5},
-        )
-
-        client = session.client(
-            service_name="s3",
-            aws_access_key_id=S3_USERNAME,
-            aws_secret_access_key=S3_SECRET_KEY,
-            # Use local shortcut endpoint when available; keep S3_ENDPOINT as public.
-            endpoint_url=_get_effective_s3_endpoint(),
-            config=cfg,
-            region_name=S3_REGION,
-        )
-
-        _S3_CLIENT = cast(S3Client, client)
+        _S3_CLIENT = cast(S3Client, _build_s3_client())
         return _S3_CLIENT
+
+
+def _build_s3_client() -> S3Client:
+    """Construct a new boto3 S3 client (not cached).
+
+    Exposed as a helper so client construction can be replaced or mocked
+    independently of the caching layer in `get_s3_client()`.
+    """
+    session = boto3.session.Session()
+
+    cfg = Config(
+        signature_version="s3v4",
+        connect_timeout=15,
+        read_timeout=120,
+        retries={"max_attempts": 5},
+    )
+
+    client = session.client(
+        service_name="s3",
+        aws_access_key_id=S3_USERNAME,
+        aws_secret_access_key=S3_SECRET_KEY,
+        # Use local shortcut endpoint when available; keep S3_ENDPOINT as public.
+        endpoint_url=_get_effective_s3_endpoint(),
+        config=cfg,
+        region_name=S3_REGION,
+    )
+
+    return cast(S3Client, client)
 
 
 def download_file(bucket: str, key: str, download_path: Path) -> None:
@@ -216,24 +233,42 @@ def upload_file(
     bucket: str,
     key: str,
     file_path: Path,
-    metadata: MediaMetadata | None = None,
-    callback: Callback | None = None,
+    options: dict | MediaMetadata | None = None,
 ) -> str | None:
+    """Upload a file to S3.
+
+    The `options` argument may be one of:
+      - `None` (no metadata or callback)
+      - a `MediaMetadata` instance (metadata only)
+      - a `dict` with optional keys `metadata` and `callback`
+    """
     _file_path = file_path if isinstance(file_path, str) else file_path.as_posix()
     assert os.path.exists(_file_path), f"Local file not found: {file_path}"
+
+    metadata = None
+    callback = None
+    if isinstance(options, dict):
+        metadata = options.get("metadata")
+        callback = options.get("callback")
+    elif options is not None and not isinstance(options, dict):
+        # Treat as metadata instance
+        metadata = options
+
     metadata_dict = metadata.to_dict() if metadata is not None else None
     boto_callback = (
         _make_upload_callback(callback, os.path.getsize(_file_path))
         if callback is not None
         else None
     )
-    _do_s3_upload(
-        bucket,
-        key,
-        _file_path,
-        _build_upload_extra_args(_file_path, metadata_dict),
-        boto_callback,
+
+    spec = _UploadSpec(
+        bucket=bucket,
+        key=key,
+        file_path=_file_path,
+        extra_args=_build_upload_extra_args(_file_path, metadata_dict),
+        boto_callback=boto_callback,
     )
+    _do_s3_upload(spec)
     _sync_upload_cache(bucket, key, metadata_dict)
     return urljoin(S3_ENDPOINT, Path(bucket, key).as_posix())
 
@@ -244,23 +279,19 @@ def upload_cache_file(
     key: str,
     file_path: Path,
     metadata: CacheMetadata | None = None,
-    callback: Callback | None = None,
 ) -> str | None:
     _file_path = file_path if isinstance(file_path, str) else file_path.as_posix()
     assert os.path.exists(_file_path), f"Local file not found: {file_path}"
     metadata_dict = metadata.to_dict() if metadata is not None else None
-    boto_callback = (
-        _make_upload_callback(callback, os.path.getsize(_file_path))
-        if callback is not None
-        else None
+
+    spec = _UploadSpec(
+        bucket=bucket,
+        key=key,
+        file_path=_file_path,
+        extra_args=_build_upload_extra_args(_file_path, metadata_dict),
+        boto_callback=None,
     )
-    _do_s3_upload(
-        bucket,
-        key,
-        _file_path,
-        _build_upload_extra_args(_file_path, metadata_dict),
-        boto_callback,
-    )
+    _do_s3_upload(spec)
     _sync_upload_cache(bucket, key, metadata_dict)
     return urljoin(S3_ENDPOINT, Path(bucket, key).as_posix())
 
@@ -337,24 +368,34 @@ def _get_file_map(bucket: str, prefix: str, without_extensions=True) -> dict:
     if cached_map is not None:
         return cached_map
 
+    file_list: dict = {}
+    for obj in _iterate_s3_objects(bucket, prefix):
+        key = obj.get("Key", "")
+        file_name = Path(key).name
+
+        if without_extensions:
+            file_name = Path(file_name).with_suffix("").as_posix()
+
+        etag = obj.get("ETag", "").strip('"')[:32]
+        file_list[file_name] = etag
+
+    _s3_cache().set(cache_key, file_list, expire=10)
+    return file_list
+
+
+def _iterate_s3_objects(bucket: str, prefix: str):
+    """Yield object dicts for all objects under `bucket/prefix`.
+
+    Extracted from `_get_file_map()` so pagination can be tested or swapped
+    independently of the mapping/ETag logic.
+    """
     s3: S3Client = get_s3_client()
     paginator = s3.get_paginator("list_objects_v2")
     page_iterator = paginator.paginate(Bucket=bucket, Prefix=prefix, Delimiter="/")
 
-    file_list: dict = {}
     for page in page_iterator:
         for obj in page.get("Contents", {}):
-            key = obj.get("Key", "")
-            file_name = Path(key).name
-
-            if without_extensions:
-                file_name = Path(file_name).with_suffix("").as_posix()
-
-            etag = obj.get("ETag", "").strip('"')[:32]
-            file_list[file_name] = etag
-
-    _s3_cache().set(cache_key, file_list, expire=10)
-    return file_list
+            yield obj
 
 
 def _remove_file_extensions(file_names: list[str]) -> list[str]:
@@ -385,11 +426,14 @@ def exists(bucket: str, prefix: str, extension_agnostic=True) -> str | None:
     file_list: list[str] = get_file_list(bucket, parent_dir, False)
 
     for f in file_list:
-        if extension_agnostic:
-            if Path(f).with_suffix("").as_posix() == identifier:
-                return f
-        else:
-            if f == identifier:
-                return f
+        if _identifier_matches(f, identifier, extension_agnostic):
+            return f
 
     return None
+
+
+def _identifier_matches(name: str, identifier: str, extension_agnostic: bool) -> bool:
+    """Return True if `name` matches `identifier` under the extension policy."""
+    if extension_agnostic:
+        return Path(name).with_suffix("").as_posix() == identifier
+    return name == identifier
