@@ -75,12 +75,17 @@ class AuditConfigs(unittest.TestCase):
                     self, fs.filters, f"{podcast.name} download {fs.url} filters"
                 )
 
-            # Validate schedule is a list of FREQ= strings when present
+            # Validate schedule is either legacy FREQ= or RFC5545 DTSTART+RRULE.
             for rule in podcast.schedule:
                 self.assertIsInstance(rule, str)
                 self.assertTrue(
-                    rule.startswith("FREQ="),
-                    f"{podcast.name}: schedule rule should start with FREQ=, got {rule!r}",
+                    rule.startswith("FREQ=")
+                    or (
+                        "DTSTART:" in rule.upper()
+                        and "RRULE:" in rule.upper()
+                        and "FREQ=" in rule.upper()
+                    ),
+                    f"{podcast.name}: unsupported schedule format {rule!r}",
                 )
 
 

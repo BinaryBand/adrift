@@ -275,6 +275,18 @@ url = "yt://@WeeklyShowPodcast"
 
 
 [[podcasts]]
+name     = "The Daily Show"
+path     = "/media/podcasts/the-daily-show"
+schedule = ["DTSTART:20240124T000000Z\nRRULE:FREQ=WEEKLY;BYDAY=MO"]
+
+[[podcasts.references]]
+url = "https://feeds.megaphone.fm/QCD2422844292"
+
+[[podcasts.downloads]]
+url = "yt://@TheDailyShow"
+
+
+[[podcasts]]
 name = "YV Edit"
 path = "/media/podcasts/yv-edit"
 

@@ -33,7 +33,19 @@ def _day_window(current: datetime) -> tuple[datetime, datetime]:
 
 
 def _next_occurrence_in_window(schedule: str, day_start: datetime) -> datetime | None:
-    rule = rrulestr(schedule, dtstart=day_start)
+    # Support RFC5545 forms like:
+    #   DTSTART:20240124T000000Z\nRRULE:FREQ=WEEKLY;BYDAY=MO
+    # For bare RRULE values, seed dtstart from the day window as before.
+    if "DTSTART" in schedule.upper():
+        rule = rrulestr(schedule)
+        rule_start = getattr(rule, "_dtstart", None)
+        if isinstance(rule_start, datetime):
+            if rule_start.tzinfo is not None and day_start.tzinfo is None:
+                day_start = day_start.replace(tzinfo=rule_start.tzinfo)
+            if rule_start.tzinfo is None and day_start.tzinfo is not None:
+                day_start = day_start.replace(tzinfo=None)
+    else:
+        rule = rrulestr(schedule, dtstart=day_start)
     return rule.after(day_start - timedelta(microseconds=1), inc=True)
 
 
@@ -138,13 +150,18 @@ def _schedule_matches_today(
 
         "FREQ=WEEKLY;BYDAY=WE,FR"  →  True on Wednesdays and Fridays
     """
-    return True
     del title
     current = today or datetime.now()
     day_start, day_end = _day_window(current)
 
     try:
         next_occurrence = _next_occurrence_in_window(schedule, day_start)
+        if next_occurrence is None:
+            return False
+        if next_occurrence.tzinfo is not None and day_end.tzinfo is None:
+            day_end = day_end.replace(tzinfo=next_occurrence.tzinfo)
+        if next_occurrence.tzinfo is None and day_end.tzinfo is not None:
+            day_end = day_end.replace(tzinfo=None)
         return next_occurrence is not None and next_occurrence < day_end
     except Exception:
         # Fail closed: if RRULE is malformed we skip this schedule.

@@ -162,6 +162,12 @@ class TestScheduleMatchesToday(unittest.TestCase):
         )
         self.assertTrue(result)
 
+    def test_dtstart_plus_rrule_supported(self):
+        """RFC5545 DTSTART+RRULE strings should evaluate schedule windows."""
+        schedule = "DTSTART:20240124T000000Z\nRRULE:FREQ=WEEKLY;BYDAY=MO"
+        self.assertTrue(_schedule_matches_today(schedule, "The Daily Show", datetime(2026, 3, 30)))
+        self.assertFalse(_schedule_matches_today(schedule, "The Daily Show", datetime(2026, 3, 31)))
+
 
 if __name__ == "__main__":
     unittest.main()

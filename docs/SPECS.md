@@ -55,6 +55,32 @@ classDiagram
 | YouTube channel | `yt://@channel_handle` | Channel episode list |
 | YouTube video | `yt://#video_id` | Single episode reference |
 
+### Schedule conventions (RFC 5545)
+
+`Podcast.schedule` is a list of recurrence definitions used to decide whether a
+podcast should run on the current day.
+
+Supported formats:
+
+| Format | Example | Notes |
+| --- | --- | --- |
+| Legacy RRULE-only | `FREQ=WEEKLY;BYDAY=MO` | Backward-compatible shorthand |
+| RFC 5545 DTSTART + RRULE | `DTSTART:20240124T000000Z\nRRULE:FREQ=WEEKLY;BYDAY=MO` | Preferred when a recurrence start date is required |
+
+TOML example:
+
+```toml
+[[podcasts]]
+name = "The Daily Show"
+schedule = ["DTSTART:20240124T000000Z\nRRULE:FREQ=WEEKLY;BYDAY=MO"]
+```
+
+Notes:
+
+- `DTSTART` establishes the recurrence start boundary.
+- `BYDAY=MO` with this start date yields Monday occurrences from the first Monday on/after the start boundary.
+- Schedule recurrence controls when a podcast is processed, not per-episode publish-date eligibility.
+
 ### References vs Downloads
 
 `Podcast.references` and `Podcast.downloads` serve distinct roles in the build pipeline, and a single episode must have a match in both.
