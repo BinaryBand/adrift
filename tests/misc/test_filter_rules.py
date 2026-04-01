@@ -6,7 +6,7 @@ import re
 import sys
 import unittest
 from pathlib import Path
-from unittest.mock import patch
+from datetime import datetime
 
 sys.path.insert(0, Path(__file__).parent.parent.parent.as_posix())
 
@@ -20,7 +20,6 @@ os.environ.setdefault("S3_REGION", "us-east-1")
 
 app_common = importlib.import_module("src.app_common")
 SourceFilter = app_common.SourceFilter
-_get_deterministic_day = app_common._get_deterministic_day
 _schedule_matches_today = app_common._schedule_matches_today
 
 
@@ -116,41 +115,52 @@ class TestScheduleMatchesToday(unittest.TestCase):
 
     def test_byday_matches_today(self):
         """If BYDAY contains today's code the function returns True."""
-        with patch("src.app_common.pd") as mock_pd:
-            mock_pd.Timestamp.now.return_value.strftime.return_value = "Wed"
-            result = _schedule_matches_today("FREQ=WEEKLY;BYDAY=WE,FR", "Some Show")
+        result = _schedule_matches_today(
+            "FREQ=WEEKLY;BYDAY=WE,FR",
+            "Some Show",
+            datetime(2026, 4, 1),  # Wednesday
+        )
         self.assertTrue(result)
 
     def test_byday_does_not_match_today(self):
         """If BYDAY does not contain today's code the function returns False."""
-        with patch("src.app_common.pd") as mock_pd:
-            mock_pd.Timestamp.now.return_value.strftime.return_value = "Mon"
-            result = _schedule_matches_today("FREQ=WEEKLY;BYDAY=WE,FR", "Some Show")
+        result = _schedule_matches_today(
+            "FREQ=WEEKLY;BYDAY=WE,FR",
+            "Some Show",
+            datetime(2026, 3, 30),  # Monday
+        )
         self.assertFalse(result)
 
-    def test_no_byday_uses_deterministic_day(self):
-        """FREQ=WEEKLY without BYDAY falls back to the deterministic per-title day."""
-        title = "Coffeezilla"
-        expected_day = _get_deterministic_day(title)
-
-        with patch("src.app_common.pd") as mock_pd:
-            mock_pd.Timestamp.now.return_value.strftime.return_value = expected_day[
-                :3
-            ].capitalize()
-            result = _schedule_matches_today("FREQ=WEEKLY", title)
-
+    def test_no_byday_uses_rrule_defaults(self):
+        """FREQ=WEEKLY without BYDAY is evaluated directly by dateutil RRULE."""
+        result = _schedule_matches_today(
+            "FREQ=WEEKLY", "Coffeezilla", datetime(2026, 4, 1)
+        )
         self.assertTrue(result)
 
     def test_single_byday(self):
-        with patch("src.app_common.pd") as mock_pd:
-            mock_pd.Timestamp.now.return_value.strftime.return_value = "Mon"
-            result = _schedule_matches_today("FREQ=WEEKLY;BYDAY=MO", "Alyssa Grenfell")
+        result = _schedule_matches_today(
+            "FREQ=WEEKLY;BYDAY=MO",
+            "Alyssa Grenfell",
+            datetime(2026, 3, 30),
+        )
         self.assertTrue(result)
 
-        with patch("src.app_common.pd") as mock_pd:
-            mock_pd.Timestamp.now.return_value.strftime.return_value = "Tue"
-            result = _schedule_matches_today("FREQ=WEEKLY;BYDAY=MO", "Alyssa Grenfell")
+        result = _schedule_matches_today(
+            "FREQ=WEEKLY;BYDAY=MO",
+            "Alyssa Grenfell",
+            datetime(2026, 3, 31),
+        )
         self.assertFalse(result)
+
+    def test_rrule_interval_supported(self):
+        """dateutil-backed parser should support additional RRULE fields."""
+        result = _schedule_matches_today(
+            "FREQ=DAILY;INTERVAL=2",
+            "Any Show",
+            datetime(2026, 4, 1),
+        )
+        self.assertTrue(result)
 
 
 if __name__ == "__main__":

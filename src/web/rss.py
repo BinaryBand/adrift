@@ -12,13 +12,11 @@ import xml.etree.ElementTree as ET
 import feedparser
 import functools
 import mimetypes
-import pandas as pd
 import requests
 import tempfile
 import sys
 
 sys.path.insert(0, Path(__file__).parent.parent.parent.as_posix())
-from src.app_common import DAY_OF_WEEK
 from src.files.audio import AUDIO_EXTENSIONS, parse_duration
 from src.files.images import make_square_image
 from src.files.s3 import S3_ENDPOINT, exists, upload_file
@@ -195,7 +193,7 @@ def _day_of_week_to_int(dow: str) -> int:
 def get_rss_episodes(
     url: str,
     filter: str | None = "",
-    feed_day_of_week_filter: list[DAY_OF_WEEK] | None = None,
+    feed_day_of_week_filter: list[str] | None = None,
     callback: Callback | None = None,
 ) -> list[RssEpisode]:
     """Parse RSS feed and extract episode information for a podcast."""
@@ -293,26 +291,6 @@ def podcast_to_rss(channel: RssChannel, episodes: list[RssEpisode]) -> str:
     rough_string = ET.tostring(rss, "utf-8")
     re_parsed = minidom.parseString(rough_string)
     return re_parsed.toprettyxml(indent="\t")
-
-
-def rss_to_df(episodes: list[RssEpisode]) -> pd.DataFrame:
-    """Convert RSS channel and episodes to a pandas DataFrame for analysis."""
-    data = []
-    for ep in episodes:
-        data.append(
-            {
-                "id": ep.id,
-                "title": ep.title,
-                "author": ep.author,
-                "description": f"{ep.description}".split("\n")[0][:64],
-                "content": ep.content,
-                "pub_date": ep.pub_date,
-                "duration": ep.duration,
-                "image": ep.image,
-            }
-        )
-    df = pd.DataFrame(data)
-    return df
 
 
 def download_direct(url: str, dest: Path) -> tuple[Path, bool]:

@@ -1,44 +1,18 @@
 from pydantic import BaseModel, computed_field
 from urllib.parse import urljoin
-from functools import cache
-from typing import Literal
 from pathlib import Path
+from dateutil.rrule import rrulestr
 
 import tomllib
-import pandas as pd
-import hashlib
 import random
-import ast
-import re
 import sys
 
 sys.path.insert(0, Path(__file__).parent.parent.as_posix())
-from src.models import DEVICE
 from src.files.s3 import S3_ENDPOINT
-from datetime import datetime
-from src.utils.text import create_slug
+from datetime import datetime, timedelta
 
 
-DAY_OF_WEEK = Literal["mon", "tue", "wed", "thu", "fri", "sat", "sun"]
-LOG_PATH = Path(".logs") / DEVICE
 MATCH_TOLERANCE = 0.75
-
-# Maps iCalendar RRULE BYDAY codes to three-letter day names used throughout
-_RRULE_BYDAY: dict[str, DAY_OF_WEEK] = {
-    "MO": "mon",
-    "TU": "tue",
-    "WE": "wed",
-    "TH": "thu",
-    "FR": "fri",
-    "SA": "sat",
-    "SU": "sun",
-}
-
-
-class MatchData(BaseModel):
-    file: str | None
-    episode: str | None
-    score: float
 
 
 class SourceFilter(BaseModel):
@@ -52,7 +26,7 @@ class SourceFilter(BaseModel):
 
     include: list[str] = []
     exclude: list[str] = []
-    publish_days: list[DAY_OF_WEEK] = []
+    publish_days: list[str] = []
 
     def to_regex(self) -> str | None:
         """Compile include/exclude lists into a single regex string.
@@ -60,9 +34,9 @@ class SourceFilter(BaseModel):
         The generated pattern is designed for ``re.search()``.  It is
         case-insensitive and combines:
 
-        * Negative lookaheads for every ``exclude`` entry so that any
+        * Negative look-ahead for every ``exclude`` entry so that any
           title containing that pattern is rejected.
-        * A positive lookahead for the union of all ``include`` entries
+        * A positive look-ahead for the union of all ``include`` entries
           so that the title must match at least one (when ``include`` is
           non-empty).
         """
@@ -109,69 +83,6 @@ class PodcastConfig(BaseModel):
     def link(self) -> str:
         return urljoin(S3_ENDPOINT, self.path + ".rss")
 
-    @computed_field(return_type=list[MatchData])
-    def log_data(self) -> list[MatchData]:
-        return get_match_data(self.name)
-
-
-def get_match_data(title: str) -> list[MatchData]:
-    df_label = f"{create_slug(title)}_match"
-    match_path = (
-        Path(".logs") / DEVICE / datetime.now().strftime("%Y-%m-%d") / f"{df_label}.csv"
-    )
-
-    if not match_path.exists():
-        return []
-
-    df = pd.read_csv(match_path)
-
-    # Preferred format: real columns written by _update_logs.
-    if {"file", "episode", "score"}.issubset(set(df.columns)):
-        _out: list[MatchData] = []
-        for row in df.to_dict(orient="records"):
-            file = row.get("file")
-            episode = row.get("episode")
-            score = row.get("score", 0.0)
-            _out.append(
-                MatchData(
-                    file=None if pd.isna(file) else str(file),
-                    episode=None if pd.isna(episode) else str(episode),
-                    score=0.0 if pd.isna(score) else float(score),
-                )
-            )
-        return _out
-
-    # Back-compat: older CSVs where each row is 3 columns containing
-    # stringified tuples like "('file', '...')", "('episode', '...')".
-    tuple_cols = [c for c in df.columns if c != "Unnamed: 0"]
-    out: list[MatchData] = []
-    for row in df.to_dict(orient="records"):
-        parsed: dict[str, object] = {}
-        for col in tuple_cols:
-            cell = row.get(col)
-            if not isinstance(cell, str):
-                continue
-            try:
-                k, v = ast.literal_eval(cell)
-            except Exception:
-                continue
-            if isinstance(k, str):
-                parsed[k] = v
-
-        file = parsed.get("file")
-        episode = parsed.get("episode")
-        _score = parsed.get("score", 0.0)
-        score = float(_score) if isinstance(_score, (int, float, str)) else 0.0
-        out.append(
-            MatchData(
-                file=None if file is None else str(file),
-                episode=None if episode is None else str(episode),
-                score=score,
-            )
-        )
-
-    return out
-
 
 def _load_config(name_or_path: str) -> list[PodcastConfig]:
     """Load podcast configurations from a TOML file.
@@ -194,47 +105,31 @@ def _load_config(name_or_path: str) -> list[PodcastConfig]:
     return configs
 
 
-@cache
-def _get_deterministic_day(title: str) -> DAY_OF_WEEK:
-    """Assign a deterministic day of the week based on the title."""
-    day_of_week_it: list[DAY_OF_WEEK] = [
-        "mon",
-        "tue",
-        "wed",
-        "thu",
-        "fri",
-        "sat",
-        "sun",
-    ]
-    normalized = title.strip().lower()
-    h = int(hashlib.md5(normalized.encode("utf-8")).hexdigest(), 16)
-    return day_of_week_it[h % len(day_of_week_it)]
-
-
-def _schedule_matches_today(schedule: str, title: str) -> bool:
+def _schedule_matches_today(
+    schedule: str, title: str, today: datetime | None = None
+) -> bool:
     """Return True if the RRULE *schedule* includes today.
 
-    Parses the ``BYDAY`` component of an iCalendar RRULE string.  When
-    ``BYDAY`` is absent the show is treated as *weekly* and a
-    deterministic per-title day is assigned (identical logic to the old
-    ``"weekly"`` sentinel).
+    Uses ``dateutil.rrule`` to evaluate whether the rule produces at
+    least one occurrence within today's local day window.
 
     Examples::
 
         "FREQ=WEEKLY;BYDAY=WE,FR"  →  True on Wednesdays and Fridays
-        "FREQ=WEEKLY"              →  True on the deterministic day for *title*
     """
-    today = pd.Timestamp.now().strftime("%a").lower()[:3]
-    byday_match = re.search(r"BYDAY=([A-Z,]+)", schedule)
-    if byday_match:
-        days: list[DAY_OF_WEEK] = [
-            _RRULE_BYDAY[code]
-            for code in byday_match.group(1).split(",")
-            if code in _RRULE_BYDAY
-        ]
-        return today in days
-    # No BYDAY → use deterministic weekly day
-    return today == _get_deterministic_day(title)
+    current = today or datetime.now()
+
+    day_start = datetime.combine(current.date(), datetime.min.time())
+    day_end = day_start + timedelta(days=1)
+
+    try:
+        rule = rrulestr(schedule, dtstart=day_start)
+        # True when the next occurrence on/after start is still in this day.
+        next_occurrence = rule.after(day_start - timedelta(microseconds=1), inc=True)
+        return next_occurrence is not None and next_occurrence < day_end
+    except Exception:
+        # Fail closed: if RRULE is malformed we skip this schedule.
+        return False
 
 
 def _config_schedule_matches_today(config: "PodcastConfig") -> bool:

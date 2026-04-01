@@ -6,6 +6,7 @@ cd "$repo_root"
 
 ruff_bin="$repo_root/.venv/bin/ruff"
 pytest_bin="$repo_root/.venv/bin/pytest"
+python_bin="$repo_root/.venv/bin/python"
 
 if [[ ! -x "$ruff_bin" ]]; then
     echo "ERROR: Ruff not found at $ruff_bin"
@@ -17,11 +18,19 @@ if [[ ! -x "$pytest_bin" ]]; then
     exit 1
 fi
 
+if [[ ! -x "$python_bin" ]]; then
+    echo "ERROR: python not found at $python_bin"
+    exit 1
+fi
+
 echo "Running Ruff lint..."
 "$ruff_bin" check src runbook tests typings
 
 echo "Running Ruff format check..."
 "$ruff_bin" format --check src runbook tests typings
+
+echo "Running complexity checks (advisory mode)..."
+"$python_bin" runbook/check_complexity.py src --ccn 5 --length 25 --params 4
 
 echo "Running tests..."
 "$pytest_bin" tests --ignore=tests/misc/test_filter_rules.py

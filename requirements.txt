@@ -19,6 +19,5 @@ yarl
 types-tqdm
 types-cachetools
 types-yt-dlp
-pandas
-pandas-stubs
 types-python-dateutil
+lizard

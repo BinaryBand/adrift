@@ -1,16 +1,12 @@
-from pydantic import BaseModel
 from rapidfuzz import fuzz
 from pathlib import Path
 from datetime import datetime
 
-import pandas as pd
 import sys
 
 sys.path.insert(0, Path(__file__).parent.parent.as_posix())
 from src.app_common import (
-    DAY_OF_WEEK,
     MATCH_TOLERANCE,
-    MatchData,
     PodcastConfig,
     FeedSource,
 )
@@ -25,31 +21,6 @@ from src.web.rss import (
 from src.utils.text import normalize_text, create_slug, is_youtube_channel
 from src.youtube.metadata import get_youtube_channel, get_youtube_episodes
 from src.models.output import EpisodeData
-
-
-def _update_logs(title: str, match: list):
-    # NOTE: pydantic BaseModel instances are iterable (yielding (field, value)
-    # tuples). Passing them directly to DataFrame produces 0/1/2 columns of
-    # stringified tuples instead of real columns like file/episode/score.
-    rows: list[dict] = []
-    for item in match:
-        if isinstance(item, BaseModel):
-            rows.append(item.model_dump())
-        elif isinstance(item, dict):
-            rows.append(item)
-        else:
-            try:
-                rows.append(dict(item))
-            except Exception:
-                rows.append({"value": str(item)})
-
-    df = pd.DataFrame(rows)
-    cols = [c for c in ("file", "episode", "score", "baseline") if c in df.columns]
-    other = [c for c in df.columns if c not in cols]
-    df = df[cols + other]
-
-    df_label = f"{create_slug(title)}_match"
-    print(f"DataFrame: {df_label}")
 
 
 def _similarity_clean(ac: str, bc: str) -> float:
@@ -87,24 +58,6 @@ def match(
             matches.append((f_idx, e_idx))
             used_files.add(f_idx)
             used_episodes.add(e_idx)
-
-    match_data: list[MatchData] = [
-        MatchData(file=files[f], episode=episodes[e], score=scores[(f, e)])
-        for f, e in matches
-    ]
-
-    # Include unmatched files (no episode paired)
-    matched_file_indices = {f for f, _ in matches}
-    for f_idx, f_name in enumerate(files):
-        if f_idx not in matched_file_indices:
-            match_data.append(MatchData(file=f_name, episode=None, score=0.0))
-
-    # Include unmatched episodes (no file paired)
-    matched_episode_indices = {e for _, e in matches}
-    for e_idx, e_name in enumerate(episodes):
-        if e_idx not in matched_episode_indices:
-            match_data.append(MatchData(file=None, episode=e_name, score=0.0))
-    _update_logs(create_slug(title), match_data)
 
     return [m for m in matches if scores[m] >= MATCH_TOLERANCE]
 
@@ -309,7 +262,7 @@ def _process_source(
     source: str,
     title: str,
     filter: str | None = None,
-    feed_day_of_week_filter: list[DAY_OF_WEEK] | None = None,
+    feed_day_of_week_filter: list[str] | None = None,
     callback: Callback | None = None,
 ) -> list[RssEpisode]:
     episodes: list[RssEpisode] = []

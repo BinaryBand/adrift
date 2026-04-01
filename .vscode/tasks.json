@@ -9,7 +9,8 @@
                 "check",
                 "src",
                 "runbook",
-                "tests"
+                "tests",
+                "typings"
             ],
             "group": "build",
             "presentation": {
@@ -32,7 +33,8 @@
                 "--check",
                 "src",
                 "runbook",
-                "tests"
+                "tests",
+                "typings"
             ],
             "group": "build",
             "presentation": {
@@ -43,6 +45,48 @@
                 "clear": true
             },
             "problemMatcher": []
+        },
+        {
+            "label": "Complexity: Lizard Check",
+            "type": "shell",
+            "command": "${workspaceFolder}/.venv/bin/python",
+            "args": [
+                "runbook/check_complexity.py",
+                "src",
+                "--ccn",
+                "5",
+                "--length",
+                "25",
+                "--params",
+                "4"
+            ],
+            "group": "build",
+            "presentation": {
+                "echo": true,
+                "reveal": "always",
+                "panel": "shared",
+                "showReuseMessage": false,
+                "clear": true
+            },
+            "problemMatcher": [
+                {
+                    "owner": "lizard",
+                    "fileLocation": [
+                        "relative",
+                        "${workspaceFolder}"
+                    ],
+                    "pattern": {
+                        "regexp": "^(.*?):(\\d+):\\s+(error|warning):\\s+(.*)$",
+                        "file": 1,
+                        "line": 2,
+                        "severity": 3,
+                        "message": 4
+                    }
+                }
+            ],
+            "runOptions": {
+                "runOn": "folderOpen"
+            }
         },
         {
             "label": "Pytest: All (ignore filter_rules)",
