@@ -45,10 +45,12 @@ class AuditConfigs(unittest.TestCase):
         # load_podcasts_config filters by today's schedule, but we want to audit
         # all entries regardless of day – load from both files without filtering.
         from src.app_common import _load_config
+        from dotenv import find_dotenv
 
+        all_files = Path(find_dotenv()).parent.glob("config/*.toml")
         configs: list[PodcastConfig] = []
-        for name in ("podcasts", "youtube"):
-            configs.extend(_load_config(name))
+        for file in all_files:
+            configs.extend(_load_config(file.as_posix()))
 
         self.assertGreater(len(configs), 0, "No podcast configs found")
 

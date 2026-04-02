@@ -1,7 +1,7 @@
 import os
 import sys
 from abc import ABC, abstractmethod
-from datetime import datetime
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Callable, TypedDict
 
@@ -119,6 +119,30 @@ def _extract_image_from_list(data: list[Any]) -> str:
     return last.get("url", "") if isinstance(last, dict) else ""
 
 
+def _from_unix_timestamp(raw: Any) -> datetime | None:
+    if isinstance(raw, (int, float)):
+        return datetime.fromtimestamp(float(raw), tz=timezone.utc)
+    if isinstance(raw, str) and raw.isdigit():
+        return datetime.fromtimestamp(float(raw), tz=timezone.utc)
+    return None
+
+
+def _parse_upload_date(raw: Any) -> datetime | None:
+    if not isinstance(raw, str) or len(raw) != 8 or not raw.isdigit():
+        return None
+    try:
+        return datetime.strptime(raw, "%Y%m%d").replace(tzinfo=timezone.utc)
+    except ValueError:
+        return None
+
+
+def _parse_ytdlp_pub_date(data: dict) -> datetime | None:
+    for key in ("timestamp", "release_timestamp"):
+        if dt := _from_unix_timestamp(data.get(key)):
+            return dt
+    return _parse_upload_date(data.get("upload_date"))
+
+
 class RssChannel(BaseModel):
     title: str
     author: str
@@ -192,6 +216,7 @@ class RssEpisode(BaseModel):
             description=description,
             content=url,
             duration=duration,
+            pub_date=_parse_ytdlp_pub_date(data),
         )
 
         # Store availability for filtering

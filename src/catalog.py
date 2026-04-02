@@ -105,6 +105,7 @@ W_DATE = 0.30
 W_TITLE = 0.50
 W_DESC = 0.10
 DATE_SCORE_TIERS: tuple[tuple[int, float], ...] = ((2, 1.00), (10, 0.70), (35, 0.15))
+SPARSE_TITLE_MIN = 0.98
 
 
 def sim_date(a: datetime | None, b: datetime | None) -> float:
@@ -129,22 +130,54 @@ def _description_similarity(ref: RssEpisode, dl: RssEpisode) -> float:
     return _similarity_clean(rc, dc)
 
 
-def _weighted_score(ref: RssEpisode, dl: RssEpisode) -> float:
-    """4-signal weighted similarity score between two episodes."""
+def _normalized_alignment_title(show: str, episode: RssEpisode) -> str:
+    title = normalize_title(show, episode.title) if show else episode.title
+    return normalize_text(title)
+
+
+def _has_date_signal(ref: RssEpisode, dl: RssEpisode) -> bool:
+    return ref.pub_date is not None and dl.pub_date is not None
+
+
+def _has_description_signal(ref: RssEpisode, dl: RssEpisode) -> bool:
+    return bool((ref.description or "").strip() and (dl.description or "").strip())
+
+
+def _weighted_score(ref: RssEpisode, dl: RssEpisode, show: str = "") -> float:
+    """Metadata-aware similarity score with ID as a small bonus."""
     s_id = _id_similarity(ref, dl)
-    s_date = sim_date(ref.pub_date, dl.pub_date)
-    s_title = _similarity_clean(normalize_text(ref.title), normalize_text(dl.title))
-    s_desc = _description_similarity(ref, dl)
-    return W_ID * s_id + W_DATE * s_date + W_TITLE * s_title + W_DESC * s_desc
+    s_title = _similarity_clean(
+        _normalized_alignment_title(show, ref),
+        _normalized_alignment_title(show, dl),
+    )
+    has_date = _has_date_signal(ref, dl)
+    has_desc = _has_description_signal(ref, dl)
+
+    if not s_id and not has_desc and s_title < SPARSE_TITLE_MIN:
+        return 0.0
+
+    weighted_sum = W_TITLE * s_title
+    total_weight = W_TITLE
+
+    if has_date:
+        weighted_sum += W_DATE * sim_date(ref.pub_date, dl.pub_date)
+        total_weight += W_DATE
+
+    if has_desc:
+        weighted_sum += W_DESC * _description_similarity(ref, dl)
+        total_weight += W_DESC
+
+    base_score = weighted_sum / total_weight
+    return min(1.0, base_score + (W_ID * s_id))
 
 
 def _build_alignment_scores(
-    references: list[RssEpisode], downloads: list[RssEpisode]
+    references: list[RssEpisode], downloads: list[RssEpisode], show: str = ""
 ) -> dict[tuple[int, int], float]:
     scores: dict[tuple[int, int], float] = {}
     for r_idx, ref in enumerate(references):
         for d_idx, dl in enumerate(downloads):
-            scores[(r_idx, d_idx)] = _weighted_score(ref, dl)
+            scores[(r_idx, d_idx)] = _weighted_score(ref, dl, show)
     return scores
 
 
@@ -170,14 +203,14 @@ def _append_match_if_unused(
 
 
 def align_episodes(
-    references: list[RssEpisode], downloads: list[RssEpisode]
+    references: list[RssEpisode], downloads: list[RssEpisode], show: str = ""
 ) -> list[tuple[int, int]]:
     """Greedy cross-alignment of reference and download episode lists.
 
     Returns a list of ``(ref_idx, dl_idx)`` index pairs for matched episodes
     with score ≥ MATCH_TOLERANCE (θ = 0.75 by default).
     """
-    scores = _build_alignment_scores(references, downloads)
+    scores = _build_alignment_scores(references, downloads, show)
     matches: list[tuple[int, int]] = []
     used_refs: set[int] = set()
     used_dls: set[int] = set()

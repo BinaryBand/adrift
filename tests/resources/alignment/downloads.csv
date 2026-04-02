@@ -1,0 +1,7 @@
+scenario,dl_idx,id,title,description,pub_date,content
+financial_audit_sparse_mismatch,0,yt-fa-001,Financial Audit: Rooster Teeth | Financial Audit,,,https://youtube.com/watch?v=yt-fa-001
+financial_audit_enriched_match,0,yt-fa-002,Financial Audit: Funhaus | Financial Audit,Caleb audits Funhaus finances.,2026-03-17T00:00:00+00:00,https://youtube.com/watch?v=yt-fa-002
+greedy_two_pair_match,0,yt-gr-001,Financial Audit: Achievement Hunter | Financial Audit,Audit with Achievement Hunter,2026-03-24T00:00:00+00:00,https://youtube.com/watch?v=yt-gr-001
+greedy_two_pair_match,1,yt-gr-002,Financial Audit: FIRST Member Benefits | Financial Audit,Audit of FIRST member budgets,2026-03-31T00:00:00+00:00,https://youtube.com/watch?v=yt-gr-002
+id_only_sparse_no_match,0,yt-id-001,Completely Different Episode Title,,,https://youtube.com/watch?v=yt-id-001
+unrelated_no_match,0,yt-un-001,Beginner Pasta at Home,A cooking basics walkthrough,2025-07-01T00:00:00+00:00,https://youtube.com/watch?v=yt-un-001

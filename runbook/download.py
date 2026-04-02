@@ -40,7 +40,7 @@ from src.youtube.metadata import get_video_info
 yt_downloader.PROPAGATE_BOT_DETECTION = True
 
 
-DF_TARGETS = ["config/podcasts.toml", "config/youtube.toml"]
+DF_TARGETS = ["config/youtube.toml"]
 
 
 # ---------------------------------------------------------------------------
@@ -158,7 +158,7 @@ def _download_series(config: PodcastConfig, budget: int | None = None) -> int:
         references = process_feeds(config, get_callback(p_bar))
         downloads = process_sources(config, get_callback(p_bar))
         if references:
-            pairs = align_episodes(references, downloads)
+            pairs = align_episodes(references, downloads, config.name)
             episodes = [downloads[d_idx] for _, d_idx in pairs]
         else:
             episodes = downloads

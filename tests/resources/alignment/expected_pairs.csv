@@ -1,0 +1,5 @@
+scenario,ref_idx,dl_idx
+financial_audit_sparse_mismatch,0,0
+financial_audit_enriched_match,0,0
+greedy_two_pair_match,0,0
+greedy_two_pair_match,1,1
