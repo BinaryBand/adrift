@@ -32,6 +32,15 @@ def _day_window(current: datetime) -> tuple[datetime, datetime]:
     return day_start, day_start + timedelta(days=1)
 
 
+def _align_tz(reference: datetime, target: datetime) -> datetime:
+    state = (reference.tzinfo is None, target.tzinfo is None)
+    if state == (False, True):
+        return target.replace(tzinfo=reference.tzinfo)
+    if state == (True, False):
+        return target.replace(tzinfo=None)
+    return target
+
+
 def _next_occurrence_in_window(schedule: str, day_start: datetime) -> datetime | None:
     # Support RFC5545 forms like:
     #   DTSTART:20240124T000000Z\nRRULE:FREQ=WEEKLY;BYDAY=MO
@@ -40,10 +49,7 @@ def _next_occurrence_in_window(schedule: str, day_start: datetime) -> datetime |
         rule = rrulestr(schedule)
         rule_start = getattr(rule, "_dtstart", None)
         if isinstance(rule_start, datetime):
-            if rule_start.tzinfo is not None and day_start.tzinfo is None:
-                day_start = day_start.replace(tzinfo=rule_start.tzinfo)
-            if rule_start.tzinfo is None and day_start.tzinfo is not None:
-                day_start = day_start.replace(tzinfo=None)
+            day_start = _align_tz(rule_start, day_start)
     else:
         rule = rrulestr(schedule, dtstart=day_start)
     return rule.after(day_start - timedelta(microseconds=1), inc=True)
@@ -65,29 +71,20 @@ class SourceFilter(BaseModel):
     exclude: list[str] = []
     r_rules: list[str] = []
 
-    def to_regex(self) -> str | None:
-        """Compile include/exclude lists into a single regex string.
-
-        The generated pattern is designed for ``re.search()``.  It is
-        case-insensitive and combines:
-
-        * Negative look-ahead for every ``exclude`` entry so that any
-          title containing that pattern is rejected.
-        * A positive look-ahead for the union of all ``include`` entries
-          so that the title must match at least one (when ``include`` is
-          non-empty).
-        """
-        if not self.include and not self.exclude:
-            return None
-
+    def _regex_parts(self) -> list[str]:
         parts: list[str] = ["(?i)^"]
-
         parts.extend(_exclude_lookahead(pattern) for pattern in self.exclude)
-        if include_part := _include_lookahead(self.include):
+        include_part = _include_lookahead(self.include)
+        if include_part:
             parts.append(include_part)
-
         parts.append(".*$")
-        return "".join(parts)
+        return parts
+
+    def to_regex(self) -> str | None:
+        """Compile include/exclude rules to a case-insensitive search regex."""
+        if not (self.include or self.exclude):
+            return None
+        return "".join(self._regex_parts())
 
 
 class FeedSource(BaseModel):
@@ -142,15 +139,7 @@ def _load_config(name_or_path: str) -> list[PodcastConfig]:
 def _schedule_matches_today(
     schedule: str, title: str, today: datetime | None = None
 ) -> bool:
-    """Return True if the RRULE *schedule* includes today.
-
-    Uses ``dateutil.rrule`` to evaluate whether the rule produces at
-    least one occurrence within today's local day window.
-
-    Examples::
-
-        "FREQ=WEEKLY;BYDAY=WE,FR"  →  True on Wednesdays and Fridays
-    """
+    """Return True if *schedule* yields an occurrence within today's day window."""
     del title
     current = today or datetime.now()
     day_start, day_end = _day_window(current)
@@ -159,11 +148,8 @@ def _schedule_matches_today(
         next_occurrence = _next_occurrence_in_window(schedule, day_start)
         if next_occurrence is None:
             return False
-        if next_occurrence.tzinfo is not None and day_end.tzinfo is None:
-            day_end = day_end.replace(tzinfo=next_occurrence.tzinfo)
-        if next_occurrence.tzinfo is None and day_end.tzinfo is not None:
-            day_end = day_end.replace(tzinfo=None)
-        return next_occurrence is not None and next_occurrence < day_end
+        day_end = _align_tz(next_occurrence, day_end)
+        return next_occurrence < day_end
     except Exception:
         # Fail closed: if RRULE is malformed we skip this schedule.
         return False

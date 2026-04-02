@@ -17,7 +17,13 @@ dotenv.load_dotenv()
 
 from src.app_common import PodcastConfig, load_podcasts_config
 from src.app_runner import get_s3_files, normalize_title
-from src.catalog import match, process_channel, process_feeds, process_sources
+from src.catalog import (
+    align_episodes,
+    match,
+    process_channel,
+    process_feeds,
+    process_sources,
+)
 from src.files.audio import get_duration, is_audio
 from src.files.s3 import exists, upload_file, download_file
 from src.models import DEVICE, MediaMetadata
@@ -149,7 +155,13 @@ def _download_series(config: PodcastConfig, budget: int | None = None) -> int:
         return 0
 
     with tqdm(desc=f"⟳ Finding {config.name} episodes", total=1) as p_bar:
-        episodes = process_sources(config, get_callback(p_bar))
+        references = process_feeds(config, get_callback(p_bar))
+        downloads = process_sources(config, get_callback(p_bar))
+        if references:
+            pairs = align_episodes(references, downloads)
+            episodes = [downloads[d_idx] for _, d_idx in pairs]
+        else:
+            episodes = downloads
         p_bar.set_description(f"✓ Found {len(episodes)} episodes")
 
     shuffle(episodes)

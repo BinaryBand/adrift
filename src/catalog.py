@@ -18,7 +18,7 @@ from src.web.rss import (
     get_rss_channel,
     get_rss_episodes,
 )
-from src.utils.text import normalize_text, create_slug, is_youtube_channel
+from src.utils.text import normalize_text, is_youtube_channel
 from src.youtube.metadata import (
     get_youtube_channel,
     get_youtube_episodes,
@@ -122,10 +122,11 @@ def _id_similarity(ref: RssEpisode, dl: RssEpisode) -> float:
 
 
 def _description_similarity(ref: RssEpisode, dl: RssEpisode) -> float:
-    return _similarity_clean(
-        normalize_text(ref.description or ""),
-        normalize_text(dl.description or ""),
-    )
+    rc = normalize_text(ref.description or "")
+    dc = normalize_text(dl.description or "")
+    if not rc and not dc:
+        return 0.0
+    return _similarity_clean(rc, dc)
 
 
 def _weighted_score(ref: RssEpisode, dl: RssEpisode) -> float:
@@ -202,7 +203,9 @@ def _best_thumbnail(a: str | None, b: str | None) -> str | None:
 
 
 def _choose_episode_id(ref: RssEpisode, dl: RssEpisode) -> str:
-    return ref.id if not ref.id.startswith("http") else dl.id
+    if ref.id.startswith("http") or not dl.id.startswith("http"):
+        return dl.id
+    return ref.id
 
 
 def _choose_title(ref: RssEpisode, dl: RssEpisode) -> str:
@@ -255,7 +258,7 @@ def _collect_episodes(
 
     merged: list[RssEpisode] = albums[0]
     for album in albums[1:]:
-        _merge_episode_album(merged, album, title, callback)
+        _merge_episode_album(merged, album)
 
     return merged
 
@@ -275,31 +278,11 @@ def _fetch_source_episodes(
     return get_rss_episodes(source.url, filter_regex, r_rules, callback)
 
 
-def _normalized_episode_titles(title: str, episodes: list[RssEpisode]) -> list[str]:
-    return [normalize_title(title, episode.title) for episode in episodes]
-
-
-def _duplicate_album_indices(
-    merged: list[RssEpisode],
-    album: list[RssEpisode],
-    title: str,
-    callback: Callback | None = None,
-) -> set[int]:
-    normalized_new = _normalized_episode_titles(title, album)
-    normalized_existing = _normalized_episode_titles(title, merged)
-    matched_indices = match(
-        normalized_new, normalized_existing, create_slug(title), callback
-    )
-    return {album_idx for album_idx, _ in matched_indices}
-
-
 def _merge_episode_album(
     merged: list[RssEpisode],
     album: list[RssEpisode],
-    title: str,
-    callback: Callback | None = None,
 ) -> None:
-    duplicate_indices = _duplicate_album_indices(merged, album, title, callback)
+    duplicate_indices = {d_idx for _, d_idx in align_episodes(merged, album)}
     for index, episode in enumerate(album):
         if index not in duplicate_indices:
             merged.append(episode)

@@ -146,6 +146,13 @@ class TestMergeEpisode(unittest.TestCase):
         result = merge_episode(ref, dl)
         self.assertEqual(result.id, "short_id")
 
+    def test_id_prefers_dl_when_both_non_url(self):
+        """Download side (YouTube video ID) beats ref side (RSS GUID) per spec."""
+        ref = _ep(id="rss-guid-abc")
+        dl = _ep(id="dQw4w9WgXcQ")
+        result = merge_episode(ref, dl)
+        self.assertEqual(result.id, "dQw4w9WgXcQ")
+
     def test_title_longest_wins(self):
         ref = _ep(title="Episode 1")
         dl = _ep(title="Episode 1: The Full Title With More Words")

@@ -156,7 +156,7 @@ url = "yt://@jaybird160"
 [[podcasts]]
 name     = "Last Week Tonight With John Oliver"
 path     = "/media/podcasts/last-week-tonight-with-john-oliver"
-schedule = ["FREQ=WEEKLY"]
+schedule = ["FREQ=WEEKLY;BYDAY=MO"]
 
 [[podcasts.references]]
 url = "yt://@LastWeekTonight"
@@ -165,7 +165,7 @@ url = "yt://@LastWeekTonight"
 url = "yt://@LastWeekTonight"
 [podcasts.downloads.filters]
 include = ["Last Week Tonight With John Oliver"]
-exclude = ["^s\\d{1,2}\\s*[-:]?\\s*e\\d{1,2}\b"]
+exclude = ["^s\\d{1,2}\\s*[-:]?\\s*e\\d{1,2}\\b"]
 
 
 [[podcasts]]
@@ -266,12 +266,11 @@ exclude = ["rerun", "documentary"]
 [[podcasts]]
 name = "The Daily Show"
 path = "/media/podcasts/the-daily-show"
-schedule = ["DTSTART:20240124T000000Z\nRRULE:FREQ=WEEKLY;BYDAY=MO"]
 
 [[podcasts.references]]
 url = "https://feeds.megaphone.fm/QCD2422844292"
 [podcasts.references.filters]
-r_rules = ["DTSTART:20240124T000000Z\nRRULE:FREQ=WEEKLY;BYDAY=MO"]
+r_rules = ["DTSTART:20240124T000000Z\nRRULE:FREQ=WEEKLY;BYDAY=TU"]
 
 [[podcasts.downloads]]
 url = "yt://@TheDailyShow"

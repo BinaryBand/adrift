@@ -16,12 +16,13 @@ classDiagram
 
     class Podcast {
         +str name
+        +str path
         +FeedSource[] references
         +FeedSource[] downloads
         +RRule[] schedule // When we (the client) should download. Spaced to avoid overwhelming YouTube.
     }
 
-    class PodcastData {
+    class PodcastFeed {
         +str id
         +str title
         +str author
@@ -44,7 +45,7 @@ classDiagram
     Podcast --> "0..*" FeedSource : references
     Podcast --> "0..*" FeedSource : downloads
     FeedSource --> "0..*" SourceFilter : filters
-    PodcastData --> "0..*" EpisodeData : episodes
+    PodcastFeed --> "0..*" EpisodeData : episodes
 ```
 
 ### Source URL conventions
@@ -98,6 +99,12 @@ flowchart LR
 
 ## Process Flow
 
+The pipeline runs in two separate phases per podcast. Both phases respect `Podcast.schedule`.
+
+### Phase 1 — Download
+
+Fetch candidate episodes from both sources, cross-align them, then download only the matched subset.
+
 ```mermaid
 flowchart TD
     A([Start]) --> B{today ∈ P.schedule?}
@@ -107,10 +114,28 @@ flowchart TD
     X --> D[Deduplicate αR → R]
     D --> E[Fetch αD from P.downloads]
     E --> F[Deduplicate αD → D]
-    F --> G[Cross-align R × D → αRD]
-    G --> H[Deduplicate αRD → RD]
-    H --> J([Emit PodcastData])
+    F --> G[Cross-align R × D → RD]
+    G --> J([Download audio for each episode in RD → S3])
 ```
+
+> **Note:** Steps D and F use the same 4-signal greedy matcher as the cross-alignment step (G), applied within each source list to collapse near-duplicates from overlapping feeds. The greedy algorithm prevents double-use, so no additional deduplication pass is needed after step G.
+
+### Phase 2 — RSS Feed Rebuild
+
+Rebuild the RSS feed from reference metadata matched against files already on S3.
+
+```mermaid
+flowchart TD
+    A([Start]) --> B{today ∈ P.schedule?}
+    B -- No --> Z([Skip])
+    B -- Yes --> C(For each podcast → P)
+    C --> D[Fetch R from P.references]
+    D --> E[List audio files on S3]
+    E --> F[Match R episodes to S3 filenames]
+    F --> G([Emit PodcastFeed → upload feed.rss to S3])
+```
+
+> **Stage 3 deferred:** `merge_episode` resolves each cross-aligned pair into a canonical `EpisodeData` (see §Stage 3 below). This merge is not yet applied in Phase 2 — the RSS feed is currently built from reference metadata only. YouTube titles, thumbnails, and descriptions are not yet used in the emitted feed.
 
 ### Tuning Parameters
 
@@ -139,7 +164,8 @@ sim_date(e1, e2)  — tiered by |date difference|:
                       ≤ 35 days → 0.15
                       otherwise → 0.00
 sim_title(e1, e2) — fuzzy title similarity after normalization
-sim_desc(e1, e2)  — fuzzy description similarity after normalization
+sim_desc(e1, e2)  — fuzzy description similarity after normalization;
+                    0.0 when both descriptions are empty
 ```
 
 All scored pairs are passed to the greedy matcher.
@@ -171,12 +197,14 @@ Resolve each matched pair to a single canonical `EpisodeData` using field-level 
 
 | Field | Resolution rule |
 | --- | --- |
-| `id` | Prefer `yt://` id › RSS GUID |
+| `id` | Prefer non-URL ID; tie-break to download side (YouTube video ID › RSS GUID) |
 | `title` | Longest / most punctuated (heuristic), or modal value |
 | `upload_date` | Earliest date in pair |
 | `description` | Longest non-empty value |
 | `thumbnail` | Prefer highest-resolution (inferred from URL) |
 | `source` | Union of all source URLs in pair |
+
+> **Deferred:** Stage 3 merge is implemented in `merge_episode` (`src/catalog.py`) and covered by tests, but is not yet wired into Phase 2. The RSS feed is currently emitted using reference metadata directly.
 
 ## Episode Download Strategy: yt-dlp vs URL
 
