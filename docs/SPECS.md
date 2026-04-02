@@ -18,7 +18,7 @@ classDiagram
         +str name
         +FeedSource[] references
         +FeedSource[] downloads
-        +RRule[] schedule
+        +RRule[] schedule // When we (the client) should download. Spaced to avoid overwhelming YouTube.
     }
 
     class PodcastData {

@@ -267,12 +267,12 @@ def _fetch_source_episodes(
     callback: Callback | None = None,
 ) -> list[RssEpisode]:
     filter_regex = source.filters.to_regex()
-    publish_days = source.filters.publish_days or None
+    r_rules = source.filters.r_rules or None
     if is_youtube_channel(source.url):
         return get_youtube_episodes(
             source.url, title, YtFetchOptions(filter_regex, is_reference, callback)
         )
-    return get_rss_episodes(source.url, filter_regex, publish_days, callback)
+    return get_rss_episodes(source.url, filter_regex, r_rules, callback)
 
 
 def _normalized_episode_titles(title: str, episodes: list[RssEpisode]) -> list[str]:

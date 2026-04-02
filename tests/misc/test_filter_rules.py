@@ -165,8 +165,31 @@ class TestScheduleMatchesToday(unittest.TestCase):
     def test_dtstart_plus_rrule_supported(self):
         """RFC5545 DTSTART+RRULE strings should evaluate schedule windows."""
         schedule = "DTSTART:20240124T000000Z\nRRULE:FREQ=WEEKLY;BYDAY=MO"
-        self.assertTrue(_schedule_matches_today(schedule, "The Daily Show", datetime(2026, 3, 30)))
-        self.assertFalse(_schedule_matches_today(schedule, "The Daily Show", datetime(2026, 3, 31)))
+        self.assertTrue(
+            _schedule_matches_today(schedule, "The Daily Show", datetime(2026, 3, 30))
+        )
+        self.assertFalse(
+            _schedule_matches_today(schedule, "The Daily Show", datetime(2026, 3, 31))
+        )
+
+
+class TestSourceFilterRRules(unittest.TestCase):
+    """Tests for SourceFilter.r_rules field."""
+
+    def test_r_rules_field_accepts_rrule_strings(self):
+        """r_rules accepts a list of RFC 5545 RRULE strings."""
+        f = SourceFilter(r_rules=["FREQ=WEEKLY;BYDAY=MO"])
+        self.assertEqual(f.r_rules, ["FREQ=WEEKLY;BYDAY=MO"])
+
+    def test_r_rules_empty_by_default(self):
+        """r_rules defaults to empty list."""
+        f = SourceFilter()
+        self.assertEqual(f.r_rules, [])
+
+    def test_r_rules_multiple_entries(self):
+        """r_rules accepts multiple RRULE strings."""
+        f = SourceFilter(r_rules=["FREQ=WEEKLY;BYDAY=MO", "FREQ=WEEKLY;BYDAY=WE"])
+        self.assertEqual(len(f.r_rules), 2)
 
 
 if __name__ == "__main__":

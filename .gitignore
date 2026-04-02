@@ -235,3 +235,4 @@ cookies.txt
 config/**/.*
 config/podcasts.toml
 runbook/**/.*
+.help

@@ -88,6 +88,20 @@ class AuditConfigs(unittest.TestCase):
                     f"{podcast.name}: unsupported schedule format {rule!r}",
                 )
 
+            # Validate r_rules entries are RRULE strings.
+            for fs in podcast.references + podcast.downloads:
+                for rule in fs.filters.r_rules:
+                    self.assertIsInstance(rule, str)
+                    self.assertTrue(
+                        rule.startswith("FREQ=")
+                        or (
+                            "DTSTART:" in rule.upper()
+                            and "RRULE:" in rule.upper()
+                            and "FREQ=" in rule.upper()
+                        ),
+                        f"{podcast.name}: invalid r_rules entry {rule!r}",
+                    )
+
 
 if __name__ == "__main__":
     unittest.main()

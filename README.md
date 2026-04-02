@@ -16,6 +16,7 @@ sudo apt install ffmpeg
 ```
 
 **Windows:**
+<!-- cspell:words choco winget -->
 Download from [ffmpeg.org](https://ffmpeg.org/download.html) and add to PATH, or use:
 
 ```bash
@@ -52,6 +53,7 @@ npm --version
 ```
 
 ## Working with Virtual Environments
+<!-- cspell:words venv -->
 
 ```bash
 # Create and activate virtual environment
@@ -95,7 +97,7 @@ pip list --outdated
 Podcast series are defined in TOML files under `config/`:
 
 | File | Contents |
-|------|----------|
+| ------ | ---------- |
 | `config/podcasts.toml` | RSS-first podcast series |
 | `config/youtube.toml` | YouTube-first podcast series |
 
@@ -122,15 +124,15 @@ include = ["My Podcast"]   # only grab videos with this title
 
 ### Filter rules
 
-Each filter subtable supports three fields.  All patterns are Python
+Each filter sub-table supports three fields. All patterns are Python
 [`re.search`](https://docs.python.org/3/library/re.html#re.search)
 patterns (case-insensitive):
 
 | Field | Effect |
-|-------|--------|
+| ------- | -------- |
 | `exclude` | Episode is **rejected** if its title matches *any* pattern. Prefix a pattern with `^` to anchor it at the start of the title. |
 | `include` | When non-empty, episode is **rejected** unless its title matches *at least one* pattern. |
-| `publish_days` | Only keep episodes published on the listed days (`"mon"` … `"sun"`). |
+| `r_rules` | RFC 5545 RRULE strings; only keep episodes whose publish date matches any of the given recurrence rules (e.g. `"FREQ=WEEKLY;BYDAY=MO"` for Monday-only). |
 
 ### Download schedule (RRULE)
 
@@ -139,11 +141,10 @@ The `schedule` field accepts a subset of the
 format:
 
 | Value | Meaning |
-|-------|---------|
+| ------- | --------- |
 | `"FREQ=WEEKLY;BYDAY=WE,FR"` | Every Wednesday and Friday |
 | `"FREQ=WEEKLY;BYDAY=MO"` | Every Monday |
 | `"FREQ=WEEKLY"` | Once per week on a day derived deterministically from the show title |
 | *(omitted)* | Download every time the script runs |
 
 BYDAY codes: `MO` `TU` `WE` `TH` `FR` `SA` `SU`
-

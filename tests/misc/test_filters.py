@@ -164,7 +164,7 @@ class TestFeedFilter(unittest.TestCase):
 
 
 class TestDayOfWeekFilter(unittest.TestCase):
-    """Test feed_day_of_week_filter functionality."""
+    """Test r_rules (RFC 5545) episode date filtering."""
 
     @patch("src.web.rss._rss_cache")
     @patch("src.web.rss.requests.get")
@@ -190,7 +190,13 @@ class TestDayOfWeekFilter(unittest.TestCase):
         # Filter for weekdays only
         result = get_rss_episodes(
             "https://example.com/feed.xml",
-            feed_day_of_week_filter=["mon", "tue", "wed", "thu", "fri"],
+            r_rules=[
+                "FREQ=WEEKLY;BYDAY=MO",
+                "FREQ=WEEKLY;BYDAY=TU",
+                "FREQ=WEEKLY;BYDAY=WE",
+                "FREQ=WEEKLY;BYDAY=TH",
+                "FREQ=WEEKLY;BYDAY=FR",
+            ],
         )
 
         self.assertEqual(len(result), 2)
@@ -218,7 +224,8 @@ class TestDayOfWeekFilter(unittest.TestCase):
 
         # Filter for weekend only
         result = get_rss_episodes(
-            "https://example.com/feed.xml", feed_day_of_week_filter=["sat", "sun"]
+            "https://example.com/feed.xml",
+            r_rules=["FREQ=WEEKLY;BYDAY=SA", "FREQ=WEEKLY;BYDAY=SU"],
         )
 
         self.assertEqual(len(result), 2)
@@ -249,7 +256,7 @@ class TestDayOfWeekFilter(unittest.TestCase):
 
         # Filter for Wednesday only
         result = get_rss_episodes(
-            "https://example.com/feed.xml", feed_day_of_week_filter=["wed"]
+            "https://example.com/feed.xml", r_rules=["FREQ=WEEKLY;BYDAY=WE"]
         )
 
         self.assertEqual(len(result), 1)
@@ -273,9 +280,7 @@ class TestDayOfWeekFilter(unittest.TestCase):
         mock_feed.entries = [entry1, entry2]
         mock_parse.return_value = mock_feed
 
-        result = get_rss_episodes(
-            "https://example.com/feed.xml", feed_day_of_week_filter=[]
-        )
+        result = get_rss_episodes("https://example.com/feed.xml", r_rules=[])
 
         self.assertEqual(len(result), 2)
 
@@ -283,7 +288,7 @@ class TestDayOfWeekFilter(unittest.TestCase):
     @patch("src.web.rss.requests.get")
     @patch("src.web.rss.feedparser.parse")
     def test_none_day_filter_returns_all(self, mock_parse, mock_get, mock_cache_fn):
-        """Test that None feed_day_of_week_filter returns all episodes."""
+        """Test that None r_rules returns all episodes."""
         mock_cache = mock_cache_fn.return_value
         mock_cache.get.return_value = None
         mock_response = Mock()
@@ -297,9 +302,7 @@ class TestDayOfWeekFilter(unittest.TestCase):
         mock_feed.entries = [entry1, entry2]
         mock_parse.return_value = mock_feed
 
-        result = get_rss_episodes(
-            "https://example.com/feed.xml", feed_day_of_week_filter=None
-        )
+        result = get_rss_episodes("https://example.com/feed.xml", r_rules=None)
 
         self.assertEqual(len(result), 2)
 
@@ -322,7 +325,7 @@ class TestDayOfWeekFilter(unittest.TestCase):
         mock_parse.return_value = mock_feed
 
         result = get_rss_episodes(
-            "https://example.com/feed.xml", feed_day_of_week_filter=["mon"]
+            "https://example.com/feed.xml", r_rules=["FREQ=WEEKLY;BYDAY=MO"]
         )
 
         # Only the valid entry should be returned (missing date is excluded)
@@ -333,7 +336,7 @@ class TestDayOfWeekFilter(unittest.TestCase):
     @patch("src.web.rss.requests.get")
     @patch("src.web.rss.feedparser.parse")
     def test_handles_invalid_pub_date(self, mock_parse, mock_get, mock_cache_fn):
-        """Test that episodes with invalid pub_date format are excluded when using day filter."""
+        """Test that episodes with invalid pub_date format are excluded when using r_rules."""
         mock_cache = mock_cache_fn.return_value
         mock_cache.get.return_value = None
         mock_response = Mock()
@@ -348,7 +351,7 @@ class TestDayOfWeekFilter(unittest.TestCase):
         mock_parse.return_value = mock_feed
 
         result = get_rss_episodes(
-            "https://example.com/feed.xml", feed_day_of_week_filter=["mon"]
+            "https://example.com/feed.xml", r_rules=["FREQ=WEEKLY;BYDAY=MO"]
         )
 
         # Only the valid entry should be returned (invalid date is excluded)
@@ -357,13 +360,13 @@ class TestDayOfWeekFilter(unittest.TestCase):
 
 
 class TestCombinedFilters(unittest.TestCase):
-    """Test combining feed_filter and feed_day_of_week_filter."""
+    """Test combining feed_filter and r_rules."""
 
     @patch("src.web.rss._rss_cache")
     @patch("src.web.rss.requests.get")
     @patch("src.web.rss.feedparser.parse")
     def test_both_filters_applied(self, mock_parse, mock_get, mock_cache_fn):
-        """Test that both feed_filter and feed_day_of_week_filter are applied together."""
+        """Test that both feed_filter and r_rules are applied together."""
         mock_cache = mock_cache_fn.return_value
         mock_cache.get.return_value = None
         mock_response = Mock()
@@ -393,7 +396,7 @@ class TestCombinedFilters(unittest.TestCase):
         result = get_rss_episodes(
             "https://example.com/feed.xml",
             filter="Episode",
-            feed_day_of_week_filter=["mon", "tue"],
+            r_rules=["FREQ=WEEKLY;BYDAY=MO", "FREQ=WEEKLY;BYDAY=TU"],
         )
 
         # Only episodes that match BOTH filters should be returned
@@ -426,7 +429,13 @@ class TestCombinedFilters(unittest.TestCase):
         result = get_rss_episodes(
             "https://example.com/feed.xml",
             filter="^(?!.*Overtime)(?!.*Trivia).*$",
-            feed_day_of_week_filter=["mon", "tue", "wed", "thu", "fri"],
+            r_rules=[
+                "FREQ=WEEKLY;BYDAY=MO",
+                "FREQ=WEEKLY;BYDAY=TU",
+                "FREQ=WEEKLY;BYDAY=WE",
+                "FREQ=WEEKLY;BYDAY=TH",
+                "FREQ=WEEKLY;BYDAY=FR",
+            ],
         )
 
         self.assertEqual(len(result), 2)
@@ -457,7 +466,7 @@ class TestCacheKeyGeneration(unittest.TestCase):
     @patch("src.web.rss.requests.get")
     @patch("src.web.rss.feedparser.parse")
     def test_cache_key_includes_day_filter(self, mock_parse, mock_get, mock_cache_fn):
-        """Test that cache key includes feed_day_of_week_filter to prevent wrong cached results."""
+        """Test that cache key includes r_rules to prevent wrong cached results."""
         mock_cache = mock_cache_fn.return_value
         mock_cache.get.return_value = None
         mock_response = Mock()
@@ -472,16 +481,21 @@ class TestCacheKeyGeneration(unittest.TestCase):
         mock_feed.entries = [entry1]
         mock_parse.return_value = mock_feed
 
-        # First call with weekday filter
+        # First call with weekday r_rules
         get_rss_episodes(
             "https://example.com/feed.xml",
-            feed_day_of_week_filter=["mon", "tue", "wed", "thu", "fri"],
+            r_rules=[
+                "FREQ=WEEKLY;BYDAY=MO",
+                "FREQ=WEEKLY;BYDAY=TU",
+                "FREQ=WEEKLY;BYDAY=WE",
+                "FREQ=WEEKLY;BYDAY=TH",
+                "FREQ=WEEKLY;BYDAY=FR",
+            ],
         )
 
-        # Verify cache.get was called with a key that includes the filter
+        # Verify cache.get was called with a key that includes the r_rules
         call_args = mock_cache.get.call_args[0][0]
-        # Cache key should include the comma-separated sorted days
-        self.assertIn("fri,mon,thu,tue,wed", call_args)
+        self.assertIn("FREQ=WEEKLY;BYDAY=FR", call_args)
 
     @patch("src.web.rss._rss_cache")
     @patch("src.web.rss.requests.get")
@@ -489,7 +503,7 @@ class TestCacheKeyGeneration(unittest.TestCase):
     def test_cache_key_converts_list_to_tuple(
         self, mock_parse, mock_get, mock_cache_fn
     ):
-        """Test that feed_day_of_week_filter list is converted to tuple for hashable cache key."""
+        """Test that r_rules list is serialized into a hashable cache key."""
         mock_cache = mock_cache_fn.return_value
         mock_cache.get.return_value = None
         mock_response = Mock()
@@ -506,7 +520,8 @@ class TestCacheKeyGeneration(unittest.TestCase):
 
         # This should not raise an error about unhashable type
         result = get_rss_episodes(
-            "https://example.com/feed.xml", feed_day_of_week_filter=["mon", "tue"]
+            "https://example.com/feed.xml",
+            r_rules=["FREQ=WEEKLY;BYDAY=MO", "FREQ=WEEKLY;BYDAY=TU"],
         )
 
         # Should complete without error

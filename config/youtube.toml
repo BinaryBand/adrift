@@ -10,7 +10,7 @@
 # ------------------------------------------------------------------------------------
 #   include   - Title must match at least one pattern (re.search, case-insensitive).
 #   exclude   - Title must NOT match any pattern.
-#   publish_days - Only include episodes published on these days of the week.
+#   r_rules - Only include episodes published on these days of the week.
 # 
 # cspell:disable
 
@@ -165,6 +165,7 @@ url = "yt://@LastWeekTonight"
 url = "yt://@LastWeekTonight"
 [podcasts.downloads.filters]
 include = ["Last Week Tonight With John Oliver"]
+exclude = ["^s\\d{1,2}\\s*[-:]?\\s*e\\d{1,2}\b"]
 
 
 [[podcasts]]
@@ -263,6 +264,20 @@ exclude = ["rerun", "documentary"]
 
 
 [[podcasts]]
+name = "The Daily Show"
+path = "/media/podcasts/the-daily-show"
+schedule = ["DTSTART:20240124T000000Z\nRRULE:FREQ=WEEKLY;BYDAY=MO"]
+
+[[podcasts.references]]
+url = "https://feeds.megaphone.fm/QCD2422844292"
+[podcasts.references.filters]
+r_rules = ["DTSTART:20240124T000000Z\nRRULE:FREQ=WEEKLY;BYDAY=MO"]
+
+[[podcasts.downloads]]
+url = "yt://@TheDailyShow"
+
+
+[[podcasts]]
 name     = "The Weekly Show with Jon Stewart"
 path     = "/media/podcasts/the-weekly-show-with-jon-stewart"
 schedule = ["FREQ=WEEKLY;BYDAY=FR"]
@@ -272,18 +287,6 @@ url = "https://feeds.megaphone.fm/BVLLC2163264914"
 
 [[podcasts.downloads]]
 url = "yt://@WeeklyShowPodcast"
-
-
-[[podcasts]]
-name     = "The Daily Show"
-path     = "/media/podcasts/the-daily-show"
-schedule = ["DTSTART:20240124T000000Z\nRRULE:FREQ=WEEKLY;BYDAY=MO"]
-
-[[podcasts.references]]
-url = "https://feeds.megaphone.fm/QCD2422844292"
-
-[[podcasts.downloads]]
-url = "yt://@TheDailyShow"
 
 
 [[podcasts]]

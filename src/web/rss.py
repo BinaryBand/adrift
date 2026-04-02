@@ -2,8 +2,9 @@ import shutil
 import uuid
 from feedparser import FeedParserDict
 from urllib.parse import urljoin
-from datetime import datetime, timezone
+from datetime import datetime, timezone, timedelta
 from dateutil import parser
+from dateutil.rrule import rrulestr
 from xml.dom import minidom
 from diskcache import Cache
 from pathlib import Path
@@ -277,73 +278,66 @@ def _parse_entry_image(entry: FeedParserDict) -> str | None:
     return image
 
 
-def _day_of_week_to_int(dow: str) -> int:
-    """Convert day of week string to integer (0=Mon, 6=Sun).
+def _align_to_tzinfo(dt: datetime, reference: datetime) -> datetime:
+    if reference.tzinfo is not None and dt.tzinfo is None:
+        return dt.replace(tzinfo=reference.tzinfo)
+    if reference.tzinfo is None and dt.tzinfo is not None:
+        return dt.replace(tzinfo=None)
+    return dt
 
-    Accepts three-letter abbreviations or full names, case-insensitive.
-    """
-    if not isinstance(dow, str):
-        raise ValueError("Invalid day of week")
 
-    dow_short = dow.strip().lower()[:3]
-    dow_map = {
-        "mon": 0,
-        "tue": 1,
-        "wed": 2,
-        "thu": 3,
-        "fri": 4,
-        "sat": 5,
-        "sun": 6,
-    }
-    if dow_short not in dow_map:
-        raise ValueError(f"Invalid day of week: {dow}")
-    return dow_map[dow_short]
+def _build_rrule(rule_str: str, day_start: datetime, day_end: datetime):
+    if "DTSTART" not in rule_str.upper():
+        return rrulestr(rule_str, dtstart=day_start), day_start, day_end
+    rule = rrulestr(rule_str)
+    ref = getattr(rule, "_dtstart", None)
+    if isinstance(ref, datetime):
+        day_start = _align_to_tzinfo(day_start, ref)
+        day_end = _align_to_tzinfo(day_end, ref)
+    return rule, day_start, day_end
+
+
+def _rrule_has_occurrence_on_date(pub_date: datetime, rule_str: str) -> bool:
+    """Return True if the RFC 5545 RRULE produces an occurrence on pub_date's calendar day."""
+    day_start = datetime.combine(pub_date.date(), datetime.min.time())
+    day_end = day_start + timedelta(days=1)
+    try:
+        rule, day_start, day_end = _build_rrule(rule_str, day_start, day_end)
+        occ = rule.after(day_start - timedelta(microseconds=1), inc=True)
+        if occ is None:
+            return False
+        return occ < _align_to_tzinfo(day_end, occ)
+    except Exception:
+        return False
 
 
 def get_rss_episodes(
     url: str,
     filter: str | None = "",
-    feed_day_of_week_filter: list[str] | None = None,
+    r_rules: list[str] | None = None,
     callback: Callback | None = None,
 ) -> list[RssEpisode]:
     """Parse RSS feed and extract episode information for a podcast."""
     assert LINK_REGEX.match(url), "Invalid RSS feed url or file path"
-    normalized_days = _normalize_day_filters(feed_day_of_week_filter)
-    feed_str = _load_rss_feed_text(url, filter, normalized_days)
-    entries = _filter_feed_entries(
-        feedparser.parse(feed_str).entries, filter, normalized_days
-    )
-    return _parse_feed_entries(entries, callback)
-
-
-def _normalize_day_filters(feed_day_of_week_filter: list[str] | None) -> list[str]:
-    if not feed_day_of_week_filter:
-        return []
-    return [day.strip().lower()[:3] for day in feed_day_of_week_filter]
-
-
-def _load_rss_feed_text(
-    url: str, filter_value: str | None, normalized_days: list[str]
-) -> str:
-    dow_filter_key = ",".join(sorted(normalized_days)) if normalized_days else ""
-    cache_key = f"feed:{url}:{filter_value}:{dow_filter_key}"
+    r_rules = r_rules or []
+    r_rules_key = ",".join(sorted(r_rules))
+    cache_key = f"feed:{url}:{filter}:{r_rules_key}"
     feed_str: str | None = _rss_cache().get(cache_key)
-    if feed_str is not None:
-        return feed_str
-
-    response = requests.get(url, timeout=15)
-    feed_str = response.text
-    _rss_cache().set(cache_key, feed_str, 1800)
-    return feed_str
+    if feed_str is None:
+        response = requests.get(url, timeout=15)
+        feed_str = response.text
+        _rss_cache().set(cache_key, feed_str, 1800)
+    entries = _filter_feed_entries(feedparser.parse(feed_str).entries, filter, r_rules)
+    return _parse_feed_entries(entries, callback)
 
 
 def _filter_feed_entries(
     entries: list[FeedParserDict],
     filter_value: str | None,
-    normalized_days: list[str],
+    r_rules: list[str],
 ) -> list[FeedParserDict]:
     filtered_entries = _apply_title_filter(entries, filter_value)
-    return _apply_day_filter(filtered_entries, normalized_days)
+    return _apply_r_rules_filter(filtered_entries, r_rules)
 
 
 def _apply_title_filter(
@@ -355,20 +349,19 @@ def _apply_title_filter(
     return [entry for entry in entries if regex.search(getattr(entry, "title"))]
 
 
-def _apply_day_filter(
-    entries: list[FeedParserDict], normalized_days: list[str]
+def _apply_r_rules_filter(
+    entries: list[FeedParserDict], r_rules: list[str]
 ) -> list[FeedParserDict]:
-    if not normalized_days:
+    if not r_rules:
         return entries
-    allowed_days = {_day_of_week_to_int(day) for day in normalized_days}
-    return [entry for entry in entries if _entry_weekday(entry) in allowed_days]
+    return [entry for entry in entries if _entry_matches_any_r_rule(entry, r_rules)]
 
 
-def _entry_weekday(entry: FeedParserDict) -> int:
+def _entry_matches_any_r_rule(entry: FeedParserDict, r_rules: list[str]) -> bool:
     pub_date = _parse_entry_pub_date(entry)
     if pub_date is None:
-        return -1
-    return pub_date.weekday()
+        return False
+    return any(_rrule_has_occurrence_on_date(pub_date, rule) for rule in r_rules)
 
 
 def _parse_entry_pub_date(entry: FeedParserDict) -> datetime | None:

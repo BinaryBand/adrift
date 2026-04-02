@@ -54,15 +54,16 @@ class SourceFilter(BaseModel):
 
     Patterns in ``include`` and ``exclude`` are standard Python regex
     strings matched with ``re.search()`` (case-insensitive by default
-    via ``to_regex()``).  ``publish_days`` restricts episodes to those
-    published on the given days of the week.
+    via ``to_regex()``).  ``r_rules`` is a list of RFC 5545 RRULE strings
+    (e.g. ``"FREQ=WEEKLY;BYDAY=MO"``) used to restrict episodes to those
+    published on days matching any of the given recurrence rules.
     """
 
     model_config = ConfigDict(extra="forbid")
 
     include: list[str] = []
     exclude: list[str] = []
-    publish_days: list[str] = []
+    r_rules: list[str] = []
 
     def to_regex(self) -> str | None:
         """Compile include/exclude lists into a single regex string.
