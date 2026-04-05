@@ -40,7 +40,7 @@ from src.youtube.metadata import get_video_info
 yt_downloader.PROPAGATE_BOT_DETECTION = True
 
 
-DF_TARGETS = ["config/youtube.toml"]
+DF_TARGETS = ["config/*.toml"]
 
 
 # ---------------------------------------------------------------------------
@@ -154,15 +154,25 @@ def _download_series(config: PodcastConfig, budget: int | None = None) -> int:
     if not config.downloads:
         return 0
 
-    with tqdm(desc=f"⟳ Finding {config.name} episodes", total=1) as p_bar:
-        references = process_feeds(config, get_callback(p_bar))
+    # Phase 1: RSS reference feeds (only when configured)
+    references: list[RssEpisode] = []
+    if config.references:
+        with tqdm(desc=f"⟳ {config.name}: RSS feeds", total=1) as p_bar:
+            references = process_feeds(config, get_callback(p_bar))
+            p_bar.set_description(f"✓ {config.name}: {len(references)} reference episodes")
+
+    # Phase 2: Download sources (YouTube, direct links, etc.)
+    with tqdm(desc=f"⟳ {config.name}: fetching episodes", total=1) as p_bar:
         downloads = process_sources(config, get_callback(p_bar))
-        if references:
-            pairs = align_episodes(references, downloads, config.name)
-            episodes = [downloads[d_idx] for _, d_idx in pairs]
-        else:
-            episodes = downloads
-        p_bar.set_description(f"✓ Found {len(episodes)} episodes")
+        p_bar.set_description(f"✓ {config.name}: {len(downloads)} episodes")
+
+    # Phase 3: Align and filter
+    if references:
+        pairs = align_episodes(references, downloads, config.name)
+        episodes = [downloads[d_idx] for _, d_idx in pairs]
+        print(f"Aligned to {len(episodes)} episodes for {config.name}")
+    else:
+        episodes = downloads
 
     shuffle(episodes)
     downloaded = 0

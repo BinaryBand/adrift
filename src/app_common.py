@@ -4,6 +4,8 @@ from pathlib import Path
 from typing import Any
 from urllib.parse import urljoin
 
+import glob
+
 import tomllib
 from dateutil.rrule import rrulestr
 from pydantic import BaseModel, ConfigDict, computed_field
@@ -172,14 +174,19 @@ def load_podcasts_config(include: list[str]) -> list[PodcastConfig]:
     """
     configs: list[PodcastConfig] = []
     for target in include:
-        configs.extend(_load_config(target))
+        # Allow shell-style glob patterns like "config/*.toml" to expand
+        # to multiple config files.
+        if any(ch in target for ch in ("*", "?", "[")):
+            matches = sorted(glob.glob(target))
+            for match in matches:
+                configs.extend(_load_config(match))
+        else:
+            configs.extend(_load_config(target))
 
-    filtered: list[PodcastConfig] = []
-    for it in configs:
-        if not _config_schedule_matches_today(it):
-            continue
-        filtered.append(it)
-
+    # Filter configs by schedule and return
+    filtered: list[PodcastConfig] = [
+        it for it in configs if _config_schedule_matches_today(it)
+    ]
     return filtered
 
 

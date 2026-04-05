@@ -1,3 +1,4 @@
+
 # YouTube-first podcast series.
 #
 # Schedule (RRULE)
@@ -17,7 +18,7 @@
 [[podcasts]]
 name     = "Alyssa Grenfell"
 path     = "/media/podcasts/alyssa-grenfell"
-schedule = ["FREQ=WEEKLY;BYDAY=MO"]
+schedule = ["FREQ=WEEKLY;BYDAY=FR,WE,MO"]
 
 [[podcasts.references]]
 url = "yt://@alyssadgrenfell"
@@ -29,7 +30,7 @@ url = "yt://@alyssadgrenfell"
 [[podcasts]]
 name = "Behind the Bastards"
 path = "/media/podcasts/behind-the-bastards"
-schedule = ["FREQ=WEEKLY;BYDAY=WE,FR"]
+schedule = ["FREQ=WEEKLY;BYDAY=TH,TU"]
 
 [[podcasts.references]]
 url = "https://www.omnycontent.com/d/playlist/e73c998e-6e60-432f-8610-ae210140c5b1/e5f91208-cc7e-4726-a312-ae280140ad11/d64f756d-6d5e-4fae-b24f-ae280140ad36/podcast.rss"
@@ -45,7 +46,7 @@ exclude = ["it could happen here", "behind the bastards presents", "czm rewind"]
 [[podcasts]]
 name     = "Camp Gagnon"
 path     = "/media/podcasts/camp-gagnon"
-schedule = ["FREQ=WEEKLY;BYDAY=WE,FR"]
+schedule = ["FREQ=WEEKLY;BYDAY=TH,TU"]
 
 [[podcasts.references]]
 url = "https://anchor.fm/s/fc9f8628/podcast/rss"
@@ -57,7 +58,7 @@ url = "yt://@CampGagnon"
 [[podcasts]]
 name     = "Coffeezilla"
 path     = "/media/podcasts/coffeezilla"
-schedule = ["FREQ=WEEKLY"]
+schedule = ["FREQ=WEEKLY;BYDAY=MO,TH,WE"]
 
 [[podcasts.references]]
 url = "yt://@Coffeezilla"
@@ -69,7 +70,7 @@ url = "yt://@Coffeezilla"
 [[podcasts]]
 name     = "CreepCast"
 path     = "/media/podcasts/creepcast"
-schedule = ["FREQ=WEEKLY;BYDAY=MO"]
+schedule = ["FREQ=WEEKLY;BYDAY=SU"]
 
 [[podcasts.references]]
 url = "https://feeds.megaphone.fm/creepcast"
@@ -81,7 +82,7 @@ url = "yt://@CreepPodcast"
 [[podcasts]]
 name     = "Darknet Diaries"
 path     = "/media/podcasts/darknet-diaries"
-schedule = ["FREQ=WEEKLY"]
+schedule = ["FREQ=WEEKLY;BYDAY=TU"]
 
 [[podcasts.references]]
 url = "https://podcast.darknetdiaries.com"
@@ -93,7 +94,7 @@ url = "yt://@JackRhysider"
 [[podcasts]]
 name     = "Financial Audit"
 path     = "/media/podcasts/financial-audit"
-schedule = ["FREQ=WEEKLY"]
+schedule = ["FREQ=WEEKLY;BYDAY=FR,WE,SA"]
 
 [[podcasts.references]]
 url = "https://feeds.megaphone.fm/ROOSTER4571910246"
@@ -133,6 +134,7 @@ exclude = [
 [[podcasts]]
 name   = "Heather Cox Richardson"
 path   = "/media/podcasts/heather-cox-richardson"
+schedule = ["FREQ=WEEKLY;BYDAY=FR,SA"]
 
 [[podcasts.references]]
 url = "yt://@HeatherCoxRichardson"
@@ -144,7 +146,7 @@ url = "yt://@HeatherCoxRichardson"
 [[podcasts]]
 name     = "Jay Bird"
 path     = "/media/podcasts/jay-bird"
-schedule = ["FREQ=WEEKLY"]
+schedule = ["FREQ=WEEKLY;BYDAY=TU,TH,WE"]
 
 [[podcasts.references]]
 url = "yt://@jaybird160"
@@ -171,7 +173,7 @@ exclude = ["^s\\d{1,2}\\s*[-:]?\\s*e\\d{1,2}\\b"]
 [[podcasts]]
 name = "Lisa Sonni"
 path = "/media/podcasts/lisa-sonni"
-schedule = ["FREQ=WEEKLY"]
+schedule = ["FREQ=WEEKLY;BYDAY=SA,WE,TH"]
 
 [[podcasts.references]]
 url = "yt://@lisasonni"
@@ -183,7 +185,7 @@ url = "yt://@lisasonni"
 [[podcasts]]
 name     = "Legal Eagle"
 path     = "/media/podcasts/legal-eagle"
-schedule = ["FREQ=WEEKLY"]
+schedule = ["FREQ=WEEKLY;BYDAY=FR,WE,MO"]
 
 [[podcasts.references]]
 url = "yt://@LegalEagle"
@@ -195,7 +197,7 @@ url = "yt://@LegalEagle"
 [[podcasts]]
 name     = "Morbid"
 path     = "/media/podcasts/morbid"
-schedule = ["FREQ=WEEKLY"]
+schedule = ["FREQ=WEEKLY;BYDAY=TH,MO,TU"]
 
 [[podcasts.references]]
 url = "https://feeds.simplecast.com/ohmVlJZQ"
@@ -205,9 +207,21 @@ url = "yt://@morbidpodcast"
 
 
 [[podcasts]]
+name = "Paul J Warburg"
+path = "/media/podcasts/paul-warburg"
+schedule = ["FREQ=WEEKLY;BYDAY=SA,TH,FR"]
+
+[[podcasts.references]]
+url = "yt://@PaulJWarburg"
+
+[[podcasts.downloads]]
+url = "yt://@PaulJWarburg"
+
+
+[[podcasts]]
 name     = "Smosh Reads Reddit Stories"
 path     = "/media/podcasts/smosh-reads-reddit-stories"
-schedule = ["FREQ=WEEKLY;BYDAY=MO"]
+schedule = ["FREQ=WEEKLY;BYDAY=SA"]
 
 [[podcasts.references]]
 url = "https://audioboom.com/channels/5148149.rss"
@@ -221,7 +235,7 @@ include = ["Reading Reddit Stories"]
 [[podcasts]]
 name     = "Stuff You Should Know"
 path     = "/media/podcasts/stuff-you-should-know"
-schedule = ["FREQ=WEEKLY"]
+schedule = ["FREQ=WEEKLY;BYDAY=MO,FR,TH"]
 
 [[podcasts.references]]
 url = "https://www.omnycontent.com/d/playlist/e73c998e-6e60-432f-8610-ae210140c5b1/a91018a4-ea4f-4130-bf55-ae270180c327/44710ecc-10bb-48d1-93c7-ae270180c33e/podcast.rss"
@@ -252,7 +266,7 @@ include = ["Stuff You Should Know"]
 [[podcasts]]
 name     = "Swindled"
 path     = "/media/podcasts/swindled"
-schedule = ["FREQ=WEEKLY"]
+schedule = ["FREQ=WEEKLY;BYDAY=WE,SU,SA"]
 
 [[podcasts.references]]
 url = "https://feeds.megaphone.fm/swindled"
@@ -266,6 +280,7 @@ exclude = ["rerun", "documentary"]
 [[podcasts]]
 name = "The Daily Show"
 path = "/media/podcasts/the-daily-show"
+schedule = ["FREQ=WEEKLY;BYDAY=TH,WE,SA"]
 
 [[podcasts.references]]
 url = "https://feeds.megaphone.fm/QCD2422844292"
@@ -279,7 +294,7 @@ url = "yt://@TheDailyShow"
 [[podcasts]]
 name     = "The Weekly Show with Jon Stewart"
 path     = "/media/podcasts/the-weekly-show-with-jon-stewart"
-schedule = ["FREQ=WEEKLY;BYDAY=FR"]
+schedule = ["FREQ=WEEKLY;BYDAY=WE,TH,FR"]
 
 [[podcasts.references]]
 url = "https://feeds.megaphone.fm/BVLLC2163264914"
@@ -291,6 +306,7 @@ url = "yt://@WeeklyShowPodcast"
 [[podcasts]]
 name = "YV Edit"
 path = "/media/podcasts/yv-edit"
+schedule = ["FREQ=WEEKLY;BYDAY=TH,SA,FR"]
 
 [[podcasts.references]]
 url = "yt://@yv_edit"
