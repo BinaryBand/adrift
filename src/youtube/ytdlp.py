@@ -57,9 +57,7 @@ class VideoInfo(BaseModel):
             return None
 
 
-def _fetch_channel_info_raw(
-    url: str, fetch_videos: bool = False
-) -> dict[str, Any] | None:
+def _fetch_channel_info_raw(url: str, fetch_videos: bool = False) -> dict[str, Any] | None:
     """Fetch raw channel information from yt-dlp."""
     opts: YtDlpParams = get_ydl_opts()
     opts["extract_flat"] = True

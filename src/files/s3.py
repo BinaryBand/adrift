@@ -162,9 +162,7 @@ def _do_s3_upload(spec: _UploadSpec) -> None:
     )
 
 
-def _sync_upload_cache(
-    bucket: str, key: str, metadata_dict: dict[str, str] | None
-) -> None:
+def _sync_upload_cache(bucket: str, key: str, metadata_dict: dict[str, str] | None) -> None:
     """Update the local S3 metadata cache after an upload."""
     cache_key = f"s3_metadata:{bucket}:{key}"
     if metadata_dict is not None:
@@ -428,9 +426,7 @@ def _build_file_map_from_iterator(
     return file_list
 
 
-def _get_file_map(
-    bucket: str, prefix: str, without_extensions: bool = True
-) -> dict[str, str]:
+def _get_file_map(bucket: str, prefix: str, without_extensions: bool = True) -> dict[str, str]:
     # Normalize prefix - add trailing slash for directory listing with delimiter
     prefix = prefix.lstrip(".")
     if prefix and not prefix.endswith("/"):
@@ -465,9 +461,7 @@ def _remove_file_extensions(file_names: list[str]) -> list[str]:
     return [Path(f).with_suffix("").as_posix() for f in file_names]
 
 
-def get_file_list(
-    bucket: str, prefix: str, without_extensions: bool = False
-) -> list[str]:
+def get_file_list(bucket: str, prefix: str, without_extensions: bool = False) -> list[str]:
     prefix = prefix.lstrip(".").rstrip("/")
     file_map = _get_file_map(bucket, prefix, False)
 

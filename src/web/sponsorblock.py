@@ -78,9 +78,7 @@ def _segment_api_url(video_id: str) -> str:
     return f"https://sponsor.ajay.app/api/skipSegments/{hash_prefix}"
 
 
-def _parse_segment_payload(
-    video_id: str, response: requests.Response
-) -> list[dict[str, Any]]:
+def _parse_segment_payload(video_id: str, response: requests.Response) -> list[dict[str, Any]]:
     if response.status_code == 404:
         return []
     if response.status_code != 200:

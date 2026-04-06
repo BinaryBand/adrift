@@ -151,9 +151,7 @@ def get_audio_content_hash(file_path: Path, sample_rate: int = 8000) -> str:
     sample_times = _compute_sample_times(duration, num_samples, sample_window)
 
     try:
-        hex_hash: str = _hash_audio_samples(
-            file_path, sample_times, sample_window, sample_rate
-        )
+        hex_hash: str = _hash_audio_samples(file_path, sample_times, sample_window, sample_rate)
     except Exception:
         hex_hash = _fallback_hash_bytes(file_path)
 

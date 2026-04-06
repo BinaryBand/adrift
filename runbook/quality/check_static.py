@@ -103,9 +103,7 @@ def _emit(diagnostics: Iterable[Diagnostic]) -> int:
     return error_count
 
 
-def _run_pyright(
-    paths: Iterable[str], exe: Optional[str]
-) -> Tuple[int, List[Diagnostic]]:
+def _run_pyright(paths: Iterable[str], exe: Optional[str]) -> Tuple[int, List[Diagnostic]]:
     if exe is None:
         exe = _venv_executable("pyright")
     if exe is None:
@@ -151,11 +149,7 @@ def _run_pyright(
         for m in f.get("messages", []) or f.get("diagnostics", []):
             rng = m.get("range") or {}
             start = rng.get("start") or {}
-            line = (
-                (start.get("line", 0) + 1)
-                if isinstance(start, dict)
-                else m.get("line", 1)
-            )
+            line = (start.get("line", 0) + 1) if isinstance(start, dict) else m.get("line", 1)
             severity = m.get("severity", "error")
             message = m.get("message", "")
             diags.append(
@@ -179,9 +173,7 @@ def _run_ruff(paths: Iterable[str], exe: Optional[str]) -> Tuple[int, List[Diagn
 
     # Prefer JSON format for reliable parsing; fall back to textual output.
     cmd_json = [exe, "check", "--format", "json", *paths]
-    proc = subprocess.run(
-        cmd_json, cwd=_ROOT, capture_output=True, text=True, check=False
-    )
+    proc = subprocess.run(cmd_json, cwd=_ROOT, capture_output=True, text=True, check=False)
     diags: List[Diagnostic] = []
     if proc.stdout:
         try:
@@ -206,11 +198,7 @@ def _run_ruff(paths: Iterable[str], exe: Optional[str]) -> Tuple[int, List[Diagn
                             line = issue.get("line", 1)
                             code = issue.get("code", "") or issue.get("rule") or ""
                             msg = issue.get("message", "")
-                            severity = (
-                                "error"
-                                if (code and code[:1] in ("E", "F"))
-                                else "warning"
-                            )
+                            severity = "error" if (code and code[:1] in ("E", "F")) else "warning"
                             diags.append(
                                 Diagnostic(
                                     path=Path(filename).as_posix(),
@@ -223,9 +211,7 @@ def _run_ruff(paths: Iterable[str], exe: Optional[str]) -> Tuple[int, List[Diagn
                         k in it for k in ("filename", "line", "code", "message")
                     ):
                         severity = (
-                            "error"
-                            if str(it.get("code", ""))[:1] in ("E", "F")
-                            else "warning"
+                            "error" if str(it.get("code", ""))[:1] in ("E", "F") else "warning"
                         )
                         diags.append(
                             Diagnostic(
@@ -242,13 +228,9 @@ def _run_ruff(paths: Iterable[str], exe: Optional[str]) -> Tuple[int, List[Diagn
 
     # Fallback: run text mode and try to parse lines like "path:line:col: CODE message"
     cmd_text = [exe, "check", *paths]
-    proc_text = subprocess.run(
-        cmd_text, cwd=_ROOT, capture_output=True, text=True, check=False
-    )
+    proc_text = subprocess.run(cmd_text, cwd=_ROOT, capture_output=True, text=True, check=False)
     text_out = proc_text.stdout or proc_text.stderr or ""
-    ruff_line_re = re.compile(
-        r"^(?P<path>.*?):(?P<line>\d+):\d+:\s*(?P<code>\w+)\s*(?P<msg>.*)$"
-    )
+    ruff_line_re = re.compile(r"^(?P<path>.*?):(?P<line>\d+):\d+:\s*(?P<code>\w+)\s*(?P<msg>.*)$")
     for raw in text_out.splitlines():
         m = ruff_line_re.match(raw.strip())
         if m:
