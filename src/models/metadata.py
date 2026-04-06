@@ -3,7 +3,7 @@ import sys
 from abc import ABC, abstractmethod
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Any, Callable
+from typing import Any, Callable, cast
 
 import pydantic
 from dotenv import find_dotenv, load_dotenv
@@ -111,8 +111,21 @@ class YtDlpParams(BaseModel):
 
 
 def _extract_image_from_list(data: list[Any]) -> str:
-    last = data[-1] if data else None
-    return last.get("url", "") if isinstance(last, dict) else ""
+    if not data:
+        return ""
+
+    last = data[-1]
+    if isinstance(last, dict):
+        last_dict = cast(dict[str, Any], last)
+        try:
+            url = last_dict["url"]
+        except Exception:
+            return ""
+
+        if isinstance(url, str):
+            return url
+
+    return ""
 
 
 def _from_unix_timestamp(raw: Any) -> datetime | None:
@@ -132,7 +145,7 @@ def _parse_upload_date(raw: Any) -> datetime | None:
         return None
 
 
-def _parse_ytdlp_pub_date(data: dict) -> datetime | None:
+def _parse_ytdlp_pub_date(data: dict[str, Any]) -> datetime | None:
     for key in ("timestamp", "release_timestamp"):
         if dt := _from_unix_timestamp(data.get(key)):
             return dt
@@ -174,7 +187,7 @@ class RssChannel(BaseModel):
         if not data:
             return ""
         if isinstance(data, list):
-            return _extract_image_from_list(data)
+            return _extract_image_from_list(cast(list[Any], data))
         if isinstance(data, str):
             return data
         return ""

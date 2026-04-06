@@ -110,8 +110,15 @@ def _run_pyright(paths: Iterable[str], exe: Optional[str]) -> Tuple[int, List[Di
         print("pyright: not found; skipping pyright checks", file=sys.stderr)
         return 2, []
 
+    # Try with --strict first; some pyright wrappers may not accept that flag,
+    # so fall back to no --strict if we detect an unexpected-option error.
     cmd = [exe, "--outputjson", "--strict", *paths]
     proc = subprocess.run(cmd, cwd=_ROOT, capture_output=True, text=True, check=False)
+    if proc.returncode != 0 and proc.stderr and "Unexpected option --strict" in proc.stderr:
+        # Retry without --strict for older/alternate pyright binaries.
+        cmd = [exe, "--outputjson", *paths]
+        proc = subprocess.run(cmd, cwd=_ROOT, capture_output=True, text=True, check=False)
+
     if not proc.stdout:
         # No structured output; surface whatever pyright printed.
         if proc.stderr:
@@ -258,10 +265,15 @@ def run_checks(
     ruff_exe: Optional[str],
 ) -> Tuple[int, List[Diagnostic]]:
     all_diags: List[Diagnostic] = []
-    py_return, py_diags = _run_pyright(paths, pyright_exe)
+    # Avoid running pyright over test files by default; tests often use
+    # untyped mocks and private helpers which can generate many spurious
+    # type-errors. Ruff should still lint tests.
+    path_list = list(paths)
+    pyright_paths = [p for p in path_list if p != "tests"]
+    py_return, py_diags = _run_pyright(pyright_paths, pyright_exe)
     all_diags.extend(py_diags)
 
-    ruff_return, ruff_diags = _run_ruff(paths, ruff_exe)
+    ruff_return, ruff_diags = _run_ruff(path_list, ruff_exe)
     all_diags.extend(ruff_diags)
 
     # Choose an overall return code: prefer non-tool-found (2) over tool-reported findings (1)

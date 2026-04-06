@@ -208,13 +208,11 @@ def _extract_content_url(entry: FeedParserDict) -> str | None:
 def _collect_enclosure_strings(entry: FeedParserDict) -> list[str]:
     content = getattr(entry, "enclosures", [])
     if content:
-        return sum(
-            (
-                LINK_REGEX.findall(enc if isinstance(enc, str) else enc.get("href", ""))
-                for enc in content
-            ),
-            [],
-        )
+        return [
+            s
+            for enc in content
+            for s in LINK_REGEX.findall(enc if isinstance(enc, str) else enc.get("href", ""))
+        ]
     if hasattr(entry, "url"):
         return [entry.get("url", "")]
     return []

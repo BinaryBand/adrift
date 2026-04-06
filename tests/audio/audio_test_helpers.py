@@ -3,8 +3,10 @@ Script to download a test video for audio testing.
 Downloads dQw4w9WgXcQ as MP3 for use in audio processing tests.
 """
 
+import shutil
 import subprocess
 import sys
+import unittest
 from pathlib import Path
 
 sys.path.insert(0, Path(__file__).parent.parent.parent.as_posix())
@@ -25,6 +27,10 @@ def download_test_audio():
     """Download test video as MP3."""
     if OUTPUT_FILE.exists():
         return OUTPUT_FILE
+
+    # Skip tests if yt-dlp is not installed on the system.
+    if shutil.which("yt-dlp") is None:
+        raise unittest.SkipTest("yt-dlp not found; skipping audio download tests")
 
     cmd = [
         "yt-dlp",

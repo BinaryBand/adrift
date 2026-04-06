@@ -181,7 +181,7 @@ def _fetch_channel_videos_raw(
     try:
         with YoutubeDL(cast(Any, opts)) as ydl:
             channel_info = ydl.extract_info(url, download=False)
-            if channel_info is None:
+            if not channel_info:
                 return []
 
             return cast(list[dict[str, Any]], channel_info.get("entries", []))

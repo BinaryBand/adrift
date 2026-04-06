@@ -116,7 +116,7 @@ def _enrich_episodes(
     episodes: list[RssEpisode], author: str, callback: Callback | None
 ) -> list[RssEpisode]:
     print("Adding detailed metadata to episodes...")
-    result = []
+    result: list[RssEpisode] = []
     for i, ep in enumerate(episodes):
         result.append(_add_episode_metadata(ep, author))
         if callback:

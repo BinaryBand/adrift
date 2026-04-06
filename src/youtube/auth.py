@@ -9,16 +9,18 @@ from src.models import YtDlpParams
 
 def get_ydl_opts() -> YtDlpParams:
     """Get basic yt-dlp options without authentication"""
-    return {
-        "quiet": True,
-        "no_warnings": True,
-        "extract_flat": False,
-        "socket_timeout": 30,
-        "sleep_interval": 3,
-        "max_sleep_interval": 8,
-        "sleep_interval_requests": 1,
-        "extractor_args": {"youtube": {"skip": ["js"]}},  # Skip JS-dependent formats
-    }
+    return YtDlpParams.model_validate(
+        {
+            "quiet": True,
+            "no_warnings": True,
+            "extract_flat": False,
+            "socket_timeout": 30,
+            "sleep_interval": 3,
+            "max_sleep_interval": 8,
+            "sleep_interval_requests": 1,
+            "extractor_args": {"youtube": {"skip": ["js"]}},  # Skip JS-dependent formats
+        }
+    )
 
 
 def get_auth_ydl_opts(

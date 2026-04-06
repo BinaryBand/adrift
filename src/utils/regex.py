@@ -2,8 +2,10 @@ import re
 
 from cachetools import LRUCache, cached
 
+_RE_COMPILE_CACHE: LRUCache[str, re.Pattern[str]] = LRUCache(2048)
 
-@cached(LRUCache(2048))
+
+@cached(_RE_COMPILE_CACHE)
 def re_compile(regex: str) -> re.Pattern[str]:
     return re.compile(regex)
 

@@ -19,7 +19,7 @@ from mypy_boto3_s3.type_defs import CopySourceTypeDef
 from pydantic import BaseModel, ConfigDict
 
 sys.path.insert(0, Path(__file__).parent.parent.as_posix())
-from src.models import CacheMetadata, MediaMetadata
+from src.models import CacheMetadata, MediaMetadata, S3Metadata
 from src.utils.progress import Callback
 
 load_dotenv(find_dotenv())
@@ -30,9 +30,9 @@ assert (S3_REGION := os.getenv("S3_REGION", "")) != "", "`S3_REGION` empty"
 
 _LOCAL_S3_ENDPOINT = os.getenv("LOCAL_S3_ENDPOINT", "http://localhost:9000")
 
-_S3_CLIENT_LOCK = Lock()
-_S3_CLIENT: S3Client | None = None
-_EFFECTIVE_ENDPOINT: str | None = None
+_s3_client_lock = Lock()
+_s3_client: S3Client | None = None
+_effective_endpoint: str | None = None
 
 
 @cache
@@ -179,33 +179,33 @@ def _sync_upload_cache(bucket: str, key: str, metadata_dict: dict[str, str] | No
 
 def _get_effective_s3_endpoint() -> str:
     """Resolve the endpoint boto3 should talk to."""
-    global _EFFECTIVE_ENDPOINT
+    global _effective_endpoint
 
-    if _EFFECTIVE_ENDPOINT is not None:
-        return _EFFECTIVE_ENDPOINT
+    if _effective_endpoint is not None:
+        return _effective_endpoint
 
     # Prefer local endpoint if it's reachable.
     if _LOCAL_S3_ENDPOINT and _is_endpoint_reachable(_LOCAL_S3_ENDPOINT):
-        _EFFECTIVE_ENDPOINT = _LOCAL_S3_ENDPOINT
+        _effective_endpoint = _LOCAL_S3_ENDPOINT
     else:
-        _EFFECTIVE_ENDPOINT = S3_ENDPOINT
+        _effective_endpoint = S3_ENDPOINT
 
-    return _EFFECTIVE_ENDPOINT
+    return _effective_endpoint
 
 
 def get_s3_client() -> S3Client:
     """Get a cached S3 client."""
-    global _S3_CLIENT
+    global _s3_client
 
-    if _S3_CLIENT is not None:
-        return _S3_CLIENT
+    if _s3_client is not None:
+        return _s3_client
 
-    with _S3_CLIENT_LOCK:
-        if _S3_CLIENT is not None:
-            return _S3_CLIENT
+    with _s3_client_lock:
+        if _s3_client is not None:
+            return _s3_client
 
-        _S3_CLIENT = _build_s3_client()
-        return _S3_CLIENT
+        _s3_client = _build_s3_client()
+        return _s3_client
 
 
 def _build_s3_client() -> S3Client:
@@ -248,7 +248,7 @@ class UploadOptions(BaseModel):
     Uses arbitrary types to allow passing a `Callback` callable.
     """
 
-    metadata: MediaMetadata | None = None
+    metadata: S3Metadata | None = None
     callback: Callback | None = None
 
     model_config = ConfigDict(arbitrary_types_allowed=True)
@@ -258,7 +258,7 @@ def _prepare_upload_spec(
     bucket: str,
     key: str,
     file_path: Path | str,
-    options: UploadOptions | MediaMetadata | None,
+    options: UploadOptions | S3Metadata | None,
 ) -> tuple[_UploadSpec, dict[str, str] | None]:
     """Prepare an _UploadSpec and metadata dict from common upload inputs.
 
@@ -282,8 +282,8 @@ def _prepare_upload_spec(
 
 
 def _extract_upload_options(
-    options: UploadOptions | MediaMetadata | dict | None,
-) -> tuple[MediaMetadata | None, Callback | None]:
+    options: UploadOptions | S3Metadata | dict[str, Any] | None,
+) -> tuple[S3Metadata | None, Callback | None]:
     """Normalize `options` to (metadata, callback).
 
     Accepts an `UploadOptions` model, a plain `dict`, or a `MediaMetadata`
@@ -291,23 +291,61 @@ def _extract_upload_options(
     """
     if options is None:
         return None, None
-    if isinstance(options, MediaMetadata):
+    if isinstance(options, S3Metadata):
         return options, None
     if isinstance(options, UploadOptions):
         return options.metadata, options.callback
-    if isinstance(options, dict):
+    # Fall back: attempt to treat remaining values as a dict-like options
+    # mapping. This avoids an `isinstance(..., dict)` check which can be
+    # noisy for the static checker in some union scenarios.
+    try:
         return _extract_upload_options_from_dict(options)
-    return None, None
+    except Exception:
+        return None, None
 
 
 def _extract_upload_options_from_dict(
-    options: dict,
-) -> tuple[MediaMetadata | None, Callback | None]:
+    options: dict[str, Any],
+) -> tuple[S3Metadata | None, Callback | None]:
     try:
         opts = UploadOptions.model_validate(options)
         return opts.metadata, opts.callback
     except Exception:
-        return options.get("metadata"), options.get("callback")
+        metadata_raw = options.get("metadata")
+        callback_raw = options.get("callback")
+
+        # Try validating raw metadata into a known model first; if that
+        # fails, fall back to accepting an already-constructed model
+        # instance.
+        metadata_obj: S3Metadata | None = None
+        try:
+            metadata_obj = MediaMetadata.model_validate(metadata_raw)
+        except Exception:
+            try:
+                metadata_obj = CacheMetadata.model_validate(metadata_raw)
+            except Exception:
+                if isinstance(metadata_raw, (MediaMetadata, CacheMetadata)):
+                    metadata_obj = metadata_raw
+                else:
+                    metadata_obj = None
+
+        callback_obj: Callback | None = None
+        if callable(callback_raw):
+            def _adapted_callback(value: int, total_value: int | None) -> None:
+                try:
+                    # Prefer calling with (value, total_value) when supported
+                    callback_raw(value, total_value)
+                except TypeError:
+                    try:
+                        # Fallback to single-arg callbacks (boto style)
+                        callback_raw(value)
+                    except Exception:
+                        # Swallow any exceptions from user callback
+                        return
+
+            callback_obj = _adapted_callback
+
+        return metadata_obj, callback_obj
 
 
 def _build_boto_callback_for_file(

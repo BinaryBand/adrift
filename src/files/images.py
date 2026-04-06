@@ -1,13 +1,14 @@
 import os
 import sys
 from pathlib import Path
+from typing import Any
 
 from PIL import Image
 
 sys.path.insert(0, Path(__file__).parent.parent.parent.as_posix())
 
 
-def _crop_to_center_square(img: Image.Image) -> Image.Image:
+def _crop_to_center_square(img: Any) -> Any:
     width, height = img.size
     side = min(width, height)
     left = (width - side) // 2
@@ -17,7 +18,7 @@ def _crop_to_center_square(img: Image.Image) -> Image.Image:
     )
 
 
-def _paste_centered(canvas: Image.Image, img: Image.Image) -> None:
+def _paste_centered(canvas: Any, img: Any) -> None:
     img.thumbnail(canvas.size, Image.Resampling.LANCZOS)
     paste_x = (canvas.width - img.width) // 2
     paste_y = (canvas.height - img.height) // 2

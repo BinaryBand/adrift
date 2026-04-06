@@ -4,7 +4,7 @@ SponsorBlock API integration for fetching and removing sponsored segments.
 
 import sys
 from pathlib import Path
-from typing import Any, Literal
+from typing import Any, Literal, cast
 
 import requests
 from pydantic import BaseModel, ConfigDict, Field
@@ -65,7 +65,7 @@ def _cached_segments(video_id: str) -> list[SponsorSegment] | None:
     cached = _CACHE.get(video_id)
     if cached is None:
         return None
-    return cached if isinstance(cached, list) else []
+    return cast(list[SponsorSegment], cached) if isinstance(cached, list) else []
 
 
 def _fetch_segment_payload(video_id: str) -> list[dict[str, Any]]:
@@ -89,13 +89,13 @@ def _parse_segment_payload(video_id: str, response: requests.Response) -> list[d
     if not isinstance(raw_data, list):
         print(f"WARNING: Unexpected API response for {video_id}: not a list")
         return []
-    return _unwrap_segment_payload(raw_data)
+    return _unwrap_segment_payload(cast(list[dict[str, Any]], raw_data))
 
 
 def _unwrap_segment_payload(raw_data: list[dict[str, Any]]) -> list[dict[str, Any]]:
-    if raw_data and isinstance(raw_data[0], dict) and "segments" in raw_data[0]:
+    if raw_data and "segments" in raw_data[0]:
         nested = raw_data[0].get("segments", [])
-        return nested if isinstance(nested, list) else []
+        return cast(list[dict[str, Any]], nested) if isinstance(nested, list) else []
     return raw_data
 
 
