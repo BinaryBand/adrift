@@ -19,7 +19,9 @@ PROJECT = os.getenv("PROJECT", "UnknownProject")
 class S3Metadata(pydantic.BaseModel, ABC):
     """Abstract base class for S3 metadata models."""
 
-    uploader: str | None = pydantic.Field(default=DEVICE, description="Device identifier")
+    uploader: str | None = pydantic.Field(
+        default=DEVICE, description="Device identifier"
+    )
 
     @abstractmethod
     def to_dict(self) -> dict[str, str]:
@@ -31,7 +33,9 @@ class CacheMetadata(S3Metadata):
     """S3 object metadata for cached items."""
 
     created_at: datetime = pydantic.Field(description="Creation timestamp")
-    expires_at: datetime | None = pydantic.Field(default=None, description="Expiration timestamp")
+    expires_at: datetime | None = pydantic.Field(
+        default=None, description="Expiration timestamp"
+    )
 
     def to_dict(self) -> dict[str, str]:
         """Convert to S3-compatible metadata dictionary (all string values)."""

@@ -55,7 +55,9 @@ def _existing_thumbnail_s3_path(path_base: Path, image_path: str) -> str | None:
     return urljoin(S3_ENDPOINT, s3_path)
 
 
-def _download_thumbnail_bytes(thumbnail_url: str, timeout: int = 30) -> tuple[bytes, str]:
+def _download_thumbnail_bytes(
+    thumbnail_url: str, timeout: int = 30
+) -> tuple[bytes, str]:
     resp = requests.get(thumbnail_url, timeout=timeout)
     resp.raise_for_status()
     content_type = resp.headers.get("Content-Type", "")
@@ -211,7 +213,9 @@ def _collect_enclosure_strings(entry: FeedParserDict) -> list[str]:
         return [
             s
             for enc in content
-            for s in LINK_REGEX.findall(enc if isinstance(enc, str) else enc.get("href", ""))
+            for s in LINK_REGEX.findall(
+                enc if isinstance(enc, str) else enc.get("href", "")
+            )
         ]
     if hasattr(entry, "url"):
         return [entry.get("url", "")]
@@ -219,7 +223,9 @@ def _collect_enclosure_strings(entry: FeedParserDict) -> list[str]:
 
 
 def _filter_audio_urls(urls: list[str]) -> list[str]:
-    return [u for u in urls if any(u.lower().find(ext) != -1 for ext in AUDIO_EXTENSIONS)]
+    return [
+        u for u in urls if any(u.lower().find(ext) != -1 for ext in AUDIO_EXTENSIONS)
+    ]
 
 
 def parse_rss_entry(entry: FeedParserDict) -> RssEpisode:
