@@ -107,9 +107,7 @@ class TestDownloadVideo(unittest.TestCase):
     @patch("src.youtube.downloader._ytdlp_download")
     def test_success_returns_path(self, mock_dl):
         mock_dl.return_value = Path("/tmp/video.m4a")
-        result = download_video(
-            "https://www.youtube.com/watch?v=abc1234abcd", Path("/tmp")
-        )
+        result = download_video("https://www.youtube.com/watch?v=abc1234abcd", Path("/tmp"))
         self.assertEqual(result, Path("/tmp/video.m4a"))
         mock_dl.assert_called_once_with("abc1234abcd", Path("/tmp"), None)
 
@@ -120,18 +118,14 @@ class TestDownloadVideo(unittest.TestCase):
     @patch("src.youtube.downloader._ytdlp_download")
     def test_generic_exception_returns_none(self, mock_dl):
         mock_dl.side_effect = Exception("Network error")
-        result = download_video(
-            "https://www.youtube.com/watch?v=abc1234abcd", Path("/tmp")
-        )
+        result = download_video("https://www.youtube.com/watch?v=abc1234abcd", Path("/tmp"))
         self.assertIsNone(result)
 
     @patch("src.youtube.downloader._ytdlp_download")
     def test_bot_detection_no_propagate_returns_none(self, mock_dl):
         mock_dl.side_effect = Exception("Sign in to confirm you're not a bot")
         yt_downloader.PROPAGATE_BOT_DETECTION = False
-        result = download_video(
-            "https://www.youtube.com/watch?v=abc1234abcd", Path("/tmp")
-        )
+        result = download_video("https://www.youtube.com/watch?v=abc1234abcd", Path("/tmp"))
         self.assertIsNone(result)
 
     @patch("src.youtube.downloader._ytdlp_download")
@@ -151,9 +145,7 @@ class TestDownloadVideo(unittest.TestCase):
     @patch("src.youtube.downloader._ytdlp_download", return_value=Path("/tmp/v.m4a"))
     def test_creates_output_directory(self, _dl):
         with patch("pathlib.Path.mkdir") as mock_mkdir:
-            download_video(
-                "https://www.youtube.com/watch?v=abc1234abcd", Path("/tmp/new")
-            )
+            download_video("https://www.youtube.com/watch?v=abc1234abcd", Path("/tmp/new"))
             mock_mkdir.assert_called_once_with(parents=True, exist_ok=True)
 
 

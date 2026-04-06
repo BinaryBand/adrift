@@ -1,6 +1,7 @@
 # ruff: noqa: E402
-from pathlib import Path
 import sys
+from pathlib import Path
+
 import dotenv
 
 sys.path.insert(0, Path(dotenv.find_dotenv()).parent.as_posix())
@@ -9,9 +10,11 @@ dotenv.load_dotenv()
 import argparse
 import subprocess
 import tempfile
+
 from tqdm import tqdm
 
-from src.files.s3 import get_s3_client, download_file as s3_download_file
+from src.files.s3 import download_file as s3_download_file
+from src.files.s3 import get_s3_client
 
 _FFMPEG_BASE = ["ffmpeg", "-hide_banner", "-loglevel", "error"]
 AUDIO_EXTENSIONS = {".mp3", ".m4a", ".aac", ".wav", ".flac", ".ogg", ".mp4"}
@@ -45,9 +48,7 @@ def _list_all_s3_objects(bucket: str, prefix: str = "") -> list[str]:
     return keys
 
 
-def _download_convert_save(
-    bucket: str, s3_key: str, local_path: Path, dry_run: bool
-) -> bool:
+def _download_convert_save(bucket: str, s3_key: str, local_path: Path, dry_run: bool) -> bool:
     """Download from S3, convert to opus, save locally.
 
     Returns True on success, False on any error.
@@ -120,9 +121,7 @@ def main() -> None:
     all_keys = _list_all_s3_objects("media", "podcasts/")
 
     # Filter to audio files only
-    audio_keys = [
-        k for k in all_keys if any(k.endswith(ext) for ext in AUDIO_EXTENSIONS)
-    ]
+    audio_keys = [k for k in all_keys if any(k.endswith(ext) for ext in AUDIO_EXTENSIONS)]
 
     print(f"Found {len(audio_keys)} audio files to process")
 

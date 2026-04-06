@@ -133,9 +133,7 @@ class TestScheduleMatchesToday(unittest.TestCase):
 
     def test_no_byday_uses_rrule_defaults(self):
         """FREQ=WEEKLY without BYDAY is evaluated directly by dateutil RRULE."""
-        result = _schedule_matches_today(
-            "FREQ=WEEKLY", "Coffeezilla", datetime(2026, 4, 1)
-        )
+        result = _schedule_matches_today("FREQ=WEEKLY", "Coffeezilla", datetime(2026, 4, 1))
         self.assertTrue(result)
 
     def test_single_byday(self):
@@ -165,12 +163,8 @@ class TestScheduleMatchesToday(unittest.TestCase):
     def test_dtstart_plus_rrule_supported(self):
         """RFC5545 DTSTART+RRULE strings should evaluate schedule windows."""
         schedule = "DTSTART:20240124T000000Z\nRRULE:FREQ=WEEKLY;BYDAY=MO"
-        self.assertTrue(
-            _schedule_matches_today(schedule, "The Daily Show", datetime(2026, 3, 30))
-        )
-        self.assertFalse(
-            _schedule_matches_today(schedule, "The Daily Show", datetime(2026, 3, 31))
-        )
+        self.assertTrue(_schedule_matches_today(schedule, "The Daily Show", datetime(2026, 3, 30)))
+        self.assertFalse(_schedule_matches_today(schedule, "The Daily Show", datetime(2026, 3, 31)))
 
 
 class TestSourceFilterRRules(unittest.TestCase):

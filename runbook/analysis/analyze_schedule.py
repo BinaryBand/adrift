@@ -116,9 +116,7 @@ def _normalize_youtube_target(raw: str) -> str:
 def _normalize_feed_target(raw: str) -> str:
     parsed = urlparse(raw.strip())
     path = parsed.path.rstrip("/") or "/"
-    return urlunparse(
-        (parsed.scheme.lower(), parsed.netloc.lower(), path, "", parsed.query, "")
-    )
+    return urlunparse((parsed.scheme.lower(), parsed.netloc.lower(), path, "", parsed.query, ""))
 
 
 def _target_key(raw: str) -> tuple[str, str]:
@@ -248,11 +246,7 @@ def _youtube_feed_url(source: str) -> str:
 
 
 def _feed_url_for_target(target: Target) -> str:
-    return (
-        target.source.strip()
-        if target.kind == "feed"
-        else _youtube_feed_url(target.source)
-    )
+    return target.source.strip() if target.kind == "feed" else _youtube_feed_url(target.source)
 
 
 def _fetch_feed(feed_url: str) -> feedparser.FeedParserDict:
@@ -340,9 +334,7 @@ def _sample_from_entry(entry: feedparser.FeedParserDict) -> Sample | None:
 
 
 def _extract_samples(feed: feedparser.FeedParserDict) -> list[Sample]:
-    samples = [
-        sample for entry in feed.entries if (sample := _sample_from_entry(entry))
-    ]
+    samples = [sample for entry in feed.entries if (sample := _sample_from_entry(entry))]
     samples.sort(key=lambda sample: sample.published_utc, reverse=True)
     return samples
 
@@ -412,9 +404,7 @@ def _build_analysis(target: Target, limit: int) -> Analysis:
     analyzed = _analyzed_samples(filtered, limit)
     if not analyzed:
         raise ValueError("No entries remain after filter/timestamp parsing")
-    return Analysis(
-        target, feed_url, len(feed.entries), len(dated), len(filtered), analyzed
-    )
+    return Analysis(target, feed_url, len(feed.entries), len(dated), len(filtered), analyzed)
 
 
 def _print_weekday_distribution(samples: list[Sample], tz: ZoneInfo) -> None:
@@ -472,9 +462,7 @@ def parse_args() -> argparse.Namespace:
         nargs="?",
         help="yt:// source, @handle, YouTube URL, or direct feed URL",
     )
-    parser.add_argument(
-        "--limit", type=int, default=100, help="Max filtered entries to analyze"
-    )
+    parser.add_argument("--limit", type=int, default=100, help="Max filtered entries to analyze")
     parser.add_argument("--tz", default="UTC", help="IANA timezone for grouping output")
     return parser.parse_args()
 

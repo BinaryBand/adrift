@@ -1,10 +1,9 @@
+import glob
 import random
 import sys
 from pathlib import Path
 from typing import Any
 from urllib.parse import urljoin
-
-import glob
 
 import tomllib
 from dateutil.rrule import rrulestr
@@ -139,9 +138,7 @@ def _load_config(name_or_path: str) -> list[PodcastConfig]:
     return configs
 
 
-def _schedule_matches_today(
-    schedule: str, title: str, today: datetime | None = None
-) -> bool:
+def _schedule_matches_today(schedule: str, title: str, today: datetime | None = None) -> bool:
     """Return True if *schedule* yields an occurrence within today's day window."""
     del title
     current = today or datetime.now()
@@ -184,9 +181,7 @@ def load_podcasts_config(include: list[str]) -> list[PodcastConfig]:
             configs.extend(_load_config(target))
 
     # Filter configs by schedule and return
-    filtered: list[PodcastConfig] = [
-        it for it in configs if _config_schedule_matches_today(it)
-    ]
+    filtered: list[PodcastConfig] = [it for it in configs if _config_schedule_matches_today(it)]
     return filtered
 
 

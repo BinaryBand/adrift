@@ -53,9 +53,7 @@ def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="Run complexity checks via lizard")
     parser.add_argument("path", nargs="?", default="src", help="Path to scan")
     parser.add_argument("--ccn", type=int, default=5, help="CCN ceiling")
-    parser.add_argument(
-        "--length", type=int, default=25, help="Function length ceiling"
-    )
+    parser.add_argument("--length", type=int, default=25, help="Function length ceiling")
     parser.add_argument("--params", type=int, default=4, help="Parameter-count ceiling")
     parser.add_argument(
         "--strict",
@@ -165,9 +163,7 @@ def _severity_for(value: int, ceiling: int) -> str | None:
     return None
 
 
-def _metric_diagnostic(
-    metrics: FunctionMetrics, check: MetricCheck
-) -> Diagnostic | None:
+def _metric_diagnostic(metrics: FunctionMetrics, check: MetricCheck) -> Diagnostic | None:
     severity = _severity_for(check.value, check.ceiling)
     if severity is None:
         return None
@@ -194,9 +190,7 @@ def evaluate_function(metrics: FunctionMetrics, ceiling: Ceiling) -> list[Diagno
     return diagnostics
 
 
-def evaluate_metrics(
-    metrics_list: list[FunctionMetrics], ceiling: Ceiling
-) -> list[Diagnostic]:
+def evaluate_metrics(metrics_list: list[FunctionMetrics], ceiling: Ceiling) -> list[Diagnostic]:
     diagnostics: list[Diagnostic] = []
     for metrics in metrics_list:
         diagnostics.extend(evaluate_function(metrics, ceiling))

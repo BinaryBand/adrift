@@ -97,9 +97,7 @@ class TestAlignEpisodes(unittest.TestCase):
             title="Science Explained: Quantum Tunneling",
             pub_date=_dt(2024, 1, 1),
         )
-        dl = _ep(
-            id="b", title="Cooking Show: Best Pasta Recipes", pub_date=_dt(2024, 6, 1)
-        )
+        dl = _ep(id="b", title="Cooking Show: Best Pasta Recipes", pub_date=_dt(2024, 6, 1))
         pairs = align_episodes([ref], [dl])
         self.assertEqual(pairs, [])
 
@@ -123,9 +121,7 @@ class TestAlignEpisodes(unittest.TestCase):
 
         pairs = align_episodes([ref1, ref2], [dl])
         dl_indices = [d for _, d in pairs]
-        self.assertEqual(
-            len(dl_indices), len(set(dl_indices)), "Download episode used twice"
-        )
+        self.assertEqual(len(dl_indices), len(set(dl_indices)), "Download episode used twice")
 
 
 # ---------------------------------------------------------------------------
@@ -167,9 +163,7 @@ class TestMergeEpisode(unittest.TestCase):
 
     def test_description_longest_wins(self):
         ref = _ep(description="Short description.")
-        dl = _ep(
-            description="This is a much longer description with more detail and context."
-        )
+        dl = _ep(description="This is a much longer description with more detail and context.")
         result = merge_episode(ref, dl)
         self.assertEqual(result.description, dl.description)
 

@@ -225,7 +225,4 @@ def normalize_text(text: str) -> str:
 
 def is_youtube_channel(text: str) -> bool:
     """Check if the given text is a YouTube channel URL or handle."""
-    return (
-        YT_CHANNEL.match(text) is not None
-        or YT_CHANNEL_SHORTHAND.match(text) is not None
-    )
+    return YT_CHANNEL.match(text) is not None or YT_CHANNEL_SHORTHAND.match(text) is not None

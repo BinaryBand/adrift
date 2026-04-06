@@ -152,8 +152,7 @@ def _render_insights(G: nx.DiGraph) -> list[str]:
         *[f"| `{k}.py` | {d} |" for k, d in hubs],
         "",
         "High in-degree modules have wide blast radius.",
-        "Prioritise their stability and consider splitting if they also"
-        " score high on Lizard.",
+        "Prioritise their stability and consider splitting if they also score high on Lizard.",
     ]
     return lines
 
@@ -164,9 +163,7 @@ def build_mermaid() -> str:
 
     lines = ["```mermaid", "graph TD"]
     for layer in _LAYER_ORDER + ["Uncategorised"]:
-        lines.extend(
-            _render_subgraph(layer, layer_groups.get(layer, []), node_subgraph)
-        )
+        lines.extend(_render_subgraph(layer, layer_groups.get(layer, []), node_subgraph))
     lines.append("")
     for src_key, dep_key in sorted(G.edges()):
         lines.append(f"    {_node_id(src_key)} --> {_node_id(dep_key)}")
@@ -208,9 +205,7 @@ def _patch_playbook(playbook: Path, new_section: str) -> bool:
 
 
 def parse_args() -> argparse.Namespace:
-    parser = argparse.ArgumentParser(
-        description="Generate Mermaid module dependency diagram"
-    )
+    parser = argparse.ArgumentParser(description="Generate Mermaid module dependency diagram")
     parser.add_argument("--print", action="store_true")
     parser.add_argument("--check", action="store_true")
     parser.add_argument("--playbook", default=str(_PLAYBOOK))

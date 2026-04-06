@@ -21,9 +21,7 @@ def is_valid_url(url: str) -> bool:
     )
 
 
-def _assert_filter_rules_valid(
-    tc: unittest.TestCase, rules: SourceFilter, label: str
-) -> None:
+def _assert_filter_rules_valid(tc: unittest.TestCase, rules: SourceFilter, label: str) -> None:
     """Validate a SourceFilter instance: patterns must compile and to_regex() must compile."""
     for pattern in rules.include + rules.exclude:
         try:
@@ -44,8 +42,9 @@ class AuditConfigs(unittest.TestCase):
         """Test that all podcast configs parsed from TOML are structurally valid."""
         # load_podcasts_config filters by today's schedule, but we want to audit
         # all entries regardless of day – load from both files without filtering.
-        from src.app_common import _load_config
         from dotenv import find_dotenv
+
+        from src.app_common import _load_config
 
         all_files = Path(find_dotenv()).parent.glob("config/*.toml")
         configs: list[PodcastConfig] = []
@@ -59,9 +58,7 @@ class AuditConfigs(unittest.TestCase):
 
             for fs in podcast.references:
                 self.assertIsInstance(fs.url, str)
-                self.assertTrue(
-                    is_valid_url(fs.url), f"Invalid reference URL: {fs.url}"
-                )
+                self.assertTrue(is_valid_url(fs.url), f"Invalid reference URL: {fs.url}")
 
             for fs in podcast.downloads:
                 self.assertIsInstance(fs.url, str)

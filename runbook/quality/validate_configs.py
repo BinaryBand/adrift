@@ -34,9 +34,7 @@ def _diag_path(path: Path) -> str:
 
 
 def _podcast_entry_spans(lines: list[str]) -> list[tuple[int, int]]:
-    starts = [
-        i for i, line in enumerate(lines, start=1) if line.strip() == "[[podcasts]]"
-    ]
+    starts = [i for i, line in enumerate(lines, start=1) if line.strip() == "[[podcasts]]"]
     if not starts:
         return []
     spans: list[tuple[int, int]] = []
@@ -46,9 +44,7 @@ def _podcast_entry_spans(lines: list[str]) -> list[tuple[int, int]]:
     return spans
 
 
-def _find_key_line(
-    lines: list[str], start: int, end: int, key: str, default_line: int
-) -> int:
+def _find_key_line(lines: list[str], start: int, end: int, key: str, default_line: int) -> int:
     key_pattern = re.compile(rf"^\s*{re.escape(key)}\s*=")
     for line_no in range(start, end + 1):
         if key_pattern.search(lines[line_no - 1]):
@@ -166,9 +162,7 @@ def main():
     args = parser.parse_args()
 
     cfg_dir = _ROOT / "config"
-    files = (
-        [Path(p) for p in args.files] if args.files else list(cfg_dir.glob("*.toml"))
-    )
+    files = [Path(p) for p in args.files] if args.files else list(cfg_dir.glob("*.toml"))
 
     if not args.watch:
         sys.exit(_scan_files(files, problems=args.problems))

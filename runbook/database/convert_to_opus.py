@@ -1,6 +1,7 @@
 # ruff: noqa: E402
-from pathlib import Path
 import sys
+from pathlib import Path
+
 import dotenv
 
 sys.path.insert(0, Path(dotenv.find_dotenv()).parent.as_posix())
@@ -9,16 +10,17 @@ dotenv.load_dotenv()
 import argparse
 import subprocess
 import tempfile
+
 from tqdm import tqdm
 
 from src.app_common import _load_config
 from src.files.s3 import (
-    get_file_list,
-    download_file,
-    upload_file,
     delete_file,
+    download_file,
+    get_file_list,
     get_metadata,
     set_metadata,
+    upload_file,
 )
 
 _FFMPEG_BASE = ["ffmpeg", "-hide_banner", "-loglevel", "error"]
@@ -158,9 +160,7 @@ def main() -> None:
             errors += 1
 
     # Summary
-    print(
-        f"\nDone. Converted: {successes}, Errors: {errors}, Already .opus: {opus_count}"
-    )
+    print(f"\nDone. Converted: {successes}, Errors: {errors}, Already .opus: {opus_count}")
 
 
 if __name__ == "__main__":

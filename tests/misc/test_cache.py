@@ -198,9 +198,7 @@ class TestS3Cache(unittest.TestCase):
         result = self.cache.get("test_key")
 
         self.assertEqual(result, "s3_value")
-        self.mock_local_cache.set.assert_called_once_with(
-            "test_key", "s3_value", expire=None
-        )
+        self.mock_local_cache.set.assert_called_once_with("test_key", "s3_value", expire=None)
 
     @patch("src.utils.cache.exists")
     def test_get_total_miss(self, mock_exists):
@@ -222,9 +220,7 @@ class TestS3Cache(unittest.TestCase):
 
         self.cache.set("test_key", "test_value", expire=3600)
 
-        self.mock_local_cache.set.assert_called_once_with(
-            "test_key", "test_value", expire=3600
-        )
+        self.mock_local_cache.set.assert_called_once_with("test_key", "test_value", expire=3600)
         mock_pickle.dump.assert_called_once()
         mock_upload.assert_called_once()
 
@@ -247,9 +243,7 @@ class TestS3Cache(unittest.TestCase):
 
     def test_get_s3_path_safe_keys(self):
         """Test that unsafe characters in keys are properly encoded."""
-        key = (
-            "_get_youtube_videos:https://www.youtube.com/@user/videos:Name With Spaces"
-        )
+        key = "_get_youtube_videos:https://www.youtube.com/@user/videos:Name With Spaces"
         path = self.cache._get_s3_path(key)
 
         self.assertTrue(path.startswith("test-prefix/_get_youtube_videos/"))

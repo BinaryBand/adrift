@@ -149,9 +149,7 @@ class TestGetYoutubeVideosFilter(unittest.TestCase):
     @patch("src.youtube.metadata._normalize_youtube_link")
     @patch("src.youtube.ytdlp.get_youtube_videos")
     @patch("src.youtube.metadata.re_compile")
-    def test_filters_videos_by_pattern(
-        self, mock_re_compile, mock_get_videos, mock_normalize
-    ):
+    def test_filters_videos_by_pattern(self, mock_re_compile, mock_get_videos, mock_normalize):
         """Test that videos are filtered by title pattern."""
         mock_normalize.return_value = "https://youtube.com/@test/videos"
 
@@ -202,9 +200,7 @@ class TestGetYoutubeVideosDetailed(unittest.TestCase):
     @patch("src.youtube.metadata._normalize_youtube_link")
     @patch("src.youtube.ytdlp.get_youtube_videos")
     @patch("src.youtube.metadata._add_episode_metadata")
-    def test_adds_detailed_metadata(
-        self, mock_add_metadata, mock_get_videos, mock_normalize
-    ):
+    def test_adds_detailed_metadata(self, mock_add_metadata, mock_get_videos, mock_normalize):
         """Test that detailed metadata is added when detailed=True."""
         mock_normalize.return_value = "https://youtube.com/@test/videos"
 

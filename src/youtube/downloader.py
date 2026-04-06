@@ -45,9 +45,7 @@ def _is_bot_detection_error(error_message: str) -> bool:
     return any(indicator in error_message for indicator in _BOT_INDICATORS)
 
 
-def _ytdlp_download(
-    id: str, dir: Path, callback: Callback | None = None
-) -> Path | None:
+def _ytdlp_download(id: str, dir: Path, callback: Callback | None = None) -> Path | None:
     """Download video using yt-dlp with authentication support."""
     opts = _build_download_opts(id, dir, callback)
     url = f"https://www.youtube.com/watch?v={id}"
@@ -60,9 +58,7 @@ def _ytdlp_download(
     return None
 
 
-def _build_download_opts(
-    id: str, dir: Path, callback: Callback | None = None
-) -> YtDlpParams:
+def _build_download_opts(id: str, dir: Path, callback: Callback | None = None) -> YtDlpParams:
     opts: YtDlpParams = get_auth_ydl_opts(use_browser_fallback=True)
     opts["format"] = "bestaudio/best"
     opts["outtmpl"] = (dir / f"{id}.%(ext)s").as_posix()
@@ -140,9 +136,7 @@ def _raise_download_error(id: str, error: Exception) -> None:
     raise error
 
 
-def download_video(
-    url: str, dir: Path, callback: Callback | None = None
-) -> Path | None:
+def download_video(url: str, dir: Path, callback: Callback | None = None) -> Path | None:
     """Download a YouTube video as audio.
 
     Args:

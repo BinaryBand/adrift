@@ -108,9 +108,7 @@ class TestFetchVideoInfoRaw(unittest.TestCase):
     @patch("src.youtube.ytdlp.YoutubeDL")
     @patch("src.youtube.ytdlp.get_auth_ydl_opts")
     @patch("src.youtube.ytdlp.get_ydl_opts")
-    def test_fallback_to_authenticated(
-        self, mock_get_opts, mock_get_auth_opts, mock_ydl_class
-    ):
+    def test_fallback_to_authenticated(self, mock_get_opts, mock_get_auth_opts, mock_ydl_class):
         """Test fallback to authenticated when unauthenticated fails."""
         mock_get_opts.return_value = {"quiet": True}
         mock_get_auth_opts.return_value = {"cookiesfrombrowser": "firefox"}
@@ -137,17 +135,13 @@ class TestFetchVideoInfoRaw(unittest.TestCase):
     @patch("src.youtube.ytdlp.YoutubeDL")
     @patch("src.youtube.ytdlp.get_auth_ydl_opts")
     @patch("src.youtube.ytdlp.get_ydl_opts")
-    def test_both_attempts_fail(
-        self, mock_get_opts, mock_get_auth_opts, mock_ydl_class
-    ):
+    def test_both_attempts_fail(self, mock_get_opts, mock_get_auth_opts, mock_ydl_class):
         """Test returns None when both auth attempts fail."""
         mock_get_opts.return_value = {"quiet": True}
         mock_get_auth_opts.return_value = {"cookiesfrombrowser": "firefox"}
 
         mock_ydl = MagicMock()
-        mock_ydl.__enter__.return_value.extract_info.side_effect = Exception(
-            "Network error"
-        )
+        mock_ydl.__enter__.return_value.extract_info.side_effect = Exception("Network error")
         mock_ydl_class.return_value = mock_ydl
 
         result = _fetch_video_info_raw("vid123")
@@ -221,9 +215,7 @@ class TestFetchChannelInfoRaw(unittest.TestCase):
         }
         mock_ydl_class.return_value = mock_ydl
 
-        result = _fetch_channel_info_raw(
-            "https://youtube.com/@test", fetch_videos=False
-        )
+        result = _fetch_channel_info_raw("https://youtube.com/@test", fetch_videos=False)
         assert result is not None
 
         self.assertEqual(result["title"], "Test Channel")
@@ -259,9 +251,7 @@ class TestFetchChannelInfoRaw(unittest.TestCase):
         mock_get_opts.return_value = {}
 
         mock_ydl = MagicMock()
-        mock_ydl.__enter__.return_value.extract_info.side_effect = Exception(
-            "Network error"
-        )
+        mock_ydl.__enter__.return_value.extract_info.side_effect = Exception("Network error")
         mock_ydl_class.return_value = mock_ydl
 
         result = _fetch_channel_info_raw("https://youtube.com/@test")
@@ -308,9 +298,7 @@ class TestFetchChannelVideosRaw(unittest.TestCase):
         mock_ydl.__enter__.return_value.extract_info.return_value = {"entries": []}
         mock_ydl_class.return_value = mock_ydl
 
-        _fetch_channel_videos_raw(
-            "https://youtube.com/@test", start=10, end=25, reverse=True
-        )
+        _fetch_channel_videos_raw("https://youtube.com/@test", start=10, end=25, reverse=True)
 
         opts = mock_get_opts.return_value
         self.assertEqual(opts["playliststart"], 10)
@@ -324,9 +312,7 @@ class TestFetchChannelVideosRaw(unittest.TestCase):
         mock_get_opts.return_value = {}
 
         mock_ydl = MagicMock()
-        mock_ydl.__enter__.return_value.extract_info.side_effect = Exception(
-            "Network error"
-        )
+        mock_ydl.__enter__.return_value.extract_info.side_effect = Exception("Network error")
         mock_ydl_class.return_value = mock_ydl
 
         result = _fetch_channel_videos_raw("https://youtube.com/@test")
@@ -363,17 +349,13 @@ class TestGetCachedChannelInfo(unittest.TestCase):
         self.assertIsInstance(result, ChannelInfo)
         assert result is not None
         self.assertEqual(result.title, "Cached Channel")
-        mock_cache.get.assert_called_once_with(
-            "get_youtube_channel:https://youtube.com/@test"
-        )
+        mock_cache.get.assert_called_once_with("get_youtube_channel:https://youtube.com/@test")
         mock_fetch_raw.assert_not_called()
 
     @patch("src.youtube.ytdlp.random")
     @patch("src.youtube.ytdlp._fetch_channel_info_raw")
     @patch("src.youtube.ytdlp._CACHE")
-    def test_fetches_and_caches_with_expiry(
-        self, mock_cache, mock_fetch_raw, mock_random
-    ):
+    def test_fetches_and_caches_with_expiry(self, mock_cache, mock_fetch_raw, mock_random):
         """Test fetches and caches with 25-35 day expiry."""
         mock_cache.get.return_value = None
         fetched_data = {"title": "Fresh Channel"}
@@ -385,9 +367,7 @@ class TestGetCachedChannelInfo(unittest.TestCase):
         self.assertIsInstance(result, ChannelInfo)
         assert result is not None
         self.assertEqual(result.title, "Fresh Channel")
-        mock_fetch_raw.assert_called_once_with(
-            "https://youtube.com/@test", fetch_videos=False
-        )
+        mock_fetch_raw.assert_called_once_with("https://youtube.com/@test", fetch_videos=False)
         # Verify cache expiry is 25-35 days
         mock_random.randint.assert_called_once_with(25, 35)
         expected_expire = 30 * 24 * 3600

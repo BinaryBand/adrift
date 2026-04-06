@@ -34,9 +34,7 @@ class TestUploadThumbnail(unittest.TestCase):
             "https://s3.example.com/media/podcasts/test/thumbnails/existing_thumb.jpg"
         )
 
-        result = upload_thumbnail(
-            "https://example.com/thumb.jpg", "Test Author", "test_123"
-        )
+        result = upload_thumbnail("https://example.com/thumb.jpg", "Test Author", "test_123")
 
         assert result is not None
         self.assertIn("existing_thumb.jpg", result)
@@ -59,9 +57,7 @@ class TestUploadThumbnail(unittest.TestCase):
             "https://s3.example.com/media/podcasts/test/thumbnails/test_123.jpg"
         )
 
-        result = upload_thumbnail(
-            "https://example.com/thumb.jpg", "Test Author", "test_123"
-        )
+        result = upload_thumbnail("https://example.com/thumb.jpg", "Test Author", "test_123")
 
         self.assertIsNotNone(result)
         mock_get.assert_called_once()
@@ -75,9 +71,7 @@ class TestUploadThumbnail(unittest.TestCase):
         mock_exists.return_value = None
         mock_get.side_effect = Exception("Network error")
 
-        result = upload_thumbnail(
-            "https://example.com/thumb.jpg", "Test Author", "test_123"
-        )
+        result = upload_thumbnail("https://example.com/thumb.jpg", "Test Author", "test_123")
 
         self.assertIsNone(result)
 
@@ -91,9 +85,7 @@ class TestUploadThumbnail(unittest.TestCase):
         mock_response.headers = {"Content-Type": "application/octet-stream"}
         mock_get.return_value = mock_response
 
-        result = upload_thumbnail(
-            "https://example.com/thumb.bin", "Test Author", "test_456"
-        )
+        result = upload_thumbnail("https://example.com/thumb.bin", "Test Author", "test_456")
 
         self.assertIsNone(result)
 
@@ -110,9 +102,7 @@ class TestExtractImageUrl(unittest.TestCase):
             "https://example.com/image.jpg" if key == "href" else default
         )
         channel.image = image_mock
-        channel.get = lambda key, default=None: (
-            channel.image if key == "image" else default
-        )
+        channel.get = lambda key, default=None: channel.image if key == "image" else default
 
         result = _extract_image_url(channel)
 
@@ -127,9 +117,7 @@ class TestExtractImageUrl(unittest.TestCase):
             "https://example.com/image.jpg" if key == "url" else default
         )
         channel.image = image_mock
-        channel.get = lambda key, default=None: (
-            channel.image if key == "image" else default
-        )
+        channel.get = lambda key, default=None: channel.image if key == "image" else default
 
         result = _extract_image_url(channel)
 
@@ -224,9 +212,7 @@ class TestGetRssChannel(unittest.TestCase):
             mock_channel.description = ""
             mock_channel.summary = ""
 
-            mock_channel.get = lambda key, default=None: getattr(
-                mock_channel, key, default
-            )
+            mock_channel.get = lambda key, default=None: getattr(mock_channel, key, default)
             mock_feed.feed = mock_channel
             mock_parse.return_value = mock_feed
 

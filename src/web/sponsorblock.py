@@ -120,9 +120,7 @@ def fetch_sponsor_segments(video_id: str) -> list[tuple[float, float]]:
         return []
 
 
-def remove_sponsors(
-    target: Path, video_id: str, callback: Callback | None = None
-) -> bool:
+def remove_sponsors(target: Path, video_id: str, callback: Callback | None = None) -> bool:
     """Remove sponsor segments from an audio file."""
     segments = fetch_sponsor_segments(video_id)
     if not segments:

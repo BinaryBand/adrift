@@ -106,12 +106,8 @@ class TestCreateSlug(unittest.TestCase):
             create_slug("SYSK Selects: How Champagne Works"),
             "sysk-selects-how-champagne-works",
         )
-        self.assertEqual(
-            create_slug("Behind the Bastards: Part II"), "behind-the-bastards-part-ii"
-        )
-        self.assertEqual(
-            create_slug("Legal Eagle - Lawyer Reacts!"), "legal-eagle-lawyer-reacts"
-        )
+        self.assertEqual(create_slug("Behind the Bastards: Part II"), "behind-the-bastards-part-ii")
+        self.assertEqual(create_slug("Legal Eagle - Lawyer Reacts!"), "legal-eagle-lawyer-reacts")
 
     def test_underscores_in_middle(self):
         """Test underscores that aren't contractions."""

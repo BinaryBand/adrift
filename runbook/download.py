@@ -195,9 +195,7 @@ def _download_series(config: PodcastConfig, budget: int | None = None) -> int:
             remaining = len(episodes) - i - 1
             if remaining > 0 and YOUTUBE_VIDEO_REGEX.match(ep.content or ""):
                 delay = random.randint(30, 120)
-                for _ in tqdm(
-                    range(delay), desc="⏳ Spacing downloads", unit="s", leave=False
-                ):
+                for _ in tqdm(range(delay), desc="⏳ Spacing downloads", unit="s", leave=False):
                     time.sleep(1)
 
     return downloaded
@@ -255,9 +253,7 @@ def _update_series(config: PodcastConfig) -> None:
 
 def main() -> None:
     parser = argparse.ArgumentParser(description="Download and update podcasts.")
-    parser.add_argument(
-        "--include", nargs="*", default=DF_TARGETS, help="Config files to include"
-    )
+    parser.add_argument("--include", nargs="*", default=DF_TARGETS, help="Config files to include")
     parser.add_argument("--skip-download", action="store_true", default=False)
     parser.add_argument("--skip-update", action="store_true", default=False)
     parser.add_argument(

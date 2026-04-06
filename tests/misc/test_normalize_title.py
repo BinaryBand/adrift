@@ -30,9 +30,7 @@ class TestNormalizeTitleUnknownShow(unittest.TestCase):
 
 class TestNormalizeTitleBehindTheBastards(unittest.TestCase):
     def test_strips_show_suffix(self):
-        result = normalize_title(
-            "Behind the Bastards", "Robert Evans | Behind the Bastards"
-        )
+        result = normalize_title("Behind the Bastards", "Robert Evans | Behind the Bastards")
         self.assertNotIn("behind the bastards", result)
 
     def test_no_suffix_unchanged(self):
@@ -72,9 +70,7 @@ class TestNormalizeTitleSwindled(unittest.TestCase):
 
 class TestNormalizeTitleCoffeeBreakSwedish(unittest.TestCase):
     def test_strips_podcast_suffix(self):
-        result = normalize_title(
-            "Coffee Break Swedish", "Lesson 12 | Coffee Break Swedish Podcast"
-        )
+        result = normalize_title("Coffee Break Swedish", "Lesson 12 | Coffee Break Swedish Podcast")
         self.assertNotIn("coffee-break-swedish-podcast", result)
 
 

@@ -82,9 +82,7 @@ def _probe_duration(path: Path) -> float | None:
         return None
 
 
-def _compute_sample_times(
-    duration: float | None, num_samples: int, window: float
-) -> list[float]:
+def _compute_sample_times(duration: float | None, num_samples: int, window: float) -> list[float]:
     """Return evenly-distributed sample start positions across the file."""
     if duration is None or duration <= 0:
         return [0.0]
@@ -92,9 +90,7 @@ def _compute_sample_times(
     return [(usable * (i + 1) / (num_samples + 1)) for i in range(num_samples)]
 
 
-def _build_ffmpeg_pcm_cmd(
-    file_path: Path, t: float, window: float, sample_rate: int
-) -> list[str]:
+def _build_ffmpeg_pcm_cmd(file_path: Path, t: float, window: float, sample_rate: int) -> list[str]:
     return [
         "ffmpeg",
         "-ss",
@@ -143,8 +139,9 @@ def _fallback_hash_bytes(file_path: Path) -> str:
 def get_audio_content_hash(file_path: Path, sample_rate: int = 8000) -> str:
     cache = _crypto_cache()
     modified_date = os.path.getmtime(file_path)
-    path = file_path.absolute().as_posix()
-    cache_key = f"audio_hash:file={path},mod={modified_date},sr={sample_rate}"
+    cache_key = (
+        f"audio_hash:file={file_path.absolute().as_posix()},mod={modified_date},sr={sample_rate}"
+    )
     if (cached_hash := cache.get(cache_key)) is not None:
         return cached_hash
 

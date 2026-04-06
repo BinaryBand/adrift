@@ -113,9 +113,7 @@ def sim_date(a: datetime | None, b: datetime | None) -> float:
     if a is None or b is None:
         return 0.0
     delta = abs((a - b).days)
-    return next(
-        (score for max_days, score in DATE_SCORE_TIERS if delta <= max_days), 0.0
-    )
+    return next((score for max_days, score in DATE_SCORE_TIERS if delta <= max_days), 0.0)
 
 
 def _id_similarity(ref: RssEpisode, dl: RssEpisode) -> float:
@@ -281,10 +279,7 @@ def _collect_episodes(
     callback: Callback | None = None,
 ) -> list[RssEpisode]:
     """Fetch and deduplicate episodes from a list of FeedSource objects."""
-    albums = [
-        _fetch_source_episodes(source, title, is_reference, callback)
-        for source in sources
-    ]
+    albums = [_fetch_source_episodes(source, title, is_reference, callback) for source in sources]
 
     if not albums:
         return []
@@ -349,9 +344,7 @@ def _fill_channel_blanks(feed_channel: RssChannel, channel_rss: RssChannel) -> N
     for field_name in ("title", "author", "subtitle", "description", "url", "image"):
         current_value = getattr(feed_channel, field_name)
         incoming_value = getattr(channel_rss, field_name)
-        setattr(
-            feed_channel, field_name, _prefer_existing(current_value, incoming_value)
-        )
+        setattr(feed_channel, field_name, _prefer_existing(current_value, incoming_value))
 
 
 def _prefer_existing(current: str, incoming: str) -> str:
@@ -369,9 +362,7 @@ def process_sources(
     return episodes
 
 
-def process_feeds(
-    config: PodcastConfig, callback: Callback | None = None
-) -> list[RssEpisode]:
+def process_feeds(config: PodcastConfig, callback: Callback | None = None) -> list[RssEpisode]:
     """Collect and deduplicate reference-side episodes (thin wrapper)."""
     title = config.name
     source_episodes = _collect_episodes(config.references, title, True, callback)

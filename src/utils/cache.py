@@ -32,9 +32,7 @@ def _resolve_created_at(raw_meta: dict[str, Any]) -> str | None:
     if "created_at" in raw_meta:
         return raw_meta["created_at"]
     try:
-        return datetime.fromtimestamp(
-            float(raw_meta["mtime"]), timezone.utc
-        ).isoformat()
+        return datetime.fromtimestamp(float(raw_meta["mtime"]), timezone.utc).isoformat()
     except Exception:
         return None
 
@@ -114,9 +112,7 @@ class S3Cache:
 
         # Encode key - use hash for long/unsafe keys
         encoded = base64.urlsafe_b64encode(key.encode()).decode().rstrip("=")
-        if len(encoded) > self._MAX_ENCODED_LENGTH or not self._S3_SAFE_RE.match(
-            encoded
-        ):
+        if len(encoded) > self._MAX_ENCODED_LENGTH or not self._S3_SAFE_RE.match(encoded):
             encoded = hashlib.sha256(key.encode()).hexdigest()
 
         return f"{self.s3_prefix}/{group}/{encoded}.pickle"
@@ -129,10 +125,7 @@ class S3Cache:
             metadata = CacheMetadata.model_validate(
                 _normalize_s3_meta(head.get("Metadata", {}) or {})
             )
-            if (
-                metadata.expires_at
-                and datetime.now(timezone.utc) >= metadata.expires_at
-            ):
+            if metadata.expires_at and datetime.now(timezone.utc) >= metadata.expires_at:
                 print(f"S3 cache expired for {key}")
                 self.delete(key)
                 return None
@@ -158,9 +151,7 @@ class S3Cache:
             return CacheMetadata(created_at=datetime.now(timezone.utc))
         return metadata
 
-    def _download_from_s3(
-        self, s3_path: str, key: str, metadata: CacheMetadata
-    ) -> Any | None:
+    def _download_from_s3(self, s3_path: str, key: str, metadata: CacheMetadata) -> Any | None:
         """Download, deserialize and populate local cache. Returns value or None."""
         self._throttle_s3_request()
         fd, tmp_str = tempfile.mkstemp(suffix=".pickle")
@@ -193,12 +184,8 @@ class S3Cache:
         return default
 
     def _build_cache_metadata(self, expire: int | None) -> CacheMetadata:
-        expires_at = (
-            datetime.now(timezone.utc) + timedelta(seconds=expire) if expire else None
-        )
-        return CacheMetadata(
-            created_at=datetime.now(timezone.utc), expires_at=expires_at
-        )
+        expires_at = datetime.now(timezone.utc) + timedelta(seconds=expire) if expire else None
+        return CacheMetadata(created_at=datetime.now(timezone.utc), expires_at=expires_at)
 
     def _upload_to_s3(self, key: str, value: Any, metadata: CacheMetadata) -> None:
         """Serialize value to a temp file then upload to S3."""

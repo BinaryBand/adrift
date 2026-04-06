@@ -15,9 +15,7 @@ OUTPUT_DIR = "tests/resources"
 OUTPUT_FILE = Path(OUTPUT_DIR) / f"{TEST_VIDEO_ID}.mp3"
 
 
-def duration_matches(
-    expected: float = 0, actual: float = 0, tolerance: float = 0.2
-) -> bool:
+def duration_matches(expected: float = 0, actual: float = 0, tolerance: float = 0.2) -> bool:
     """Check if actual duration matches expected within a tolerance percentage."""
     diff = float(actual or MIN_LENGTH) / float(expected or MIN_LENGTH)
     return abs(1 - diff) <= tolerance

@@ -31,9 +31,7 @@ class TestFeedFilter(unittest.TestCase):
     @patch("src.web.rss._rss_cache")
     @patch("src.web.rss.requests.get")
     @patch("src.web.rss.feedparser.parse")
-    def test_filter_includes_matching_episodes(
-        self, mock_parse, mock_get, mock_cache_fn
-    ):
+    def test_filter_includes_matching_episodes(self, mock_parse, mock_get, mock_cache_fn):
         """Test that episodes matching the filter regex are included."""
         mock_cache = mock_cache_fn.return_value
         mock_cache.get.return_value = None
@@ -42,15 +40,9 @@ class TestFeedFilter(unittest.TestCase):
         mock_get.return_value = mock_response
 
         # Create test entries
-        entry1 = _create_mock_entry(
-            "ep1", "Episode 001: Introduction", "2023-12-18T10:00:00"
-        )
-        entry2 = _create_mock_entry(
-            "ep2", "Episode 002: Deep Dive", "2023-12-17T10:00:00"
-        )
-        entry3 = _create_mock_entry(
-            "ep3", "Bonus: Behind the Scenes", "2023-12-16T10:00:00"
-        )
+        entry1 = _create_mock_entry("ep1", "Episode 001: Introduction", "2023-12-18T10:00:00")
+        entry2 = _create_mock_entry("ep2", "Episode 002: Deep Dive", "2023-12-17T10:00:00")
+        entry3 = _create_mock_entry("ep3", "Bonus: Behind the Scenes", "2023-12-16T10:00:00")
 
         mock_feed = Mock()
         mock_feed.entries = [entry1, entry2, entry3]
@@ -66,9 +58,7 @@ class TestFeedFilter(unittest.TestCase):
     @patch("src.web.rss._rss_cache")
     @patch("src.web.rss.requests.get")
     @patch("src.web.rss.feedparser.parse")
-    def test_filter_excludes_non_matching_episodes(
-        self, mock_parse, mock_get, mock_cache_fn
-    ):
+    def test_filter_excludes_non_matching_episodes(self, mock_parse, mock_get, mock_cache_fn):
         """Test that episodes not matching the filter regex are excluded."""
         mock_cache = mock_cache_fn.return_value
         mock_cache.get.return_value = None
@@ -246,18 +236,14 @@ class TestDayOfWeekFilter(unittest.TestCase):
         # Dec 18 = Monday, Dec 19 = Tuesday, Dec 20 = Wednesday
         entry_mon = _create_mock_entry("ep1", "Monday Episode", "2023-12-18T10:00:00")
         entry_tue = _create_mock_entry("ep2", "Tuesday Episode", "2023-12-19T10:00:00")
-        entry_wed = _create_mock_entry(
-            "ep3", "Wednesday Episode", "2023-12-20T10:00:00"
-        )
+        entry_wed = _create_mock_entry("ep3", "Wednesday Episode", "2023-12-20T10:00:00")
 
         mock_feed = Mock()
         mock_feed.entries = [entry_mon, entry_tue, entry_wed]
         mock_parse.return_value = mock_feed
 
         # Filter for Wednesday only
-        result = get_rss_episodes(
-            "https://example.com/feed.xml", r_rules=["FREQ=WEEKLY;BYDAY=WE"]
-        )
+        result = get_rss_episodes("https://example.com/feed.xml", r_rules=["FREQ=WEEKLY;BYDAY=WE"])
 
         self.assertEqual(len(result), 1)
         self.assertEqual(result[0].title, "Wednesday Episode")
@@ -324,9 +310,7 @@ class TestDayOfWeekFilter(unittest.TestCase):
         mock_feed.entries = [entry_valid, entry_missing]
         mock_parse.return_value = mock_feed
 
-        result = get_rss_episodes(
-            "https://example.com/feed.xml", r_rules=["FREQ=WEEKLY;BYDAY=MO"]
-        )
+        result = get_rss_episodes("https://example.com/feed.xml", r_rules=["FREQ=WEEKLY;BYDAY=MO"])
 
         # Only the valid entry should be returned (missing date is excluded)
         self.assertEqual(len(result), 1)
@@ -350,9 +334,7 @@ class TestDayOfWeekFilter(unittest.TestCase):
         mock_feed.entries = [entry_valid, entry_invalid]
         mock_parse.return_value = mock_feed
 
-        result = get_rss_episodes(
-            "https://example.com/feed.xml", r_rules=["FREQ=WEEKLY;BYDAY=MO"]
-        )
+        result = get_rss_episodes("https://example.com/feed.xml", r_rules=["FREQ=WEEKLY;BYDAY=MO"])
 
         # Only the valid entry should be returned (invalid date is excluded)
         self.assertEqual(len(result), 1)
@@ -473,9 +455,7 @@ class TestCacheKeyGeneration(unittest.TestCase):
         mock_response.text = "<rss>fake feed</rss>"
         mock_get.return_value = mock_response
 
-        entry1 = TestCombinedFilters()._create_mock_entry(
-            "ep1", "Episode", "2023-12-18T10:00:00"
-        )
+        entry1 = TestCombinedFilters()._create_mock_entry("ep1", "Episode", "2023-12-18T10:00:00")
 
         mock_feed = Mock()
         mock_feed.entries = [entry1]
@@ -500,9 +480,7 @@ class TestCacheKeyGeneration(unittest.TestCase):
     @patch("src.web.rss._rss_cache")
     @patch("src.web.rss.requests.get")
     @patch("src.web.rss.feedparser.parse")
-    def test_cache_key_converts_list_to_tuple(
-        self, mock_parse, mock_get, mock_cache_fn
-    ):
+    def test_cache_key_converts_list_to_tuple(self, mock_parse, mock_get, mock_cache_fn):
         """Test that r_rules list is serialized into a hashable cache key."""
         mock_cache = mock_cache_fn.return_value
         mock_cache.get.return_value = None
@@ -510,9 +488,7 @@ class TestCacheKeyGeneration(unittest.TestCase):
         mock_response.text = "<rss>fake feed</rss>"
         mock_get.return_value = mock_response
 
-        entry1 = TestCombinedFilters()._create_mock_entry(
-            "ep1", "Episode", "2023-12-18T10:00:00"
-        )
+        entry1 = TestCombinedFilters()._create_mock_entry("ep1", "Episode", "2023-12-18T10:00:00")
 
         mock_feed = Mock()
         mock_feed.entries = [entry1]

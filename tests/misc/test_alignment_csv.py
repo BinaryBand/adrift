@@ -2,10 +2,10 @@
 
 import csv
 import os
+import sys
 import unittest
 from datetime import datetime
 from pathlib import Path
-import sys
 
 sys.path.insert(0, Path(__file__).parent.parent.parent.as_posix())
 
@@ -16,7 +16,6 @@ os.environ.setdefault("S3_REGION", "us-east-1")
 
 from src.catalog import align_episodes
 from src.models.metadata import RssEpisode
-
 
 FIXTURE_DIR = Path(__file__).resolve().parents[1] / "resources" / "alignment"
 
@@ -56,9 +55,7 @@ def _load_episode_rows(filename: str, index_field: str) -> dict[str, list[RssEpi
 
 def _load_expected_pairs() -> dict[str, list[tuple[int, int]]]:
     grouped: dict[str, list[tuple[int, int]]] = {}
-    with open(
-        FIXTURE_DIR / "expected_pairs.csv", "r", encoding="utf-8", newline=""
-    ) as f:
+    with open(FIXTURE_DIR / "expected_pairs.csv", "r", encoding="utf-8", newline="") as f:
         reader = csv.DictReader(f)
         for row in reader:
             scenario = row["scenario"]
@@ -77,9 +74,7 @@ def _load_scenarios() -> dict[
     expected = _load_expected_pairs()
 
     scenario_names = sorted(set(refs) | set(dls) | set(expected))
-    scenarios: dict[
-        str, tuple[list[RssEpisode], list[RssEpisode], list[tuple[int, int]]]
-    ] = {}
+    scenarios: dict[str, tuple[list[RssEpisode], list[RssEpisode], list[tuple[int, int]]]] = {}
     for name in scenario_names:
         scenarios[name] = (
             refs.get(name, []),
@@ -105,12 +100,8 @@ class TestAlignmentCsvFixtures(unittest.TestCase):
         sparse_refs, sparse_dls, _ = scenarios["financial_audit_sparse_mismatch"]
         enriched_refs, enriched_dls, _ = scenarios["financial_audit_enriched_match"]
 
-        self.assertEqual(
-            align_episodes(sparse_refs, sparse_dls, "Financial Audit"), [(0, 0)]
-        )
-        self.assertEqual(
-            align_episodes(enriched_refs, enriched_dls, "Financial Audit"), [(0, 0)]
-        )
+        self.assertEqual(align_episodes(sparse_refs, sparse_dls, "Financial Audit"), [(0, 0)])
+        self.assertEqual(align_episodes(enriched_refs, enriched_dls, "Financial Audit"), [(0, 0)])
 
 
 if __name__ == "__main__":

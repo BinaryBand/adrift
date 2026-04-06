@@ -145,9 +145,7 @@ def _write_concat_list(segment_files: list[Path]) -> Path:
     return concat
 
 
-def _concat_segment_files(
-    segment_files: list[Path], dest: Path, source_file: Path
-) -> None:
+def _concat_segment_files(segment_files: list[Path], dest: Path, source_file: Path) -> None:
     """Concatenate extracted segments into a single output file."""
     if len(segment_files) == 1:
         shutil.copy(segment_files[0], dest)
@@ -183,9 +181,7 @@ def _cut_segments(
     callback: Callback | None = None,
 ) -> None:
     """Cut segments using re-encoding (slower but no artifacts at join points)."""
-    keep_segs = [
-        (s, e) for s, e in invert_segments(file, segments) if e - s >= MIN_LENGTH
-    ]
+    keep_segs = [(s, e) for s, e in invert_segments(file, segments) if e - s >= MIN_LENGTH]
     with tempfile.TemporaryDirectory() as temp_dir:
         seg_files = _extract_all_segments(keep_segs, file, Path(temp_dir), callback)
         _concat_segment_files(seg_files, dest, file)

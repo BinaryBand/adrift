@@ -97,9 +97,7 @@ class TestCollectEpisodes(unittest.TestCase):
         ep1 = _ep("1", "Episode One", pub_date=_dt(2024, 2, 6))
         ep2 = _ep("2", "Episode Two", pub_date=_dt(2024, 2, 13))
         ep3 = _ep("3", "Episode Three", pub_date=_dt(2024, 2, 20))
-        ep2_dup = _ep(
-            "2b", "Episode Two", pub_date=_dt(2024, 2, 13)
-        )  # same episode, second source
+        ep2_dup = _ep("2b", "Episode Two", pub_date=_dt(2024, 2, 13))  # same episode, second source
         mock_rss.side_effect = [[ep1, ep2], [ep2_dup, ep3]]
         result = _collect_episodes(
             [
@@ -204,9 +202,7 @@ class TestFullPipeline(unittest.TestCase):
     def test_only_matched_downloads_survive(self, mock_yt, mock_rss):
         ep1 = _ep("r1", "The Show: Episode 101", pub_date=_dt(2024, 2, 6))
         ep2 = _ep("r2", "The Show: Episode 102", pub_date=_dt(2024, 2, 13))
-        unrelated = _ep(
-            "d9", "Science Quarterly: Quantum Tunneling", pub_date=_dt(2016, 3, 1)
-        )
+        unrelated = _ep("d9", "Science Quarterly: Quantum Tunneling", pub_date=_dt(2016, 3, 1))
 
         mock_rss.return_value = [ep1, ep2]
         mock_yt.return_value = [
@@ -324,9 +320,7 @@ class TestFullPipeline(unittest.TestCase):
         """A download with no reference counterpart must not survive alignment."""
         matched_ref = _ep("ref1", "The Show: Episode 5", pub_date=_dt(2024, 3, 5))
         matched_dl = _ep("dl1", "The Show: Episode 5", pub_date=_dt(2024, 3, 5))
-        orphan_dl = _ep(
-            "dl_only", "Download Only: Bonus Footage", pub_date=_dt(2016, 1, 1)
-        )
+        orphan_dl = _ep("dl_only", "Download Only: Bonus Footage", pub_date=_dt(2016, 1, 1))
 
         mock_rss.return_value = [matched_ref]
         mock_yt.return_value = [matched_dl, orphan_dl]
