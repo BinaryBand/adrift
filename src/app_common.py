@@ -169,20 +169,28 @@ def load_podcasts_config(include: list[str]) -> list[PodcastConfig]:
     :func:`_load_config`.  Entries whose ``schedule`` RRULE does not
     match today are excluded.
     """
-    configs: list[PodcastConfig] = []
-    for target in include:
-        # Allow shell-style glob patterns like "config/*.toml" to expand
-        # to multiple config files.
-        if any(ch in target for ch in ("*", "?", "[")):
-            matches = sorted(glob.glob(target))
-            for match in matches:
-                configs.extend(_load_config(match))
-        else:
-            configs.extend(_load_config(target))
+    targets = _expand_include_targets(include)
+    configs: list[PodcastConfig] = [c for t in targets for c in _load_config(t)]
 
-    # Filter configs by schedule and return
+    # Filter configs by schedule and return (shuffle to randomize order)
     filtered: list[PodcastConfig] = [it for it in configs if _config_schedule_matches_today(it)]
+    random.shuffle(filtered)
     return filtered
+
+
+def _expand_include_targets(include: list[str]) -> list[str]:
+    """Expand shell-style glob patterns in the include list to concrete paths.
+
+    This helper centralises glob expansion and keeps the public API simple
+    and easier to test.
+    """
+    targets: list[str] = []
+    for target in include:
+        if any(ch in target for ch in ("*", "?", "[")):
+            targets.extend(sorted(glob.glob(target)))
+        else:
+            targets.append(target)
+    return targets
 
 
 def load_static_config(filename: str) -> dict[str, Any]:

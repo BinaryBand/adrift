@@ -51,27 +51,33 @@ def retry(
     """Decorator to retry a function with exponential backoff on failure."""
 
     def decorator(func: Callable[_P, _T]) -> Callable[_P, _T]:
-        @wraps(func)
-        def wrapper(*args: _P.args, **kwargs: _P.kwargs) -> _T:
-            label = func.__name__
-            last_exception = None
-            for i in range(1, attempts + 1):
-                try:
-                    return func(*args, **kwargs)
-                except Exception as e:
-                    last_exception = e
-                    if i < attempts:
-                        wait = backoff_base**i  # 1s, 2s, 4s...
-                        print(f"{label} attempt {i}/{attempts} failed. Wait {wait}s...")
-                        time.sleep(wait)
-                    else:
-                        print(f"{label} failed all {attempts} attempts")
-
-            raise last_exception  # type: ignore[misc]
-
-        return wrapper
+        return _make_retry_wrapper(func, attempts, backoff_base)
 
     return decorator
+
+
+def _make_retry_wrapper(
+    func: Callable[_P, _T], attempts: int, backoff_base: int
+) -> Callable[_P, _T]:
+    @wraps(func)
+    def wrapper(*args: _P.args, **kwargs: _P.kwargs) -> _T:
+        label = func.__name__
+        last_exception = None
+        for i in range(1, attempts + 1):
+            try:
+                return func(*args, **kwargs)
+            except Exception as e:
+                last_exception = e
+                if i < attempts:
+                    wait = backoff_base**i
+                    print(f"{label} attempt {i}/{attempts} failed. Wait {wait}s...")
+                    time.sleep(wait)
+                else:
+                    print(f"{label} failed all {attempts} attempts")
+
+        raise last_exception  # type: ignore[misc]
+
+    return wrapper
 
 
 def _build_upload_extra_args(
@@ -262,7 +268,6 @@ def _prepare_upload_spec(
     assert os.path.exists(_file_path), f"Local file not found: {file_path}"
 
     metadata, callback = _extract_upload_options(options)
-
     metadata_dict = metadata.to_dict() if metadata is not None else None
     boto_callback = _build_boto_callback_for_file(_file_path, callback)
 
@@ -284,8 +289,6 @@ def _extract_upload_options(
     Accepts an `UploadOptions` model, a plain `dict`, or a `MediaMetadata`
     instance for backward compatibility.
     """
-    metadata: MediaMetadata | None = None
-    callback: Callback | None = None
     if options is None:
         return None, None
     if isinstance(options, MediaMetadata):
@@ -293,13 +296,18 @@ def _extract_upload_options(
     if isinstance(options, UploadOptions):
         return options.metadata, options.callback
     if isinstance(options, dict):
-        try:
-            opts = UploadOptions.model_validate(options)
-            return opts.metadata, opts.callback
-        except Exception:
-            metadata = options.get("metadata")
-            callback = options.get("callback")
-    return metadata, callback
+        return _extract_upload_options_from_dict(options)
+    return None, None
+
+
+def _extract_upload_options_from_dict(
+    options: dict,
+) -> tuple[MediaMetadata | None, Callback | None]:
+    try:
+        opts = UploadOptions.model_validate(options)
+        return opts.metadata, opts.callback
+    except Exception:
+        return options.get("metadata"), options.get("callback")
 
 
 def _build_boto_callback_for_file(

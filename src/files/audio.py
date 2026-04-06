@@ -207,29 +207,8 @@ def cut_segments(
 
 
 def convert_to_opus(file: Path) -> Path:
-    """Convert audio file to Opus format (libopus 128k).
-
-    Converts the input file to Opus in the same directory.
-
-    Args:
-        file: Path to the audio file to convert.
-
-    Returns:
-        Path to the newly created .opus file.
-
-    Raises:
-        subprocess.CalledProcessError: If ffmpeg conversion fails.
-    """
+    """Convert `file` to Opus (libopus 128k) and return the new Path."""
     output = file.with_suffix(".opus")
-    cmd = _FFMPEG_BASE + [
-        "-i",
-        str(file),
-        "-c:a",
-        "libopus",
-        "-b:a",
-        "128k",
-        "-y",
-        str(output),
-    ]
+    cmd = _FFMPEG_BASE + ["-i", str(file), "-c:a", "libopus", "-b:a", "128k", "-y", str(output)]
     subprocess.run(cmd, check=True, capture_output=True)
     return output

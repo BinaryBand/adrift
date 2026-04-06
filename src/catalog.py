@@ -150,23 +150,34 @@ def _weighted_score(ref: RssEpisode, dl: RssEpisode, show: str = "") -> float:
     )
     has_date = _has_date_signal(ref, dl)
     has_desc = _has_description_signal(ref, dl)
-
     if not s_id and not has_desc and s_title < SPARSE_TITLE_MIN:
         return 0.0
 
     weighted_sum = W_TITLE * s_title
     total_weight = W_TITLE
 
-    if has_date:
-        weighted_sum += W_DATE * sim_date(ref.pub_date, dl.pub_date)
-        total_weight += W_DATE
-
-    if has_desc:
-        weighted_sum += W_DESC * _description_similarity(ref, dl)
-        total_weight += W_DESC
+    # Compute optional contributions (date / description) in a helper
+    opt_sum, opt_total = _compute_optional_weights(ref, dl, has_date, has_desc)
+    weighted_sum += opt_sum
+    total_weight += opt_total
 
     base_score = weighted_sum / total_weight
     return min(1.0, base_score + (W_ID * s_id))
+
+
+def _compute_optional_weights(
+    ref: RssEpisode, dl: RssEpisode, has_date: bool, has_desc: bool
+) -> tuple[float, float]:
+    """Return (weighted_sum, total_weight) for optional metadata contributions."""
+    weighted = 0.0
+    total = 0.0
+    if has_date:
+        weighted += W_DATE * sim_date(ref.pub_date, dl.pub_date)
+        total += W_DATE
+    if has_desc:
+        weighted += W_DESC * _description_similarity(ref, dl)
+        total += W_DESC
+    return weighted, total
 
 
 def _build_alignment_scores(

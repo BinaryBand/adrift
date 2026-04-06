@@ -143,12 +143,10 @@ def _extract_image_from_get(obj: object) -> str:
     get = getattr(obj, "get", None)
     if not callable(get):
         return ""
-    href = get("href", None)
-    if isinstance(href, str) and href:
-        return href
-    url = get("url", None)
-    if isinstance(url, str) and url:
-        return url
+    for key in ("href", "url"):
+        val = get(key, None)
+        if isinstance(val, str) and val:
+            return val
     return ""
 
 
