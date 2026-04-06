@@ -24,6 +24,31 @@ from src.youtube.auth import get_auth_ydl_opts, get_ydl_opts
 # Constants
 _CACHE = S3Cache(".cache/yt-dlp", "yt-dlp")
 
+_CHANNEL_CACHE_FIELDS = {
+    "title",
+    "uploader",
+    "uploader_id",
+    "description",
+    "avatar",
+    "thumbnails",
+}
+
+_VIDEO_CACHE_FIELDS = {
+    "id",
+    "title",
+    "description",
+    "duration",
+    "upload_date",
+    "thumbnail",
+    "availability",
+    "url",
+    "timestamp",
+    "release_timestamp",
+    "view_count",
+    "like_count",
+    "comment_count",
+}
+
 
 class ChannelInfo(BaseModel):
     """Typed channel information from yt-dlp."""
@@ -57,9 +82,15 @@ class VideoInfo(BaseModel):
             return None
 
 
-def _fetch_channel_info_raw(
-    url: str, fetch_videos: bool = False
-) -> dict[str, Any] | None:
+def _trim_channel_cache_payload(raw_info: dict[str, Any]) -> dict[str, Any]:
+    return {key: raw_info[key] for key in _CHANNEL_CACHE_FIELDS if key in raw_info}
+
+
+def _trim_video_cache_payload(raw_info: dict[str, Any]) -> dict[str, Any]:
+    return {key: raw_info[key] for key in _VIDEO_CACHE_FIELDS if key in raw_info}
+
+
+def _fetch_channel_info_raw(url: str, fetch_videos: bool = False) -> dict[str, Any] | None:
     """Fetch raw channel information from yt-dlp."""
     opts: YtDlpParams = get_ydl_opts()
     opts["extract_flat"] = True
@@ -132,7 +163,7 @@ def get_channel_info(url: str) -> ChannelInfo | None:
 
     # Cache for 25-35 days
     expire_days = random.randint(25, 35)
-    _CACHE.set(cache_key, raw_info, expire=expire_days * 24 * 3600)
+    _CACHE.set(cache_key, _trim_channel_cache_payload(raw_info), expire=expire_days * 24 * 3600)
     return model
 
 
@@ -163,7 +194,7 @@ def get_video_info(video_id: str) -> VideoInfo | None:
         print(f"WARNING: Failed to parse video info for {video_id}: {e}")
         return None
 
-    _CACHE.set(cache_key, raw_info)
+    _CACHE.set(cache_key, _trim_video_cache_payload(raw_info))
     return model
 
 

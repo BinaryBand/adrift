@@ -18,9 +18,7 @@ def get_ydl_opts() -> YtDlpParams:
             "sleep_interval": 3,
             "max_sleep_interval": 8,
             "sleep_interval_requests": 1,
-            "extractor_args": {
-                "youtube": {"skip": ["js"]}
-            },  # Skip JS-dependent formats
+            "extractor_args": {"youtube": {"skip": ["js"]}},  # Skip JS-dependent formats
         }
     )
 

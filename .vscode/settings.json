@@ -1,15 +1,43 @@
 {
+  "python.analysis.enable": false,
   "python.analysis.typeCheckingMode": "strict",
   "python.analysis.diagnosticMode": "workspace",
   "python.analysis.stubPath": "typings",
   "python.analysis.extraPaths": ["src"],
   "python.analysis.useLibraryCodeForTypes": true,
-  "python.defaultInterpreterPath": "${workspaceFolder}/.venv/Scripts/python.exe",
+  "python.defaultInterpreterPath": "/home/owen/Documents/Dev/adrift/.venv/bin/python",
   "files.exclude": {
     "**/.venv": true,
     "**/__pycache__": true
   },
   "editor.formatOnSave": true,
+  "emeraldwalk.runonsave": {
+    "commands": [
+      {
+        "match": "\\.py$",
+        "notMatch": "(\\.venv|__pycache__|/\\.)",
+        "cmd": "poetry run python ${workspaceFolder}/runbook/quality/check_static.py --problems src runbook tests typings",
+        "isAsync": true
+      },
+      {
+        "match": "\\.py$",
+        "notMatch": "(\\.venv|__pycache__|/\\.)",
+        "cmd": "poetry run python ${workspaceFolder}/runbook/quality/check_complexity.py src --ccn 5 --length 25 --params 4",
+        "isAsync": true
+      },
+      {
+        "match": "\\.py$",
+        "notMatch": "(\\.venv|__pycache__|/\\.)",
+        "cmd": "poetry run python ${workspaceFolder}/runbook/quality/check_dead_code.py src",
+        "isAsync": true
+      },
+      {
+        "match": "config/.*\\.toml$",
+        "cmd": "poetry run python ${workspaceFolder}/runbook/quality/validate_configs.py --problems ${file}",
+        "isAsync": true
+      }
+    ]
+  },
   "cSpell.words": [
     "adless",
     "aselect",
@@ -46,7 +74,9 @@
     "ytdlp",
     "ytvideo"
   ],
-  "python.testing.pytestArgs": ["tests"],
+  "python.testing.pytestArgs": [
+    "tests"
+  ],
   "python.testing.unittestEnabled": false,
   "python.testing.pytestEnabled": true,
   "python-envs.defaultEnvManager": "ms-python.python:poetry",

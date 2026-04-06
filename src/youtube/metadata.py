@@ -93,9 +93,7 @@ def _maybe_update_pub_date(episode: RssEpisode, info: ytdlp.VideoInfo) -> None:
         pass
 
 
-def _maybe_update_thumbnail(
-    episode: RssEpisode, info: ytdlp.VideoInfo, author: str
-) -> None:
+def _maybe_update_thumbnail(episode: RssEpisode, info: ytdlp.VideoInfo, author: str) -> None:
     """Download/upload thumbnail if present and update `episode.image`."""
     try:
         if thumbnail := getattr(info, "thumbnail", None):
