@@ -25,7 +25,7 @@ from src.catalog import (
     process_feeds,
     process_sources,
 )
-from src.files.audio import get_duration, is_audio
+from src.files.audio import convert_to_opus, get_duration, is_audio
 from src.files.s3 import download_file, exists, upload_file
 from src.models import DEVICE, MediaMetadata
 from src.utils.progress import get_callback
@@ -118,6 +118,8 @@ def _download_episode(
                 stage, sponsored = _download_youtube(vid_id, episode.title, dest)
             else:
                 stage, sponsored = download_direct(episode.content, dest)
+
+            stage = convert_to_opus(stage)
 
             metadata = _get_metadata(episode, bucket, file_path)
             if sponsored and metadata is not None:

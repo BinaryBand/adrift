@@ -236,3 +236,4 @@ config/**/.*
 config/podcasts.toml
 runbook/**/.*
 .help
+runbook/systemd
