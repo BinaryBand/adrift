@@ -1,29 +1,28 @@
-from datetime import datetime, timezone, timedelta
-from diskcache import Cache
+import base64
+import hashlib
+import json
+import os
+import pickle
+import re
+import sys
+import tempfile
+import time
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import Any
 
-import tempfile
-import hashlib
-import pickle
-import base64
-import json
-import sys
-import os
-import time
-import re
+from diskcache import Cache
 
 sys.path.insert(0, Path(__file__).parent.parent.parent.as_posix())
 from src.files.s3 import (
     delete_file,
     download_file,
     exists,
-    upload_file,
-    upload_cache_file,
     get_s3_client,
+    upload_cache_file,
+    upload_file,
 )
 from src.models import CacheMetadata
-
 
 _PASSTHROUGH_META_KEYS = ("expires_at", "uploader")
 

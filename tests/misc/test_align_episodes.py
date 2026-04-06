@@ -1,10 +1,10 @@
 """Tests for the new 4-signal alignment algorithm (SPECS.md §Stage 1-3)."""
 
 import os
+import sys
 import unittest
 from datetime import datetime, timezone
 from pathlib import Path
-import sys
 
 sys.path.insert(0, Path(__file__).parent.parent.parent.as_posix())
 
@@ -13,7 +13,7 @@ os.environ.setdefault("S3_SECRET_KEY", "_test")
 os.environ.setdefault("S3_ENDPOINT", "http://localhost")
 os.environ.setdefault("S3_REGION", "us-east-1")
 
-from src.catalog import sim_date, align_episodes, merge_episode, _best_thumbnail
+from src.catalog import _best_thumbnail, align_episodes, merge_episode, sim_date
 from src.models.metadata import RssEpisode
 
 

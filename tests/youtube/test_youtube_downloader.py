@@ -1,18 +1,18 @@
 """Tests for YouTube downloader functionality."""
 
-from pathlib import Path
-from unittest.mock import patch, MagicMock
-import unittest
 import sys
+import unittest
+from pathlib import Path
+from unittest.mock import MagicMock, patch
 
 sys.path.insert(0, Path(__file__).parent.parent.parent.as_posix())
 import src.youtube.downloader as yt_downloader
 from src.youtube.downloader import (
+    BotDetectionError,
     _extract_video_id,
     _is_bot_detection_error,
     _ytdlp_download,
     download_video,
-    BotDetectionError,
 )
 
 

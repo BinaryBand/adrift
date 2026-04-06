@@ -1,16 +1,16 @@
-from pydantic import BaseModel, ConfigDict, computed_field
-from urllib.parse import urljoin
-from pathlib import Path
-from dateutil.rrule import rrulestr
-
-import tomllib
 import random
 import sys
+from pathlib import Path
+from urllib.parse import urljoin
+
+import tomllib
+from dateutil.rrule import rrulestr
+from pydantic import BaseModel, ConfigDict, computed_field
 
 sys.path.insert(0, Path(__file__).parent.parent.as_posix())
-from src.files.s3 import S3_ENDPOINT
 from datetime import datetime, timedelta
 
+from src.files.s3 import S3_ENDPOINT
 
 MATCH_TOLERANCE = 0.75
 

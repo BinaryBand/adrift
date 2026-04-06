@@ -7,15 +7,15 @@ This file combines tests for:
 
 # cspell:ignore-word dunder
 
-from unittest.mock import MagicMock, mock_open, patch
-from pathlib import Path
-import unittest
 import json
 import sys
+import unittest
+from pathlib import Path
+from unittest.mock import MagicMock, mock_open, patch
 
 sys.path.insert(0, Path(__file__).parent.parent.parent.as_posix())
-from src.utils.cache import S3Cache, read_s3_json_cache, write_s3_json_cache
 from src.models import CacheMetadata
+from src.utils.cache import S3Cache, read_s3_json_cache, write_s3_json_cache
 
 
 class TestReadS3JsonCache(unittest.TestCase):

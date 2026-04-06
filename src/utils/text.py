@@ -1,7 +1,8 @@
-from unidecode import unidecode
+import sys
 from functools import lru_cache
 from pathlib import Path
-import sys
+
+from unidecode import unidecode
 
 sys.path.insert(0, Path(__file__).parent.parent.parent.as_posix())
 # from src.app_common import load_static_config
@@ -10,7 +11,6 @@ from src.utils.regex import (
     YT_CHANNEL_SHORTHAND,
     re_compile,
 )
-
 
 # _CHAR_REPLACEMENTS = load_static_config("character_replacements.json")
 

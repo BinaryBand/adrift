@@ -1,6 +1,6 @@
-from pathlib import Path
-import sys
 import os
+import sys
+from pathlib import Path
 from typing import Optional
 
 sys.path.insert(0, Path(__file__).parent.parent.as_posix())

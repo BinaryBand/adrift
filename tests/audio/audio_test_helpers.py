@@ -3,9 +3,9 @@ Script to download a test video for audio testing.
 Downloads dQw4w9WgXcQ as MP3 for use in audio processing tests.
 """
 
-from pathlib import Path
 import subprocess
 import sys
+from pathlib import Path
 
 sys.path.insert(0, Path(__file__).parent.parent.parent.as_posix())
 from src.files.audio import MIN_LENGTH

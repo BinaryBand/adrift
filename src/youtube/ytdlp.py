@@ -5,21 +5,21 @@ This module provides a clean, typed interface for fetching YouTube data via yt-d
 Similar to the sponsorblock module, it uses Pydantic models for type safety.
 """
 
-from pydantic import BaseModel, ValidationError, field_validator
-from typing import Any, Callable, cast
-from yt_dlp import YoutubeDL
-from datetime import datetime
-from dateutil import parser
-from pathlib import Path
 import random
 import sys
+from datetime import datetime
+from pathlib import Path
+from typing import Any, Callable, cast
+
+from dateutil import parser
+from pydantic import BaseModel, ValidationError, field_validator
+from yt_dlp import YoutubeDL
 
 sys.path.insert(0, Path(__file__).parent.parent.parent.as_posix())
 from src.models import RssEpisode, YtDlpParams
 from src.utils.cache import S3Cache
 from src.utils.progress import Callback
-from src.youtube.auth import get_ydl_opts, get_auth_ydl_opts
-
+from src.youtube.auth import get_auth_ydl_opts, get_ydl_opts
 
 # Constants
 _CACHE = S3Cache(".cache/yt-dlp", "yt-dlp")

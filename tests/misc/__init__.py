@@ -1,9 +1,8 @@
 """Audio tests subpackage."""
 
-from pathlib import Path
-import unittest
 import sys
-
+import unittest
+from pathlib import Path
 
 if __name__ == "__main__":
     # Run all audio tests in this directory

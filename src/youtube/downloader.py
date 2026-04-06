@@ -2,11 +2,11 @@
 YouTube video downloader with pytubefix and yt-dlp fallback support.
 """
 
-from typing import Any, cast
+import sys
 from pathlib import Path
+from typing import Any, cast
 
 import yt_dlp
-import sys
 
 sys.path.insert(0, Path(__file__).parent.parent.as_posix())
 from src.utils.progress import Callback

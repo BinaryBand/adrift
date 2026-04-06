@@ -3,10 +3,10 @@ Miscellaneous tests for small bug fixes and edge cases.
 This file is for quick, focused tests that don't fit neatly into other test files.
 """
 
-from unittest.mock import patch, MagicMock, mock_open
-from urllib.parse import urlparse
-from pathlib import Path
 import sys
+from pathlib import Path
+from unittest.mock import MagicMock, mock_open, patch
+from urllib.parse import urlparse
 
 sys.path.insert(0, Path(__file__).parent.parent.parent.as_posix())
 

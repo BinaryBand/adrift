@@ -1,23 +1,23 @@
 """Tests for RSS feed parsing and generation functionality."""
 
-from unittest.mock import Mock, patch
+import sys
+import unittest
 from datetime import datetime
 from pathlib import Path
-import unittest
-import sys
+from unittest.mock import Mock, patch
 
 sys.path.insert(0, Path(__file__).parent.parent.parent.as_posix())
 from src.files.audio import parse_duration
+from src.models import RssChannel, RssEpisode
 from src.web.rss import (
-    upload_thumbnail,
+    _extract_content_url,
     _extract_image_url,
     get_rss_channel,
-    _extract_content_url,
-    parse_rss_entry,
     get_rss_episodes,
+    parse_rss_entry,
     podcast_to_rss,
+    upload_thumbnail,
 )
-from src.models import RssChannel, RssEpisode
 
 
 class TestUploadThumbnail(unittest.TestCase):

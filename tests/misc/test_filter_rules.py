@@ -5,8 +5,8 @@ import os
 import re
 import sys
 import unittest
-from pathlib import Path
 from datetime import datetime
+from pathlib import Path
 
 sys.path.insert(0, Path(__file__).parent.parent.parent.as_posix())
 

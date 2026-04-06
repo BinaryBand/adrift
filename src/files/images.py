@@ -1,7 +1,8 @@
-from pathlib import Path
-from PIL import Image
-import sys
 import os
+import sys
+from pathlib import Path
+
+from PIL import Image
 
 sys.path.insert(0, Path(__file__).parent.parent.parent.as_posix())
 

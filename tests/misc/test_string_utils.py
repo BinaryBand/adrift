@@ -1,9 +1,9 @@
-from pathlib import Path
-import unittest
 import sys
+import unittest
+from pathlib import Path
 
 sys.path.insert(0, Path(__file__).parent.parent.parent.as_posix())
-from src.utils.text import create_slug, normalize_text, is_slug, remove_file_extension
+from src.utils.text import create_slug, is_slug, normalize_text, remove_file_extension
 
 
 class TestCreateSlug(unittest.TestCase):

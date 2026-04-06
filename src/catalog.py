@@ -1,30 +1,30 @@
-from rapidfuzz import fuzz
-from pathlib import Path
-from datetime import datetime
-
 import sys
+from datetime import datetime
+from pathlib import Path
+
+from rapidfuzz import fuzz
 
 sys.path.insert(0, Path(__file__).parent.parent.as_posix())
 from src.app_common import (
     MATCH_TOLERANCE,
-    PodcastConfig,
     FeedSource,
+    PodcastConfig,
 )
 from src.app_runner import normalize_title
+from src.models.output import EpisodeData
 from src.utils.progress import Callback
+from src.utils.text import is_youtube_channel, normalize_text
 from src.web.rss import (
     RssChannel,
     RssEpisode,
     get_rss_channel,
     get_rss_episodes,
 )
-from src.utils.text import normalize_text, is_youtube_channel
 from src.youtube.metadata import (
+    YtFetchOptions,
     get_youtube_channel,
     get_youtube_episodes,
-    YtFetchOptions,
 )
-from src.models.output import EpisodeData
 
 
 def _similarity_clean(ac: str, bc: str) -> float:

@@ -1,9 +1,9 @@
 """Tests for SponsorBlock API integration."""
 
-from unittest.mock import Mock, patch
-from pathlib import Path
-import unittest
 import sys
+import unittest
+from pathlib import Path
+from unittest.mock import Mock, patch
 
 sys.path.insert(0, Path(__file__).parent.parent.parent.as_posix())
 from src.web.sponsorblock import (

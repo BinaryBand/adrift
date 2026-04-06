@@ -1,7 +1,7 @@
-from unittest.mock import patch
-from pathlib import Path
-import unittest
 import sys
+import unittest
+from pathlib import Path
+from unittest.mock import patch
 
 sys.path.insert(0, Path(__file__).parent.parent.parent.as_posix())
 

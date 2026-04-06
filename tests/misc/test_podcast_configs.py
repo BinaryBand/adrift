@@ -1,14 +1,14 @@
-import unittest
 import re
-from pathlib import Path
 import sys
+import unittest
+from pathlib import Path
 
 sys.path.insert(0, Path(__file__).parent.parent.parent.as_posix())
-from src.app_common import SourceFilter, PodcastConfig
+from src.app_common import PodcastConfig, SourceFilter
 from src.utils.regex import (
     LINK_REGEX,
-    YT_CHANNEL_SHORTHAND,
     YOUTUBE_PLAYLIST_SHORTHAND_REGEX,
+    YT_CHANNEL_SHORTHAND,
 )
 
 

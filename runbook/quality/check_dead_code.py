@@ -15,13 +15,12 @@ pass.
 
 from __future__ import annotations
 
-from dataclasses import dataclass
-from pathlib import Path
 import argparse
 import subprocess
 import sys
 import time
-
+from dataclasses import dataclass
+from pathlib import Path
 
 _WATCH_INTERVAL_SECONDS = 300  # 5 minutes
 _BEGIN_MARKER = "[vulture] Scanning..."

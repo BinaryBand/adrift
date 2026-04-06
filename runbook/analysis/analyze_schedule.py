@@ -5,7 +5,6 @@ from __future__ import annotations
 
 import argparse
 import re
-import tomllib
 from collections import Counter
 from dataclasses import dataclass
 from datetime import datetime, timezone
@@ -16,6 +15,7 @@ from zoneinfo import ZoneInfo
 
 import feedparser
 import requests
+import tomllib
 from dateutil import parser as date_parser
 from yt_dlp import YoutubeDL
 

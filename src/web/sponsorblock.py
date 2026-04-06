@@ -2,19 +2,18 @@
 SponsorBlock API integration for fetching and removing sponsored segments.
 """
 
-from pydantic import BaseModel, ConfigDict, Field
-from typing import Literal
+import sys
 from pathlib import Path
+from typing import Literal
 
 import requests
-import sys
+from pydantic import BaseModel, ConfigDict, Field
 
 sys.path.insert(0, Path(__file__).parent.parent.as_posix())
 from src.files.audio import cut_segments
 from src.utils.cache import S3Cache
 from src.utils.crypto import sha256
 from src.utils.progress import Callback
-
 
 # Constants
 _CACHE = S3Cache(".cache/sponsorblock", "sponsorblock/segments")

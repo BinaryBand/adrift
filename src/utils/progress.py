@@ -1,6 +1,6 @@
 from typing import Callable
-from tqdm import tqdm
 
+from tqdm import tqdm
 
 Callback = Callable[[int, int | None], None]
 

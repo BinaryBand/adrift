@@ -1,27 +1,25 @@
-from mypy_boto3_s3.type_defs import CopySourceTypeDef
+import mimetypes
+import os
+import sys
+import time
+from dataclasses import dataclass
+from functools import cache, wraps
+from pathlib import Path
+from threading import Lock
+from typing import Callable, cast
+from urllib.parse import urljoin
+
+import boto3
 from boto3.s3.transfer import TransferConfig
 from botocore.client import Config
-from mypy_boto3_s3 import S3Client
-
-from dotenv import load_dotenv, find_dotenv
-from urllib.parse import urljoin
-from functools import cache, wraps
-from dataclasses import dataclass
 from diskcache import Cache
-from threading import Lock
-from pathlib import Path
-from typing import cast, Callable
-
-import mimetypes
-import boto3
-import time
-import sys
-import os
+from dotenv import find_dotenv, load_dotenv
+from mypy_boto3_s3 import S3Client
+from mypy_boto3_s3.type_defs import CopySourceTypeDef
 
 sys.path.insert(0, Path(__file__).parent.parent.as_posix())
-from src.models import MediaMetadata, CacheMetadata
+from src.models import CacheMetadata, MediaMetadata
 from src.utils.progress import Callback
-
 
 load_dotenv(find_dotenv())
 assert (S3_USERNAME := os.getenv("S3_USERNAME", "")) != "", "`S3_USERNAME` empty"

@@ -9,12 +9,13 @@ Exits with status 0 when all files validate, or 1 on validation errors.
 
 from __future__ import annotations
 
-import sys
-from pathlib import Path
-import tomllib
 import argparse
 import re
+import sys
 import time
+from pathlib import Path
+
+import tomllib
 
 _ROOT = Path(__file__).parent.parent.parent.resolve()
 sys.path.insert(0, _ROOT.as_posix())
@@ -101,6 +102,7 @@ def validate_file(path: Path, problems: bool = False) -> int:
 
     entry_spans = _podcast_entry_spans(lines)
     from pydantic import ValidationError
+
     from src.app_common import PodcastConfig  # type: ignore
 
     exit_code = 0

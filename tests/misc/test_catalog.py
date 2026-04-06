@@ -10,11 +10,11 @@ External I/O is patched at the source-fetch boundary:
 """
 
 import os
+import sys
 import unittest
 from datetime import datetime, timezone
 from pathlib import Path
 from unittest.mock import patch
-import sys
 
 sys.path.insert(0, Path(__file__).parent.parent.parent.as_posix())
 
@@ -23,13 +23,13 @@ os.environ.setdefault("S3_SECRET_KEY", "_test")
 os.environ.setdefault("S3_ENDPOINT", "http://localhost")
 os.environ.setdefault("S3_REGION", "us-east-1")
 
+from src.app_common import FeedSource, PodcastConfig, SourceFilter
 from src.catalog import (
     _collect_episodes,
     align_episodes,
     process_feeds,
     process_sources,
 )
-from src.app_common import FeedSource, PodcastConfig, SourceFilter
 from src.models.metadata import RssEpisode
 
 

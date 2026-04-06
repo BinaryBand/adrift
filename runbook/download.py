@@ -1,20 +1,21 @@
 # ruff: noqa: E402
 
-from datetime import datetime
-from random import shuffle
-from pathlib import Path
-from tqdm import tqdm
-
-import tempfile
 import argparse
-import dotenv
 import random
-import time
 import sys
+import tempfile
+import time
+from datetime import datetime
+from pathlib import Path
+from random import shuffle
+
+import dotenv
+from tqdm import tqdm
 
 sys.path.insert(0, Path(dotenv.find_dotenv()).parent.as_posix())
 dotenv.load_dotenv()
 
+import src.youtube.downloader as yt_downloader
 from src.app_common import PodcastConfig, load_podcasts_config
 from src.app_runner import get_s3_files, normalize_title
 from src.catalog import (
@@ -25,14 +26,13 @@ from src.catalog import (
     process_sources,
 )
 from src.files.audio import get_duration, is_audio
-from src.files.s3 import exists, upload_file, download_file
+from src.files.s3 import download_file, exists, upload_file
 from src.models import DEVICE, MediaMetadata
 from src.utils.progress import get_callback
 from src.utils.regex import YOUTUBE_VIDEO_REGEX
 from src.web.rss import RssChannel, RssEpisode, download_direct, podcast_to_rss
 from src.web.sponsorblock import fetch_sponsor_segments, remove_sponsors
 from src.youtube.downloader import BotDetectionError, download_video
-import src.youtube.downloader as yt_downloader
 from src.youtube.metadata import get_video_info
 
 # Ask the YouTube downloader to propagate bot-detection errors so this

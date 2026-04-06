@@ -1,8 +1,8 @@
-from urllib.parse import urljoin
+import os
+import sys
 from dataclasses import dataclass, field
 from pathlib import Path
-import sys
-import os
+from urllib.parse import urljoin
 
 sys.path.insert(0, Path(__file__).parent.parent.parent.as_posix())
 from src.models import RssChannel, RssEpisode

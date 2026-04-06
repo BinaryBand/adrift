@@ -1,8 +1,8 @@
 """Tests for normalize_title() in src/app_runner.py."""
 
-from pathlib import Path
-import unittest
 import sys
+import unittest
+from pathlib import Path
 
 sys.path.insert(0, Path(__file__).parent.parent.parent.as_posix())
 from src.app_runner import normalize_title

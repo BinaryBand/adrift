@@ -1,7 +1,7 @@
-from pathlib import Path
-import unittest
-import tempfile
 import sys
+import tempfile
+import unittest
+from pathlib import Path
 
 sys.path.insert(0, Path(__file__).parent.parent.parent.as_posix())
 from src.files.audio import cut_segments, get_duration

@@ -1,5 +1,6 @@
-from cachetools import cached, LRUCache
 import re
+
+from cachetools import LRUCache, cached
 
 
 @cached(LRUCache(2048))
