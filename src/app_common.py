@@ -1,6 +1,7 @@
 import random
 import sys
 from pathlib import Path
+from typing import Any
 from urllib.parse import urljoin
 
 import tomllib
@@ -130,7 +131,7 @@ def _load_config(name_or_path: str) -> list[PodcastConfig]:
     with open(path, "rb") as f:
         data = tomllib.load(f)
 
-    podcasts_raw: list[dict] = data.get("podcasts", [])
+    podcasts_raw: list[dict[str, Any]] = data.get("podcasts", [])
     configs = [PodcastConfig.model_validate(entry) for entry in podcasts_raw]
     random.shuffle(configs)
     return configs
@@ -182,7 +183,7 @@ def load_podcasts_config(include: list[str]) -> list[PodcastConfig]:
     return filtered
 
 
-def load_static_config(filename: str) -> dict:
+def load_static_config(filename: str) -> dict[str, Any]:
     """Load a static TOML configuration file from the ``config/`` directory.
 
     Falls back gracefully and returns an empty dict when the file is

@@ -146,20 +146,20 @@ def _extract_image_from_get(obj: object) -> str:
     if not callable(get):
         return ""
     href = get("href", None)
-    if href:
+    if isinstance(href, str) and href:
         return href
     url = get("url", None)
-    if url:
+    if isinstance(url, str) and url:
         return url
     return ""
 
 
 def _extract_image_from_attrs(obj: object) -> str:
     href = getattr(obj, "href", None)
-    if href:
+    if isinstance(href, str) and href:
         return href
     url = getattr(obj, "url", None)
-    if url:
+    if isinstance(url, str) and url:
         return url
     return ""
 
@@ -368,7 +368,7 @@ def _parse_entry_pub_date(entry: FeedParserDict) -> datetime | None:
     try:
         pub_date_str = getattr(entry, "published", getattr(entry, "pubDate", ""))
         pub_date = parser.parse(pub_date_str)
-        if pub_date is not None and pub_date.tzinfo is None:
+        if pub_date.tzinfo is None:
             return pub_date.replace(tzinfo=timezone.utc)
         return pub_date
     except (ValueError, TypeError, AttributeError):
@@ -495,7 +495,7 @@ def download_direct(url: str, dest: Path) -> tuple[Path, bool]:
     return staging_file, False
 
 
-def _browser_headers_for(url: str) -> dict:
+def _browser_headers_for(url: str) -> dict[str, str]:
     return {
         "User-Agent": (
             "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "

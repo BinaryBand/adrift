@@ -116,7 +116,7 @@ def _build_ffmpeg_pcm_cmd(
 
 def _hash_audio_samples(
     file_path: Path, sample_times: list[float], window: float, sample_rate: int
-) -> hashlib.md5:  # type: ignore[type-arg]
+) -> str:
     """Hash PCM windows at each sample position. Returns a partially-filled md5."""
     hash_md5 = hashlib.md5()
     for t in sample_times:
@@ -128,7 +128,7 @@ def _hash_audio_samples(
         )
         if res.stdout:
             hash_md5.update(res.stdout)
-    return hash_md5
+    return hash_md5.hexdigest()
 
 
 def _fallback_hash_bytes(file_path: Path) -> str:
@@ -143,7 +143,8 @@ def _fallback_hash_bytes(file_path: Path) -> str:
 def get_audio_content_hash(file_path: Path, sample_rate: int = 8000) -> str:
     cache = _crypto_cache()
     modified_date = os.path.getmtime(file_path)
-    cache_key = f"audio_hash:file={file_path.absolute().as_posix()},mod={modified_date},sr={sample_rate}"
+    path = file_path.absolute().as_posix()
+    cache_key = f"audio_hash:file={path},mod={modified_date},sr={sample_rate}"
     if (cached_hash := cache.get(cache_key)) is not None:
         return cached_hash
 
@@ -153,9 +154,9 @@ def get_audio_content_hash(file_path: Path, sample_rate: int = 8000) -> str:
     sample_times = _compute_sample_times(duration, num_samples, sample_window)
 
     try:
-        hex_hash = _hash_audio_samples(
+        hex_hash: str = _hash_audio_samples(
             file_path, sample_times, sample_window, sample_rate
-        ).hexdigest()
+        )
     except Exception:
         hex_hash = _fallback_hash_bytes(file_path)
 

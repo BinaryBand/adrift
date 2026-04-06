@@ -6,7 +6,8 @@ from dataclasses import dataclass
 from functools import cache, wraps
 from pathlib import Path
 from threading import Lock
-from typing import Callable, cast
+from typing import Any, Callable, ParamSpec, TypeVar
+from pydantic import BaseModel, ConfigDict
 from urllib.parse import urljoin
 
 import boto3
@@ -40,12 +41,18 @@ def _s3_cache() -> Cache:
     return Cache(".cache/s3")
 
 
-def retry(attempts: int = 3, backoff_base: int = 2):
+_P = ParamSpec("_P")
+_T = TypeVar("_T")
+
+
+def retry(
+    attempts: int = 3, backoff_base: int = 2
+) -> Callable[[Callable[_P, _T]], Callable[_P, _T]]:
     """Decorator to retry a function with exponential backoff on failure."""
 
-    def decorator(func):
+    def decorator(func: Callable[_P, _T]) -> Callable[_P, _T]:
         @wraps(func)
-        def wrapper(*args, **kwargs):
+        def wrapper(*args: _P.args, **kwargs: _P.kwargs) -> _T:
             label = func.__name__
             last_exception = None
             for i in range(1, attempts + 1):
@@ -67,9 +74,11 @@ def retry(attempts: int = 3, backoff_base: int = 2):
     return decorator
 
 
-def _build_upload_extra_args(file_path: str, metadata_dict: dict | None) -> dict:
+def _build_upload_extra_args(
+    file_path: str, metadata_dict: dict[str, str] | None
+) -> dict[str, Any]:
     """Build the ExtraArgs dict for a boto3 upload_file call."""
-    extra_args: dict = {"ACL": "public-read"}
+    extra_args: dict[str, Any] = {"ACL": "public-read"}
     if metadata_dict is not None:
         extra_args["Metadata"] = metadata_dict
     content_type, _ = mimetypes.guess_type(file_path)
@@ -93,7 +102,7 @@ def _make_upload_callback(
 
 
 def _make_boto_config(
-    connect_timeout: int = 15, read_timeout: int = 120, max_attempts: int = 5
+    connect_timeout: float = 15, read_timeout: float = 120, max_attempts: int = 5
 ) -> Config:
     """Return a standardized botocore Config for S3 clients used in this module."""
     return Config(
@@ -135,8 +144,8 @@ class _UploadSpec:
     bucket: str
     key: str
     file_path: str
-    extra_args: dict
-    boto_callback: Callable | None = None
+    extra_args: dict[str, Any]
+    boto_callback: Callable[[int], None] | None = None
 
 
 def _do_s3_upload(spec: _UploadSpec) -> None:
@@ -157,7 +166,9 @@ def _do_s3_upload(spec: _UploadSpec) -> None:
     )
 
 
-def _sync_upload_cache(bucket: str, key: str, metadata_dict: dict | None) -> None:
+def _sync_upload_cache(
+    bucket: str, key: str, metadata_dict: dict[str, str] | None
+) -> None:
     """Update the local S3 metadata cache after an upload."""
     cache_key = f"s3_metadata:{bucket}:{key}"
     if metadata_dict is not None:
@@ -193,7 +204,7 @@ def get_s3_client() -> S3Client:
         if _S3_CLIENT is not None:
             return _S3_CLIENT
 
-        _S3_CLIENT = cast(S3Client, _build_s3_client())
+        _S3_CLIENT = _build_s3_client()
         return _S3_CLIENT
 
 
@@ -217,7 +228,7 @@ def _build_s3_client() -> S3Client:
         region_name=S3_REGION,
     )
 
-    return cast(S3Client, client)
+    return client
 
 
 @retry(attempts=5, backoff_base=2)
@@ -231,9 +242,24 @@ def download_file(bucket: str, key: str, download_path: Path) -> None:
             f.write(chunk)
 
 
+class UploadOptions(BaseModel):
+    """Options model for `upload_file`.
+
+    Uses arbitrary types to allow passing a `Callback` callable.
+    """
+
+    metadata: MediaMetadata | None = None
+    callback: Callback | None = None
+
+    model_config = ConfigDict(arbitrary_types_allowed=True)
+
+
 def _prepare_upload_spec(
-    bucket: str, key: str, file_path: Path | str, options: dict | MediaMetadata | None
-) -> tuple[_UploadSpec, dict | None]:
+    bucket: str,
+    key: str,
+    file_path: Path | str,
+    options: UploadOptions | MediaMetadata | None,
+) -> tuple[_UploadSpec, dict[str, str] | None]:
     """Prepare an _UploadSpec and metadata dict from common upload inputs.
 
     Extracted to keep `upload_file` short and focused on orchestration.
@@ -257,22 +283,34 @@ def _prepare_upload_spec(
 
 
 def _extract_upload_options(
-    options: dict | MediaMetadata | None,
-) -> tuple[MediaMetadata | None, Callable | None]:
-    """Normalize `options` to (metadata, callback)."""
-    metadata = None
-    callback = None
+    options: UploadOptions | MediaMetadata | dict | None,
+) -> tuple[MediaMetadata | None, Callback | None]:
+    """Normalize `options` to (metadata, callback).
+
+    Accepts an `UploadOptions` model, a plain `dict`, or a `MediaMetadata`
+    instance for backward compatibility.
+    """
+    metadata: MediaMetadata | None = None
+    callback: Callback | None = None
+    if options is None:
+        return None, None
+    if isinstance(options, MediaMetadata):
+        return options, None
+    if isinstance(options, UploadOptions):
+        return options.metadata, options.callback
     if isinstance(options, dict):
-        metadata = options.get("metadata")
-        callback = options.get("callback")
-    elif options is not None and not isinstance(options, dict):
-        metadata = options
+        try:
+            opts = UploadOptions.model_validate(options)
+            return opts.metadata, opts.callback
+        except Exception:
+            metadata = options.get("metadata")
+            callback = options.get("callback")
     return metadata, callback
 
 
 def _build_boto_callback_for_file(
-    file_path: str, callback: Callable | None
-) -> Callable | None:
+    file_path: str, callback: Callback | None
+) -> Callable[[int], None] | None:
     """Return a boto3-compatible callback for `file_path` or None."""
     if callback is None:
         return None
@@ -284,14 +322,14 @@ def upload_file(
     bucket: str,
     key: str,
     file_path: Path,
-    options: dict | MediaMetadata | None = None,
+    options: UploadOptions | MediaMetadata | None = None,
 ) -> str | None:
     """Upload a file to S3.
 
     The `options` argument may be one of:
       - `None` (no metadata or callback)
       - a `MediaMetadata` instance (metadata only)
-      - a `dict` with optional keys `metadata` and `callback`
+      - an `UploadOptions` dict with optional keys `metadata` and `callback`
     """
     spec, metadata_dict = _prepare_upload_spec(bucket, key, file_path, options)
     _do_s3_upload(spec)
@@ -376,13 +414,13 @@ def set_metadata(bucket: str, key: str, metadata: MediaMetadata) -> None:
 
 def _build_file_map_from_iterator(
     bucket: str, prefix: str, without_extensions: bool
-) -> dict:
+) -> dict[str, str]:
     """Build a file->etag map from the iterator that yields S3 objects.
 
     Extracted so pagination and mapping logic can be tested or swapped
     independently of the cache handling in `_get_file_map()`.
     """
-    file_list: dict = {}
+    file_list: dict[str, str] = {}
     for obj in _iterate_s3_objects(bucket, prefix):
         key = obj.get("Key", "")
         file_name = Path(key).name
@@ -396,7 +434,9 @@ def _build_file_map_from_iterator(
     return file_list
 
 
-def _get_file_map(bucket: str, prefix: str, without_extensions=True) -> dict:
+def _get_file_map(
+    bucket: str, prefix: str, without_extensions: bool = True
+) -> dict[str, str]:
     # Normalize prefix - add trailing slash for directory listing with delimiter
     prefix = prefix.lstrip(".")
     if prefix and not prefix.endswith("/"):
@@ -431,7 +471,9 @@ def _remove_file_extensions(file_names: list[str]) -> list[str]:
     return [Path(f).with_suffix("").as_posix() for f in file_names]
 
 
-def get_file_list(bucket: str, prefix: str, without_extensions=False) -> list[str]:
+def get_file_list(
+    bucket: str, prefix: str, without_extensions: bool = False
+) -> list[str]:
     prefix = prefix.lstrip(".").rstrip("/")
     file_map = _get_file_map(bucket, prefix, False)
 
@@ -442,7 +484,7 @@ def get_file_list(bucket: str, prefix: str, without_extensions=False) -> list[st
     return file_list
 
 
-def exists(bucket: str, prefix: str, extension_agnostic=True) -> str | None:
+def exists(bucket: str, prefix: str, extension_agnostic: bool = True) -> str | None:
     prefix = prefix.lstrip(".").rstrip("/")
     key: Path = Path(prefix)
 

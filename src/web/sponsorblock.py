@@ -4,7 +4,7 @@ SponsorBlock API integration for fetching and removing sponsored segments.
 
 import sys
 from pathlib import Path
-from typing import Literal
+from typing import Any, Literal
 
 import requests
 from pydantic import BaseModel, ConfigDict, Field
@@ -68,7 +68,7 @@ def _cached_segments(video_id: str) -> list[SponsorSegment] | None:
     return cached if isinstance(cached, list) else []
 
 
-def _fetch_segment_payload(video_id: str) -> list[dict]:
+def _fetch_segment_payload(video_id: str) -> list[dict[str, Any]]:
     response = requests.get(_segment_api_url(video_id), timeout=_API_TIMEOUT)
     return _parse_segment_payload(video_id, response)
 
@@ -78,7 +78,9 @@ def _segment_api_url(video_id: str) -> str:
     return f"https://sponsor.ajay.app/api/skipSegments/{hash_prefix}"
 
 
-def _parse_segment_payload(video_id: str, response: requests.Response) -> list[dict]:
+def _parse_segment_payload(
+    video_id: str, response: requests.Response
+) -> list[dict[str, Any]]:
     if response.status_code == 404:
         return []
     if response.status_code != 200:
@@ -92,14 +94,14 @@ def _parse_segment_payload(video_id: str, response: requests.Response) -> list[d
     return _unwrap_segment_payload(raw_data)
 
 
-def _unwrap_segment_payload(raw_data: list[dict]) -> list[dict]:
+def _unwrap_segment_payload(raw_data: list[dict[str, Any]]) -> list[dict[str, Any]]:
     if raw_data and isinstance(raw_data[0], dict) and "segments" in raw_data[0]:
         nested = raw_data[0].get("segments", [])
         return nested if isinstance(nested, list) else []
     return raw_data
 
 
-def _validate_segments(raw_segments: list[dict]) -> list[SponsorSegment]:
+def _validate_segments(raw_segments: list[dict[str, Any]]) -> list[SponsorSegment]:
     return [SponsorSegment.model_validate(item) for item in raw_segments]
 
 

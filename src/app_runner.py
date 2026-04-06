@@ -1,5 +1,6 @@
 import sys
 from pathlib import Path
+from typing import Any
 from urllib.parse import urljoin
 
 from cachetools import LRUCache, cached
@@ -9,7 +10,7 @@ from src.files.s3 import S3_ENDPOINT, get_file_list
 from src.utils.regex import re_compile
 from src.utils.text import create_slug, remove_control_chars
 
-_TITLE_CACHE: LRUCache = LRUCache(2048)
+_TITLE_CACHE: LRUCache[Any, Any] = LRUCache(2048)
 
 
 def _strip_suffix(pattern: str, episode: str) -> str:

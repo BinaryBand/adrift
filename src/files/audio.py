@@ -19,11 +19,12 @@ AUDIO_EXTENSIONS = {".mp3", ".m4a", ".aac", ".wav", ".flac", ".ogg", ".mp4"}
 
 
 def _duration_weights(part_count: int) -> tuple[int, ...] | None:
-    return {
+    weights_map: dict[int, tuple[int, ...]] = {
         1: (1,),
         2: (60, 1),
         3: (3600, 60, 1),
-    }.get(part_count)
+    }
+    return weights_map.get(part_count)
 
 
 def _run_ffprobe(file: Path) -> str:
@@ -79,7 +80,7 @@ def is_audio(filename: Path | str) -> bool:
     return ext in AUDIO_EXTENSIONS
 
 
-def parse_duration(duration_str: str) -> float | None:
+def parse_duration(duration_str: str | None) -> float | None:
     """Parse duration string in HH:MM:SS or MM:SS format to total seconds."""
     if duration_str is None or duration_str == "":
         return None

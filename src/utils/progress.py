@@ -1,11 +1,11 @@
-from typing import Callable
+from typing import Any, Callable
 
 from tqdm import tqdm
 
 Callback = Callable[[int, int | None], None]
 
 
-def get_callback(progress: tqdm) -> Callback:
+def get_callback(progress: tqdm[Any]) -> Callback:
     """Create a callback function for progress tracking."""
 
     def callback(value: int, total_value: int | None) -> None:

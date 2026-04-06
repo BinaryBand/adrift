@@ -33,7 +33,7 @@ class ChannelInfo(BaseModel):
     uploader_id: str | None = None
     description: str | None = None
     avatar: Any = None  # Can be list[dict] or str
-    thumbnails: list[dict] | None = None
+    thumbnails: list[dict[str, Any]] | None = None
 
 
 class VideoInfo(BaseModel):
@@ -57,7 +57,9 @@ class VideoInfo(BaseModel):
             return None
 
 
-def _fetch_channel_info_raw(url: str, fetch_videos: bool = False) -> dict | None:
+def _fetch_channel_info_raw(
+    url: str, fetch_videos: bool = False
+) -> dict[str, Any] | None:
     """Fetch raw channel information from yt-dlp."""
     opts: YtDlpParams = get_ydl_opts()
     opts["extract_flat"] = True
@@ -68,7 +70,7 @@ def _fetch_channel_info_raw(url: str, fetch_videos: bool = False) -> dict | None
     try:
         with YoutubeDL(cast(Any, opts)) as ydl:
             info = ydl.extract_info(url, download=False)
-            return cast(dict, info) if info else None
+            return cast(dict[str, Any], info) if info else None
     except Exception as e:
         print(f"ERROR: Failed to fetch channel info from {url}: {e}")
         return None
@@ -78,17 +80,17 @@ def _video_info_url(video_id: str) -> str:
     return f"https://youtube.com/watch?v={video_id}"
 
 
-def _extract_info(url: str, opts: YtDlpParams) -> dict | None:
+def _extract_info(url: str, opts: YtDlpParams) -> dict[str, Any] | None:
     with YoutubeDL(cast(Any, opts)) as ydl:
         info = ydl.extract_info(url, download=False)
-        return cast(dict, info) if info else None
+        return cast(dict[str, Any], info) if info else None
 
 
 def _fetch_video_info_attempt(
     video_id: str,
     label: str,
     build_opts: Callable[[], YtDlpParams],
-) -> dict | None:
+) -> dict[str, Any] | None:
     print(f"Fetching video info for {video_id} using {label} yt-dlp")
     try:
         return _extract_info(_video_info_url(video_id), build_opts())
@@ -134,7 +136,7 @@ def get_channel_info(url: str) -> ChannelInfo | None:
     return model
 
 
-def _fetch_video_info_raw(video_id: str) -> dict | None:
+def _fetch_video_info_raw(video_id: str) -> dict[str, Any] | None:
     """Fetch raw video info using yt-dlp with fallback to authenticated."""
     for label, build_opts in _video_info_attempts():
         if info := _fetch_video_info_attempt(video_id, label, build_opts):
@@ -170,7 +172,7 @@ def _fetch_channel_videos_raw(
     start: int = 1,
     end: int | None = None,
     reverse: bool = False,
-) -> list[dict]:
+) -> list[dict[str, Any]]:
     """Fetch video entries from a channel/playlist."""
     opts: YtDlpParams = get_ydl_opts()
     opts["extract_flat"] = True
@@ -184,7 +186,7 @@ def _fetch_channel_videos_raw(
             if channel_info is None:
                 return []
 
-            return cast(list[dict], channel_info.get("entries", []))
+            return cast(list[dict[str, Any]], channel_info.get("entries", []))
     except Exception as e:
         print(f"ERROR: Failed to fetch videos from {url}: {e}")
         return []
@@ -202,13 +204,13 @@ def _fetch_video_batch(
     author: str,
     batch_index: int,
     batch_size: int | None,
-) -> list[dict]:
+) -> list[dict[str, Any]]:
     print(f"Fetching {author} videos {batch_index} (size={str(batch_size)})...")
     return _fetch_channel_videos_raw(url, 1, end=batch_size, reverse=False)
 
 
 def _add_new_public_episodes(
-    video_entries: list[dict],
+    video_entries: list[dict[str, Any]],
     author: str,
     episodes: dict[str, RssEpisode],
 ) -> bool:

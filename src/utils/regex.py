@@ -4,7 +4,7 @@ from cachetools import LRUCache, cached
 
 
 @cached(LRUCache(2048))
-def re_compile(regex: str) -> re.Pattern:
+def re_compile(regex: str) -> re.Pattern[str]:
     return re.compile(regex)
 
 

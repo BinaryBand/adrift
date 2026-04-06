@@ -13,7 +13,7 @@ def _crop_to_center_square(img: Image.Image) -> Image.Image:
     left = (width - side) // 2
     top = (height - side) // 2
     return img.crop((left, top, left + side, top + side)).resize(
-        (side, side), Image.Resampling.LANCZOS
+        (side, side), resample=int(Image.Resampling.LANCZOS)
     )
 
 

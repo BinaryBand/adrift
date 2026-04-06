@@ -59,7 +59,7 @@ class MediaMetadata(S3Metadata):
         default=False, description="Whether ads were removed"
     )
 
-    def to_dict(self) -> dict:
+    def to_dict(self) -> dict[str, str]:
         """Convert to S3-compatible metadata dictionary (all string values)."""
         return {
             "duration": str(self.duration),
@@ -70,35 +70,51 @@ class MediaMetadata(S3Metadata):
         }
 
 
-class YtDlpParams(TypedDict, total=False):
-    """yt-dlp configuration parameters.
+class YtDlpParams(BaseModel):
+    """Typed yt-dlp options as a Pydantic model.
 
-    Note: This is not exhaustive. yt-dlp supports many more options.
-    Using total=False allows any subset of these fields.
+    This model is intentionally permissive (extra fields allowed) and
+    implements mapping-style access so it can be used interchangeably with
+    plain dicts in existing call sites (e.g., `opts["format"] = "..."`).
     """
 
-    quiet: bool
-    no_warnings: bool
-    extract_flat: bool
-    socket_timeout: int
-    sleep_interval: int
-    max_sleep_interval: int
-    sleep_interval_requests: int
-    cookiefile: str
-    cookiesfrombrowser: tuple[str, ...]
-    format: str
-    outtmpl: str
-    postprocessors: list[dict]
-    progress_hooks: list[Callable[[dict], None]]
-    playlistreverse: bool
-    playliststart: int
-    playlistend: int | None
-    extractor_args: Any
-    remote_components: Any
-    js_runtimes: dict[str, dict]
+    quiet: bool | None = None
+    no_warnings: bool | None = None
+    extract_flat: bool | None = None
+    socket_timeout: int | None = None
+    sleep_interval: int | None = None
+    max_sleep_interval: int | None = None
+    sleep_interval_requests: int | None = None
+    cookiefile: str | None = None
+    cookiesfrombrowser: tuple[str, ...] | None = None
+    format: str | None = None
+    outtmpl: str | None = None
+    postprocessors: list[dict[str, Any]] | None = None
+    progress_hooks: list[Callable[[dict[str, Any]], None]] | None = None
+    playlistreverse: bool | None = None
+    playliststart: int | None = None
+    playlistend: int | None = None
+    extractor_args: Any | None = None
+    remote_components: Any | None = None
+    ratelimit: int | None = None
+    js_runtimes: dict[str, dict[str, Any]] | None = None
+
+    model_config = ConfigDict(extra="allow", arbitrary_types_allowed=True)
+
+    def __getitem__(self, key: str) -> Any:
+        return getattr(self, key) if hasattr(self, key) else self.model_dump().get(key)
+
+    def __setitem__(self, key: str, value: Any) -> None:
+        try:
+            setattr(self, key, value)
+        except Exception:
+            # Fallback to storing in the extra dict
+            data = self.model_dump()
+            data[key] = value
+            self.model_validate(data)
 
 
-def _extract_image_from_list(data: list) -> str:
+def _extract_image_from_list(data: list[Any]) -> str:
     last = data[-1] if data else None
     return last.get("url", "") if isinstance(last, dict) else ""
 
@@ -112,7 +128,7 @@ class RssChannel(BaseModel):
     image: str
 
     @classmethod
-    def from_ytdlp(cls, data: dict, url: str) -> "RssChannel":
+    def from_ytdlp(cls, data: dict[str, Any], url: str) -> "RssChannel":
         """Create RssChannel directly from yt-dlp extract_info response."""
         title = data.get("uploader") or data.get("title", "")
         author = data.get("uploader_id", "YouTube")
@@ -158,7 +174,7 @@ class RssEpisode(BaseModel):
     _availability: str | None = None
 
     @classmethod
-    def from_ytdlp(cls, data: dict, author: str) -> "RssEpisode":
+    def from_ytdlp(cls, data: dict[str, Any], author: str) -> "RssEpisode":
         """Create RssEpisode from yt-dlp video entry dict."""
         video_id = data.get("id", "")
         title = data.get("title", "")

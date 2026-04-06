@@ -27,7 +27,7 @@ from src.models import CacheMetadata
 _PASSTHROUGH_META_KEYS = ("expires_at", "uploader")
 
 
-def _resolve_created_at(raw_meta: dict) -> str | None:
+def _resolve_created_at(raw_meta: dict[str, Any]) -> str | None:
     """Extract or convert a creation timestamp from raw S3 object metadata."""
     if "created_at" in raw_meta:
         return raw_meta["created_at"]
@@ -39,7 +39,7 @@ def _resolve_created_at(raw_meta: dict) -> str | None:
         return None
 
 
-def _normalize_s3_meta(raw_meta: dict) -> dict:
+def _normalize_s3_meta(raw_meta: dict[str, Any]) -> dict[str, Any]:
     """Normalise S3 object metadata into a form CacheMetadata can validate."""
     norm = {k: raw_meta[k] for k in _PASSTHROUGH_META_KEYS if k in raw_meta}
     if created_at := _resolve_created_at(raw_meta):

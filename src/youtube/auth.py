@@ -1,7 +1,7 @@
 import os
 import sys
 from pathlib import Path
-from typing import Optional
+from typing import Optional, Any
 
 sys.path.insert(0, Path(__file__).parent.parent.as_posix())
 from src.models import YtDlpParams
@@ -22,7 +22,7 @@ def get_ydl_opts() -> YtDlpParams:
 
 
 def get_auth_ydl_opts(
-    use_browser_fallback=False, prefer_native: bool = True
+    use_browser_fallback: bool = False, prefer_native: bool = True
 ) -> YtDlpParams:
     """Get yt-dlp options with cookie authentication and optional browser fallback.
 
@@ -121,7 +121,7 @@ def _try_export_firefox_cookies() -> Optional[Path]:
     return None
 
 
-def _import_browser_cookie3():
+def _import_browser_cookie3() -> Any | None:
     try:
         import browser_cookie3
     except Exception:
@@ -130,7 +130,7 @@ def _import_browser_cookie3():
     return browser_cookie3
 
 
-def _load_firefox_cookie_jar(browser_cookie3) -> object | None:
+def _load_firefox_cookie_jar(browser_cookie3: Any) -> Any | None:
     try:
         return browser_cookie3.firefox(domain_name=".youtube.com")
     except TypeError:
@@ -144,12 +144,12 @@ def _load_firefox_cookie_jar(browser_cookie3) -> object | None:
         return None
 
 
-def _iter_cookie_jar(cookie_jar: object):
+def _iter_cookie_jar(cookie_jar: Any) -> list[Any]:
     cookies = getattr(cookie_jar, "cookies", None)
     return cookies or list(cookie_jar)
 
 
-def _write_cookie_jar(cookies_path: Path, cookie_jar: object) -> bool:
+def _write_cookie_jar(cookies_path: Path, cookie_jar: Any) -> bool:
     try:
         with cookies_path.open("w", encoding="utf-8") as fh:
             fh.write("# Netscape HTTP Cookie File\n")
@@ -161,7 +161,7 @@ def _write_cookie_jar(cookies_path: Path, cookie_jar: object) -> bool:
         return False
 
 
-def _format_cookie_line(cookie: object) -> str:
+def _format_cookie_line(cookie: Any) -> str:
     domain = cookie.domain
     flag = "TRUE" if domain.startswith(".") else "FALSE"
     path = cookie.path or "/"
