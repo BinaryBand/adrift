@@ -208,14 +208,33 @@ def _extract_content_url(entry: FeedParserDict) -> str | None:
 def _collect_enclosure_strings(entry: FeedParserDict) -> list[str]:
     content = getattr(entry, "enclosures", [])
     if content:
-        return [
-            s
-            for enc in content
-            for s in LINK_REGEX.findall(enc if isinstance(enc, str) else enc.get("href", ""))
-        ]
-    if hasattr(entry, "url"):
-        return [entry.get("url", "")]
+        return _extract_urls_from_enclosures(content)
+
+    url = getattr(entry, "url", None)
+    if isinstance(url, str) and url:
+        return [url]
     return []
+
+
+def _extract_urls_from_enclosures(content: object) -> list[str]:
+    urls: list[str] = []
+    for enc in content if isinstance(content, list) else []:
+        urls.extend(LINK_REGEX.findall(_enclosure_value(enc)))
+    return urls
+
+
+def _enclosure_value(enc: object) -> str:
+    if isinstance(enc, str):
+        return enc
+
+    get = getattr(enc, "get", None)
+    if not callable(get):
+        return ""
+
+    href = get("href", "")
+    if isinstance(href, str):
+        return href
+    return ""
 
 
 def _filter_audio_urls(urls: list[str]) -> list[str]:

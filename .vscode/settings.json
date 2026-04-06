@@ -1,10 +1,4 @@
 {
-  "python.analysis.enable": false,
-  "python.analysis.typeCheckingMode": "strict",
-  "python.analysis.diagnosticMode": "workspace",
-  "python.analysis.stubPath": "typings",
-  "python.analysis.extraPaths": ["src"],
-  "python.analysis.useLibraryCodeForTypes": true,
   "python.defaultInterpreterPath": "/home/owen/Documents/Dev/adrift/.venv/bin/python",
   "files.exclude": {
     "**/.venv": true,
@@ -44,45 +38,19 @@
     ]
   },
   "cSpell.words": [
-    "adless",
-    "aselect",
-    "atrim",
     "BYDAY",
-    "chunksize",
-    "cookiefile",
-    "cookiesfrombrowser",
-    "Darknet",
     "dateutil",
     "dotenv",
-    "eucl",
-    "ffprobe",
-    "flac",
-    "frombuffer",
-    "ignoreerrors",
-    "muxer",
-    "noverlap",
-    "nperseg",
-    "outtmpl",
-    "overscan",
-    "playlistend",
-    "playlistreverse",
-    "playliststart",
-    "postprocessors",
-    "pytubefix",
-    "randn",
-    "reencode",
-    "RRULE",
-    "selfpromo",
+    "DTSTART",
+    "rrule",
     "sponsorblock",
-    "tobytes",
-    "usecwd",
-    "ytdlp",
-    "ytvideo"
+    "ytdlp"
   ],
   "python.testing.pytestArgs": [
     "tests"
   ],
   "python.testing.unittestEnabled": false,
   "python.testing.pytestEnabled": true,
-  
+  "python-envs.defaultEnvManager": "ms-python.python:poetry",
+  "python-envs.defaultPackageManager": "ms-python.python:poetry",
 }

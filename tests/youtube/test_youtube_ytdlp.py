@@ -7,6 +7,7 @@ from pathlib import Path
 from unittest.mock import MagicMock, patch
 
 sys.path.insert(0, Path(__file__).parent.parent.parent.as_posix())
+from src.models import YtDlpParams
 from src.youtube.ytdlp import (
     ChannelInfo,
     VideoInfo,
@@ -195,6 +196,26 @@ class TestFetchVideoInfoRaw(unittest.TestCase):
         result = _fetch_video_info_raw("vid123")
 
         self.assertIsNone(result)
+
+
+class TestYtDlpOptsCompatibility(unittest.TestCase):
+    """Regression tests for passing typed yt-dlp opts into YoutubeDL."""
+
+    @patch("src.youtube.ytdlp.YoutubeDL")
+    @patch("src.youtube.ytdlp.get_ydl_opts")
+    def test_channel_video_fetch_passes_plain_dict_to_youtubedl(self, mock_get_opts, mock_ydl_cls):
+        mock_get_opts.return_value = YtDlpParams.model_validate({"quiet": True})
+        mock_ydl = MagicMock()
+        mock_ydl.__enter__.return_value.extract_info.return_value = {"entries": []}
+        mock_ydl_cls.return_value = mock_ydl
+
+        result = _fetch_channel_videos_raw("https://www.youtube.com/@example/videos")
+
+        self.assertEqual(result, [])
+        self.assertTrue(mock_ydl_cls.called)
+        opts_arg = mock_ydl_cls.call_args[0][0]
+        self.assertIsInstance(opts_arg, dict)
+        self.assertTrue(opts_arg.get("extract_flat"))
 
 
 class TestFetchVideoInfo(unittest.TestCase):

@@ -7,6 +7,7 @@ from unittest.mock import MagicMock, patch
 
 sys.path.insert(0, Path(__file__).parent.parent.parent.as_posix())
 import src.youtube.downloader as yt_downloader
+from src.models import YtDlpParams
 from src.youtube.downloader import (
     BotDetectionError,
     _extract_video_id,
@@ -66,6 +67,22 @@ class TestYtDlpDownload(unittest.TestCase):
         mock_ydl_cls.return_value = self._make_ydl_mock("/tmp/abc.m4a")
         result = _ytdlp_download("abc123", Path("/tmp"))
         self.assertEqual(result, Path("/tmp/abc.m4a"))
+
+    @patch(
+        "src.youtube.downloader.get_auth_ydl_opts",
+        return_value=YtDlpParams.model_validate({"quiet": True}),
+    )
+    @patch("src.youtube.downloader.yt_dlp.YoutubeDL")
+    @patch("pathlib.Path.exists", return_value=True)
+    def test_typed_opts_are_converted_to_plain_dict(self, _exists, mock_ydl_cls, _opts):
+        mock_ydl_cls.return_value = self._make_ydl_mock("/tmp/abc.m4a")
+
+        result = _ytdlp_download("abc123", Path("/tmp"))
+
+        self.assertEqual(result, Path("/tmp/abc.m4a"))
+        opts_arg = mock_ydl_cls.call_args[0][0]
+        self.assertIsInstance(opts_arg, dict)
+        self.assertEqual(opts_arg.get("quiet"), True)
 
     @patch("src.youtube.downloader.get_auth_ydl_opts", return_value={})
     @patch("src.youtube.downloader.yt_dlp.YoutubeDL")

@@ -97,8 +97,15 @@ def _make_progress_hook(callback: Callback | None = None):
     return progress_hook
 
 
-def _extract_download_info(url: str, opts: YtDlpParams) -> dict[str, Any]:
-    with yt_dlp.YoutubeDL(cast(Any, opts)) as ydl:
+def _ydl_opts_dict(opts: YtDlpParams | dict[str, Any]) -> dict[str, Any]:
+    """Convert typed yt-dlp params into a plain dict for yt-dlp internals."""
+    if isinstance(opts, dict):
+        return {k: v for k, v in opts.items() if v is not None}
+    return opts.model_dump(exclude_none=True)
+
+
+def _extract_download_info(url: str, opts: YtDlpParams | dict[str, Any]) -> dict[str, Any]:
+    with yt_dlp.YoutubeDL(_ydl_opts_dict(opts)) as ydl:
         info = ydl.extract_info(url, download=True)
     return cast(dict[str, Any], info)
 

@@ -1,8 +1,9 @@
 """
+cspell: words playliststart playlistend playlistreverse
 YouTube Data Layer (yt-dlp) integration with typed interfaces.
 
 This module provides a clean, typed interface for fetching YouTube data via yt-dlp.
-Similar to the sponsorblock module, it uses Pydantic models for type safety.
+Similar to the SponsorBlock module, it uses Pydantic models for type safety.
 """
 
 import random
@@ -90,6 +91,13 @@ def _trim_video_cache_payload(raw_info: dict[str, Any]) -> dict[str, Any]:
     return {key: raw_info[key] for key in _VIDEO_CACHE_FIELDS if key in raw_info}
 
 
+def _ydl_opts_dict(opts: YtDlpParams | dict[str, Any]) -> dict[str, Any]:
+    """Convert typed yt-dlp params into a plain dict for yt-dlp internals."""
+    if isinstance(opts, dict):
+        return {k: v for k, v in opts.items() if v is not None}
+    return opts.model_dump(exclude_none=True)
+
+
 def _fetch_channel_info_raw(url: str, fetch_videos: bool = False) -> dict[str, Any] | None:
     """Fetch raw channel information from yt-dlp."""
     opts: YtDlpParams = get_ydl_opts()
@@ -99,7 +107,7 @@ def _fetch_channel_info_raw(url: str, fetch_videos: bool = False) -> dict[str, A
         opts["playlistend"] = 0  # Don't fetch any video entries
 
     try:
-        with YoutubeDL(cast(Any, opts)) as ydl:
+        with YoutubeDL(_ydl_opts_dict(opts)) as ydl:
             info = ydl.extract_info(url, download=False)
             return cast(dict[str, Any], info) if info else None
     except Exception as e:
@@ -111,8 +119,8 @@ def _video_info_url(video_id: str) -> str:
     return f"https://youtube.com/watch?v={video_id}"
 
 
-def _extract_info(url: str, opts: YtDlpParams) -> dict[str, Any] | None:
-    with YoutubeDL(cast(Any, opts)) as ydl:
+def _extract_info(url: str, opts: YtDlpParams | dict[str, Any]) -> dict[str, Any] | None:
+    with YoutubeDL(_ydl_opts_dict(opts)) as ydl:
         info = ydl.extract_info(url, download=False)
         return cast(dict[str, Any], info) if info else None
 
@@ -212,7 +220,7 @@ def _fetch_channel_videos_raw(
     opts["playlistend"] = end
 
     try:
-        with YoutubeDL(cast(Any, opts)) as ydl:
+        with YoutubeDL(_ydl_opts_dict(opts)) as ydl:
             channel_info = ydl.extract_info(url, download=False)
             if not channel_info:
                 return []

@@ -1,3 +1,4 @@
+# cspell: ignore-word rrulestr
 import glob
 import random
 import sys
@@ -156,10 +157,11 @@ def _schedule_matches_today(schedule: str, title: str, today: datetime | None = 
 
 
 def _config_schedule_matches_today(config: "PodcastConfig") -> bool:
-    """Return True if any RRULE in config.schedule matches today, or if schedule is empty."""
-    if not config.schedule:
-        return True
-    return any(_schedule_matches_today(rule, config.name) for rule in config.schedule)
+    # """Return True if any RRULE in config.schedule matches today, or if schedule is empty."""
+    # if not config.schedule:
+    #     return True
+    # return any(_schedule_matches_today(rule, config.name) for rule in config.schedule)
+    return True
 
 
 def load_podcasts_config(include: list[str]) -> list[PodcastConfig]:
@@ -181,7 +183,7 @@ def load_podcasts_config(include: list[str]) -> list[PodcastConfig]:
 def _expand_include_targets(include: list[str]) -> list[str]:
     """Expand shell-style glob patterns in the include list to concrete paths.
 
-    This helper centralises glob expansion and keeps the public API simple
+    This helper centralizes glob expansion and keeps the public API simple
     and easier to test.
     """
     targets: list[str] = []
