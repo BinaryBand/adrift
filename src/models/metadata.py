@@ -3,11 +3,11 @@ import sys
 from abc import ABC, abstractmethod
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Any, Callable, TypedDict
+from typing import Any, Callable
 
 import pydantic
 from dotenv import find_dotenv, load_dotenv
-from pydantic import BaseModel
+from pydantic import BaseModel, ConfigDict
 
 # Ensure project root is on sys.path when executed as script
 sys.path.insert(0, Path(__file__).parent.parent.as_posix())

@@ -6,9 +6,7 @@ from dataclasses import dataclass
 from functools import cache, wraps
 from pathlib import Path
 from threading import Lock
-<<<<<<< HEAD
-from typing import Any, Callable, ParamSpec, TypeVar, cast
-from pydantic import BaseModel, ConfigDict
+from typing import Any, Callable, ParamSpec, TypeVar
 from urllib.parse import urljoin
 
 import boto3
@@ -18,6 +16,7 @@ from diskcache import Cache
 from dotenv import find_dotenv, load_dotenv
 from mypy_boto3_s3 import S3Client
 from mypy_boto3_s3.type_defs import CopySourceTypeDef
+from pydantic import BaseModel, ConfigDict
 
 sys.path.insert(0, Path(__file__).parent.parent.as_posix())
 from src.models import CacheMetadata, MediaMetadata
@@ -407,13 +406,9 @@ def set_metadata(bucket: str, key: str, metadata: MediaMetadata) -> None:
     _s3_cache().set(cache_key, metadata_dict)
 
 
-<<<<<<< HEAD
 def _build_file_map_from_iterator(
     bucket: str, prefix: str, without_extensions: bool
 ) -> dict[str, str]:
-=======
-def _build_file_map_from_iterator(bucket: str, prefix: str, without_extensions: bool) -> dict:
->>>>>>> 563a377 (chore: apply ruff formatting and lint fixes)
     """Build a file->etag map from the iterator that yields S3 objects.
 
     Extracted so pagination and mapping logic can be tested or swapped
