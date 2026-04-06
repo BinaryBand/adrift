@@ -1,0 +1,57 @@
+[tool.poetry]
+name = "adrift"
+version = "0.1.0"
+description = "Podcast aggregation and ad-removal platform"
+authors = []
+package-mode = false
+
+[tool.poetry.dependencies]
+python = "^3.11"
+attrs = "*"
+pydantic = "*"
+boto3 = "*"
+feedparser = "*"
+Pillow = "*"
+python-dotenv = "*"
+requests = "*"
+tqdm = "*"
+yt-dlp = "*"
+browser-cookie3 = "*"
+rapidfuzz = "*"
+unidecode = "*"
+cachetools = "*"
+diskcache = "*"
+yarl = "*"
+
+[tool.poetry.group.dev.dependencies]
+# Type stubs
+mypy-boto3-s3 = "*"
+boto3-stubs = { extras = ["s3"], version = "*" }
+types-tqdm = "*"
+types-cachetools = "*"
+types-yt-dlp = "*"
+types-python-dateutil = "*"
+# Linting & formatting
+ruff = "*"
+mypy = "*"
+# Testing
+pytest = "*"
+# Quality tools
+lizard = "*"
+vulture = "*"
+grimp = "*"
+networkx = "*"
+
+[tool.mypy]
+mypy_path = "typings"
+python_version = "3.11"
+ignore_missing_imports = false
+disallow_untyped_calls = false
+warn_unused_ignores = true
+show_error_codes = true
+
+[tool.ruff]
+line-length = 100
+
+[tool.ruff.lint]
+select = ["E", "F", "I"]

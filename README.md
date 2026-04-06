@@ -52,16 +52,30 @@ node --version
 npm --version
 ```
 
-## Working with Virtual Environments
+## Install Poetry
+
+This project uses [Poetry](https://python-poetry.org/) for dependency management.
+
+**Install via the official installer:**
+
+```bash
+(Invoke-WebRequest -Uri https://install.python-poetry.org -UseBasicParsing).Content | python -
+```
+
+Then add `%APPDATA%\Python\Scripts` to your PATH (the installer will show the exact command).
+
+## Working with the Virtual Environment
 <!-- cspell:words venv -->
 
 ```bash
-# Create and activate virtual environment
-python -m venv .venv
-source .venv/bin/activate  # On Windows: .venv\Scripts\activate
+# Install all dependencies (creates .venv in the project folder)
+poetry install
 
-# Install project dependencies
-pip install -r requirements.txt
+# Activate the virtual environment
+.venv\Scripts\activate
+
+# Or run a command directly without activating
+poetry run python runbook/download.py
 
 # When done, deactivate
 deactivate
@@ -70,15 +84,17 @@ deactivate
 ## Update Dependencies
 
 ```bash
+# Add a new dependency
+poetry add <package>
 
-# Install/update dependencies from requirements.txt
-pip install -r requirements.txt
+# Add a dev-only dependency
+poetry add --group dev <package>
 
-# To upgrade all packages to latest versions
-pip install --upgrade -r requirements.txt
+# Update all packages to latest allowed versions
+poetry update
 
-# To check for outdated packages
-pip list --outdated
+# Show outdated packages
+poetry show --outdated
 ```
 
 ## Project Structure
