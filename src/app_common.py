@@ -14,6 +14,7 @@ sys.path.insert(0, Path(__file__).parent.parent.as_posix())
 from datetime import datetime, timedelta
 
 from src.files.s3 import S3_ENDPOINT
+from src.utils.text import create_slug
 
 MATCH_TOLERANCE = 0.75
 
@@ -102,12 +103,19 @@ class FeedSource(BaseModel):
 class PodcastConfig(BaseModel):
     """Configuration for a single podcast series."""
 
-    model_config = ConfigDict(extra="forbid")
+    model_config = ConfigDict(extra="ignore")
 
     name: str
-    path: str
     references: list[FeedSource] = []
     downloads: list[FeedSource] = []
+
+    @computed_field(return_type=str)
+    def slug(self) -> str:
+        return create_slug(self.name)
+
+    @computed_field(return_type=str)
+    def path(self) -> str:
+        return f"/media/podcasts/{self.slug}"
 
     # iCalendar RRULE strings that control when downloads run, e.g.
     # ["FREQ=WEEKLY;BYDAY=WE,FR"].  Empty list = always run.
