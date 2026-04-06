@@ -1,0 +1,14 @@
+{
+  "typeCheckingMode": "strict",
+  "include": ["src", "runbook", "tests", "typings"],
+  "venvPath": ".",
+  "venv": ".venv",
+  "stubPath": "typings",
+  "reportMissingImports": true,
+  "executionEnvironments": [
+    {
+      "root": ".",
+      "extraPaths": ["src"]
+    }
+  ]
+}

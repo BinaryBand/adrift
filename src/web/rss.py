@@ -210,16 +210,21 @@ def _extract_content_url(entry: FeedParserDict) -> str | None:
 def _collect_enclosure_strings(entry: FeedParserDict) -> list[str]:
     content = getattr(entry, "enclosures", [])
     if content:
-        return [
-            s
-            for enc in content
-            for s in LINK_REGEX.findall(
-                enc if isinstance(enc, str) else enc.get("href", "")
-            )
-        ]
+        return _extract_links_from_enclosures(content)
     if hasattr(entry, "url"):
         return [entry.get("url", "")]
     return []
+
+
+def _extract_links_from_enclosures(content: object) -> list[str]:
+    out: list[str] = []
+    for enc in content:
+        src = enc if isinstance(enc, str) else enc.get("href", "")
+        if not src:
+            continue
+        matches = LINK_REGEX.findall(src)
+        out.extend(matches)
+    return out
 
 
 def _filter_audio_urls(urls: list[str]) -> list[str]:
@@ -299,6 +304,10 @@ def _rrule_has_occurrence_on_date(pub_date: datetime, rule_str: str) -> bool:
     """Return True if the RFC 5545 RRULE produces an occurrence on pub_date's calendar day."""
     day_start = datetime.combine(pub_date.date(), datetime.min.time())
     day_end = day_start + timedelta(days=1)
+    return _rrule_occurrence_exists(rule_str, day_start, day_end)
+
+
+def _rrule_occurrence_exists(rule_str: str, day_start: datetime, day_end: datetime) -> bool:
     try:
         rule, day_start, day_end = _build_rrule(rule_str, day_start, day_end)
         occ = rule.after(day_start - timedelta(microseconds=1), inc=True)

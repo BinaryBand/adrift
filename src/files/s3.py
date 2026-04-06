@@ -310,6 +310,36 @@ def _extract_upload_options(
         return None, None
 
 
+def _normalize_metadata_raw(metadata_raw: Any) -> S3Metadata | None:
+    if metadata_raw is None:
+        return None
+    try:
+        return MediaMetadata.model_validate(metadata_raw)
+    except Exception:
+        try:
+            return CacheMetadata.model_validate(metadata_raw)
+        except Exception:
+            if isinstance(metadata_raw, (MediaMetadata, CacheMetadata)):
+                return metadata_raw
+    return None
+
+
+def _normalize_callback_raw(callback_raw: Any) -> Callback | None:
+    if not callable(callback_raw):
+        return None
+
+    def _adapted_callback(value: int, total_value: int | None) -> None:
+        try:
+            callback_raw(value, total_value)
+        except TypeError:
+            try:
+                callback_raw(value)
+            except Exception:
+                return
+
+    return _adapted_callback
+
+
 def _extract_upload_options_from_dict(
     options: dict[str, Any],
 ) -> tuple[S3Metadata | None, Callback | None]:
@@ -320,37 +350,8 @@ def _extract_upload_options_from_dict(
         metadata_raw = options.get("metadata")
         callback_raw = options.get("callback")
 
-        # Try validating raw metadata into a known model first; if that
-        # fails, fall back to accepting an already-constructed model
-        # instance.
-        metadata_obj: S3Metadata | None = None
-        try:
-            metadata_obj = MediaMetadata.model_validate(metadata_raw)
-        except Exception:
-            try:
-                metadata_obj = CacheMetadata.model_validate(metadata_raw)
-            except Exception:
-                if isinstance(metadata_raw, (MediaMetadata, CacheMetadata)):
-                    metadata_obj = metadata_raw
-                else:
-                    metadata_obj = None
-
-        callback_obj: Callback | None = None
-        if callable(callback_raw):
-
-            def _adapted_callback(value: int, total_value: int | None) -> None:
-                try:
-                    # Prefer calling with (value, total_value) when supported
-                    callback_raw(value, total_value)
-                except TypeError:
-                    try:
-                        # Fallback to single-arg callbacks (boto style)
-                        callback_raw(value)
-                    except Exception:
-                        # Swallow any exceptions from user callback
-                        return
-
-            callback_obj = _adapted_callback
+        metadata_obj = _normalize_metadata_raw(metadata_raw)
+        callback_obj = _normalize_callback_raw(callback_raw)
 
         return metadata_obj, callback_obj
 

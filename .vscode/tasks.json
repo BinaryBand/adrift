@@ -4,14 +4,8 @@
         {
             "label": "Ruff: Check",
             "type": "shell",
-            "command": "${workspaceFolder}/.venv/bin/ruff",
-            "args": [
-                "check",
-                "src",
-                "runbook",
-                "tests",
-                "typings"
-            ],
+            "command": "${config:python.defaultInterpreterPath}",
+            "args": ["-m", "ruff", "check", "src", "runbook", "tests", "typings"],
             "group": "build",
             "presentation": {
                 "echo": true,
@@ -27,15 +21,8 @@
         {
             "label": "Ruff: Format Check",
             "type": "shell",
-            "command": "${workspaceFolder}/.venv/bin/ruff",
-            "args": [
-                "format",
-                "--check",
-                "src",
-                "runbook",
-                "tests",
-                "typings"
-            ],
+            "command": "${config:python.defaultInterpreterPath}",
+            "args": ["-m", "ruff", "format", "--check", "src", "runbook", "tests", "typings"],
             "group": "build",
             "presentation": {
                 "echo": true,
@@ -49,7 +36,7 @@
         {
             "label": "Complexity: Lizard Check",
             "type": "shell",
-            "command": "${workspaceFolder}/.venv/bin/python",
+            "command": "${config:python.defaultInterpreterPath}",
             "args": [
                 "runbook/quality/check_complexity.py",
                 "src",
@@ -91,7 +78,7 @@
         {
             "label": "Dead Code: Vulture Check",
             "type": "shell",
-            "command": "${workspaceFolder}/.venv/bin/python",
+            "command": "${config:python.defaultInterpreterPath}",
             "args": [
                 "runbook/quality/check_dead_code.py",
                 "src"
@@ -124,7 +111,7 @@
         {
             "label": "Dead Code: Vulture Watch",
             "type": "shell",
-            "command": "${workspaceFolder}/.venv/bin/python",
+            "command": "${config:python.defaultInterpreterPath}",
             "args": [
                 "runbook/quality/check_dead_code.py",
                 "src",
@@ -166,11 +153,8 @@
         {
             "label": "Pytest: All (ignore filter_rules)",
             "type": "shell",
-            "command": "${workspaceFolder}/.venv/bin/pytest",
-            "args": [
-                "tests",
-                "--ignore=tests/misc/test_filter_rules.py"
-            ],
+            "command": "${config:python.defaultInterpreterPath}",
+            "args": ["-m", "pytest", "tests", "--ignore=tests/misc/test_filter_rules.py"],
             "group": "test",
             "presentation": {
                 "echo": true,
@@ -184,7 +168,7 @@
         {
             "label": "Validate TOML",
             "type": "shell",
-            "command": "${workspaceFolder}/.venv/bin/python",
+            "command": "${config:python.defaultInterpreterPath}",
             "args": [
                 "runbook/quality/validate_configs.py",
                 "--problems",
@@ -214,7 +198,7 @@
         {
             "label": "Validate TOML Watch",
             "type": "shell",
-            "command": "${workspaceFolder}/.venv/bin/python",
+            "command": "${config:python.defaultInterpreterPath}",
             "args": [
                 "runbook/quality/validate_configs.py",
                 "--problems",
