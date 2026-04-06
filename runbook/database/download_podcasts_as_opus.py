@@ -43,8 +43,15 @@ def _list_all_s3_objects(bucket: str, prefix: str = "") -> list[str]:
 
     keys = []
     for page in page_iterator:
-        for obj in page.get("Contents", []):
-            keys.append(obj["Key"])
+        contents = page.get("Contents", [])
+        if not isinstance(contents, list):
+            continue
+        for obj in contents:
+            if not isinstance(obj, dict):
+                continue
+            key = obj.get("Key")
+            if isinstance(key, str):
+                keys.append(key)
     return keys
 
 

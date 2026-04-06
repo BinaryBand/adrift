@@ -4,10 +4,8 @@
         {
             "label": "Ruff: Check",
             "type": "shell",
-            "command": "poetry",
+            "command": "${workspaceFolder}/.venv/bin/ruff",
             "args": [
-                "run",
-                "ruff",
                 "check",
                 "src",
                 "runbook",
@@ -29,10 +27,8 @@
         {
             "label": "Ruff: Format Check",
             "type": "shell",
-            "command": "poetry",
+            "command": "${workspaceFolder}/.venv/bin/ruff",
             "args": [
-                "run",
-                "ruff",
                 "format",
                 "--check",
                 "src",
@@ -53,10 +49,8 @@
         {
             "label": "Complexity: Lizard Check",
             "type": "shell",
-            "command": "poetry",
+            "command": "${workspaceFolder}/.venv/bin/python",
             "args": [
-                "run",
-                "python",
                 "runbook/quality/check_complexity.py",
                 "src",
                 "--ccn",
@@ -97,10 +91,8 @@
         {
             "label": "Dead Code: Vulture Check",
             "type": "shell",
-            "command": "poetry",
+            "command": "${workspaceFolder}/.venv/bin/python",
             "args": [
-                "run",
-                "python",
                 "runbook/quality/check_dead_code.py",
                 "src"
             ],
@@ -132,10 +124,8 @@
         {
             "label": "Dead Code: Vulture Watch",
             "type": "shell",
-            "command": "poetry",
+            "command": "${workspaceFolder}/.venv/bin/python",
             "args": [
-                "run",
-                "python",
                 "runbook/quality/check_dead_code.py",
                 "src",
                 "--watch"
@@ -176,10 +166,8 @@
         {
             "label": "Pytest: All (ignore filter_rules)",
             "type": "shell",
-            "command": "poetry",
+            "command": "${workspaceFolder}/.venv/bin/pytest",
             "args": [
-                "run",
-                "pytest",
                 "tests",
                 "--ignore=tests/misc/test_filter_rules.py"
             ],
@@ -196,10 +184,8 @@
         {
             "label": "Validate TOML",
             "type": "shell",
-            "command": "poetry",
+            "command": "${workspaceFolder}/.venv/bin/python",
             "args": [
-                "run",
-                "python",
                 "runbook/quality/validate_configs.py",
                 "--problems",
                 "${file}"
@@ -228,10 +214,8 @@
         {
             "label": "Validate TOML Watch",
             "type": "shell",
-            "command": "poetry",
+            "command": "${workspaceFolder}/.venv/bin/python",
             "args": [
-                "run",
-                "python",
                 "runbook/quality/validate_configs.py",
                 "--problems",
                 "--watch"

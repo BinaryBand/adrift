@@ -258,7 +258,7 @@ def _prepare_upload_spec(
     bucket: str,
     key: str,
     file_path: Path | str,
-    options: UploadOptions | S3Metadata | None,
+    options: UploadOptions | S3Metadata | dict[str, Any] | None,
 ) -> tuple[_UploadSpec, dict[str, str] | None]:
     """Prepare an _UploadSpec and metadata dict from common upload inputs.
 
@@ -363,7 +363,7 @@ def upload_file(
     bucket: str,
     key: str,
     file_path: Path,
-    options: UploadOptions | MediaMetadata | None = None,
+    options: UploadOptions | MediaMetadata | dict[str, Any] | None = None,
 ) -> str | None:
     """Upload a file to S3.
 

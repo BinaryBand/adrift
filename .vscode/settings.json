@@ -15,24 +15,24 @@
       {
         "match": "\\.py$",
         "notMatch": "(\\.venv|__pycache__|/\\.)",
-        "cmd": "poetry run python ${workspaceFolder}/runbook/quality/check_static.py --problems src runbook tests typings",
+        "cmd": "${workspaceFolder}/.venv/bin/python ${workspaceFolder}/runbook/quality/check_static.py --problems src runbook tests typings",
         "isAsync": true
       },
       {
         "match": "\\.py$",
         "notMatch": "(\\.venv|__pycache__|/\\.)",
-        "cmd": "poetry run python ${workspaceFolder}/runbook/quality/check_complexity.py src --ccn 5 --length 25 --params 4",
+        "cmd": "${workspaceFolder}/.venv/bin/python ${workspaceFolder}/runbook/quality/check_complexity.py src --ccn 5 --length 25 --params 4",
         "isAsync": true
       },
       {
         "match": "\\.py$",
         "notMatch": "(\\.venv|__pycache__|/\\.)",
-        "cmd": "poetry run python ${workspaceFolder}/runbook/quality/check_dead_code.py src",
+        "cmd": "${workspaceFolder}/.venv/bin/python ${workspaceFolder}/runbook/quality/check_dead_code.py src",
         "isAsync": true
       },
       {
         "match": "config/.*\\.toml$",
-        "cmd": "poetry run python ${workspaceFolder}/runbook/quality/validate_configs.py --problems ${file}",
+        "cmd": "${workspaceFolder}/.venv/bin/python ${workspaceFolder}/runbook/quality/validate_configs.py --problems ${file}",
         "isAsync": true
       }
     ]

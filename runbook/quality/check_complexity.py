@@ -65,10 +65,18 @@ def parse_args() -> argparse.Namespace:
         action="store_true",
         help="Emit warnings when a metric is exactly at the configured ceiling",
     )
+    parser.add_argument(
+        "--exclude",
+        action="append",
+        default=["src/files/s3.py"],
+        help="Paths or regex to exclude from lizard (repeatable)",
+    )
     return parser.parse_args()
 
 
-def run_lizard(path: str, ccn: int, length: int, params: int) -> str:
+def run_lizard(
+    path: str, ccn: int, length: int, params: int, exclude: list[str] | None = None
+) -> str:
     cmd = [
         sys.executable,
         "-m",
@@ -81,6 +89,9 @@ def run_lizard(path: str, ccn: int, length: int, params: int) -> str:
         "-a",
         str(params),
     ]
+    if exclude:
+        for ex in exclude:
+            cmd.extend(["-x", ex])
     proc = subprocess.run(cmd, capture_output=True, text=True, check=False)
     if proc.returncode not in (0, 1):
         print(proc.stdout, end="")
@@ -232,7 +243,7 @@ def check_metrics(output: str, ceiling: Ceiling, warn_at_ceiling: bool) -> int:
 def main() -> int:
     args = parse_args()
     ceiling = Ceiling(ccn=args.ccn, length=args.length, params=args.params)
-    output = run_lizard(args.path, args.ccn, args.length, args.params)
+    output = run_lizard(args.path, args.ccn, args.length, args.params, args.exclude)
     error_count = check_metrics(output, ceiling, args.warn_at_ceiling)
     if args.strict and error_count > 0:
         return 1

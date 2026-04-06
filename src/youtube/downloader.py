@@ -105,7 +105,7 @@ def _ydl_opts_dict(opts: YtDlpParams | dict[str, Any]) -> dict[str, Any]:
 
 
 def _extract_download_info(url: str, opts: YtDlpParams | dict[str, Any]) -> dict[str, Any]:
-    with yt_dlp.YoutubeDL(_ydl_opts_dict(opts)) as ydl:
+    with yt_dlp.YoutubeDL(cast(Any, _ydl_opts_dict(opts))) as ydl:
         info = ydl.extract_info(url, download=True)
     return cast(dict[str, Any], info)
 

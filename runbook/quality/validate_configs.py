@@ -7,14 +7,16 @@ If no files are provided, all `config/*.toml` files will be validated.
 Exits with status 0 when all files validate, or 1 on validation errors.
 """
 
+# ruff: noqa: I001
+
 from __future__ import annotations
 
 import argparse
+from pathlib import Path
+from typing import Any, cast
 import re
 import sys
 import time
-from pathlib import Path
-
 import tomllib
 
 _ROOT = Path(__file__).parent.parent.parent.resolve()
@@ -111,7 +113,7 @@ def validate_file(path: Path, problems: bool = False) -> int:
                 start_line, end_line = (
                     entry_spans[i] if i < len(entry_spans) else (1, max(len(lines), 1))
                 )
-                for err in e.errors():
+                for err in cast(Any, e).errors():
                     loc = ".".join(map(str, err.get("loc", []))) or "<root>"
                     msg = err.get("msg", "")
                     key = str(err.get("loc", [""])[0]) if err.get("loc") else ""

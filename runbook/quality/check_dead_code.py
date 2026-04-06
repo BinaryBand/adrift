@@ -84,7 +84,7 @@ def _parse_confidence(tail: str) -> tuple[str, int]:
 
 
 def _parse_diagnostic(raw: str) -> Diagnostic | None:
-    """Parse one vulture output line; return None if unparseable."""
+    """Parse one vulture output line; return None if cannot be parsed."""
     try:
         location, tail = raw.split(": ", 1)
         path_str, line_str = location.rsplit(":", 1)

@@ -199,7 +199,8 @@ def _run_ruff(paths: Iterable[str], exe: Optional[str]) -> Tuple[int, List[Diagn
                         and "filename" in it
                         and ("diagnostics" in it or "messages" in it)
                     ):
-                        filename = it.get("filename")
+                        raw_filename = it.get("filename")
+                        filename = raw_filename if isinstance(raw_filename, str) else "<unknown>"
                         issues = it.get("diagnostics") or it.get("messages") or []
                         for issue in issues:
                             line = issue.get("line", 1)
@@ -217,12 +218,14 @@ def _run_ruff(paths: Iterable[str], exe: Optional[str]) -> Tuple[int, List[Diagn
                     elif isinstance(it, dict) and all(
                         k in it for k in ("filename", "line", "code", "message")
                     ):
+                        raw_filename = it.get("filename")
+                        filename = raw_filename if isinstance(raw_filename, str) else "<unknown>"
                         severity = (
                             "error" if str(it.get("code", ""))[:1] in ("E", "F") else "warning"
                         )
                         diags.append(
                             Diagnostic(
-                                path=Path(it["filename"]).as_posix(),
+                                path=Path(filename).as_posix(),
                                 line=it["line"],
                                 severity=severity,
                                 message=f"{it.get('code')} {it.get('message')}".strip(),
