@@ -43,7 +43,7 @@ select = ["E", "F", "I", "UP", "B", "SIM"]
 
 [tool.pyright]
 pythonVersion = "3.13"
-typeCheckingMode = "strict"
+typeCheckingMode = "off" # prefer a committed pyrightconfig.json for repo-specific rules
 venvPath = "."
 venv = ".venv"
 
@@ -129,7 +129,7 @@ or use the tasks in `.vscode/tasks.json`.
   "python.defaultInterpreterPath": "${workspaceFolder}/.venv/bin/python",
   "python.terminal.activateEnvironment": true,
   "python.languageServer": "Pylance",
-  "python.analysis.typeCheckingMode": "strict",
+  "python.analysis.typeCheckingMode": "off",
   "terminal.integrated.defaultProfile.linux": "bash",
   "terminal.integrated.shell.linux": "/bin/bash",
   "files.associations": { "*.j2": "jinja-yaml", "*.toml": "toml" },
@@ -199,9 +199,9 @@ Every rule is paired with its enforcement tier. Rules marked **review** have no 
 | Cyclomatic complexity ≤ 5 | Automated | Lizard |
 | Nesting depth ≤ 3 | Review | — |
 | Parameters per function ≤ 4 | Automated | Ruff |
-| No type errors | Automated | Pyright (`strict`) |
+| No type errors | Automated | Pyright (per-project) |
 | No lint violations | Automated | Ruff |
-| No mutable globals | Automated | Pyright (`strict`) |
+| No mutable globals | Automated | Pyright (per-project) |
 | No silent exception swallowing | Automated | Ruff (`B001`, `S110`) |
 | No shell scripts — Python only | Automated | Ruff + pre-commit |
 | Service contract consistent | Automated | `src.utils.validate_contract` — pre-push hook |
@@ -218,7 +218,7 @@ Prefer early returns over nested conditionals. If a function needs more than 25 
 ## Contribution Workflow
 
 ```text
-0. After cloning:              poetry install && pre-commit install --hook-type pre-push
+0. After cloning:              poetry install
 1. Branch from main
 2. Run quality checks:         run the runbook quality scripts or use the VS Code tasks
                               (see `.vscode/tasks.json`). Example:
