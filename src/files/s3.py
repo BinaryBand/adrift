@@ -341,12 +341,8 @@ def _extract_upload_options_from_dict(
         opts = UploadOptions.model_validate(options)
         return opts.metadata, opts.callback
     except Exception:
-        metadata_raw = options.get("metadata")
-        callback_raw = options.get("callback")
-
-        metadata_obj = _normalize_metadata_raw(metadata_raw)
-        callback_obj = _normalize_callback_raw(callback_raw)
-
+        metadata_obj = _validate_metadata_raw(options.get("metadata"))
+        callback_obj = _adapt_callback_obj(options.get("callback"))
         return metadata_obj, callback_obj
 
 
@@ -357,6 +353,37 @@ def _build_boto_callback_for_file(
     if callback is None:
         return None
     return _make_upload_callback(callback, os.path.getsize(file_path))
+
+
+def _validate_metadata_raw(metadata_raw: Any) -> S3Metadata | None:
+    try:
+        return MediaMetadata.model_validate(metadata_raw)
+    except Exception:
+        try:
+            return CacheMetadata.model_validate(metadata_raw)
+        except Exception:
+            if isinstance(metadata_raw, (MediaMetadata, CacheMetadata)):
+                return metadata_raw
+            return None
+
+
+def _adapt_callback_obj(callback_raw: Any) -> Callback | None:
+    if not callable(callback_raw):
+        return None
+
+    def _adapted(value: int, total_value: int | None) -> None:
+        try:
+            # Prefer calling with (value, total_value) when supported
+            callback_raw(value, total_value)
+        except TypeError:
+            try:
+                # Fallback to single-arg callbacks (boto style)
+                callback_raw(value)
+            except Exception:
+                # Swallow any exceptions from user callback
+                return
+
+    return _adapted
 
 
 @retry(attempts=3, backoff_base=2)
