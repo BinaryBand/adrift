@@ -49,11 +49,10 @@
             ],
             "group": "build",
             "presentation": {
-                "echo": true,
-                "reveal": "always",
-                "panel": "shared",
-                "showReuseMessage": false,
-                "clear": true
+                "echo": false,
+                "reveal": "never",
+                "panel": "dedicated",
+                "showReuseMessage": false
             },
             "problemMatcher": [
                 {

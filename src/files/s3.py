@@ -14,26 +14,51 @@ import boto3
 from boto3.s3.transfer import TransferConfig
 from botocore.client import Config
 from diskcache import Cache
-from dotenv import find_dotenv, load_dotenv
 from mypy_boto3_s3 import S3Client
 from mypy_boto3_s3.type_defs import CopySourceTypeDef
 from pydantic import BaseModel, ConfigDict
 
 sys.path.insert(0, Path(__file__).parent.parent.as_posix())
+from src.adapters.env_secrets import EnvironmentSecretProvider
 from src.models import CacheMetadata, MediaMetadata, S3Metadata
+from src.ports.secrets import SecretProviderPort, require_secrets
 from src.utils.progress import Callback
 
-load_dotenv(find_dotenv())
-assert (S3_USERNAME := os.getenv("S3_USERNAME", "")) != "", "`S3_USERNAME` empty"
-assert (S3_SECRET_KEY := os.getenv("S3_SECRET_KEY", "")) != "", "`S3_SECRET_KEY` empty"
-assert (S3_ENDPOINT := os.getenv("S3_ENDPOINT", "")) != "", "`S3_ENDPOINT` empty"
-assert (S3_REGION := os.getenv("S3_REGION", "")) != "", "`S3_REGION` empty"
+_secret_provider: SecretProviderPort = EnvironmentSecretProvider()
 
-_LOCAL_S3_ENDPOINT = os.getenv("LOCAL_S3_ENDPOINT", "http://localhost:9000")
+S3_ENDPOINT = _secret_provider.get("S3_ENDPOINT", "")
+
+_LOCAL_S3_ENDPOINT = _secret_provider.get("LOCAL_S3_ENDPOINT", "http://localhost:9000")
 
 _s3_client_lock = Lock()
 _s3_client: S3Client | None = None
 _effective_endpoint: str | None = None
+
+
+def set_secret_provider(provider: SecretProviderPort) -> None:
+    """Swap the secret provider port implementation used by this module."""
+    global _secret_provider, _s3_client, _effective_endpoint
+    _secret_provider = provider
+    _s3_client = None
+    _effective_endpoint = None
+
+
+def reset_secret_provider() -> None:
+    """Restore default environment-backed secret provider."""
+    set_secret_provider(EnvironmentSecretProvider())
+
+
+def _require_s3_env() -> tuple[str, str, str, str]:
+    values = require_secrets(
+        _secret_provider,
+        ["S3_USERNAME", "S3_SECRET_KEY", "S3_ENDPOINT", "S3_REGION"],
+    )
+    return (
+        values["S3_USERNAME"],
+        values["S3_SECRET_KEY"],
+        values["S3_ENDPOINT"],
+        values["S3_REGION"],
+    )
 
 
 @cache
@@ -127,17 +152,18 @@ def _is_endpoint_reachable(url: str, timeout: float = 2.0) -> bool:
     list_buckets() so the check exercises the same code-path as normal usage.
     """
     try:
+        username, secret_key, _, region = _require_s3_env()
         cfg = _make_boto_config(connect_timeout=timeout, read_timeout=timeout, max_attempts=1)
         boto3_factory: Callable[..., Any] = boto3.client  # pyright: ignore[reportUnknownVariableType]
         client = cast(  # pyright: ignore[reportUnknownVariableType]
             S3Client,
             boto3_factory(
                 "s3",
-                aws_access_key_id=S3_USERNAME,
-                aws_secret_access_key=S3_SECRET_KEY,
+                aws_access_key_id=username,
+                aws_secret_access_key=secret_key,
                 endpoint_url=url,
                 config=cfg,
-                region_name=S3_REGION,
+                region_name=region,
             ),
         )
         client.list_buckets()
@@ -189,11 +215,14 @@ def _get_effective_s3_endpoint() -> str:
     if _effective_endpoint is not None:
         return _effective_endpoint
 
+    _, _, endpoint, _ = _require_s3_env()
+
     # Prefer local endpoint if it's reachable.
-    if _LOCAL_S3_ENDPOINT and _is_endpoint_reachable(_LOCAL_S3_ENDPOINT):
-        _effective_endpoint = _LOCAL_S3_ENDPOINT
+    local_endpoint = _secret_provider.get("LOCAL_S3_ENDPOINT", _LOCAL_S3_ENDPOINT)
+    if local_endpoint and _is_endpoint_reachable(local_endpoint):
+        _effective_endpoint = local_endpoint
     else:
-        _effective_endpoint = S3_ENDPOINT
+        _effective_endpoint = endpoint
 
     return _effective_endpoint
 
@@ -220,6 +249,7 @@ def _build_s3_client() -> S3Client:
     independently of the caching layer in `get_s3_client()`.
     """
     session = boto3.session.Session()
+    username, secret_key, _, region = _require_s3_env()
 
     cfg = _make_boto_config()
     session_factory: Callable[..., Any] = session.client  # pyright: ignore[reportUnknownVariableType]
@@ -228,12 +258,12 @@ def _build_s3_client() -> S3Client:
         S3Client,
         session_factory(
             "s3",
-            aws_access_key_id=S3_USERNAME,
-            aws_secret_access_key=S3_SECRET_KEY,
+            aws_access_key_id=username,
+            aws_secret_access_key=secret_key,
             # Use local shortcut endpoint when available; keep S3_ENDPOINT as public.
             endpoint_url=_get_effective_s3_endpoint(),
             config=cfg,
-            region_name=S3_REGION,
+            region_name=region,
         ),
     )
 
@@ -380,7 +410,7 @@ def upload_file(
     spec, metadata_dict = _prepare_upload_spec(bucket, key, file_path, options)
     _do_s3_upload(spec)
     _sync_upload_cache(bucket, key, metadata_dict)
-    return urljoin(S3_ENDPOINT, Path(bucket, key).as_posix())
+    return urljoin(_secret_provider.get("S3_ENDPOINT", S3_ENDPOINT), Path(bucket, key).as_posix())
 
 
 @retry(attempts=3, backoff_base=2)
@@ -393,7 +423,7 @@ def upload_cache_file(
     spec, metadata_dict = _prepare_upload_spec(bucket, key, file_path, metadata)
     _do_s3_upload(spec)
     _sync_upload_cache(bucket, key, metadata_dict)
-    return urljoin(S3_ENDPOINT, Path(bucket, key).as_posix())
+    return urljoin(_secret_provider.get("S3_ENDPOINT", S3_ENDPOINT), Path(bucket, key).as_posix())
 
 
 @retry(attempts=3, backoff_base=2)
