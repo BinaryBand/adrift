@@ -15,15 +15,13 @@ from src.app_common import (
 from src.app_runner import normalize_title
 from src.models.output import EpisodeData
 from src.utils.progress import Callback
-from src.utils.text import is_youtube_channel, normalize_text
+from src.utils.text import normalize_text
 from src.web import rss as _rss
 from src.web.rss import (
     RssChannel,
     RssEpisode,
-    get_rss_channel,
 )
 from src.youtube import metadata as _ytmeta
-from src.youtube.metadata import YtFetchOptions, get_youtube_channel
 
 
 def _similarity_clean(ac: str, bc: str) -> float:
@@ -307,14 +305,22 @@ def _fetch_source_episodes(
     is_reference: bool,
     callback: Callback | None = None,
 ) -> list[RssEpisode]:
+    from src.adapters import get_episode_source_adapter
+
     resolved = ensure_feed_source(source)
-    filter_regex = resolved.filters.to_regex()
-    r_rules = resolved.filters.r_rules or None
-    if is_youtube_channel(resolved.url):
-        return get_youtube_episodes(
-            resolved.url, title, YtFetchOptions(filter_regex, is_reference, callback)
-        )
-    return get_rss_episodes(resolved.url, filter_regex, r_rules, callback)
+
+    # Get appropriate adapter for source type
+    adapter = get_episode_source_adapter(resolved)
+
+    # Build options dict for adapter
+    options = {
+        "title": title,
+        "detailed": is_reference,  # is_reference maps to detailed flag for YouTube
+        "callback": callback,
+    }
+
+    # Delegate to adapter
+    return adapter.fetch_episodes(resolved, options)
 
 
 def _merge_episode_album(
@@ -338,16 +344,20 @@ def process_channel(config: PodcastConfig) -> RssChannel:
     )
 
     for fs in config.references:
-        channel_rss = _fetch_channel_data(fs.url, config.name)
+        channel_rss = _fetch_channel_data(fs, config.name)
         _fill_channel_blanks(feed_channel, channel_rss)
 
     return feed_channel
 
 
-def _fetch_channel_data(feed_url: str, title: str) -> RssChannel:
-    if is_youtube_channel(feed_url):
-        return get_youtube_channel(feed_url, title)
-    return get_rss_channel(feed_url)
+def _fetch_channel_data(source: FeedSource, title: str) -> RssChannel:
+    from src.adapters import get_episode_source_adapter
+
+    # Get appropriate adapter for source type
+    adapter = get_episode_source_adapter(source)
+
+    # Delegate to adapter
+    return adapter.fetch_channel(source)
 
 
 def _fill_channel_blanks(feed_channel: RssChannel, channel_rss: RssChannel) -> None:

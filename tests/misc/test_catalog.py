@@ -151,7 +151,8 @@ class TestProcessFeeds(unittest.TestCase):
         mock_rss.return_value = []
         rules = ["DTSTART:20240124T000000Z\nRRULE:FREQ=WEEKLY;BYDAY=TU"]
         process_feeds(_config(references=[_rss_source(r_rules=rules)]))
-        # get_rss_episodes(url, filter_regex, r_rules, callback) — r_rules is index 2
+        # get_rss_episodes is now called via adapter with positional args
+        # get_rss_episodes(url, filter_regex, r_rules, callback)
         self.assertEqual(mock_rss.call_args[0][2], rules)
 
     @patch("src.catalog.get_youtube_episodes")

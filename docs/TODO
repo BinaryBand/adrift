@@ -1,5 +1,7 @@
 # ToDo
 
+<!-- cspell: words Pydantic -->
+
 Address these concerns on a feature branch and keep behavior stable.
 
 ## Status
@@ -13,16 +15,20 @@ Address these concerns on a feature branch and keep behavior stable.
 ## Decisions
 
 1. `S3_REGION` remains required.
+
 - Rationale: it keeps request signing/config deterministic across providers (AWS and S3-compatible targets) and avoids silent environment drift.
 - Scope: no behavior change; requirement remains runtime-validated.
 
-2. Ports/adapters are now the official extension direction.
+1. Ports/adapters are now the official extension direction.
+
 - Current implemented baseline: swappable secrets provider used by S3 flow.
 - Next targets are documented in [docs/PORT_ADAPTER_ROADMAP.md](docs/PORT_ADAPTER_ROADMAP.md).
 
-3. Pydantic in RSS pipeline is valid for selected boundaries.
+1. Pydantic in RSS pipeline is valid for selected boundaries.
+
 - Recommendation: apply Pydantic to parsed-entry/channel boundary objects first (not full DOM traversal) to reduce risk and preserve behavior.
 - Phased plan is documented in [docs/PORT_ADAPTER_ROADMAP.md](docs/PORT_ADAPTER_ROADMAP.md).
 
-4. Validation terminal visibility on open is now hidden.
+1. Validation terminal visibility on open is now hidden.
+
 - Applied to the folder-open Lizard task in [.vscode/tasks.json](.vscode/tasks.json).

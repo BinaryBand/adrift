@@ -6,22 +6,20 @@ This roadmap preserves current behavior while making future swaps easier.
 
 - S3 secret retrieval is abstracted behind a swappable secret provider.
 - Runtime validation still fails fast when required S3 values are missing.
+- ✅ **Episode source fetching is abstracted behind a swappable episode source provider** with adapters for RSS feed extraction and YouTube metadata extraction.
+  - Routing logic centralized in `get_episode_source_adapter()` factory function
+  - Adapters wrap existing extraction functions without changing behavior
+  - Tests can inject mock providers via dependency injection
 
 ## Next Targets
 
-1. YouTube/RSS Source Ports
-- Add `EpisodeSourcePort` with adapter implementations for:
-- RSS feed extraction
-- YouTube metadata extraction
-- Keep existing orchestration flow in place and switch by dependency injection at boundaries.
-
-2. Config Source Port
+1. Config Source Port
 - Add `ConfigSourcePort` to abstract config loading from:
 - local TOML files
 - remote/object-backed config storage (future)
 - Continue returning current model types to avoid behavior changes.
 
-3. Storage Endpoint Selection Port
+2. Storage Endpoint Selection Port
 - Add a small `StorageEndpointPort` for endpoint policy:
 - local-first selection
 - remote fallback
