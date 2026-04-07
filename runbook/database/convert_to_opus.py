@@ -8,13 +8,12 @@ sys.path.insert(0, Path(dotenv.find_dotenv()).parent.as_posix())
 dotenv.load_dotenv()
 
 import argparse
-import glob
 import subprocess
 import tempfile
 
 from tqdm import tqdm
 
-from src.app_common import load_config
+from runbook.database.convert_common import collect_podcast_targets, format_bytes
 from src.files.s3 import (
     delete_file,
     download_file,
@@ -25,46 +24,6 @@ from src.files.s3 import (
 )
 
 _FFMPEG_BASE = ["ffmpeg", "-hide_banner", "-loglevel", "error"]
-CONFIG_GLOB = "config/*.toml"
-
-
-def _format_bytes(size: int) -> str:
-    """Format bytes into a human-readable string."""
-    units = ["B", "KB", "MB", "GB", "TB"]
-    value = float(size)
-    for unit in units:
-        if value < 1024 or unit == units[-1]:
-            if unit == "B":
-                return f"{int(value)} {unit}"
-            return f"{value:.2f} {unit}"
-        value /= 1024
-    return f"{size} B"
-
-
-def _collect_podcast_targets() -> list[tuple[str, str]]:
-    """Load all podcast targets from config/*.toml as (bucket, prefix)."""
-    targets: list[tuple[str, str]] = []
-    seen: set[tuple[str, str]] = set()
-
-    for config_path in sorted(glob.glob(CONFIG_GLOB)):
-        try:
-            configs = load_config(config_path)
-        except Exception as e:
-            print(f"WARNING: Failed loading {config_path}: {e}")
-            continue
-
-        for config in configs:
-            raw = Path(config.path)
-            if len(raw.parts) < 3:
-                print(f"WARNING: Invalid podcast path format in {config_path}: {config.path}")
-                continue
-            target = (raw.parts[1], Path(*raw.parts[2:]).as_posix())
-            if target in seen:
-                continue
-            seen.add(target)
-            targets.append(target)
-
-    return targets
 
 
 def _new_key(old_key: str) -> str:
@@ -131,8 +90,8 @@ def _convert_key(bucket: str, prefix: str, filename: str, dry_run: bool) -> bool
 
             print(
                 f"Saved for {filename}: "
-                f"{_format_bytes(old_size)} -> {_format_bytes(new_size)} "
-                f"(-{_format_bytes(saved_size)}, {saved_pct:.1f}%)"
+                f"{format_bytes(old_size)} -> {format_bytes(new_size)} "
+                f"(-{format_bytes(saved_size)}, {saved_pct:.1f}%)"
             )
 
         return True
@@ -169,7 +128,7 @@ def _parse_args() -> argparse.Namespace:
 def main() -> None:
     """Main orchestration: list files, convert each across all podcast paths."""
     args = _parse_args()
-    targets = _collect_podcast_targets()
+    targets = collect_podcast_targets()
     if not targets:
         print("No podcast targets found under config/*.toml")
         return
