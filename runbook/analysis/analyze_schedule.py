@@ -19,6 +19,11 @@ import tomllib
 from dateutil import parser as date_parser
 from yt_dlp import YoutubeDL
 
+try:
+    from .podcast_config import PodcastConfig
+except Exception:
+    from src.models.podcast_config import PodcastConfig
+
 ROOT = Path(__file__).resolve().parents[2]
 CONFIG_PATH = ROOT / "config" / "youtube.toml"
 WEEKDAYS = ("MO", "TU", "WE", "TH", "FR", "SA", "SU")
@@ -164,7 +169,16 @@ def _filters_to_regex(filters: Any) -> str | None:
 
 
 def _build_target(name: str, idx: int, source: dict[str, Any]) -> Target | None:
-    url = source.get("url")
+    # Accept either legacy dicts or validated `FeedSource` models.
+    url: str | None = None
+    filters_val: Any = {}
+    if hasattr(source, "url"):
+        url = getattr(source, "url")
+        filters_val = getattr(source, "filters", {}) or {}
+    elif isinstance(source, dict):
+        url = source.get("url")
+        filters_val = source.get("filters", {}) or {}
+
     if not isinstance(url, str):
         return None
     kind = "youtube" if _is_youtube_target(url) else "feed"
@@ -172,11 +186,14 @@ def _build_target(name: str, idx: int, source: dict[str, Any]) -> Target | None:
         source=url,
         label=f"{name} downloads[{idx}]",
         kind=kind,
-        filter_regex=_filters_to_regex(source.get("filters", {})),
+        filter_regex=_filters_to_regex(filters_val),
     )
 
 
-def _podcast_downloads(podcast: Any) -> list[dict[str, Any]]:
+def _podcast_downloads(podcast: Any) -> list[Any]:
+    # Support both `PodcastConfig` models and legacy dicts.
+    if isinstance(podcast, PodcastConfig):
+        return list(podcast.downloads or [])
     if not isinstance(podcast, dict):
         return []
     downloads = podcast.get("downloads", [])
@@ -186,9 +203,12 @@ def _podcast_downloads(podcast: Any) -> list[dict[str, Any]]:
 
 
 def _targets_from_podcast(podcast: Any) -> list[Target]:
-    if not isinstance(podcast, dict):
+    if isinstance(podcast, PodcastConfig):
+        name = podcast.name or "Unknown"
+    elif isinstance(podcast, dict):
+        name = str(podcast.get("name", "Unknown"))
+    else:
         return []
-    name = str(podcast.get("name", "Unknown"))
     targets: list[Target] = []
     for idx, source in enumerate(_podcast_downloads(podcast), start=1):
         if target := _build_target(name, idx, source):
@@ -201,7 +221,20 @@ def _load_download_targets() -> list[Target]:
         data = tomllib.load(f)
 
     targets: list[Target] = []
-    for podcast in data.get("podcasts", []):
+    raw = data.get("podcasts", [])
+    if not isinstance(raw, list):
+        return targets
+
+    # Try parsing into typed `PodcastConfig` models for a safer surface.
+    try:
+        podcasts = [PodcastConfig.model_validate(item) for item in raw]
+    except Exception:
+        # Fallback to legacy dict processing if validation fails.
+        for podcast in raw:
+            targets.extend(_targets_from_podcast(podcast))
+        return targets
+
+    for podcast in podcasts:
         targets.extend(_targets_from_podcast(podcast))
     return targets
 
