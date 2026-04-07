@@ -1,5 +1,5 @@
 #!/usr/bin/env python
-"""Generate a churn+complexity hotspot map for ARCHITECTURE_PLAYBOOK.md.
+"""Generate a churn+complexity hotspot map for PLAYBOOK.md.
 
 Usage:
     python runbook/analysis/build_hotspots.py            # write to playbook
@@ -19,7 +19,7 @@ from typing import Any, cast
 import lizard
 
 _ROOT = Path(__file__).parent.parent.parent.resolve()
-_PLAYBOOK = _ROOT / "docs" / "ARCHITECTURE_PLAYBOOK.md"
+_PLAYBOOK = _ROOT / "docs" / "PLAYBOOK.md"
 _SRC = _ROOT / "src"
 
 _SECTION_HEADING = "## Refactoring Hotspot Map"

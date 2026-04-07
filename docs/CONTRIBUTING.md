@@ -2,7 +2,7 @@
 
 Bounded constraints for contributors. The goal is a solution space tight enough that any output passing these rules is consistent, reviewable, and mergeable without negotiation.
 
-See `ARCHITECTURE.md` for tool responsibilities and structural decisions.
+See `PLAYBOOK.md` for tool responsibilities and structural decisions.
 
 * * *
 
@@ -12,7 +12,13 @@ WSL with base Debian compatibility is the development target.
 
 ```bash
 poetry install
-pre-commit install --hook-type pre-push
+# Optional: create/activate a virtual environment with `poetry shell` or a `.venv`.
+# This repository does not include a `.pre-commit-config.yaml` by default.
+# Run quality checks manually (examples):
+#   .venv/bin/ruff check
+#   .venv/bin/ruff format --check
+#   .venv/bin/python runbook/quality/check_dead_code.py src
+#   .venv/bin/python runbook/quality/check_complexity.py src --ccn 5 --length 25 --params 4
 ```
 
 Open in VS Code from inside WSL:
@@ -97,56 +103,11 @@ indent_style = space
 indent_size = 2
 ```
 
-**`.pre-commit-config.yaml`** — ensures consistent quality gates on every push:
-
-```yaml
-repos:
-  - repo: local
-    hooks:
-      - id: ruff
-        name: Ruff lint
-        entry: .venv/bin/ruff check
-        language: system
-        types: [python]
-
-      - id: ruff-format
-        name: Ruff format
-        entry: .venv/bin/ruff format --check
-        language: system
-        types: [python]
-
-      - id: pyright
-        name: Pyright type check
-        entry: .venv/bin/pyright
-        language: system
-        types: [python]
-        pass_filenames: false
-
-      - id: lizard
-        name: Lizard complexity check
-        entry: .venv/bin/lizard
-        language: system
-        args: ["src/", "-C", "5", "-L", "25", "-a", "4"]
-        pass_filenames: false
-
-      - id: import-linter
-        name: Import linter
-        entry: .venv/bin/lint-imports
-        language: system
-        pass_filenames: false
-
-      - id: contract-validation
-        name: Service contract validation
-        entry: .venv/bin/python -m src.utils.validate_contract
-        language: system
-        pass_filenames: false
-
-      - id: duplicate-values
-        name: Duplicate value check
-        entry: .venv/bin/python -m src.utils.validate_no_duplicates
-        language: system
-        pass_filenames: false
-```
+Note: earlier versions of these docs described a `.pre-commit-config.yaml` and local wrapper scripts
+(import-linter, `src.utils.validate_contract`, `src.utils.validate_no_duplicates`). Those files are
+not included in this repository. If you want pre-push hooks, add a `.pre-commit-config.yaml` and any
+required wrapper scripts; otherwise run the checks manually using the examples in the Setup section
+or use the tasks in `.vscode/tasks.json`.
 
 ### VS Code
 
@@ -259,7 +220,9 @@ Prefer early returns over nested conditionals. If a function needs more than 25 
 ```text
 0. After cloning:              poetry install && pre-commit install --hook-type pre-push
 1. Branch from main
-2. Run quality checks:         python3 runbook/quality-checks
+2. Run quality checks:         run the runbook quality scripts or use the VS Code tasks
+                              (see `.vscode/tasks.json`). Example:
+                              `.venv/bin/ruff check && .venv/bin/python runbook/quality/check_dead_code.py src && .venv/bin/python runbook/quality/check_complexity.py src --ccn 5 --length 25 --params 4`
 3. Run tests:                  pytest
 4. Push — pre-commit hooks run automatically
 5. Open PR — check checklist
@@ -272,4 +235,4 @@ Prefer early returns over nested conditionals. If a function needs more than 25 
 - [ ] No Ansible queries mid-reconciliation
 - [ ] No CQS violations — functions either mutate or return, not both
 - [ ] Tests added or updated
-- [ ] `ARCHITECTURE.md` updated if any structural decision changed
+- [ ] `PLAYBOOK.md` updated if any structural decision changed
