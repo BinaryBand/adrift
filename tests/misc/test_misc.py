@@ -5,7 +5,7 @@ This file is for quick, focused tests that don't fit neatly into other test file
 
 import sys
 from pathlib import Path
-from unittest.mock import MagicMock, mock_open, patch
+from unittest.mock import MagicMock, patch
 from urllib.parse import urlparse
 
 sys.path.insert(0, Path(__file__).parent.parent.parent.as_posix())
@@ -56,7 +56,6 @@ def test_upload_thumbnail_new_file_returns_valid_url():
         patch("src.web.rss.requests.get") as mock_get,
         patch("src.web.rss.upload_file") as mock_upload_file,
         patch("src.web.rss.make_square_image_to") as mock_square,
-        patch("builtins.open", mock_open()),
     ):
         # Simulate no existing file
         mock_exists.return_value = None

@@ -10,6 +10,7 @@ dotenv.load_dotenv()
 import argparse
 import subprocess
 import tempfile
+from typing import Literal
 
 from tqdm import tqdm
 
@@ -24,39 +25,64 @@ from src.files.s3 import (
 )
 
 _FFMPEG_BASE = ["ffmpeg", "-hide_banner", "-loglevel", "error"]
+DEFAULT_OPUS_BITRATE = "96k"
+AUDIO_EXTENSIONS_TO_CONVERT = {
+    ".m4a",
+    ".mp3",
+    ".aac",
+    ".m4b",
+    ".wav",
+    ".flac",
+    ".ogg",
+    ".oga",
+    ".wma",
+    ".aif",
+    ".aiff",
+}
 
 
 def _new_key(old_key: str) -> str:
-    """Convert .m4a key to .opus."""
+    """Convert an audio key to .opus."""
     return Path(old_key).with_suffix(".opus").as_posix()
 
 
-def _convert_to_opus(input_path: Path, output_path: Path) -> None:
+def _is_convertible_audio(filename: str) -> bool:
+    """Return True when file extension is a supported input audio type."""
+    return Path(filename).suffix.lower() in AUDIO_EXTENSIONS_TO_CONVERT
+
+
+def _convert_to_opus(input_path: Path, output_path: Path, bitrate: str) -> None:
     """Convert input audio to Opus format using ffmpeg."""
     cmd = _FFMPEG_BASE + [
         "-i",
         str(input_path),
         "-c:a",
         "libopus",
+        "-vbr",
+        "on",
+        "-compression_level",
+        "10",
         "-b:a",
-        "128k",
+        bitrate,
         "-y",
         str(output_path),
     ]
     subprocess.run(cmd, check=True, capture_output=True)
 
 
-def _convert_key(bucket: str, prefix: str, filename: str, dry_run: bool) -> bool:
-    """Convert a single .m4a file to Opus.
+def _convert_key(
+    bucket: str, prefix: str, filename: str, dry_run: bool, bitrate: str
+) -> Literal["converted", "error"]:
+    """Convert a single audio file to Opus.
 
-    Returns True on success, False on any error.
+    Returns conversion outcome.
     """
     old_key = f"{prefix}/{filename}"
     new_key = _new_key(old_key)
 
     if dry_run:
         print(f"[DRY RUN] {old_key} → {new_key}")
-        return True
+        return "converted"
 
     try:
         with tempfile.TemporaryDirectory() as tmpdir:
@@ -70,10 +96,11 @@ def _convert_key(bucket: str, prefix: str, filename: str, dry_run: bool) -> bool
             download_file(bucket, old_key, input_path)
 
             # Transcode to opus
-            _convert_to_opus(input_path, output_path)
+            _convert_to_opus(input_path, output_path, bitrate)
 
             old_size = input_path.stat().st_size
             new_size = output_path.stat().st_size
+
             saved_size = max(0, old_size - new_size)
             saved_pct = (saved_size / old_size * 100) if old_size > 0 else 0.0
 
@@ -85,29 +112,38 @@ def _convert_key(bucket: str, prefix: str, filename: str, dry_run: bool) -> bool
             if metadata is not None:
                 set_metadata(bucket, new_key, metadata)
 
-            # Delete original .m4a
+            # Delete original source file
             delete_file(bucket, old_key)
 
-            print(
-                f"Saved for {filename}: "
-                f"{format_bytes(old_size)} -> {format_bytes(new_size)} "
-                f"(-{format_bytes(saved_size)}, {saved_pct:.1f}%)"
-            )
+            if new_size <= old_size:
+                print(
+                    f"Saved for {filename}: "
+                    f"{format_bytes(old_size)} -> {format_bytes(new_size)} "
+                    f"(-{format_bytes(saved_size)}, {saved_pct:.1f}%)"
+                )
+            else:
+                expanded_size = new_size - old_size
+                expanded_pct = (expanded_size / old_size * 100) if old_size > 0 else 0.0
+                print(
+                    f"Expanded for {filename}: "
+                    f"{format_bytes(old_size)} -> {format_bytes(new_size)} "
+                    f"(+{format_bytes(expanded_size)}, {expanded_pct:.1f}%)"
+                )
 
-        return True
+        return "converted"
     except subprocess.CalledProcessError as e:
         stderr = e.stderr.decode("utf-8", errors="replace") if e.stderr else "no stderr"
         print(f"ERROR: ffmpeg failed for {old_key}: exit {e.returncode}: {stderr}")
-        return False
+        return "error"
     except Exception as e:
         print(f"ERROR: Failed to convert {old_key}: {e}")
-        return False
+        return "error"
 
 
 def _parse_args() -> argparse.Namespace:
     """Parse command-line arguments."""
     parser = argparse.ArgumentParser(
-        description="Convert .m4a files to Opus for all podcasts discovered from config/*.toml."
+        description="Convert audio files to Opus for podcasts discovered from config/*.toml."
     )
     parser.add_argument(
         "--dry-run",
@@ -122,6 +158,23 @@ def _parse_args() -> argparse.Namespace:
         metavar="N",
         help="Maximum number of files to convert (default: unlimited).",
     )
+    parser.add_argument(
+        "--bitrate",
+        type=str,
+        default=DEFAULT_OPUS_BITRATE,
+        metavar="RATE",
+        help="Opus target bitrate (default: 96k). For speech-heavy podcasts, 64k-96k is typical.",
+    )
+    parser.add_argument(
+        "--podcast",
+        type=str,
+        default=None,
+        metavar="MATCH",
+        help=(
+            "Only convert podcasts whose prefix contains this case-insensitive "
+            "substring (example: necronomipod)."
+        ),
+    )
     return parser.parse_args()
 
 
@@ -133,6 +186,13 @@ def main() -> None:
         print("No podcast targets found under config/*.toml")
         return
 
+    if args.podcast:
+        needle = args.podcast.lower()
+        targets = [(bucket, prefix) for bucket, prefix in targets if needle in prefix.lower()]
+        if not targets:
+            print(f"No podcast targets matched --podcast {args.podcast!r}")
+            return
+
     total_successes, total_errors, total_already_opus = 0, 0, 0
     remaining = args.limit
 
@@ -141,7 +201,7 @@ def main() -> None:
             break
 
         filenames = get_file_list(bucket, prefix)
-        to_convert = [f for f in filenames if f.lower().endswith(".m4a")]
+        to_convert = [f for f in filenames if _is_convertible_audio(f)]
         opus_count = sum(1 for f in filenames if f.lower().endswith(".opus"))
         total_already_opus += opus_count
 
@@ -151,10 +211,12 @@ def main() -> None:
         if not to_convert:
             continue
 
-        print(f"\nProcessing {bucket}/{prefix}: {len(to_convert)} .m4a files")
+        print(f"\nProcessing {bucket}/{prefix}: {len(to_convert)} audio files")
         for filename in tqdm(to_convert, desc=f"Converting {prefix}"):
-            ok = _convert_key(bucket, prefix, filename, dry_run=args.dry_run)
-            if ok:
+            outcome = _convert_key(
+                bucket, prefix, filename, dry_run=args.dry_run, bitrate=args.bitrate
+            )
+            if outcome == "converted":
                 total_successes += 1
             else:
                 total_errors += 1

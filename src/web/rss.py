@@ -24,9 +24,12 @@ from src.files.audio import AUDIO_EXTENSIONS, parse_duration
 from src.files.images import make_square_image_to
 from src.files.s3 import S3_ENDPOINT, exists, upload_file
 from src.models import RssChannel, RssEpisode
+from src.utils.crypto import get_file_hash
 from src.utils.progress import Callback
 from src.utils.regex import LINK_REGEX, re_compile
 from src.utils.text import create_slug, is_youtube_channel, remove_control_chars
+
+_THUMB_HASH_BASE = Path("podcasts/_thumbs/by-hash")
 
 
 def get_rss_episodes_from_source(
@@ -130,6 +133,30 @@ def _existing_thumbnail_s3_path(path_base: Path, image_path: str) -> str | None:
     return urljoin(S3_ENDPOINT, (Path("media") / path_base / existing_name).as_posix())
 
 
+def _canonical_thumbnail_url(file_hash: str) -> str | None:
+    canonical_stem = (_THUMB_HASH_BASE / file_hash).as_posix()
+    existing_canonical = exists("media", canonical_stem)
+    if not existing_canonical:
+        return None
+    canonical_path = (Path("media") / _THUMB_HASH_BASE / existing_canonical).as_posix()
+    return urljoin(S3_ENDPOINT, canonical_path)
+
+
+def _log_thumbnail_compression(id: str, old_size: int, new_size: int, output_ext: str) -> None:
+    saved = max(0, old_size - new_size)
+    saved_pct = (saved / old_size * 100) if old_size > 0 else 0.0
+    print(
+        f"Thumbnail compressed for {id}: "
+        f"{_format_bytes(old_size)} -> {_format_bytes(new_size)} "
+        f"(-{_format_bytes(saved)}, {saved_pct:.1f}%, {output_ext})"
+    )
+
+
+def _upload_canonical_thumbnail(output_file: Path, output_ext: str, file_hash: str) -> str | None:
+    canonical_stem = (_THUMB_HASH_BASE / file_hash).as_posix()
+    return upload_file("media", f"{canonical_stem}{output_ext}", output_file)
+
+
 def _upload_thumbnail_pipeline(thumbnail_url: str, author: str, id: str) -> str | None:
     """Pipeline implementation for thumbnail upload (replaceable stages)."""
     author_slug = create_slug(author)
@@ -147,14 +174,13 @@ def _upload_thumbnail_pipeline(thumbnail_url: str, author: str, id: str) -> str 
 
     source_file, output_ext, old_size, new_size = _stage_thumbnail_bytes(data, id, ext)
     output_file = source_file.with_suffix(output_ext)
-    saved = max(0, old_size - new_size)
-    saved_pct = (saved / old_size * 100) if old_size > 0 else 0.0
-    print(
-        f"Thumbnail compressed for {id}: "
-        f"{_format_bytes(old_size)} -> {_format_bytes(new_size)} "
-        f"(-{_format_bytes(saved)}, {saved_pct:.1f}%, {output_ext})"
-    )
-    return upload_file("media", f"{image_path}{output_ext}", output_file)
+    file_hash = get_file_hash(output_file)
+    if existing := _canonical_thumbnail_url(file_hash):
+        print(f"Thumbnail dedup hit for {id}: using canonical hash {file_hash}")
+        return existing
+
+    _log_thumbnail_compression(id, old_size, new_size, output_ext)
+    return _upload_canonical_thumbnail(output_file, output_ext, file_hash)
 
 
 def _extract_image_url(channel: FeedParserDict) -> str:

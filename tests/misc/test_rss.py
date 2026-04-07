@@ -60,7 +60,7 @@ class TestUploadThumbnail(unittest.TestCase):
         mock_response.headers = {"Content-Type": "image/jpeg"}
         mock_get.return_value = mock_response
         mock_upload.return_value = (
-            "https://s3.example.com/media/podcasts/test/thumbnails/test_123.webp"
+            "https://s3.example.com/media/podcasts/_thumbs/by-hash/deadbeef.webp"
         )
 
         result = upload_thumbnail("https://example.com/thumb.jpg", "Test Author", "test_123")
@@ -70,6 +70,7 @@ class TestUploadThumbnail(unittest.TestCase):
         mock_square.assert_called_once()
         mock_upload.assert_called_once()
         self.assertIn(".webp", mock_upload.call_args[0][1])
+        self.assertIn("podcasts/_thumbs/by-hash/", mock_upload.call_args[0][1])
 
     @patch("src.web.rss.exists")
     @patch("src.web.rss.requests.get")
@@ -95,6 +96,40 @@ class TestUploadThumbnail(unittest.TestCase):
         result = upload_thumbnail("https://example.com/thumb.bin", "Test Author", "test_456")
 
         self.assertIsNone(result)
+
+    @patch("src.web.rss.urljoin")
+    @patch("src.web.rss.exists")
+    @patch("src.web.rss.requests.get")
+    @patch("src.web.rss.make_square_image_to")
+    @patch("src.web.rss.upload_file")
+    def test_reuses_canonical_hash_image_when_available(
+        self, mock_upload, mock_square, mock_get, mock_exists, mock_urljoin
+    ):
+        """When canonical hash image exists, do not upload a duplicate thumbnail."""
+
+        # 1st exists(): no per-episode thumbnail yet; 2nd exists(): canonical hash exists
+        mock_exists.side_effect = [None, "deadbeef.webp"]
+
+        def _fake_square(_input_path, output_path, output_format="WEBP", quality=80):
+            output_path.write_bytes(b"fake_transcoded_data")
+            return True
+
+        mock_square.side_effect = _fake_square
+
+        mock_response = Mock()
+        mock_response.content = b"fake_image_data"
+        mock_response.headers = {"Content-Type": "image/jpeg"}
+        mock_get.return_value = mock_response
+
+        mock_urljoin.return_value = "https://s3.example.com/media/podcasts/_thumbs/by-hash/deadbeef.webp"
+
+        result = upload_thumbnail("https://example.com/thumb.jpg", "Test Author", "test_123")
+
+        self.assertEqual(
+            result,
+            "https://s3.example.com/media/podcasts/_thumbs/by-hash/deadbeef.webp",
+        )
+        mock_upload.assert_not_called()
 
 
 class TestExtractImageUrl(unittest.TestCase):
