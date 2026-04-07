@@ -24,21 +24,35 @@ from src.files.s3 import (
 )
 
 _FFMPEG_BASE = ["ffmpeg", "-hide_banner", "-loglevel", "error"]
-SYSK_CONFIG_FILE = "config/youtube.toml"
+YOUTUBE_CONFIG_FILE = "config/youtube.toml"
+TARGET_PODCAST_PATH = "alyssa-grenfell"  # Substring to identify the target podcast config
 
 
-def _get_sysk_path() -> tuple[str, str]:
-    """Load SYSK config and return (bucket, prefix)."""
-    configs = load_config(SYSK_CONFIG_FILE)
+def _format_bytes(size: int) -> str:
+    """Format bytes into a human-readable string."""
+    units = ["B", "KB", "MB", "GB", "TB"]
+    value = float(size)
+    for unit in units:
+        if value < 1024 or unit == units[-1]:
+            if unit == "B":
+                return f"{int(value)} {unit}"
+            return f"{value:.2f} {unit}"
+        value /= 1024
+    return f"{size} B"
+
+
+def _get_target_path() -> tuple[str, str]:
+    """Load target podcast config and return (bucket, prefix)."""
+    configs = load_config(YOUTUBE_CONFIG_FILE)
     for config in configs:
-        if "stuff-you-should-know" in config.path:
+        if TARGET_PODCAST_PATH in config.path:
             raw = Path(config.path)
             if len(raw.parts) < 3:
-                raise ValueError(f"Invalid SYSK path format: {config.path}")
+                raise ValueError(f"Invalid target path format: {config.path}")
             bucket = raw.parts[1]
             prefix = Path(*raw.parts[2:]).as_posix()
             return bucket, prefix
-    raise ValueError("stuff-you-should-know config path not found")
+    raise ValueError(f"{TARGET_PODCAST_PATH} config path not found")
 
 
 def _new_key(old_key: str) -> str:
@@ -85,6 +99,11 @@ def _convert_key(bucket: str, prefix: str, filename: str, dry_run: bool) -> bool
             # Transcode to opus
             _convert_to_opus(input_path, output_path)
 
+            old_size = input_path.stat().st_size
+            new_size = output_path.stat().st_size
+            saved_size = max(0, old_size - new_size)
+            saved_pct = (saved_size / old_size * 100) if old_size > 0 else 0.0
+
             # Upload new .opus file
             upload_file(bucket, new_key, output_path)
 
@@ -95,6 +114,12 @@ def _convert_key(bucket: str, prefix: str, filename: str, dry_run: bool) -> bool
 
             # Delete original .m4a
             delete_file(bucket, old_key)
+
+            print(
+                f"Saved for {filename}: "
+                f"{_format_bytes(old_size)} -> {_format_bytes(new_size)} "
+                f"(-{_format_bytes(saved_size)}, {saved_pct:.1f}%)"
+            )
 
         return True
     except subprocess.CalledProcessError as e:
@@ -109,7 +134,7 @@ def _convert_key(bucket: str, prefix: str, filename: str, dry_run: bool) -> bool
 def _parse_args() -> argparse.Namespace:
     """Parse command-line arguments."""
     parser = argparse.ArgumentParser(
-        description="Convert SYSK .m4a files in S3 to Opus format in-place."
+        description="Convert Alyssa Grenfell .m4a files in S3 to Opus format in-place."
     )
     parser.add_argument(
         "--dry-run",
@@ -130,9 +155,9 @@ def _parse_args() -> argparse.Namespace:
 def main() -> None:
     """Main orchestration: list files, convert each."""
     args = _parse_args()
-    bucket, prefix = _get_sysk_path()
+    bucket, prefix = _get_target_path()
 
-    # Get all files in the SYSK prefix
+    # Get all files in the target prefix
     filenames = get_file_list(bucket, prefix)
 
     # Separate .m4a files to convert from already-.opus files

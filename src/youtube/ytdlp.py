@@ -18,6 +18,7 @@ from yt_dlp import YoutubeDL
 
 sys.path.insert(0, Path(__file__).parent.parent.parent.as_posix())
 from src.models import RssEpisode, YtDlpParams
+from src.models.ytdlp import YtDlpImage
 from src.utils.cache import S3Cache
 from src.utils.progress import Callback
 from src.youtube.auth import get_auth_ydl_opts, get_ydl_opts
@@ -58,8 +59,8 @@ class ChannelInfo(BaseModel):
     uploader: str | None = None
     uploader_id: str | None = None
     description: str | None = None
-    avatar: Any = None  # Can be list[dict] or str
-    thumbnails: list[dict[str, Any]] | None = None
+    avatar: list[YtDlpImage] | str | None = None
+    thumbnails: list[YtDlpImage] | None = None
 
 
 class VideoInfo(BaseModel):

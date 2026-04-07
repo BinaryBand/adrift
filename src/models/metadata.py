@@ -3,7 +3,7 @@ import sys
 from abc import ABC, abstractmethod
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Any, Callable, cast
+from typing import Any, Callable, Sequence, cast
 
 import pydantic
 from dotenv import find_dotenv, load_dotenv
@@ -110,22 +110,22 @@ class YtDlpParams(BaseModel):
             self.model_validate(data)
 
 
-def _extract_image_from_list(data: list[Any]) -> str:
+def _extract_image_url(value: Any) -> str:
+    if isinstance(value, YtDlpImage):
+        return value.url or ""
+    if isinstance(value, dict):
+        value_dict = cast(dict[str, Any], value)
+        url_value = value_dict.get("url")
+        return url_value if isinstance(url_value, str) else ""
+    return ""
+
+
+def _extract_image_from_list(data: "Sequence[YtDlpImage | dict[str, Any]]") -> str:
     if not data:
         return ""
 
     last = data[-1]
-    if isinstance(last, dict):
-        last_dict = cast(dict[str, Any], last)
-        try:
-            url = last_dict["url"]
-        except Exception:
-            return ""
-
-        if isinstance(url, str):
-            return url
-
-    return ""
+    return _extract_image_url(last)
 
 
 def _from_unix_timestamp(raw: Any) -> datetime | None:
@@ -159,11 +159,11 @@ def _coalesce_str(*values: Any) -> str:
 
 
 try:
-    from .ytdlp import YtDlpVideo
+    from .ytdlp import YtDlpImage, YtDlpVideo
 except Exception:
     # When executed as a script the package-relative import may fail;
     # fall back to absolute import using the `src` package on sys.path.
-    from src.models.ytdlp import YtDlpVideo
+    from src.models.ytdlp import YtDlpImage, YtDlpVideo
 
 
 def _parse_ytdlp_pub_date(data: YtDlpVideo | dict[str, Any]) -> datetime | None:
@@ -219,15 +219,13 @@ class RssChannel(BaseModel):
         )
 
     @staticmethod
-    def _extract_image(data: Any) -> str:
+    def _extract_image(data: list[YtDlpImage] | str | None) -> str:
         """Extract image URL from avatar/thumbnails data (list or string)."""
         if not data:
             return ""
         if isinstance(data, list):
-            return _extract_image_from_list(cast(list[Any], data))
-        if isinstance(data, str):
-            return data
-        return ""
+            return _extract_image_from_list(data)
+        return data
 
 
 class RssEpisode(BaseModel):

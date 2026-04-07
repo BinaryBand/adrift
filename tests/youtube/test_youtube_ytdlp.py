@@ -8,6 +8,7 @@ from unittest.mock import MagicMock, patch
 
 sys.path.insert(0, Path(__file__).parent.parent.parent.as_posix())
 from src.models import YtDlpParams
+from src.models.ytdlp import YtDlpImage
 from src.youtube.ytdlp import (
     ChannelInfo,
     VideoInfo,
@@ -79,6 +80,8 @@ class TestPydanticModels(unittest.TestCase):
         self.assertEqual(channel.uploader, "Test Uploader")
         self.assertEqual(channel.uploader_id, "test_id")
         self.assertEqual(channel.description, "Channel description")
+        assert channel.thumbnails is not None
+        self.assertIsInstance(channel.thumbnails[0], YtDlpImage)
 
 
 class TestCachePayloadTrimming(unittest.TestCase):
