@@ -1,5 +1,5 @@
 #!/usr/bin/env python
-"""Generate the Mermaid module dependency map for ARCHITECTURE_PLAYBOOK.md.
+"""Generate the Mermaid module dependency map for PLAYBOOK.md.
 
 Uses grimp to build the import graph and networkx for hub analysis.
 
@@ -25,7 +25,7 @@ import networkx as nx
 # ── Paths ─────────────────────────────────────────────────────────────────────
 
 _ROOT = Path(__file__).parent.parent.parent.resolve()
-_PLAYBOOK = _ROOT / "docs" / "ARCHITECTURE_PLAYBOOK.md"
+_PLAYBOOK = _ROOT / "docs" / "PLAYBOOK.md"
 _PACKAGE = "src"
 
 _SECTION_HEADING = "## Module Dependency Map"
