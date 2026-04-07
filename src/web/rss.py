@@ -7,7 +7,6 @@ import uuid
 import xml.etree.ElementTree as ET
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
-from typing import Any
 from urllib.parse import urljoin
 from xml.dom import minidom
 
@@ -19,6 +18,7 @@ from diskcache import Cache
 from feedparser import FeedParserDict
 
 sys.path.insert(0, Path(__file__).parent.parent.parent.as_posix())
+from src.app_common import FeedSource, ensure_feed_source
 from src.files.audio import AUDIO_EXTENSIONS, parse_duration
 from src.files.images import make_square_image
 from src.files.s3 import S3_ENDPOINT, exists, upload_file
@@ -26,45 +26,6 @@ from src.models import RssChannel, RssEpisode
 from src.utils.progress import Callback
 from src.utils.regex import LINK_REGEX, re_compile
 from src.utils.text import create_slug, is_youtube_channel, remove_control_chars
-
-try:
-    from src.app_common import FeedSource
-except Exception:
-    from src.app_common import FeedSource
-
-
-def _string_list(values: Any) -> list[str]:
-    if not isinstance(values, list):
-        return []
-    return [v for v in values if isinstance(v, str)]
-
-
-def _exclude_lookahead(pattern: str) -> str:
-    return f"(?!{pattern[1:]})" if pattern.startswith("^") else f"(?!.*{pattern})"
-
-
-def _include_lookahead(patterns: list[str]) -> str | None:
-    return f"(?=.*(?:{'|'.join(patterns)}))" if patterns else None
-
-
-def _filter_parts(include: list[str], exclude: list[str]) -> list[str]:
-    parts: list[str] = ["(?i)^"]
-    parts.extend(_exclude_lookahead(p) for p in exclude)
-    include_part = _include_lookahead(include)
-    if include_part:
-        parts.append(include_part)
-    parts.append(".*$")
-    return parts
-
-
-def _filters_to_regex(filters: Any) -> str | None:
-    if not isinstance(filters, dict):
-        return None
-    include = _string_list(filters.get("include"))
-    exclude = _string_list(filters.get("exclude"))
-    if not (include or exclude):
-        return None
-    return "".join(_filter_parts(include, exclude))
 
 
 def get_rss_episodes_from_source(
@@ -77,20 +38,10 @@ def get_rss_episodes_from_source(
 
     Returns episodes using the same semantics as `get_rss_episodes`.
     """
-    if isinstance(source, FeedSource):
-        url = source.url
-        filter_regex = source.filters.to_regex()
-        r_rules = source.filters.r_rules or None
-    elif isinstance(source, dict):
-        url = source.get("url")
-        filter_regex = _filters_to_regex(source.get("filters", {}))
-        r_rules_list = _string_list((source.get("filters") or {}).get("r_rules", []))
-        r_rules = r_rules_list or None
-    else:
-        raise TypeError("source must be FeedSource or dict")
-
-    if not isinstance(url, str):
-        raise TypeError("invalid source url")
+    resolved = ensure_feed_source(source)
+    url = resolved.url
+    filter_regex = resolved.filters.to_regex()
+    r_rules = resolved.filters.r_rules or None
 
     if is_youtube_channel(url):
         try:
