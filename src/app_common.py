@@ -126,6 +126,47 @@ class PodcastConfig(BaseModel):
         return urljoin(S3_ENDPOINT, self.path + ".rss")
 
 
+def ensure_source_filter(filters: SourceFilter | dict[str, Any] | None) -> SourceFilter:
+    if isinstance(filters, SourceFilter):
+        return filters
+    if filters is None:
+        return SourceFilter()
+    if isinstance(filters, dict):
+        return SourceFilter.model_validate(filters)
+    raise TypeError("filters must be SourceFilter, dict, or None")
+
+
+def ensure_feed_source(source: FeedSource | dict[str, Any]) -> FeedSource:
+    if isinstance(source, FeedSource):
+        return source
+    if isinstance(source, dict):
+        payload = dict(source)
+        payload["filters"] = ensure_source_filter(payload.get("filters"))
+        return FeedSource.model_validate(payload)
+    raise TypeError("source must be FeedSource or dict")
+
+
+def ensure_podcast_config(podcast: PodcastConfig | dict[str, Any]) -> PodcastConfig:
+    if isinstance(podcast, PodcastConfig):
+        return podcast
+    if isinstance(podcast, dict):
+        payload = dict(podcast)
+        for key in ("references", "downloads"):
+            raw_sources = payload.get(key, [])
+            if raw_sources is None:
+                payload[key] = []
+                continue
+            if not isinstance(raw_sources, list):
+                raise TypeError(f"{key} must be a list")
+            payload[key] = [ensure_feed_source(item) for item in raw_sources]
+        return PodcastConfig.model_validate(payload)
+    raise TypeError("podcast must be PodcastConfig or dict")
+
+
+def parse_podcasts_raw(raw: list[PodcastConfig | dict[str, Any]]) -> list[PodcastConfig]:
+    return [ensure_podcast_config(entry) for entry in raw]
+
+
 def _load_config(name_or_path: str) -> list[PodcastConfig]:
     """Load podcast configurations from a TOML file.
 
@@ -141,8 +182,10 @@ def _load_config(name_or_path: str) -> list[PodcastConfig]:
     with open(path, "rb") as f:
         data = tomllib.load(f)
 
-    podcasts_raw: list[dict[str, Any]] = data.get("podcasts", [])
-    configs = [PodcastConfig.model_validate(entry) for entry in podcasts_raw]
+    podcasts_raw = data.get("podcasts", [])
+    if not isinstance(podcasts_raw, list):
+        return []
+    configs = parse_podcasts_raw(podcasts_raw)
     random.shuffle(configs)
     return configs
 

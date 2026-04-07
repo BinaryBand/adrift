@@ -1,6 +1,7 @@
 import sys
 from datetime import datetime
 from pathlib import Path
+from typing import Any
 
 from rapidfuzz import fuzz
 
@@ -9,6 +10,7 @@ from src.app_common import (
     MATCH_TOLERANCE,
     FeedSource,
     PodcastConfig,
+    ensure_feed_source,
 )
 from src.app_runner import normalize_title
 from src.models.output import EpisodeData
@@ -300,18 +302,19 @@ def _collect_episodes(
 
 
 def _fetch_source_episodes(
-    source: FeedSource,
+    source: FeedSource | dict[str, Any],
     title: str,
     is_reference: bool,
     callback: Callback | None = None,
 ) -> list[RssEpisode]:
-    filter_regex = source.filters.to_regex()
-    r_rules = source.filters.r_rules or None
-    if is_youtube_channel(source.url):
+    resolved = ensure_feed_source(source)
+    filter_regex = resolved.filters.to_regex()
+    r_rules = resolved.filters.r_rules or None
+    if is_youtube_channel(resolved.url):
         return get_youtube_episodes(
-            source.url, title, YtFetchOptions(filter_regex, is_reference, callback)
+            resolved.url, title, YtFetchOptions(filter_regex, is_reference, callback)
         )
-    return get_rss_episodes(source.url, filter_regex, r_rules, callback)
+    return get_rss_episodes(resolved.url, filter_regex, r_rules, callback)
 
 
 def _merge_episode_album(
