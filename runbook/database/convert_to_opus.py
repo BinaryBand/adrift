@@ -25,27 +25,20 @@ from src.files.s3 import (
 
 _FFMPEG_BASE = ["ffmpeg", "-hide_banner", "-loglevel", "error"]
 SYSK_CONFIG_FILE = "config/youtube.toml"
-SYSK_FALLBACK_PATH = "/media/podcasts/stuff-you-should-know"
 
 
 def _get_sysk_path() -> tuple[str, str]:
     """Load SYSK config and return (bucket, prefix)."""
-    try:
-        configs = _load_config(SYSK_CONFIG_FILE)
-        for config in configs:
-            if "stuff-you-should-know" in config.path:
-                raw = Path(config.path)
-                bucket = raw.parts[1]
-                prefix = Path(*raw.parts[2:]).as_posix()
-                return bucket, prefix
-    except Exception as e:
-        print(f"WARNING: Failed to load config: {e}. Using fallback path.")
-
-    # Fallback: parse hardcoded path
-    raw = Path(SYSK_FALLBACK_PATH)
-    bucket = raw.parts[1]
-    prefix = Path(*raw.parts[2:]).as_posix()
-    return bucket, prefix
+    configs = _load_config(SYSK_CONFIG_FILE)
+    for config in configs:
+        if "stuff-you-should-know" in config.path:
+            raw = Path(config.path)
+            if len(raw.parts) < 3:
+                raise ValueError(f"Invalid SYSK path format: {config.path}")
+            bucket = raw.parts[1]
+            prefix = Path(*raw.parts[2:]).as_posix()
+            return bucket, prefix
+    raise ValueError("stuff-you-should-know config path not found")
 
 
 def _new_key(old_key: str) -> str:

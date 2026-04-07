@@ -92,9 +92,7 @@ def _build_upload_extra_args(
     return extra_args
 
 
-def _make_upload_callback(
-    callback: Callback, file_size: int
-) -> "Callable[[int], None]":
+def _make_upload_callback(callback: Callback, file_size: int) -> "Callable[[int], None]":
     """Wrap a progress Callback in a thread-safe boto3-compatible callable."""
     lock = Lock()
     bytes_transferred = [0]
@@ -128,9 +126,7 @@ def _is_endpoint_reachable(url: str, timeout: float = 2.0) -> bool:
     list_buckets() so the check exercises the same code-path as normal usage.
     """
     try:
-        cfg = _make_boto_config(
-            connect_timeout=timeout, read_timeout=timeout, max_attempts=1
-        )
+        cfg = _make_boto_config(connect_timeout=timeout, read_timeout=timeout, max_attempts=1)
         client = boto3.client(
             "s3",
             aws_access_key_id=S3_USERNAME,
@@ -172,9 +168,7 @@ def _do_s3_upload(spec: _UploadSpec) -> None:
     )
 
 
-def _sync_upload_cache(
-    bucket: str, key: str, metadata_dict: dict[str, str] | None
-) -> None:
+def _sync_upload_cache(bucket: str, key: str, metadata_dict: dict[str, str] | None) -> None:
     """Update the local S3 metadata cache after an upload."""
     cache_key = f"s3_metadata:{bucket}:{key}"
     if metadata_dict is not None:
@@ -264,7 +258,7 @@ def _prepare_upload_spec(
     bucket: str,
     key: str,
     file_path: Path | str,
-    options: UploadOptions | S3Metadata | None,
+    options: UploadOptions | S3Metadata | dict[str, Any] | None,
 ) -> tuple[_UploadSpec, dict[str, str] | None]:
     """Prepare an _UploadSpec and metadata dict from common upload inputs.
 
@@ -370,7 +364,7 @@ def upload_file(
     bucket: str,
     key: str,
     file_path: Path,
-    options: UploadOptions | MediaMetadata | None = None,
+    options: UploadOptions | MediaMetadata | dict[str, Any] | None = None,
 ) -> str | None:
     """Upload a file to S3.
 
@@ -414,9 +408,7 @@ def rename_file(bucket: str, old_key: str, new_key: str) -> None:
     client: S3Client = get_s3_client()
 
     copy_source: CopySourceTypeDef = {"Bucket": bucket, "Key": old_key}
-    client.copy_object(
-        Bucket=bucket, Key=new_key, CopySource=copy_source, MetadataDirective="COPY"
-    )
+    client.copy_object(Bucket=bucket, Key=new_key, CopySource=copy_source, MetadataDirective="COPY")
     client.delete_object(Bucket=bucket, Key=old_key)
 
     old_cache_key = f"s3_metadata:{bucket}:{old_key}"
@@ -482,9 +474,7 @@ def _build_file_map_from_iterator(
     return file_list
 
 
-def _get_file_map(
-    bucket: str, prefix: str, without_extensions: bool = True
-) -> dict[str, str]:
+def _get_file_map(bucket: str, prefix: str, without_extensions: bool = True) -> dict[str, str]:
     # Normalize prefix - add trailing slash for directory listing with delimiter
     prefix = prefix.lstrip(".")
     if prefix and not prefix.endswith("/"):
@@ -519,9 +509,7 @@ def _remove_file_extensions(file_names: list[str]) -> list[str]:
     return [Path(f).with_suffix("").as_posix() for f in file_names]
 
 
-def get_file_list(
-    bucket: str, prefix: str, without_extensions: bool = False
-) -> list[str]:
+def get_file_list(bucket: str, prefix: str, without_extensions: bool = False) -> list[str]:
     prefix = prefix.lstrip(".").rstrip("/")
     file_map = _get_file_map(bucket, prefix, False)
 

@@ -17,6 +17,7 @@ import sys
 import tempfile
 from collections import defaultdict
 from pathlib import Path
+from typing import Any
 
 import grimp
 import networkx as nx
@@ -79,7 +80,7 @@ def _is_leaf(mod: str) -> bool:
     return "." in mod.removeprefix(_PACKAGE + ".") and mod != _PACKAGE
 
 
-def _add_edges(G: nx.DiGraph, g: grimp.Graph, mod: str, key: str) -> None:
+def _add_edges(G: nx.DiGraph, g: Any, mod: str, key: str) -> None:
     for dep in g.find_modules_directly_imported_by(mod):
         dep_key = _to_key(dep)
         if dep_key != key and dep != _PACKAGE:
@@ -89,7 +90,7 @@ def _add_edges(G: nx.DiGraph, g: grimp.Graph, mod: str, key: str) -> None:
 def _build_graph() -> nx.DiGraph:
     if str(_ROOT) not in sys.path:
         sys.path.insert(0, str(_ROOT))
-    g = grimp.build_graph(_PACKAGE, include_external_packages=False)
+    g: Any = grimp.build_graph(_PACKAGE, include_external_packages=False)
     G: nx.DiGraph = nx.DiGraph()
     for mod in sorted(m for m in g.modules if _is_leaf(m)):
         key = _to_key(mod)

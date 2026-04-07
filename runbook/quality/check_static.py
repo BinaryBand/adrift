@@ -103,9 +103,7 @@ def _emit(diagnostics: Iterable[Diagnostic]) -> int:
     return error_count
 
 
-def _run_pyright(
-    paths: Iterable[str], exe: Optional[str]
-) -> Tuple[int, List[Diagnostic]]:
+def _run_pyright(paths: Iterable[str], exe: Optional[str]) -> Tuple[int, List[Diagnostic]]:
     if exe is None:
         exe = _venv_executable("pyright")
     if exe is None:
@@ -116,16 +114,10 @@ def _run_pyright(
     # so fall back to no --strict if we detect an unexpected-option error.
     cmd = [exe, "--outputjson", "--strict", *paths]
     proc = subprocess.run(cmd, cwd=_ROOT, capture_output=True, text=True, check=False)
-    if (
-        proc.returncode != 0
-        and proc.stderr
-        and "Unexpected option --strict" in proc.stderr
-    ):
+    if proc.returncode != 0 and proc.stderr and "Unexpected option --strict" in proc.stderr:
         # Retry without --strict for older/alternate pyright binaries.
         cmd = [exe, "--outputjson", *paths]
-        proc = subprocess.run(
-            cmd, cwd=_ROOT, capture_output=True, text=True, check=False
-        )
+        proc = subprocess.run(cmd, cwd=_ROOT, capture_output=True, text=True, check=False)
 
     if not proc.stdout:
         # No structured output; surface whatever pyright printed.
@@ -164,11 +156,7 @@ def _run_pyright(
         for m in f.get("messages", []) or f.get("diagnostics", []):
             rng = m.get("range") or {}
             start = rng.get("start") or {}
-            line = (
-                (start.get("line", 0) + 1)
-                if isinstance(start, dict)
-                else m.get("line", 1)
-            )
+            line = (start.get("line", 0) + 1) if isinstance(start, dict) else m.get("line", 1)
             severity = m.get("severity", "error")
             message = m.get("message", "")
             diags.append(
@@ -192,9 +180,7 @@ def _run_ruff(paths: Iterable[str], exe: Optional[str]) -> Tuple[int, List[Diagn
 
     # Prefer JSON format for reliable parsing; fall back to textual output.
     cmd_json = [exe, "check", "--format", "json", *paths]
-    proc = subprocess.run(
-        cmd_json, cwd=_ROOT, capture_output=True, text=True, check=False
-    )
+    proc = subprocess.run(cmd_json, cwd=_ROOT, capture_output=True, text=True, check=False)
     diags: List[Diagnostic] = []
     if proc.stdout:
         try:
@@ -213,17 +199,14 @@ def _run_ruff(paths: Iterable[str], exe: Optional[str]) -> Tuple[int, List[Diagn
                         and "filename" in it
                         and ("diagnostics" in it or "messages" in it)
                     ):
-                        filename = it.get("filename")
+                        raw_filename = it.get("filename")
+                        filename = raw_filename if isinstance(raw_filename, str) else "<unknown>"
                         issues = it.get("diagnostics") or it.get("messages") or []
                         for issue in issues:
                             line = issue.get("line", 1)
                             code = issue.get("code", "") or issue.get("rule") or ""
                             msg = issue.get("message", "")
-                            severity = (
-                                "error"
-                                if (code and code[:1] in ("E", "F"))
-                                else "warning"
-                            )
+                            severity = "error" if (code and code[:1] in ("E", "F")) else "warning"
                             diags.append(
                                 Diagnostic(
                                     path=Path(filename).as_posix(),
@@ -235,14 +218,14 @@ def _run_ruff(paths: Iterable[str], exe: Optional[str]) -> Tuple[int, List[Diagn
                     elif isinstance(it, dict) and all(
                         k in it for k in ("filename", "line", "code", "message")
                     ):
+                        raw_filename = it.get("filename")
+                        filename = raw_filename if isinstance(raw_filename, str) else "<unknown>"
                         severity = (
-                            "error"
-                            if str(it.get("code", ""))[:1] in ("E", "F")
-                            else "warning"
+                            "error" if str(it.get("code", ""))[:1] in ("E", "F") else "warning"
                         )
                         diags.append(
                             Diagnostic(
-                                path=Path(it["filename"]).as_posix(),
+                                path=Path(filename).as_posix(),
                                 line=it["line"],
                                 severity=severity,
                                 message=f"{it.get('code')} {it.get('message')}".strip(),
@@ -255,13 +238,9 @@ def _run_ruff(paths: Iterable[str], exe: Optional[str]) -> Tuple[int, List[Diagn
 
     # Fallback: run text mode and try to parse lines like "path:line:col: CODE message"
     cmd_text = [exe, "check", *paths]
-    proc_text = subprocess.run(
-        cmd_text, cwd=_ROOT, capture_output=True, text=True, check=False
-    )
+    proc_text = subprocess.run(cmd_text, cwd=_ROOT, capture_output=True, text=True, check=False)
     text_out = proc_text.stdout or proc_text.stderr or ""
-    ruff_line_re = re.compile(
-        r"^(?P<path>.*?):(?P<line>\d+):\d+:\s*(?P<code>\w+)\s*(?P<msg>.*)$"
-    )
+    ruff_line_re = re.compile(r"^(?P<path>.*?):(?P<line>\d+):\d+:\s*(?P<code>\w+)\s*(?P<msg>.*)$")
     for raw in text_out.splitlines():
         m = ruff_line_re.match(raw.strip())
         if m:

@@ -78,9 +78,7 @@ def _segment_api_url(video_id: str) -> str:
     return f"https://sponsor.ajay.app/api/skipSegments/{hash_prefix}"
 
 
-def _parse_segment_payload(
-    video_id: str, response: requests.Response
-) -> list[dict[str, Any]]:
+def _parse_segment_payload(video_id: str, response: requests.Response) -> list[dict[str, Any]]:
     if response.status_code == 404:
         return []
     if response.status_code != 200:
@@ -120,9 +118,7 @@ def fetch_sponsor_segments(video_id: str) -> list[tuple[float, float]]:
         return []
 
 
-def remove_sponsors(
-    target: Path, video_id: str, callback: Callback | None = None
-) -> bool:
+def remove_sponsors(target: Path, video_id: str, callback: Callback | None = None) -> bool:
     """Remove sponsor segments from an audio file."""
     segments = fetch_sponsor_segments(video_id)
     if not segments:

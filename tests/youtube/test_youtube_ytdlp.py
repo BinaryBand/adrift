@@ -7,12 +7,15 @@ from pathlib import Path
 from unittest.mock import MagicMock, patch
 
 sys.path.insert(0, Path(__file__).parent.parent.parent.as_posix())
+from src.models import YtDlpParams
 from src.youtube.ytdlp import (
     ChannelInfo,
     VideoInfo,
     _fetch_channel_info_raw,
     _fetch_channel_videos_raw,
     _fetch_video_info_raw,
+    _trim_channel_cache_payload,
+    _trim_video_cache_payload,
     get_channel_info,
     get_video_info,
 )
@@ -76,6 +79,52 @@ class TestPydanticModels(unittest.TestCase):
         self.assertEqual(channel.uploader, "Test Uploader")
         self.assertEqual(channel.uploader_id, "test_id")
         self.assertEqual(channel.description, "Channel description")
+
+
+class TestCachePayloadTrimming(unittest.TestCase):
+    """Test payload trimming before cache persistence."""
+
+    def test_trim_video_cache_payload(self):
+        raw = {
+            "id": "vid123",
+            "title": "Test Video",
+            "description": "desc",
+            "duration": 22,
+            "upload_date": "20231218",
+            "thumbnail": "thumb",
+            "availability": "public",
+            "url": "https://youtube.com/watch?v=vid123",
+            "timestamp": 1700000000,
+            "release_timestamp": 1700000001,
+            "view_count": 10,
+            "like_count": 2,
+            "comment_count": 1,
+            "formats": [{"id": "heavy"}],
+            "subtitles": {"en": []},
+        }
+
+        trimmed = _trim_video_cache_payload(raw)
+
+        self.assertNotIn("formats", trimmed)
+        self.assertNotIn("subtitles", trimmed)
+        self.assertEqual(trimmed["id"], "vid123")
+        self.assertEqual(trimmed["view_count"], 10)
+
+    def test_trim_channel_cache_payload(self):
+        raw = {
+            "title": "Channel",
+            "uploader": "Uploader",
+            "uploader_id": "@uploader",
+            "description": "desc",
+            "avatar": [{"url": "avatar"}],
+            "thumbnails": [{"url": "thumb"}],
+            "entries": [{"id": "vid123"}],
+        }
+
+        trimmed = _trim_channel_cache_payload(raw)
+
+        self.assertNotIn("entries", trimmed)
+        self.assertEqual(trimmed["title"], "Channel")
 
 
 class TestFetchVideoInfoRaw(unittest.TestCase):
@@ -149,6 +198,26 @@ class TestFetchVideoInfoRaw(unittest.TestCase):
         self.assertIsNone(result)
 
 
+class TestYtDlpOptsCompatibility(unittest.TestCase):
+    """Regression tests for passing typed yt-dlp opts into YoutubeDL."""
+
+    @patch("src.youtube.ytdlp.YoutubeDL")
+    @patch("src.youtube.ytdlp.get_ydl_opts")
+    def test_channel_video_fetch_passes_plain_dict_to_youtubedl(self, mock_get_opts, mock_ydl_cls):
+        mock_get_opts.return_value = YtDlpParams.model_validate({"quiet": True})
+        mock_ydl = MagicMock()
+        mock_ydl.__enter__.return_value.extract_info.return_value = {"entries": []}
+        mock_ydl_cls.return_value = mock_ydl
+
+        result = _fetch_channel_videos_raw("https://www.youtube.com/@example/videos")
+
+        self.assertEqual(result, [])
+        self.assertTrue(mock_ydl_cls.called)
+        opts_arg = mock_ydl_cls.call_args[0][0]
+        self.assertIsInstance(opts_arg, dict)
+        self.assertTrue(opts_arg.get("extract_flat"))
+
+
 class TestFetchVideoInfo(unittest.TestCase):
     """Test get_video_info caching wrapper."""
 
@@ -173,7 +242,12 @@ class TestFetchVideoInfo(unittest.TestCase):
     def test_fetches_and_caches_when_not_cached(self, mock_cache, mock_fetch_raw):
         """Test fetches from API and caches when not in cache."""
         mock_cache.get.return_value = None
-        fetched_data = {"id": "vid123", "title": "Fresh Video"}
+        fetched_data = {
+            "id": "vid123",
+            "title": "Fresh Video",
+            "formats": [{"id": "heavy"}],
+            "view_count": 12,
+        }
         mock_fetch_raw.return_value = fetched_data
 
         result = get_video_info("vid123")
@@ -184,7 +258,14 @@ class TestFetchVideoInfo(unittest.TestCase):
         self.assertEqual(result.title, "Fresh Video")
         mock_cache.get.assert_called_once_with("get_video_info:vid123")
         mock_fetch_raw.assert_called_once_with("vid123")
-        mock_cache.set.assert_called_once_with("get_video_info:vid123", fetched_data)
+        mock_cache.set.assert_called_once_with(
+            "get_video_info:vid123",
+            {
+                "id": "vid123",
+                "title": "Fresh Video",
+                "view_count": 12,
+            },
+        )
 
     @patch("src.youtube.ytdlp._fetch_video_info_raw")
     @patch("src.youtube.ytdlp._CACHE")
@@ -358,7 +439,10 @@ class TestGetCachedChannelInfo(unittest.TestCase):
     def test_fetches_and_caches_with_expiry(self, mock_cache, mock_fetch_raw, mock_random):
         """Test fetches and caches with 25-35 day expiry."""
         mock_cache.get.return_value = None
-        fetched_data = {"title": "Fresh Channel"}
+        fetched_data = {
+            "title": "Fresh Channel",
+            "entries": [{"id": "vid123"}],
+        }
         mock_fetch_raw.return_value = fetched_data
         mock_random.randint.return_value = 30  # 30 days
 
@@ -373,7 +457,7 @@ class TestGetCachedChannelInfo(unittest.TestCase):
         expected_expire = 30 * 24 * 3600
         mock_cache.set.assert_called_once_with(
             "get_youtube_channel:https://youtube.com/@test",
-            fetched_data,
+            {"title": "Fresh Channel"},
             expire=expected_expire,
         )
 

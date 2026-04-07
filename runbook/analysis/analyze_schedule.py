@@ -9,7 +9,7 @@ from collections import Counter
 from dataclasses import dataclass
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Any
+from typing import Any, cast
 from urllib.parse import urlparse, urlunparse
 from zoneinfo import ZoneInfo
 
@@ -231,7 +231,7 @@ def _resolve_channel_id(channel_url: str) -> str:
         "extract_flat": True,
         "playlistend": 0,
     }
-    with YoutubeDL(opts) as ydl:
+    with YoutubeDL(cast(Any, opts)) as ydl:
         info = ydl.extract_info(channel_url, download=False) or {}
     channel_id = info.get("channel_id") or info.get("id")
     if isinstance(channel_id, str) and channel_id.startswith("UC"):

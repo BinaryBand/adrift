@@ -45,14 +45,29 @@ def upload_thumbnail(thumbnail_url: str, author: str, id: str) -> str | None:
         print(f"WARNING: Failed to upload thumbnail for {id}: {e}")
         return None
 
+        url = getattr(entry, "url", None)
+        if isinstance(url, str) and url:
+            return [url]
+        return []
 
-def _existing_thumbnail_s3_path(path_base: Path, image_path: str) -> str | None:
-    """Return a public URL for an existing thumbnail, or None."""
-    existing_file = exists("media", image_path, True)
-    if not existing_file:
-        return None
-    s3_path = (Path("media") / path_base / existing_file).as_posix()
-    return urljoin(S3_ENDPOINT, s3_path)
+    def _extract_urls_from_enclosures(content: object) -> list[str]:
+        urls: list[str] = []
+        for enc in content if isinstance(content, list) else []:
+            urls.extend(LINK_REGEX.findall(_enclosure_value(enc)))
+        return urls
+
+    def _enclosure_value(enc: object) -> str:
+        if isinstance(enc, str):
+            return enc
+
+        get = getattr(enc, "get", None)
+        if not callable(get):
+            return ""
+
+        href = get("href", "")
+        if isinstance(href, str):
+            return href
+        return ""
 
 
 def _download_thumbnail_bytes(
@@ -210,21 +225,33 @@ def _extract_content_url(entry: FeedParserDict) -> str | None:
 def _collect_enclosure_strings(entry: FeedParserDict) -> list[str]:
     content = getattr(entry, "enclosures", [])
     if content:
-        return _extract_links_from_enclosures(content)
-    if hasattr(entry, "url"):
-        return [entry.get("url", "")]
+        return _extract_urls_from_enclosures(content)
+
+    url = getattr(entry, "url", None)
+    if isinstance(url, str) and url:
+        return [url]
     return []
 
 
-def _extract_links_from_enclosures(content: object) -> list[str]:
-    out: list[str] = []
-    for enc in content:
-        src = enc if isinstance(enc, str) else enc.get("href", "")
-        if not src:
-            continue
-        matches = LINK_REGEX.findall(src)
-        out.extend(matches)
-    return out
+def _extract_urls_from_enclosures(content: object) -> list[str]:
+    urls: list[str] = []
+    for enc in content if isinstance(content, list) else []:
+        urls.extend(LINK_REGEX.findall(_enclosure_value(enc)))
+    return urls
+
+
+def _enclosure_value(enc: object) -> str:
+    if isinstance(enc, str):
+        return enc
+
+    get = getattr(enc, "get", None)
+    if not callable(get):
+        return ""
+
+    href = get("href", "")
+    if isinstance(href, str):
+        return href
+    return ""
 
 
 def _filter_audio_urls(urls: list[str]) -> list[str]:
@@ -307,7 +334,9 @@ def _rrule_has_occurrence_on_date(pub_date: datetime, rule_str: str) -> bool:
     return _rrule_occurrence_exists(rule_str, day_start, day_end)
 
 
-def _rrule_occurrence_exists(rule_str: str, day_start: datetime, day_end: datetime) -> bool:
+def _rrule_occurrence_exists(
+    rule_str: str, day_start: datetime, day_end: datetime
+) -> bool:
     try:
         rule, day_start, day_end = _build_rrule(rule_str, day_start, day_end)
         occ = rule.after(day_start - timedelta(microseconds=1), inc=True)

@@ -26,8 +26,6 @@ YOUTUBE_PLAYLIST_REGEX = re_compile(
 YT_CHANNEL_SHORTHAND = re_compile(r"^yt://@([A-Za-z0-9_\-]+)$")
 YOUTUBE_PLAYLIST_SHORTHAND_REGEX = re_compile(r"^yt://#([A-Za-z0-9_\-]+)$")
 
-YOUTUBE_VIDEO_REGEX = re_compile(
-    r"(https?://)?(www\.)?(youtube\.com|youtu\.be)/watch\?v=([\w-]+)"
-)
+YOUTUBE_VIDEO_REGEX = re_compile(r"(https?://)?(www\.)?(youtube\.com|youtu\.be)/watch\?v=([\w-]+)")
 
 SEGMENT_TIME_REGEX = re_compile(r"(\d+\.\d+)_(\d+\.\d+)\b")

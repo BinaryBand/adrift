@@ -14,6 +14,7 @@ import shutil
 import subprocess
 import tempfile
 from pathlib import Path
+from typing import Any, cast
 
 import lizard
 
@@ -36,7 +37,7 @@ def _iter_python_files(root: Path) -> list[Path]:
 def _complexity_by_file(paths: list[Path]) -> dict[str, int]:
     totals: dict[str, int] = {}
     for path in paths:
-        analysis = lizard.analyze_file(str(path))
+        analysis = cast(Any, lizard.analyze_file(str(path)))
         totals[_rel_to_root(path)] = int(analysis.CCN)
     return totals
 
@@ -157,7 +158,10 @@ def _append_quadrant(
     for row in groups[key]:
         node = _node_id(str(row["path"]))
         node_label = _node_label(
-            str(row["path"]), int(row["churn"]), int(row["ccn"]), float(row["score"])
+            str(row["path"]),
+            int(cast(int, row["churn"])),
+            int(cast(int, row["ccn"])),
+            float(cast(float, row["score"])),
         )
         lines.append(f'        {node}["{node_label}"]')
     lines.append("    end")
@@ -181,9 +185,11 @@ def _render_table(rows: list[dict[str, object]], top_n: int) -> str:
         "| --- | --- | --- | --- |",
     ]
     for row in rows[:top_n]:
-        lines.append(
-            f"| `{row['path']}` | {row['churn']} | {row['ccn']} | {float(row['score']):.2f} |"
-        )
+        path_display = row["path"]
+        churn_val = int(cast(int, row["churn"]))
+        ccn_val = int(cast(int, row["ccn"]))
+        score_val = float(cast(float, row["score"]))
+        lines.append(f"| `{path_display}` | {churn_val} | {ccn_val} | {score_val:.2f} |")
     return "\n".join(lines)
 
 

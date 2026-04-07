@@ -15,13 +15,11 @@ class _PILImage:
     def __enter__(self) -> "_PILImage": ...
     def __exit__(self, exc_type: Any, exc: Any, tb: Any) -> None: ...
 
-
 class _ImageModule:
     Image: type[_PILImage]
     Resampling: Any
     LANCZOS: Any
     def open(self, *args: Any, **kwargs: Any) -> _PILImage: ...
     def new(self, *args: Any, **kwargs: Any) -> _PILImage: ...
-
 
 Image: _ImageModule

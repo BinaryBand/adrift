@@ -21,7 +21,7 @@ jobs:
           python -m pip install --upgrade pip
           pip install poetry
           poetry config virtualenvs.create false || true
-          poetry install --no-interaction --no-ansi
+          poetry install --no-root --with dev --no-interaction --no-ansi
 
       - name: Ruff format check
         run: poetry run ruff format --check src runbook tests typings

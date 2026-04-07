@@ -1,11 +1,9 @@
 {
   "recommendations": [
     "ms-python.python",
+    "emeraldwalk.runonsave"
+  ],
+  "unwantedRecommendations": [
     "ms-python.vscode-pylance"
   ]
-}
-{
-    "recommendations": [
-        "emeraldwalk.runonsave"
-    ]
 }
