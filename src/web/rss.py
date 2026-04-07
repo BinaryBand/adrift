@@ -21,7 +21,7 @@ from feedparser import FeedParserDict
 sys.path.insert(0, Path(__file__).parent.parent.parent.as_posix())
 from src.app_common import FeedSource, ensure_feed_source
 from src.files.audio import AUDIO_EXTENSIONS, parse_duration
-from src.files.images import make_square_image
+from src.files.images import make_square_image_to
 from src.files.s3 import S3_ENDPOINT, exists, upload_file
 from src.models import RssChannel, RssEpisode
 from src.utils.progress import Callback
@@ -89,14 +89,38 @@ def _ext_for_content_type(content_type: str) -> str | None:
     return ext
 
 
-def _stage_thumbnail_bytes(data: bytes, id: str, ext: str) -> Path:
-    """Write bytes to a temporary file, make it square, and return Path."""
+def _format_bytes(size: int) -> str:
+    units = ["B", "KB", "MB", "GB", "TB"]
+    value = float(size)
+    for unit in units:
+        if value < 1024 or unit == units[-1]:
+            if unit == "B":
+                return f"{int(value)} {unit}"
+            return f"{value:.2f} {unit}"
+        value /= 1024
+    return f"{size} B"
+
+
+def _stage_thumbnail_bytes(data: bytes, id: str, ext: str) -> tuple[Path, str, int, int]:
+    """Write bytes to temp, transcode square image, and return file info.
+
+    Returns: (output_path, output_ext, original_size, encoded_size)
+    """
     temp_dir = tempfile.mkdtemp()
-    staging_file = Path(temp_dir) / f"{create_slug(id)}{ext}"
-    with open(staging_file, "wb") as f:
+    source_file = Path(temp_dir) / f"{create_slug(id)}{ext}"
+    source_size = len(data)
+    with open(source_file, "wb") as f:
         f.write(data)
-    make_square_image(staging_file)
-    return staging_file
+
+    webp_file = Path(temp_dir) / f"{create_slug(id)}.webp"
+    if make_square_image_to(source_file, webp_file, output_format="WEBP", quality=80):
+        return source_file, ".webp", source_size, webp_file.stat().st_size
+
+    jpg_file = Path(temp_dir) / f"{create_slug(id)}.jpg"
+    if make_square_image_to(source_file, jpg_file, output_format="JPEG", quality=85):
+        return source_file, ".jpg", source_size, jpg_file.stat().st_size
+
+    raise RuntimeError(f"Failed to transcode thumbnail for {id}")
 
 
 def _existing_thumbnail_s3_path(path_base: Path, image_path: str) -> str | None:
@@ -121,8 +145,16 @@ def _upload_thumbnail_pipeline(thumbnail_url: str, author: str, id: str) -> str 
     if ext is None:
         return None
 
-    staging_file = _stage_thumbnail_bytes(data, id, ext)
-    return upload_file("media", f"{image_path}{ext}", staging_file)
+    source_file, output_ext, old_size, new_size = _stage_thumbnail_bytes(data, id, ext)
+    output_file = source_file.with_suffix(output_ext)
+    saved = max(0, old_size - new_size)
+    saved_pct = (saved / old_size * 100) if old_size > 0 else 0.0
+    print(
+        f"Thumbnail compressed for {id}: "
+        f"{_format_bytes(old_size)} -> {_format_bytes(new_size)} "
+        f"(-{_format_bytes(saved)}, {saved_pct:.1f}%, {output_ext})"
+    )
+    return upload_file("media", f"{image_path}{output_ext}", output_file)
 
 
 def _extract_image_url(channel: FeedParserDict) -> str:

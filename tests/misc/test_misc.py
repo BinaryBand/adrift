@@ -55,7 +55,7 @@ def test_upload_thumbnail_new_file_returns_valid_url():
         patch("src.web.rss.exists") as mock_exists,
         patch("src.web.rss.requests.get") as mock_get,
         patch("src.web.rss.upload_file") as mock_upload_file,
-        patch("src.web.rss.make_square_image"),
+        patch("src.web.rss.make_square_image_to") as mock_square,
         patch("builtins.open", mock_open()),
     ):
         # Simulate no existing file
@@ -67,9 +67,15 @@ def test_upload_thumbnail_new_file_returns_valid_url():
         mock_response.content = b"fake image data"
         mock_get.return_value = mock_response
 
+        def _fake_square(_input_path, output_path, output_format="WEBP", quality=80):
+            output_path.write_bytes(b"fake webp data")
+            return True
+
+        mock_square.side_effect = _fake_square
+
         # Mock upload_file to return a URL with forward slashes
         mock_upload_file.return_value = (
-            "https://s3.example.com/media/podcasts/test-author/thumbnails/test-id.jpg"
+            "https://s3.example.com/media/podcasts/test-author/thumbnails/test-id.webp"
         )
 
         result = upload_thumbnail(

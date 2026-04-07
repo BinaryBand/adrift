@@ -42,19 +42,25 @@ class TestUploadThumbnail(unittest.TestCase):
 
     @patch("src.web.rss.exists")
     @patch("src.web.rss.requests.get")
-    @patch("src.web.rss.make_square_image")
+    @patch("src.web.rss.make_square_image_to")
     @patch("src.web.rss.upload_file")
     def test_downloads_and_uploads_new_thumbnail(
         self, mock_upload, mock_square, mock_get, mock_exists
     ):
         """Test downloading and uploading a new thumbnail."""
         mock_exists.return_value = None
+
+        def _fake_square(_input_path, output_path, output_format="WEBP", quality=80):
+            output_path.write_bytes(b"fake_transcoded_data")
+            return True
+
+        mock_square.side_effect = _fake_square
         mock_response = Mock()
         mock_response.content = b"fake_image_data"
         mock_response.headers = {"Content-Type": "image/jpeg"}
         mock_get.return_value = mock_response
         mock_upload.return_value = (
-            "https://s3.example.com/media/podcasts/test/thumbnails/test_123.jpg"
+            "https://s3.example.com/media/podcasts/test/thumbnails/test_123.webp"
         )
 
         result = upload_thumbnail("https://example.com/thumb.jpg", "Test Author", "test_123")
@@ -63,6 +69,7 @@ class TestUploadThumbnail(unittest.TestCase):
         mock_get.assert_called_once()
         mock_square.assert_called_once()
         mock_upload.assert_called_once()
+        self.assertIn(".webp", mock_upload.call_args[0][1])
 
     @patch("src.web.rss.exists")
     @patch("src.web.rss.requests.get")

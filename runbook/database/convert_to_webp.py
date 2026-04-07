@@ -9,9 +9,9 @@ dotenv.load_dotenv()
 
 import argparse
 import glob
-import subprocess
 import tempfile
 
+from PIL import Image
 from tqdm import tqdm
 
 from src.app_common import load_config
@@ -24,8 +24,13 @@ from src.files.s3 import (
     upload_file,
 )
 
-_FFMPEG_BASE = ["ffmpeg", "-hide_banner", "-loglevel", "error"]
 CONFIG_GLOB = "config/*.toml"
+_IMAGE_EXTENSIONS = {".jpg", ".jpeg", ".png"}
+
+
+def _image_prefixes(prefix: str) -> list[str]:
+    """Return prefixes that may contain podcast images."""
+    return [prefix.rstrip("/"), f"{prefix.rstrip('/')}/thumbnails"]
 
 
 def _format_bytes(size: int) -> str:
@@ -68,27 +73,24 @@ def _collect_podcast_targets() -> list[tuple[str, str]]:
 
 
 def _new_key(old_key: str) -> str:
-    """Convert .m4a key to .opus."""
-    return Path(old_key).with_suffix(".opus").as_posix()
+    """Convert image key suffix to .webp."""
+    return Path(old_key).with_suffix(".webp").as_posix()
 
 
-def _convert_to_opus(input_path: Path, output_path: Path) -> None:
-    """Convert input audio to Opus format using ffmpeg."""
-    cmd = _FFMPEG_BASE + [
-        "-i",
-        str(input_path),
-        "-c:a",
-        "libopus",
-        "-b:a",
-        "128k",
-        "-y",
-        str(output_path),
-    ]
-    subprocess.run(cmd, check=True, capture_output=True)
+def _convert_image_to_webp(input_path: Path, output_path: Path, quality: int = 80) -> None:
+    """Convert image to WebP format."""
+    with Image.open(input_path) as img:
+        if img.mode not in {"RGB", "RGBA"}:
+            img = img.convert("RGB")
+        img.save(output_path, format="WEBP", quality=quality, optimize=True, method=6)
+
+
+def _is_convertible_image(filename: str) -> bool:
+    return Path(filename).suffix.lower() in _IMAGE_EXTENSIONS
 
 
 def _convert_key(bucket: str, prefix: str, filename: str, dry_run: bool) -> bool:
-    """Convert a single .m4a file to Opus.
+    """Convert a single image file to WebP.
 
     Returns True on success, False on any error.
     """
@@ -96,37 +98,31 @@ def _convert_key(bucket: str, prefix: str, filename: str, dry_run: bool) -> bool
     new_key = _new_key(old_key)
 
     if dry_run:
-        print(f"[DRY RUN] {old_key} → {new_key}")
+        print(f"[DRY RUN] {old_key} -> {new_key}")
         return True
 
     try:
         with tempfile.TemporaryDirectory() as tmpdir:
             tmpdir_path = Path(tmpdir)
             input_path = tmpdir_path / filename
-            output_path = tmpdir_path / Path(filename).with_suffix(".opus").name
+            output_path = tmpdir_path / Path(filename).with_suffix(".webp").name
             input_path.parent.mkdir(parents=True, exist_ok=True)
             output_path.parent.mkdir(parents=True, exist_ok=True)
 
-            # Download original
             download_file(bucket, old_key, input_path)
-
-            # Transcode to opus
-            _convert_to_opus(input_path, output_path)
+            _convert_image_to_webp(input_path, output_path)
 
             old_size = input_path.stat().st_size
             new_size = output_path.stat().st_size
             saved_size = max(0, old_size - new_size)
             saved_pct = (saved_size / old_size * 100) if old_size > 0 else 0.0
 
-            # Upload new .opus file
             upload_file(bucket, new_key, output_path)
 
-            # Copy metadata to new key
             metadata = get_metadata(bucket, old_key)
             if metadata is not None:
                 set_metadata(bucket, new_key, metadata)
 
-            # Delete original .m4a
             delete_file(bucket, old_key)
 
             print(
@@ -136,10 +132,6 @@ def _convert_key(bucket: str, prefix: str, filename: str, dry_run: bool) -> bool
             )
 
         return True
-    except subprocess.CalledProcessError as e:
-        stderr = e.stderr.decode("utf-8", errors="replace") if e.stderr else "no stderr"
-        print(f"ERROR: ffmpeg failed for {old_key}: exit {e.returncode}: {stderr}")
-        return False
     except Exception as e:
         print(f"ERROR: Failed to convert {old_key}: {e}")
         return False
@@ -148,7 +140,7 @@ def _convert_key(bucket: str, prefix: str, filename: str, dry_run: bool) -> bool
 def _parse_args() -> argparse.Namespace:
     """Parse command-line arguments."""
     parser = argparse.ArgumentParser(
-        description="Convert .m4a files to Opus for all podcasts discovered from config/*.toml."
+        description="Convert image files to WebP for all podcasts discovered from config/*.toml."
     )
     parser.add_argument(
         "--dry-run",
@@ -174,40 +166,44 @@ def main() -> None:
         print("No podcast targets found under config/*.toml")
         return
 
-    total_successes, total_errors, total_already_opus = 0, 0, 0
+    total_successes, total_errors, total_already_webp = 0, 0, 0
     remaining = args.limit
 
-    for bucket, prefix in targets:
+    for bucket, podcast_prefix in targets:
         if remaining is not None and remaining <= 0:
             break
 
-        filenames = get_file_list(bucket, prefix)
-        to_convert = [f for f in filenames if f.lower().endswith(".m4a")]
-        opus_count = sum(1 for f in filenames if f.lower().endswith(".opus"))
-        total_already_opus += opus_count
+        for prefix in _image_prefixes(podcast_prefix):
+            if remaining is not None and remaining <= 0:
+                break
 
-        if remaining is not None:
-            to_convert = to_convert[:remaining]
-
-        if not to_convert:
-            continue
-
-        print(f"\nProcessing {bucket}/{prefix}: {len(to_convert)} .m4a files")
-        for filename in tqdm(to_convert, desc=f"Converting {prefix}"):
-            ok = _convert_key(bucket, prefix, filename, dry_run=args.dry_run)
-            if ok:
-                total_successes += 1
-            else:
-                total_errors += 1
+            filenames = get_file_list(bucket, prefix)
+            to_convert = [f for f in filenames if _is_convertible_image(f)]
+            webp_count = sum(1 for f in filenames if f.lower().endswith(".webp"))
+            total_already_webp += webp_count
 
             if remaining is not None:
-                remaining -= 1
-                if remaining <= 0:
-                    break
+                to_convert = to_convert[:remaining]
+
+            if not to_convert:
+                continue
+
+            print(f"\nProcessing {bucket}/{prefix}: {len(to_convert)} images")
+            for filename in tqdm(to_convert, desc=f"Converting {prefix}"):
+                ok = _convert_key(bucket, prefix, filename, dry_run=args.dry_run)
+                if ok:
+                    total_successes += 1
+                else:
+                    total_errors += 1
+
+                if remaining is not None:
+                    remaining -= 1
+                    if remaining <= 0:
+                        break
 
     print(
         f"\nDone. Converted: {total_successes}, "
-        f"Errors: {total_errors}, Already .opus: {total_already_opus}"
+        f"Errors: {total_errors}, Already .webp: {total_already_webp}"
     )
 
 
