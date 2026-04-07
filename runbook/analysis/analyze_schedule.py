@@ -20,10 +20,18 @@ from dateutil import parser as date_parser
 from yt_dlp import YoutubeDL
 
 try:
-    from src.app_common import PodcastConfig
+    from src.app_common import (
+        ensure_feed_source,
+        ensure_podcast_config,
+        parse_podcasts_raw,
+    )
 except Exception:
     # Fallback for ad-hoc script execution environments
-    from src.app_common import PodcastConfig
+    from src.app_common import (
+        ensure_feed_source,
+        ensure_podcast_config,
+        parse_podcasts_raw,
+    )
 
 ROOT = Path(__file__).resolve().parents[2]
 CONFIG_PATH = ROOT / "config" / "youtube.toml"
@@ -160,6 +168,12 @@ def _filter_parts(include: list[str], exclude: list[str]) -> list[str]:
 
 
 def _filters_to_regex(filters: Any) -> str | None:
+    # Accept either legacy dicts or structured SourceFilter objects.
+    if hasattr(filters, "to_regex"):
+        try:
+            return filters.to_regex()
+        except Exception:
+            return None
     if not isinstance(filters, dict):
         return None
     include = _string_list(filters.get("include"))
@@ -169,17 +183,14 @@ def _filters_to_regex(filters: Any) -> str | None:
     return "".join(_filter_parts(include, exclude))
 
 
-def _build_target(name: str, idx: int, source: dict[str, Any]) -> Target | None:
-    # Accept either legacy dicts or validated `FeedSource` models.
-    url: str | None = None
-    filters_val: Any = {}
-    if hasattr(source, "url"):
-        url = getattr(source, "url")
-        filters_val = getattr(source, "filters", {}) or {}
-    elif isinstance(source, dict):
-        url = source.get("url")
-        filters_val = source.get("filters", {}) or {}
+def _build_target(name: str, idx: int, source: Any) -> Target | None:
+    # Coerce legacy dicts into `FeedSource` models and extract filter regex.
+    try:
+        fs = ensure_feed_source(source)
+    except Exception:
+        return None
 
+    url = fs.url
     if not isinstance(url, str):
         return None
     kind = "youtube" if _is_youtube_target(url) else "feed"
@@ -187,31 +198,27 @@ def _build_target(name: str, idx: int, source: dict[str, Any]) -> Target | None:
         source=url,
         label=f"{name} downloads[{idx}]",
         kind=kind,
-        filter_regex=_filters_to_regex(filters_val),
+        filter_regex=_filters_to_regex(fs.filters),
     )
 
 
 def _podcast_downloads(podcast: Any) -> list[Any]:
-    # Support both `PodcastConfig` models and legacy dicts.
-    if isinstance(podcast, PodcastConfig):
-        return list(podcast.downloads or [])
-    if not isinstance(podcast, dict):
+    # Normalize to a `PodcastConfig` model, then return its configured downloads.
+    try:
+        pc = ensure_podcast_config(podcast)
+    except Exception:
         return []
-    downloads = podcast.get("downloads", [])
-    if not isinstance(downloads, list):
-        return []
-    return [source for source in downloads if isinstance(source, dict)]
+    return list(pc.downloads or [])
 
 
 def _targets_from_podcast(podcast: Any) -> list[Target]:
-    if isinstance(podcast, PodcastConfig):
-        name = podcast.name or "Unknown"
-    elif isinstance(podcast, dict):
-        name = str(podcast.get("name", "Unknown"))
-    else:
+    try:
+        pc = ensure_podcast_config(podcast)
+    except Exception:
         return []
+    name = pc.name or "Unknown"
     targets: list[Target] = []
-    for idx, source in enumerate(_podcast_downloads(podcast), start=1):
+    for idx, source in enumerate(_podcast_downloads(pc), start=1):
         if target := _build_target(name, idx, source):
             targets.append(target)
     return targets
@@ -226,9 +233,9 @@ def _load_download_targets() -> list[Target]:
     if not isinstance(raw, list):
         return targets
 
-    # Try parsing into typed `PodcastConfig` models for a safer surface.
+    # Parse into typed `PodcastConfig` models for a safer surface.
     try:
-        podcasts = [PodcastConfig.model_validate(item) for item in raw]
+        podcasts = parse_podcasts_raw(raw)
     except Exception:
         # Fallback to legacy dict processing if validation fails.
         for podcast in raw:

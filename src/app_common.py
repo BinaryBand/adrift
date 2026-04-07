@@ -147,18 +147,19 @@ def ensure_feed_source(source: FeedSource | dict[str, Any]) -> FeedSource:
 
 
 def ensure_podcast_config(podcast: PodcastConfig | dict[str, Any]) -> PodcastConfig:
+    def _ensure_sources_list(raw_sources: Any) -> list[FeedSource]:
+        if raw_sources is None:
+            return []
+        if not isinstance(raw_sources, list):
+            raise TypeError("references/downloads must be a list")
+        return [ensure_feed_source(item) for item in raw_sources]
+
     if isinstance(podcast, PodcastConfig):
         return podcast
     if isinstance(podcast, dict):
         payload = dict(podcast)
-        for key in ("references", "downloads"):
-            raw_sources = payload.get(key, [])
-            if raw_sources is None:
-                payload[key] = []
-                continue
-            if not isinstance(raw_sources, list):
-                raise TypeError(f"{key} must be a list")
-            payload[key] = [ensure_feed_source(item) for item in raw_sources]
+        payload["references"] = _ensure_sources_list(payload.get("references"))
+        payload["downloads"] = _ensure_sources_list(payload.get("downloads"))
         return PodcastConfig.model_validate(payload)
     raise TypeError("podcast must be PodcastConfig or dict")
 
