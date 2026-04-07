@@ -20,9 +20,10 @@ from dateutil import parser as date_parser
 from yt_dlp import YoutubeDL
 
 try:
-    from .podcast_config import PodcastConfig
+    from src.app_common import PodcastConfig
 except Exception:
-    from src.models.podcast_config import PodcastConfig
+    # Fallback for ad-hoc script execution environments
+    from src.app_common import PodcastConfig
 
 ROOT = Path(__file__).resolve().parents[2]
 CONFIG_PATH = ROOT / "config" / "youtube.toml"
