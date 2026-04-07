@@ -311,41 +311,8 @@ def _extract_upload_options_from_dict(
         opts = UploadOptions.model_validate(options)
         return opts.metadata, opts.callback
     except Exception:
-        metadata_raw = options.get("metadata")
-        callback_raw = options.get("callback")
-
-        # Try validating raw metadata into a known model first; if that
-        # fails, fall back to accepting an already-constructed model
-        # instance.
-        metadata_obj: S3Metadata | None = None
-        try:
-            metadata_obj = MediaMetadata.model_validate(metadata_raw)
-        except Exception:
-            try:
-                metadata_obj = CacheMetadata.model_validate(metadata_raw)
-            except Exception:
-                if isinstance(metadata_raw, (MediaMetadata, CacheMetadata)):
-                    metadata_obj = metadata_raw
-                else:
-                    metadata_obj = None
-
-        callback_obj: Callback | None = None
-        if callable(callback_raw):
-
-            def _adapted_callback(value: int, total_value: int | None) -> None:
-                try:
-                    # Prefer calling with (value, total_value) when supported
-                    callback_raw(value, total_value)
-                except TypeError:
-                    try:
-                        # Fallback to single-arg callbacks (boto style)
-                        callback_raw(value)
-                    except Exception:
-                        # Swallow any exceptions from user callback
-                        return
-
-            callback_obj = _adapted_callback
-
+        metadata_obj = _validate_metadata_raw(options.get("metadata"))
+        callback_obj = _adapt_callback_obj(options.get("callback"))
         return metadata_obj, callback_obj
 
 
@@ -356,6 +323,37 @@ def _build_boto_callback_for_file(
     if callback is None:
         return None
     return _make_upload_callback(callback, os.path.getsize(file_path))
+
+
+def _validate_metadata_raw(metadata_raw: Any) -> S3Metadata | None:
+    try:
+        return MediaMetadata.model_validate(metadata_raw)
+    except Exception:
+        try:
+            return CacheMetadata.model_validate(metadata_raw)
+        except Exception:
+            if isinstance(metadata_raw, (MediaMetadata, CacheMetadata)):
+                return metadata_raw
+            return None
+
+
+def _adapt_callback_obj(callback_raw: Any) -> Callback | None:
+    if not callable(callback_raw):
+        return None
+
+    def _adapted(value: int, total_value: int | None) -> None:
+        try:
+            # Prefer calling with (value, total_value) when supported
+            callback_raw(value, total_value)
+        except TypeError:
+            try:
+                # Fallback to single-arg callbacks (boto style)
+                callback_raw(value)
+            except Exception:
+                # Swallow any exceptions from user callback
+                return
+
+    return _adapted
 
 
 @retry(attempts=3, backoff_base=2)

@@ -145,6 +145,19 @@ def _parse_upload_date(raw: Any) -> datetime | None:
         return None
 
 
+def _coalesce_str(*values: Any) -> str:
+    """Return the first truthy value as a string, or empty string.
+
+    This helper centralises simple fallback chains into one place so
+    that small methods using multiple `or` fallbacks have reduced
+    cyclomatic complexity.
+    """
+    for v in values:
+        if v:
+            return str(v)
+    return ""
+
+
 try:
     from .ytdlp import YtDlpVideo
 except Exception:
@@ -168,6 +181,12 @@ def _parse_ytdlp_pub_date(data: YtDlpVideo | dict[str, Any]) -> datetime | None:
     return _parse_upload_date(mapping.get("upload_date"))
 
 
+def _ensure_ytdlp_model(data: YtDlpVideo | dict[str, Any]) -> YtDlpVideo:
+    if isinstance(data, YtDlpVideo):
+        return data
+    return YtDlpVideo.model_validate(data)
+
+
 class RssChannel(BaseModel):
     title: str
     author: str
@@ -183,25 +202,20 @@ class RssChannel(BaseModel):
         Accepts either a raw dict (validated into `YtDlpVideo`) or an
         already-validated `YtDlpVideo` instance.
         """
-        if not isinstance(data, YtDlpVideo):
-            data = YtDlpVideo.model_validate(data)
+        model = _ensure_ytdlp_model(data)
+        return cls._from_model(model, url)
 
-        title = data.uploader or data.title or ""
-        author = data.uploader_id or "YouTube"
-        description = data.description or ""
-
-        # Extract image from avatar or thumbnails
-        avatar_data = data.avatar
-        thumbnail_data = data.thumbnails
-        image = cls._extract_image(avatar_data) or cls._extract_image(thumbnail_data)
-
+    @classmethod
+    def _from_model(cls, model: YtDlpVideo, url: str) -> "RssChannel":
         return cls(
-            title=title,
-            author=author,
+            title=_coalesce_str(model.uploader, model.title),
+            author=_coalesce_str(model.uploader_id, "YouTube"),
             subtitle="",
             url=url,
-            description=description,
-            image=image,
+            description=_coalesce_str(model.description),
+            image=_coalesce_str(
+                cls._extract_image(model.avatar), cls._extract_image(model.thumbnails)
+            ),
         )
 
     @staticmethod
@@ -232,17 +246,19 @@ class RssEpisode(BaseModel):
     @classmethod
     def from_ytdlp(cls, data: YtDlpVideo | dict[str, Any], author: str) -> "RssEpisode":
         """Create RssEpisode from yt-dlp video entry dict or model."""
-        if not isinstance(data, YtDlpVideo):
-            data = YtDlpVideo.model_validate(data)
+        model = _ensure_ytdlp_model(data)
+        return cls._from_model(model, author)
 
-        video_id = data.id or ""
-        title = data.title or ""
-        description = data.description
-        duration = data.duration
-        availability = data.availability or "public"
+    @classmethod
+    def _from_model(cls, model: YtDlpVideo, author: str) -> "RssEpisode":
+        video_id = _coalesce_str(model.id)
+        title = _coalesce_str(model.title)
+        description = model.description
+        duration = model.duration
+        availability = _coalesce_str(model.availability, "public")
 
         # Construct YouTube URL
-        url = data.url or f"https://youtube.com/watch?v={video_id}"
+        url = _coalesce_str(model.url, f"https://youtube.com/watch?v={video_id}")
 
         episode = cls(
             id=video_id,
@@ -251,7 +267,7 @@ class RssEpisode(BaseModel):
             description=description,
             content=url,
             duration=duration,
-            pub_date=_parse_ytdlp_pub_date(data),
+            pub_date=_parse_ytdlp_pub_date(model),
         )
 
         # Store availability for filtering

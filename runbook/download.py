@@ -16,7 +16,7 @@ sys.path.insert(0, Path(dotenv.find_dotenv()).parent.as_posix())
 dotenv.load_dotenv()
 
 import src.youtube.downloader as yt_downloader
-from src.app_common import PodcastConfig, load_podcasts_config
+from src.app_common import PodcastConfig, ensure_podcast_config, load_podcasts_config
 from src.app_runner import get_s3_files, normalize_title
 from src.catalog import (
     align_episodes,
@@ -266,6 +266,8 @@ def main() -> None:
     args = parser.parse_args()
 
     configs: list[PodcastConfig] = load_podcasts_config(include=args.include)
+    # Coerce any legacy dict entries to canonical `PodcastConfig`
+    configs = [ensure_podcast_config(c) for c in configs]
     print(f"Processing {len(configs)} podcast(s)")
 
     remaining = args.max_downloads
