@@ -1,5 +1,6 @@
 # cspell: ignore-word rrulestr
 import glob
+import os
 import random
 import sys
 from pathlib import Path
@@ -13,10 +14,10 @@ from pydantic import BaseModel, ConfigDict, computed_field
 sys.path.insert(0, Path(__file__).parent.parent.as_posix())
 from datetime import datetime, timedelta
 
-from src.files.s3 import S3_ENDPOINT
 from src.utils.text import create_slug
 
 MATCH_TOLERANCE = 0.75
+S3_ENDPOINT = os.getenv("S3_ENDPOINT", "")
 
 
 def _exclude_lookahead(pattern: str) -> str:
