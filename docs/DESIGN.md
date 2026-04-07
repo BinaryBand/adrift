@@ -164,7 +164,7 @@ flowchart LR
 | **State & Secrets** | Port: `SecretReader` |
 | **Config** | Port: `ConfigReader` |
 
-The contract matrix and stage contracts become the Forbidden Dependencies and Port Compliance sections of `ARCHITECTURE.md` and `CONTRIBUTING.md` when those documents are drafted.
+The contract matrix and stage contracts become the Forbidden Dependencies and Port Compliance sections of `PLAYBOOK.md` and `CONTRIBUTING.md` when those documents are drafted.
 
 ---
 

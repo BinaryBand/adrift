@@ -135,7 +135,7 @@ flowchart TD
     F --> G([Emit PodcastFeed → upload feed.rss to S3])
 ```
 
-> **Stage 3 deferred:** `merge_episode` resolves each cross-aligned pair into a canonical `EpisodeData` (see §Stage 3 below). This merge is not yet applied in Phase 2 — the RSS feed is currently built from reference metadata only. YouTube titles, thumbnails, and descriptions are not yet used in the emitted feed.
+> **Note:** Stage 3 merge is implemented in `merge_episode` (`src/catalog.py`) and covered by tests (see `tests/misc/test_align_episodes.py` and `tests/misc/test_catalog.py`), but it is not yet integrated into the Phase 2 RSS rebuild. The RSS feed is currently emitted using reference metadata only; YouTube titles, thumbnails, and descriptions are not yet used in the emitted feed.
 
 ### Tuning Parameters
 
@@ -204,7 +204,7 @@ Resolve each matched pair to a single canonical `EpisodeData` using field-level 
 | `thumbnail` | Prefer highest-resolution (inferred from URL) |
 | `source` | Union of all source URLs in pair |
 
-> **Deferred:** Stage 3 merge is implemented in `merge_episode` (`src/catalog.py`) and covered by tests, but is not yet wired into Phase 2. The RSS feed is currently emitted using reference metadata directly.
+> **Status:** `merge_episode` is implemented in `src/catalog.py` and covered by tests (`tests/misc/test_align_episodes.py`, `tests/misc/test_catalog.py`). Integration into the Phase 2 RSS rebuild remains pending.
 
 ## Episode Download Strategy: yt-dlp vs URL
 

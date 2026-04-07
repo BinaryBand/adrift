@@ -42,6 +42,8 @@
     "dateutil",
     "dotenv",
     "DTSTART",
+    "flac",
+    "libopus",
     "rrule",
     "sponsorblock",
     "ytdlp"
