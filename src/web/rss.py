@@ -7,6 +7,7 @@ import uuid
 import xml.etree.ElementTree as ET
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
+from typing import Any, cast
 from urllib.parse import urljoin
 from xml.dom import minidom
 
@@ -29,7 +30,7 @@ from src.utils.text import create_slug, is_youtube_channel, remove_control_chars
 
 
 def get_rss_episodes_from_source(
-    source: FeedSource | dict,
+    source: FeedSource | dict[str, Any],
     title: str = "",
     is_reference: bool = False,
     callback: Callback | None = None,
@@ -73,34 +74,8 @@ def upload_thumbnail(thumbnail_url: str, author: str, id: str) -> str | None:
         print(f"WARNING: Failed to upload thumbnail for {id}: {e}")
         return None
 
-        url = getattr(entry, "url", None)
-        if isinstance(url, str) and url:
-            return [url]
-        return []
 
-    def _extract_urls_from_enclosures(content: object) -> list[str]:
-        urls: list[str] = []
-        for enc in content if isinstance(content, list) else []:
-            urls.extend(LINK_REGEX.findall(_enclosure_value(enc)))
-        return urls
-
-    def _enclosure_value(enc: object) -> str:
-        if isinstance(enc, str):
-            return enc
-
-        get = getattr(enc, "get", None)
-        if not callable(get):
-            return ""
-
-        href = get("href", "")
-        if isinstance(href, str):
-            return href
-        return ""
-
-
-def _download_thumbnail_bytes(
-    thumbnail_url: str, timeout: int = 30
-) -> tuple[bytes, str]:
+def _download_thumbnail_bytes(thumbnail_url: str, timeout: int = 30) -> tuple[bytes, str]:
     resp = requests.get(thumbnail_url, timeout=timeout)
     resp.raise_for_status()
     content_type = resp.headers.get("Content-Type", "")
@@ -122,6 +97,13 @@ def _stage_thumbnail_bytes(data: bytes, id: str, ext: str) -> Path:
         f.write(data)
     make_square_image(staging_file)
     return staging_file
+
+
+def _existing_thumbnail_s3_path(path_base: Path, image_path: str) -> str | None:
+    existing_name = exists("media", image_path)
+    if not existing_name:
+        return None
+    return urljoin(S3_ENDPOINT, (Path("media") / path_base / existing_name).as_posix())
 
 
 def _upload_thumbnail_pipeline(thumbnail_url: str, author: str, id: str) -> str | None:
@@ -263,7 +245,8 @@ def _collect_enclosure_strings(entry: FeedParserDict) -> list[str]:
 
 def _extract_urls_from_enclosures(content: object) -> list[str]:
     urls: list[str] = []
-    for enc in content if isinstance(content, list) else []:
+    enclosures = cast(list[object], content) if isinstance(content, list) else []
+    for enc in enclosures:
         urls.extend(LINK_REGEX.findall(_enclosure_value(enc)))
     return urls
 
@@ -283,9 +266,7 @@ def _enclosure_value(enc: object) -> str:
 
 
 def _filter_audio_urls(urls: list[str]) -> list[str]:
-    return [
-        u for u in urls if any(u.lower().find(ext) != -1 for ext in AUDIO_EXTENSIONS)
-    ]
+    return [u for u in urls if any(u.lower().find(ext) != -1 for ext in AUDIO_EXTENSIONS)]
 
 
 def parse_rss_entry(entry: FeedParserDict) -> RssEpisode:
@@ -362,9 +343,7 @@ def _rrule_has_occurrence_on_date(pub_date: datetime, rule_str: str) -> bool:
     return _rrule_occurrence_exists(rule_str, day_start, day_end)
 
 
-def _rrule_occurrence_exists(
-    rule_str: str, day_start: datetime, day_end: datetime
-) -> bool:
+def _rrule_occurrence_exists(rule_str: str, day_start: datetime, day_end: datetime) -> bool:
     try:
         rule, day_start, day_end = _build_rrule(rule_str, day_start, day_end)
         occ = rule.after(day_start - timedelta(microseconds=1), inc=True)

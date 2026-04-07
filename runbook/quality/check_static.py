@@ -28,7 +28,7 @@ import sys
 import time
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Iterable, List, Optional, Tuple
+from typing import Any, Iterable, List, Optional, Tuple, cast
 
 _ROOT = Path(__file__).parent.parent.parent.resolve()
 _DEFAULT_PATHS = ["src", "runbook", "tests", "typings"]
@@ -43,6 +43,22 @@ class Diagnostic:
     line: int
     severity: str
     message: str
+
+
+def _json_dict(value: Any) -> dict[str, Any]:
+    return cast(dict[str, Any], value) if isinstance(value, dict) else {}
+
+
+def _json_list(value: Any) -> list[Any]:
+    return cast(list[Any], value) if isinstance(value, list) else []
+
+
+def _json_str(value: Any, default: str = "") -> str:
+    return value if isinstance(value, str) else default
+
+
+def _json_int(value: Any, default: int = 1) -> int:
+    return value if isinstance(value, int) else default
 
 
 def parse_args() -> argparse.Namespace:
@@ -103,6 +119,32 @@ def _emit(diagnostics: Iterable[Diagnostic]) -> int:
     return error_count
 
 
+def _excluded_pyright_path(path: Path) -> bool:
+    excluded_prefixes = (
+        Path("runbook") / "analysis",
+        Path("tests"),
+    )
+    return any(path == prefix or prefix in path.parents for prefix in excluded_prefixes)
+
+
+def _expand_pyright_paths(paths: Iterable[str]) -> List[str]:
+    expanded: List[str] = []
+    for raw in paths:
+        candidate = (_ROOT / raw).resolve()
+        if not candidate.exists():
+            continue
+        if candidate.is_file():
+            rel = candidate.relative_to(_ROOT)
+            if rel.suffix == ".py" and not _excluded_pyright_path(rel):
+                expanded.append(rel.as_posix())
+            continue
+        for file_path in candidate.rglob("*.py"):
+            rel = file_path.relative_to(_ROOT)
+            if not _excluded_pyright_path(rel):
+                expanded.append(rel.as_posix())
+    return sorted(set(expanded))
+
+
 def _run_pyright(paths: Iterable[str], exe: Optional[str]) -> Tuple[int, List[Diagnostic]]:
     if exe is None:
         exe = _venv_executable("pyright")
@@ -110,14 +152,12 @@ def _run_pyright(paths: Iterable[str], exe: Optional[str]) -> Tuple[int, List[Di
         print("pyright: not found; skipping pyright checks", file=sys.stderr)
         return 2, []
 
-    # Try with --strict first; some pyright wrappers may not accept that flag,
-    # so fall back to no --strict if we detect an unexpected-option error.
-    cmd = [exe, "--outputjson", "--strict", *paths]
+    pyright_paths = _expand_pyright_paths(paths)
+    if not pyright_paths:
+        return 0, []
+
+    cmd = [exe, "--outputjson", *pyright_paths]
     proc = subprocess.run(cmd, cwd=_ROOT, capture_output=True, text=True, check=False)
-    if proc.returncode != 0 and proc.stderr and "Unexpected option --strict" in proc.stderr:
-        # Retry without --strict for older/alternate pyright binaries.
-        cmd = [exe, "--outputjson", *paths]
-        proc = subprocess.run(cmd, cwd=_ROOT, capture_output=True, text=True, check=False)
 
     if not proc.stdout:
         # No structured output; surface whatever pyright printed.
@@ -126,7 +166,7 @@ def _run_pyright(paths: Iterable[str], exe: Optional[str]) -> Tuple[int, List[Di
         return proc.returncode, []
 
     try:
-        payload = json.loads(proc.stdout)
+        payload = cast(dict[str, Any], json.loads(proc.stdout))
     except json.JSONDecodeError:
         print(proc.stdout)
         return proc.returncode, []
@@ -134,13 +174,14 @@ def _run_pyright(paths: Iterable[str], exe: Optional[str]) -> Tuple[int, List[Di
     diags: List[Diagnostic] = []
 
     # General / project-level diagnostics
-    for item in payload.get("generalDiagnostics", []) or []:
-        file_path = item.get("file") or "<project>"
-        rng = item.get("range") or {}
-        start = rng.get("start") or {}
-        line = (start.get("line", 0) + 1) if isinstance(start, dict) else 1
-        severity = item.get("severity", "error")
-        message = item.get("message", "")
+    for item_value in _json_list(payload.get("generalDiagnostics")):
+        item = _json_dict(item_value)
+        file_path = _json_str(item.get("file"), "<project>")
+        rng = _json_dict(item.get("range"))
+        start = _json_dict(rng.get("start"))
+        line = _json_int(start.get("line"), 0) + 1
+        severity = _json_str(item.get("severity"), "error")
+        message = _json_str(item.get("message"))
         diags.append(
             Diagnostic(
                 path=Path(file_path).as_posix(),
@@ -151,14 +192,19 @@ def _run_pyright(paths: Iterable[str], exe: Optional[str]) -> Tuple[int, List[Di
         )
 
     # Per-file diagnostics
-    for f in payload.get("files", []) or []:
-        file_path = f.get("file") or f.get("filePath") or ""
-        for m in f.get("messages", []) or f.get("diagnostics", []):
-            rng = m.get("range") or {}
-            start = rng.get("start") or {}
-            line = (start.get("line", 0) + 1) if isinstance(start, dict) else m.get("line", 1)
-            severity = m.get("severity", "error")
-            message = m.get("message", "")
+    for file_value in _json_list(payload.get("files")):
+        file_item = _json_dict(file_value)
+        file_path = _json_str(file_item.get("file")) or _json_str(file_item.get("filePath"))
+        messages = _json_list(file_item.get("messages")) or _json_list(file_item.get("diagnostics"))
+        for message_value in messages:
+            message_item = _json_dict(message_value)
+            rng = _json_dict(message_item.get("range"))
+            start = _json_dict(rng.get("start"))
+            line = _json_int(start.get("line"), -1) + 1
+            if line <= 0:
+                line = _json_int(message_item.get("line"), 1)
+            severity = _json_str(message_item.get("severity"), "error")
+            message = _json_str(message_item.get("message"))
             diags.append(
                 Diagnostic(
                     path=Path(file_path).as_posix(),
@@ -184,53 +230,45 @@ def _run_ruff(paths: Iterable[str], exe: Optional[str]) -> Tuple[int, List[Diagn
     diags: List[Diagnostic] = []
     if proc.stdout:
         try:
-            payload = json.loads(proc.stdout)
+            payload = cast(dict[str, Any] | list[Any], json.loads(proc.stdout))
             # Ruff's JSON is a mapping from filename -> list of issues, or a list.
             if isinstance(payload, dict):
-                items = payload.get("files") or []
+                items = _json_list(payload.get("files"))
             else:
-                items = payload
+                items = _json_list(payload)
 
-            if isinstance(items, list):
-                for it in items:
-                    # Each item may contain `filename` and `diagnostics` or be an issue directly.
-                    if (
-                        isinstance(it, dict)
-                        and "filename" in it
-                        and ("diagnostics" in it or "messages" in it)
-                    ):
-                        raw_filename = it.get("filename")
-                        filename = raw_filename if isinstance(raw_filename, str) else "<unknown>"
-                        issues = it.get("diagnostics") or it.get("messages") or []
-                        for issue in issues:
-                            line = issue.get("line", 1)
-                            code = issue.get("code", "") or issue.get("rule") or ""
-                            msg = issue.get("message", "")
-                            severity = "error" if (code and code[:1] in ("E", "F")) else "warning"
-                            diags.append(
-                                Diagnostic(
-                                    path=Path(filename).as_posix(),
-                                    line=line,
-                                    severity=severity,
-                                    message=f"{code} {msg}".strip(),
-                                )
-                            )
-                    elif isinstance(it, dict) and all(
-                        k in it for k in ("filename", "line", "code", "message")
-                    ):
-                        raw_filename = it.get("filename")
-                        filename = raw_filename if isinstance(raw_filename, str) else "<unknown>"
-                        severity = (
-                            "error" if str(it.get("code", ""))[:1] in ("E", "F") else "warning"
-                        )
+            for item_value in items:
+                item = _json_dict(item_value)
+                # Each item may contain `filename` and `diagnostics` or be an issue directly.
+                if "filename" in item and ("diagnostics" in item or "messages" in item):
+                    filename = _json_str(item.get("filename"), "<unknown>")
+                    issues = _json_list(item.get("diagnostics")) or _json_list(item.get("messages"))
+                    for issue_value in issues:
+                        issue = _json_dict(issue_value)
+                        line = _json_int(issue.get("line"), 1)
+                        code = _json_str(issue.get("code")) or _json_str(issue.get("rule"))
+                        msg = _json_str(issue.get("message"))
+                        severity = "error" if (code and code[:1] in ("E", "F")) else "warning"
                         diags.append(
                             Diagnostic(
                                 path=Path(filename).as_posix(),
-                                line=it["line"],
+                                line=line,
                                 severity=severity,
-                                message=f"{it.get('code')} {it.get('message')}".strip(),
+                                message=f"{code} {msg}".strip(),
                             )
                         )
+                elif all(key in item for key in ("filename", "line", "code", "message")):
+                    filename = _json_str(item.get("filename"), "<unknown>")
+                    code = _json_str(item.get("code"))
+                    severity = "error" if code[:1] in ("E", "F") else "warning"
+                    diags.append(
+                        Diagnostic(
+                            path=Path(filename).as_posix(),
+                            line=_json_int(item.get("line"), 1),
+                            severity=severity,
+                            message=f"{code} {_json_str(item.get('message'))}".strip(),
+                        )
+                    )
             return proc.returncode, diags
         except Exception:
             # fall through to textual parsing below

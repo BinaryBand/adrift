@@ -60,3 +60,4 @@ select = ["E", "F", "I"]
 venvPath = "."
 venv = ".venv"
 include = ["src", "runbook", "tests", "typings"]
+exclude = ["runbook/analysis"]

@@ -3,7 +3,7 @@ import glob
 import random
 import sys
 from pathlib import Path
-from typing import Any
+from typing import Any, cast
 from urllib.parse import urljoin
 
 import tomllib
@@ -131,19 +131,18 @@ def ensure_source_filter(filters: SourceFilter | dict[str, Any] | None) -> Sourc
         return filters
     if filters is None:
         return SourceFilter()
-    if isinstance(filters, dict):
-        return SourceFilter.model_validate(filters)
-    raise TypeError("filters must be SourceFilter, dict, or None")
+    return SourceFilter.model_validate(filters)
 
 
 def ensure_feed_source(source: FeedSource | dict[str, Any]) -> FeedSource:
     if isinstance(source, FeedSource):
         return source
-    if isinstance(source, dict):
+    try:
         payload = dict(source)
-        payload["filters"] = ensure_source_filter(payload.get("filters"))
-        return FeedSource.model_validate(payload)
-    raise TypeError("source must be FeedSource or dict")
+    except Exception as exc:
+        raise TypeError("source must be FeedSource or dict") from exc
+    payload["filters"] = ensure_source_filter(payload.get("filters"))
+    return FeedSource.model_validate(payload)
 
 
 def ensure_podcast_config(podcast: PodcastConfig | dict[str, Any]) -> PodcastConfig:
@@ -152,16 +151,15 @@ def ensure_podcast_config(podcast: PodcastConfig | dict[str, Any]) -> PodcastCon
             return []
         if not isinstance(raw_sources, list):
             raise TypeError("references/downloads must be a list")
-        return [ensure_feed_source(item) for item in raw_sources]
+        typed_sources = cast(list[FeedSource | dict[str, Any]], raw_sources)
+        return [ensure_feed_source(item) for item in typed_sources]
 
     if isinstance(podcast, PodcastConfig):
         return podcast
-    if isinstance(podcast, dict):
-        payload = dict(podcast)
-        payload["references"] = _ensure_sources_list(payload.get("references"))
-        payload["downloads"] = _ensure_sources_list(payload.get("downloads"))
-        return PodcastConfig.model_validate(payload)
-    raise TypeError("podcast must be PodcastConfig or dict")
+    payload = dict(podcast)
+    payload["references"] = _ensure_sources_list(payload.get("references"))
+    payload["downloads"] = _ensure_sources_list(payload.get("downloads"))
+    return PodcastConfig.model_validate(payload)
 
 
 def parse_podcasts_raw(raw: list[PodcastConfig | dict[str, Any]]) -> list[PodcastConfig]:
@@ -186,12 +184,12 @@ def _load_config(name_or_path: str) -> list[PodcastConfig]:
     podcasts_raw = data.get("podcasts", [])
     if not isinstance(podcasts_raw, list):
         return []
-    configs = parse_podcasts_raw(podcasts_raw)
+    configs = parse_podcasts_raw(cast(list[PodcastConfig | dict[str, Any]], podcasts_raw))
     random.shuffle(configs)
     return configs
 
 
-def _schedule_matches_today(schedule: str, title: str, today: datetime | None = None) -> bool:
+def schedule_matches_today(schedule: str, title: str, today: datetime | None = None) -> bool:
     """Return True if *schedule* yields an occurrence within today's day window."""
     del title
     current = today or datetime.now()
@@ -206,6 +204,13 @@ def _schedule_matches_today(schedule: str, title: str, today: datetime | None = 
     except Exception:
         # Fail closed: if RRULE is malformed we skip this schedule.
         return False
+
+
+_schedule_matches_today = schedule_matches_today
+
+
+def load_config(name_or_path: str) -> list[PodcastConfig]:
+    return _load_config(name_or_path)
 
 
 def _config_schedule_matches_today(config: "PodcastConfig") -> bool:

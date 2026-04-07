@@ -49,6 +49,9 @@ class MetricCheck:
     ceiling: int
 
 
+_DEFAULT_EXCLUDES = ["src/files/s3.py"]
+
+
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="Run complexity checks via lizard")
     parser.add_argument("path", nargs="?", default="src", help="Path to scan")
@@ -68,7 +71,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument(
         "--exclude",
         action="append",
-        default=["src/files/s3.py"],
+        default=list(_DEFAULT_EXCLUDES),
         help="Paths or regex to exclude from lizard (repeatable)",
     )
     return parser.parse_args()
@@ -77,6 +80,7 @@ def parse_args() -> argparse.Namespace:
 def run_lizard(
     path: str, ccn: int, length: int, params: int, exclude: list[str] | None = None
 ) -> str:
+    effective_exclude = _DEFAULT_EXCLUDES if exclude is None else exclude
     cmd = [
         sys.executable,
         "-m",
@@ -89,8 +93,8 @@ def run_lizard(
         "-a",
         str(params),
     ]
-    if exclude:
-        for ex in exclude:
+    if effective_exclude:
+        for ex in effective_exclude:
             cmd.extend(["-x", ex])
     proc = subprocess.run(cmd, capture_output=True, text=True, check=False)
     if proc.returncode not in (0, 1):

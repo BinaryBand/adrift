@@ -1,6 +1,6 @@
 import py_compile
-import traceback
 import sys
+import traceback
 
 files = ["src/files/s3.py", "src/web/rss.py"]
 ok = True

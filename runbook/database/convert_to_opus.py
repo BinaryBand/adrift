@@ -13,7 +13,7 @@ import tempfile
 
 from tqdm import tqdm
 
-from src.app_common import _load_config
+from src.app_common import load_config
 from src.files.s3 import (
     delete_file,
     download_file,
@@ -29,7 +29,7 @@ SYSK_CONFIG_FILE = "config/youtube.toml"
 
 def _get_sysk_path() -> tuple[str, str]:
     """Load SYSK config and return (bucket, prefix)."""
-    configs = _load_config(SYSK_CONFIG_FILE)
+    configs = load_config(SYSK_CONFIG_FILE)
     for config in configs:
         if "stuff-you-should-know" in config.path:
             raw = Path(config.path)

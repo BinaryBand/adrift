@@ -41,14 +41,10 @@ def _list_all_s3_objects(bucket: str, prefix: str = "") -> list[str]:
     paginator = client.get_paginator("list_objects_v2")
     page_iterator = paginator.paginate(Bucket=bucket, Prefix=prefix)
 
-    keys = []
+    keys: list[str] = []
     for page in page_iterator:
         contents = page.get("Contents", [])
-        if not isinstance(contents, list):
-            continue
         for obj in contents:
-            if not isinstance(obj, dict):
-                continue
             key = obj.get("Key")
             if isinstance(key, str):
                 keys.append(key)

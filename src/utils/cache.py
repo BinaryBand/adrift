@@ -17,13 +17,6 @@ from src.files.s3 import (
 )
 
 
-def _remaining_ttl_from_epoch(expires_at_epoch: float | None) -> int | None:
-    if expires_at_epoch is None:
-        return None
-    remaining = int(expires_at_epoch - time.time())
-    return remaining if remaining > 0 else None
-
-
 class _SQLiteCacheStore:
     """Small SQLite wrapper used as the primary cache persistence layer."""
 

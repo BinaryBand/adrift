@@ -237,7 +237,7 @@ def _update_series(config: PodcastConfig) -> None:
         progress.set_description("* Matching episodes")
 
         matches = match(file_names, episode_names, config.name, get_callback(progress))
-        rss_episodes = []
+        rss_episodes: list[RssEpisode] = []
         for f_idx, e_idx in matches:
             episodes[e_idx].content = files[f_idx]
             rss_episodes.append(episodes[e_idx])

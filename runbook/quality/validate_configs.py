@@ -13,11 +13,11 @@ from __future__ import annotations
 
 import argparse
 from pathlib import Path
-from typing import Any, cast
 import re
 import sys
 import time
 import tomllib
+from typing import Any, cast
 
 _ROOT = Path(__file__).parent.parent.parent.resolve()
 sys.path.insert(0, _ROOT.as_posix())
@@ -104,7 +104,8 @@ def validate_file(path: Path, problems: bool = False) -> int:
     from src.app_common import PodcastConfig  # type: ignore
 
     exit_code = 0
-    for i, entry in enumerate(podcasts):
+    podcast_entries = cast(list[object], podcasts)
+    for i, entry in enumerate(podcast_entries):
         try:
             PodcastConfig.model_validate(entry)
         except ValidationError as e:
@@ -128,7 +129,7 @@ def validate_file(path: Path, problems: bool = False) -> int:
                 print(e)
 
     if exit_code == 0 and not problems:
-        print(f"  OK: {len(podcasts)} entries validated")
+        print(f"  OK: {len(podcast_entries)} entries validated")
     return exit_code
 
 
@@ -144,7 +145,7 @@ def _scan_files(files: list[Path], problems: bool) -> int:
     return overall
 
 
-def main():
+def main() -> int:
     parser = argparse.ArgumentParser(description="Validate TOML podcast configs")
     parser.add_argument("files", nargs="*", help="TOML config files to validate")
     parser.add_argument(

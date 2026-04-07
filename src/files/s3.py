@@ -1,3 +1,4 @@
+# pyright: reportUnknownVariableType=false, reportUnknownMemberType=false, reportUnknownArgumentType=false
 import mimetypes
 import os
 import sys
@@ -6,7 +7,7 @@ from dataclasses import dataclass
 from functools import cache, wraps
 from pathlib import Path
 from threading import Lock
-from typing import Any, Callable, ParamSpec, TypeVar
+from typing import Any, Callable, ParamSpec, TypeVar, cast
 from urllib.parse import urljoin
 
 import boto3
@@ -127,13 +128,17 @@ def _is_endpoint_reachable(url: str, timeout: float = 2.0) -> bool:
     """
     try:
         cfg = _make_boto_config(connect_timeout=timeout, read_timeout=timeout, max_attempts=1)
-        client = boto3.client(
-            "s3",
-            aws_access_key_id=S3_USERNAME,
-            aws_secret_access_key=S3_SECRET_KEY,
-            endpoint_url=url,
-            config=cfg,
-            region_name=S3_REGION,
+        boto3_factory: Callable[..., Any] = boto3.client  # pyright: ignore[reportUnknownVariableType]
+        client = cast(  # pyright: ignore[reportUnknownVariableType]
+            S3Client,
+            boto3_factory(
+                "s3",
+                aws_access_key_id=S3_USERNAME,
+                aws_secret_access_key=S3_SECRET_KEY,
+                endpoint_url=url,
+                config=cfg,
+                region_name=S3_REGION,
+            ),
         )
         client.list_buckets()
         return True
@@ -217,18 +222,20 @@ def _build_s3_client() -> S3Client:
     session = boto3.session.Session()
 
     cfg = _make_boto_config()
+    session_factory: Callable[..., Any] = session.client  # pyright: ignore[reportUnknownVariableType]
 
-    client = session.client(
-        service_name="s3",
-        aws_access_key_id=S3_USERNAME,
-        aws_secret_access_key=S3_SECRET_KEY,
-        # Use local shortcut endpoint when available; keep S3_ENDPOINT as public.
-        endpoint_url=_get_effective_s3_endpoint(),
-        config=cfg,
-        region_name=S3_REGION,
+    return cast(  # pyright: ignore[reportUnknownVariableType]
+        S3Client,
+        session_factory(
+            "s3",
+            aws_access_key_id=S3_USERNAME,
+            aws_secret_access_key=S3_SECRET_KEY,
+            # Use local shortcut endpoint when available; keep S3_ENDPOINT as public.
+            endpoint_url=_get_effective_s3_endpoint(),
+            config=cfg,
+            region_name=S3_REGION,
+        ),
     )
-
-    return client
 
 
 @retry(attempts=5, backoff_base=2)
@@ -302,36 +309,6 @@ def _extract_upload_options(
         return _extract_upload_options_from_dict(options)
     except Exception:
         return None, None
-
-
-def _normalize_metadata_raw(metadata_raw: Any) -> S3Metadata | None:
-    if metadata_raw is None:
-        return None
-    try:
-        return MediaMetadata.model_validate(metadata_raw)
-    except Exception:
-        try:
-            return CacheMetadata.model_validate(metadata_raw)
-        except Exception:
-            if isinstance(metadata_raw, (MediaMetadata, CacheMetadata)):
-                return metadata_raw
-    return None
-
-
-def _normalize_callback_raw(callback_raw: Any) -> Callback | None:
-    if not callable(callback_raw):
-        return None
-
-    def _adapted_callback(value: int, total_value: int | None) -> None:
-        try:
-            callback_raw(value, total_value)
-        except TypeError:
-            try:
-                callback_raw(value)
-            except Exception:
-                return
-
-    return _adapted_callback
 
 
 def _extract_upload_options_from_dict(
