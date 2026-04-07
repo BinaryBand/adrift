@@ -145,11 +145,27 @@ def _parse_upload_date(raw: Any) -> datetime | None:
         return None
 
 
-def _parse_ytdlp_pub_date(data: dict[str, Any]) -> datetime | None:
+try:
+    from .ytdlp import YtDlpVideo
+except Exception:
+    # When executed as a script the package-relative import may fail;
+    # fall back to absolute import using the `src` package on sys.path.
+    from src.models.ytdlp import YtDlpVideo
+
+
+def _parse_ytdlp_pub_date(data: YtDlpVideo | dict[str, Any]) -> datetime | None:
+    # Accept either a validated YtDlpVideo model or a raw dict and
+    # normalise to a mapping for existing parsing helpers.
+    mapping: dict[str, Any]
+    if isinstance(data, YtDlpVideo):
+        mapping = data.model_dump()
+    else:
+        mapping = data
+
     for key in ("timestamp", "release_timestamp"):
-        if dt := _from_unix_timestamp(data.get(key)):
+        if dt := _from_unix_timestamp(mapping.get(key)):
             return dt
-    return _parse_upload_date(data.get("upload_date"))
+    return _parse_upload_date(mapping.get("upload_date"))
 
 
 class RssChannel(BaseModel):
@@ -161,15 +177,22 @@ class RssChannel(BaseModel):
     image: str
 
     @classmethod
-    def from_ytdlp(cls, data: dict[str, Any], url: str) -> "RssChannel":
-        """Create RssChannel directly from yt-dlp extract_info response."""
-        title = data.get("uploader") or data.get("title", "")
-        author = data.get("uploader_id", "YouTube")
-        description = data.get("description", "")
+    def from_ytdlp(cls, data: YtDlpVideo | dict[str, Any], url: str) -> "RssChannel":
+        """Create RssChannel directly from yt-dlp extract_info response.
+
+        Accepts either a raw dict (validated into `YtDlpVideo`) or an
+        already-validated `YtDlpVideo` instance.
+        """
+        if not isinstance(data, YtDlpVideo):
+            data = YtDlpVideo.model_validate(data)
+
+        title = data.uploader or data.title or ""
+        author = data.uploader_id or "YouTube"
+        description = data.description or ""
 
         # Extract image from avatar or thumbnails
-        avatar_data = data.get("avatar")
-        thumbnail_data = data.get("thumbnails")
+        avatar_data = data.avatar
+        thumbnail_data = data.thumbnails
         image = cls._extract_image(avatar_data) or cls._extract_image(thumbnail_data)
 
         return cls(
@@ -207,16 +230,19 @@ class RssEpisode(BaseModel):
     _availability: str | None = None
 
     @classmethod
-    def from_ytdlp(cls, data: dict[str, Any], author: str) -> "RssEpisode":
-        """Create RssEpisode from yt-dlp video entry dict."""
-        video_id = data.get("id", "")
-        title = data.get("title", "")
-        description = data.get("description")
-        duration = data.get("duration")
-        availability = data.get("availability", "public")
+    def from_ytdlp(cls, data: YtDlpVideo | dict[str, Any], author: str) -> "RssEpisode":
+        """Create RssEpisode from yt-dlp video entry dict or model."""
+        if not isinstance(data, YtDlpVideo):
+            data = YtDlpVideo.model_validate(data)
+
+        video_id = data.id or ""
+        title = data.title or ""
+        description = data.description
+        duration = data.duration
+        availability = data.availability or "public"
 
         # Construct YouTube URL
-        url = data.get("url") or f"https://youtube.com/watch?v={video_id}"
+        url = data.url or f"https://youtube.com/watch?v={video_id}"
 
         episode = cls(
             id=video_id,
