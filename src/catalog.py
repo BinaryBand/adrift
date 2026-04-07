@@ -14,17 +14,14 @@ from src.app_runner import normalize_title
 from src.models.output import EpisodeData
 from src.utils.progress import Callback
 from src.utils.text import is_youtube_channel, normalize_text
+from src.web import rss as _rss
 from src.web.rss import (
     RssChannel,
     RssEpisode,
     get_rss_channel,
-    get_rss_episodes,
 )
-from src.youtube.metadata import (
-    YtFetchOptions,
-    get_youtube_channel,
-    get_youtube_episodes,
-)
+from src.youtube import metadata as _ytmeta
+from src.youtube.metadata import YtFetchOptions, get_youtube_channel
 
 
 def _similarity_clean(ac: str, bc: str) -> float:
@@ -379,3 +376,8 @@ def process_feeds(config: PodcastConfig, callback: Callback | None = None) -> li
     source_episodes = _collect_episodes(config.references, title, True, callback)
 
     return source_episodes
+
+
+# Compatibility aliases: tests may patch these names on the `src.catalog` module.
+get_rss_episodes = _rss.get_rss_episodes
+get_youtube_episodes = _ytmeta.get_youtube_episodes
