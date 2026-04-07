@@ -121,7 +121,9 @@ class TestUploadThumbnail(unittest.TestCase):
         mock_response.headers = {"Content-Type": "image/jpeg"}
         mock_get.return_value = mock_response
 
-        mock_urljoin.return_value = "https://s3.example.com/media/podcasts/_thumbs/by-hash/deadbeef.webp"
+        mock_urljoin.return_value = (
+            "https://s3.example.com/media/podcasts/_thumbs/by-hash/deadbeef.webp"
+        )
 
         result = upload_thumbnail("https://example.com/thumb.jpg", "Test Author", "test_123")
 
