@@ -29,8 +29,8 @@ class TestDownloadService(unittest.TestCase):
         with patch("src.orchestration.download_service.load_podcasts_config", return_value=configs):
             result = run_download_pipeline(
                 DownloadRunRequest(include=["config/podcasts.toml"], max_downloads=3),
-                download_series=fake_download,
-                update_series=fake_update,
+                download_series_fn=fake_download,
+                update_series_fn=fake_update,
             )
 
         self.assertEqual(result.total_series, 2)
@@ -67,8 +67,8 @@ class TestDownloadService(unittest.TestCase):
             ):
                 run_download_pipeline(
                     DownloadRunRequest(include=["config/podcasts.toml"], workdir=workdir),
-                    download_series=fake_download,
-                    update_series=fake_update,
+                    download_series_fn=fake_download,
+                    update_series_fn=fake_update,
                 )
 
         self.assertEqual(Path.cwd(), original_cwd)
