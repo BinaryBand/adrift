@@ -12,11 +12,12 @@ from random import shuffle
 import dotenv
 from tqdm import tqdm
 
-sys.path.insert(0, Path(dotenv.find_dotenv()).parent.as_posix())
+PROJECT_ROOT = Path(dotenv.find_dotenv()).parent
+
+sys.path.insert(0, PROJECT_ROOT.as_posix())
 dotenv.load_dotenv()
 
-import src.youtube.downloader as yt_downloader
-from src.app_common import PodcastConfig, ensure_podcast_config, load_podcasts_config
+from src.app_common import PodcastConfig
 from src.app_runner import get_s3_files, normalize_title
 from src.catalog import (
     align_episodes,
@@ -28,17 +29,13 @@ from src.catalog import (
 from src.files.audio import convert_to_opus, get_duration, is_audio
 from src.files.s3 import download_file, exists, upload_file
 from src.models import DEVICE, MediaMetadata
+from src.orchestration import DownloadRunRequest, run_download_pipeline
 from src.utils.progress import get_callback
 from src.utils.regex import YOUTUBE_VIDEO_REGEX
 from src.web.rss import RssChannel, RssEpisode, download_direct, podcast_to_rss
 from src.web.sponsorblock import fetch_sponsor_segments, remove_sponsors
 from src.youtube.downloader import BotDetectionError, download_video
 from src.youtube.metadata import get_video_info
-
-# Ask the YouTube downloader to propagate bot-detection errors so this
-# runbook can stop further YouTube downloads when detection occurs.
-yt_downloader.PROPAGATE_BOT_DETECTION = True
-
 
 DF_TARGETS = ["config/*.toml"]
 
@@ -264,34 +261,17 @@ def main() -> None:
         help="Maximum total number of new episode downloads across all series (default: unlimited)",
     )
     args = parser.parse_args()
-
-    configs: list[PodcastConfig] = load_podcasts_config(include=args.include)
-    # Coerce any legacy dict entries to canonical `PodcastConfig`
-    configs = [ensure_podcast_config(c) for c in configs]
-    print(f"Processing {len(configs)} podcast(s)")
-
-    remaining = args.max_downloads
-    for config in configs:
-        if not args.skip_download:
-            if remaining is not None and remaining <= 0:
-                print("Download budget exhausted; skipping remaining series.")
-                break
-            try:
-                print(f"Downloading series: {config.name}")
-                n = _download_series(config, budget=remaining)
-                print(f"Successfully downloaded series: {config.name} ({n} new)")
-                if remaining is not None:
-                    remaining -= n
-            except Exception as e:
-                print(f"ERROR: Failed to download series {config.name}: {e}")
-
-        if not args.skip_update:
-            try:
-                print(f"Updating series: {config.name}")
-                _update_series(config)
-                print(f"Successfully updated series: {config.name}")
-            except Exception as e:
-                print(f"ERROR: Failed to update series {config.name}: {e}")
+    run_download_pipeline(
+        DownloadRunRequest(
+            include=args.include,
+            skip_download=args.skip_download,
+            skip_update=args.skip_update,
+            max_downloads=args.max_downloads,
+            workdir=PROJECT_ROOT,
+        ),
+        download_series=_download_series,
+        update_series=_update_series,
+    )
 
 
 if __name__ == "__main__":
