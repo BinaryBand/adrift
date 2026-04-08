@@ -44,11 +44,22 @@ class TestUploadThumbnail(unittest.TestCase):
     @patch("src.web.rss.requests.get")
     @patch("src.web.rss.make_square_image_to")
     @patch("src.web.rss.upload_file")
+    @patch("src.web.rss.get_hash_dedupe")
+    @patch("src.web.rss.remember_hash_dedupe")
+    @patch("src.web.rss.remember_episode_dedupe")
     def test_downloads_and_uploads_new_thumbnail(
-        self, mock_upload, mock_square, mock_get, mock_exists
+        self,
+        mock_remember_episode,
+        mock_remember_hash,
+        mock_get_hash_dedupe,
+        mock_upload,
+        mock_square,
+        mock_get,
+        mock_exists,
     ):
         """Test downloading and uploading a new thumbnail."""
         mock_exists.return_value = None
+        mock_get_hash_dedupe.return_value = None
 
         def _fake_square(_input_path, output_path, output_format="WEBP", quality=80):
             output_path.write_bytes(b"fake_transcoded_data")
@@ -71,6 +82,8 @@ class TestUploadThumbnail(unittest.TestCase):
         mock_upload.assert_called_once()
         self.assertIn(".webp", mock_upload.call_args[0][1])
         self.assertIn("podcasts/_thumbs/by-hash/", mock_upload.call_args[0][1])
+        mock_remember_hash.assert_called_once()
+        mock_remember_episode.assert_called_once()
 
     @patch("src.web.rss.exists")
     @patch("src.web.rss.requests.get")
@@ -102,10 +115,22 @@ class TestUploadThumbnail(unittest.TestCase):
     @patch("src.web.rss.requests.get")
     @patch("src.web.rss.make_square_image_to")
     @patch("src.web.rss.upload_file")
+    @patch("src.web.rss.get_hash_dedupe")
+    @patch("src.web.rss.remember_hash_dedupe")
+    @patch("src.web.rss.remember_episode_dedupe")
     def test_reuses_canonical_hash_image_when_available(
-        self, mock_upload, mock_square, mock_get, mock_exists, mock_urljoin
+        self,
+        mock_remember_episode,
+        mock_remember_hash,
+        mock_get_hash_dedupe,
+        mock_upload,
+        mock_square,
+        mock_get,
+        mock_exists,
+        mock_urljoin,
     ):
         """When canonical hash image exists, do not upload a duplicate thumbnail."""
+        mock_get_hash_dedupe.return_value = None
 
         # 1st exists(): no per-episode thumbnail yet; 2nd exists(): canonical hash exists
         mock_exists.side_effect = [None, "deadbeef.webp"]
@@ -132,6 +157,8 @@ class TestUploadThumbnail(unittest.TestCase):
             "https://s3.example.com/media/podcasts/_thumbs/by-hash/deadbeef.webp",
         )
         mock_upload.assert_not_called()
+        mock_remember_hash.assert_called_once()
+        mock_remember_episode.assert_called_once()
 
 
 class TestExtractImageUrl(unittest.TestCase):

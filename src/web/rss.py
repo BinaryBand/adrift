@@ -5,6 +5,7 @@ import sys
 import tempfile
 import uuid
 import xml.etree.ElementTree as ET
+from dataclasses import dataclass
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import Any, cast
@@ -25,11 +26,26 @@ from src.files.images import make_square_image_to
 from src.files.s3 import S3_ENDPOINT, exists, upload_file
 from src.models import RssChannel, RssEpisode
 from src.utils.crypto import get_file_hash
+from src.utils.image_dedupe_index import (
+    HashDedupeEntry,
+    get_hash_dedupe,
+    remember_episode_dedupe,
+    remember_hash_dedupe,
+)
 from src.utils.progress import Callback
 from src.utils.regex import LINK_REGEX, re_compile
 from src.utils.text import create_slug, is_youtube_channel, remove_control_chars
 
 _THUMB_HASH_BASE = Path("podcasts/_thumbs/by-hash")
+
+
+@dataclass(frozen=True)
+class _StagedThumbnail:
+    output_file: Path
+    file_hash: str
+    output_ext: str
+    old_size: int
+    new_size: int
 
 
 def get_rss_episodes_from_source(
@@ -126,6 +142,18 @@ def _stage_thumbnail_bytes(data: bytes, id: str, ext: str) -> tuple[Path, str, i
     raise RuntimeError(f"Failed to transcode thumbnail for {id}")
 
 
+def _stage_thumbnail(data: bytes, id: str, ext: str) -> _StagedThumbnail:
+    source_file, output_ext, old_size, new_size = _stage_thumbnail_bytes(data, id, ext)
+    output_file = source_file.with_suffix(output_ext)
+    return _StagedThumbnail(
+        output_file=output_file,
+        file_hash=get_file_hash(output_file),
+        output_ext=output_ext,
+        old_size=old_size,
+        new_size=new_size,
+    )
+
+
 def _existing_thumbnail_s3_path(path_base: Path, image_path: str) -> str | None:
     existing_name = exists("media", image_path)
     if not existing_name:
@@ -153,8 +181,36 @@ def _log_thumbnail_compression(id: str, old_size: int, new_size: int, output_ext
 
 
 def _upload_canonical_thumbnail(output_file: Path, output_ext: str, file_hash: str) -> str | None:
+    return upload_file("media", _canonical_thumbnail_key(file_hash, output_ext), output_file)
+
+
+def _canonical_thumbnail_key(file_hash: str, output_ext: str) -> str:
     canonical_stem = (_THUMB_HASH_BASE / file_hash).as_posix()
-    return upload_file("media", f"{canonical_stem}{output_ext}", output_file)
+    return f"{canonical_stem}{output_ext}"
+
+
+def _remember_dedupe_entries(
+    author_slug: str, id: str, staged: _StagedThumbnail, canonical_url: str
+) -> None:
+    canonical_key = _canonical_thumbnail_key(staged.file_hash, staged.output_ext)
+    remember_episode_dedupe(author_slug, id, staged.file_hash, canonical_url)
+    if get_hash_dedupe(staged.file_hash) is None:
+        remember_hash_dedupe(HashDedupeEntry(
+            file_hash=staged.file_hash,
+            canonical_key=canonical_key,
+            canonical_url=canonical_url,
+            output_ext=staged.output_ext,
+            source_bytes=staged.old_size,
+            encoded_bytes=staged.new_size,
+        ))
+
+
+def _download_and_stage(thumbnail_url: str, id: str) -> _StagedThumbnail | None:
+    data, content_type = _download_thumbnail_bytes(thumbnail_url)
+    ext = _ext_for_content_type(content_type)
+    if ext is None:
+        return None
+    return _stage_thumbnail(data, id, ext)
 
 
 def _upload_thumbnail_pipeline(thumbnail_url: str, author: str, id: str) -> str | None:
@@ -167,20 +223,21 @@ def _upload_thumbnail_pipeline(thumbnail_url: str, author: str, id: str) -> str 
     if existing:
         return existing
 
-    data, content_type = _download_thumbnail_bytes(thumbnail_url)
-    ext = _ext_for_content_type(content_type)
-    if ext is None:
+    staged = _download_and_stage(thumbnail_url, id)
+    if staged is None:
         return None
 
-    source_file, output_ext, old_size, new_size = _stage_thumbnail_bytes(data, id, ext)
-    output_file = source_file.with_suffix(output_ext)
-    file_hash = get_file_hash(output_file)
-    if existing := _canonical_thumbnail_url(file_hash):
-        print(f"Thumbnail dedup hit for {id}: using canonical hash {file_hash}")
+    if existing := _canonical_thumbnail_url(staged.file_hash):
+        print(f"Thumbnail dedup hit for {id}: using canonical hash {staged.file_hash}")
+        _remember_dedupe_entries(author_slug, id, staged, existing)
         return existing
 
-    _log_thumbnail_compression(id, old_size, new_size, output_ext)
-    return _upload_canonical_thumbnail(output_file, output_ext, file_hash)
+    _log_thumbnail_compression(id, staged.old_size, staged.new_size, staged.output_ext)
+    uploaded = _upload_canonical_thumbnail(staged.output_file, staged.output_ext, staged.file_hash)
+    if uploaded is None:
+        return None
+    _remember_dedupe_entries(author_slug, id, staged, uploaded)
+    return uploaded
 
 
 def _extract_image_url(channel: FeedParserDict) -> str:

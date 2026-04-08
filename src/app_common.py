@@ -215,11 +215,10 @@ def load_config(name_or_path: str) -> list[PodcastConfig]:
 
 
 def _config_schedule_matches_today(config: "PodcastConfig") -> bool:
-    # """Return True if any RRULE in config.schedule matches today, or if schedule is empty."""
-    # if not config.schedule:
-    #     return True
-    # return any(_schedule_matches_today(rule, config.name) for rule in config.schedule)
-    return True
+    """Return True if any RRULE in config.schedule matches today, or if schedule is empty."""
+    if not config.schedule:
+        return True
+    return any(_schedule_matches_today(rule, config.name) for rule in config.schedule)
 
 
 def load_podcasts_config(include: list[str]) -> list[PodcastConfig]:
