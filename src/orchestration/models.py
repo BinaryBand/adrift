@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Callable
+from typing import Callable, List, cast
 
 LogCallback = Callable[[str], None]
 
@@ -28,5 +28,5 @@ class FailedSeries:
 class DownloadRunResult:
     total_series: int
     total_episodes_downloaded: int
-    failed_series: list[FailedSeries] = field(default_factory=list)
+    failed_series: List[FailedSeries] = field(default_factory=lambda: cast(List[FailedSeries], []))
     bot_detected: bool = False

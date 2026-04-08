@@ -9,7 +9,7 @@ from dataclasses import dataclass, field
 from datetime import datetime
 from pathlib import Path
 from random import shuffle
-from typing import Callable
+from typing import Callable, List, cast
 
 from tqdm import tqdm
 
@@ -45,7 +45,7 @@ class _DownloadContext:
 class _PipelineState:
     remaining: int | None
     total_downloaded: int = 0
-    failed_series: list[FailedSeries] = field(default_factory=list)
+    failed_series: List[FailedSeries] = field(default_factory=lambda: cast(List[FailedSeries], []))
     bot_detected: bool = False
 
 
@@ -75,7 +75,7 @@ def _youtube_metadata_from_source(source: str) -> tuple[float | None, datetime |
 
 def _load_local_duration_and_date(
     bucket: str, prefix: Path, fallback_date: datetime | None
-) -> tuple[float, datetime | None]:
+) -> tuple[float | None, datetime | None]:
     with tempfile.TemporaryDirectory() as temp_dir:
         suffix = prefix.suffix
         staging_file = Path(temp_dir) / f"temp_audio{suffix}"
