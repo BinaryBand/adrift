@@ -9,21 +9,39 @@ dotenv.load_dotenv()
 
 import argparse
 import tempfile
+from urllib.parse import urljoin
 
 from PIL import Image
 from tqdm import tqdm
 
 from runbook.database._convert_common import collect_podcast_targets, format_bytes
+
+# Dedupe helpers
+from src.files.images import make_square_image_to
 from src.files.s3 import (
+    S3_ENDPOINT,
+    copy_file,
     delete_file,
     download_file,
+    exists,
     get_file_list,
     get_metadata,
     set_metadata,
     upload_file,
 )
+from src.utils.crypto import get_file_hash
+from src.utils.image_dedupe_index import (
+    HashDedupeEntry,
+    find_similar_by_phash,
+    get_hash_dedupe,
+    remember_episode_dedupe,
+    remember_hash_dedupe,
+)
+from src.utils.image_phash import average_hash
 
 _IMAGE_EXTENSIONS = {".jpg", ".jpeg", ".png"}
+
+_THUMB_HASH_BASE = Path("podcasts/_thumbs/by-hash")
 
 
 def _image_prefixes(prefix: str) -> list[str]:
@@ -68,7 +86,160 @@ def _convert_key(bucket: str, prefix: str, filename: str, dry_run: bool) -> bool
             input_path.parent.mkdir(parents=True, exist_ok=True)
             output_path.parent.mkdir(parents=True, exist_ok=True)
 
+            # Download source
             download_file(bucket, old_key, input_path)
+
+            # Create a normalized WEBP for dedupe (square, same pipeline as uploads)
+            normalized_file = tmpdir_path / f"{Path(filename).stem}.norm.webp"
+            normalized_ok = False
+            try:
+                normalized_ok = make_square_image_to(
+                    input_path, normalized_file, output_format="WEBP", quality=80
+                )
+            except Exception:
+                normalized_ok = False
+
+            file_hash = None
+            phash = None
+            if normalized_ok and normalized_file.exists():
+                try:
+                    file_hash = get_file_hash(normalized_file)
+                except Exception:
+                    file_hash = None
+                try:
+                    phash = average_hash(normalized_file)
+                except Exception:
+                    phash = None
+
+            # If we have a normalized hash, check for existing canonical or perceptual matches
+            canonical_url: str | None = None
+            if file_hash:
+                canonical_stem = (_THUMB_HASH_BASE / file_hash).as_posix()
+                existing_canonical = exists(bucket, canonical_stem)
+                if existing_canonical:
+                    canonical_path = (
+                        Path(bucket) / _THUMB_HASH_BASE / existing_canonical
+                    ).as_posix()
+                    canonical_url = urljoin(S3_ENDPOINT, canonical_path)
+                    # Record episode->hash mapping (use filename stem as episode id)
+                    try:
+                        author_slug = Path(prefix).name
+                        episode_id = Path(filename).with_suffix("").as_posix()
+                        remember_episode_dedupe(author_slug, episode_id, file_hash, canonical_url)
+                    except Exception:
+                        pass
+                else:
+                    # Try perceptual match
+                    try:
+                        similar = None
+                        if phash:
+                            similar = find_similar_by_phash(phash)
+                        if similar is not None:
+                            # Attempt to copy the existing canonical blob to the canonical key
+                            canonical_key = f"{canonical_stem}.webp"
+                            try:
+                                uploaded = copy_file(bucket, similar.canonical_key, canonical_key)
+                                if uploaded is not None:
+                                    canonical_url = uploaded
+                                    print(
+                                        "Copied canonical from"
+                                        f" {similar.canonical_key} to {canonical_key} ->"
+                                        f" {uploaded}"
+                                    )
+                                    try:
+                                        entry = HashDedupeEntry(
+                                            file_hash=file_hash,
+                                            canonical_key=canonical_key,
+                                            canonical_url=uploaded,
+                                            output_ext=similar.output_ext,
+                                            source_bytes=input_path.stat().st_size,
+                                            encoded_bytes=normalized_file.stat().st_size,
+                                            phash=phash,
+                                        )
+                                        if get_hash_dedupe(file_hash) is None:
+                                            remember_hash_dedupe(entry)
+                                    except Exception:
+                                        pass
+                                    try:
+                                        author_slug = Path(prefix).name
+                                        episode_id = Path(filename).with_suffix("").as_posix()
+                                        remember_episode_dedupe(
+                                            author_slug, episode_id, file_hash, uploaded
+                                        )
+                                    except Exception:
+                                        pass
+                                else:
+                                    # fallback: map to the similar file if copy failed
+                                    canonical_url = similar.canonical_url
+                                    print(
+                                        "Copy failed for"
+                                        f" {filename}: mapping to existing canonical"
+                                        f" {similar.canonical_key}"
+                                    )
+                                    try:
+                                        author_slug = Path(prefix).name
+                                        episode_id = Path(filename).with_suffix("").as_posix()
+                                        remember_episode_dedupe(
+                                            author_slug,
+                                            episode_id,
+                                            similar.file_hash,
+                                            similar.canonical_url,
+                                        )
+                                    except Exception:
+                                        pass
+                            except Exception:
+                                # on any copy error fallback to mapping to existing canonical
+                                canonical_url = similar.canonical_url
+                                try:
+                                    author_slug = Path(prefix).name
+                                    episode_id = Path(filename).with_suffix("").as_posix()
+                                    remember_episode_dedupe(
+                                        author_slug,
+                                        episode_id,
+                                        similar.file_hash,
+                                        similar.canonical_url,
+                                    )
+                                except Exception:
+                                    pass
+                    except Exception:
+                        similar = None
+
+                # If no canonical found via exact or perceptual match,
+                # register this normalized file as canonical
+                if canonical_url is None and file_hash:
+                    try:
+                        canonical_key = f"{canonical_stem}.webp"
+                        uploaded = upload_file(bucket, canonical_key, normalized_file)
+                        if uploaded is not None:
+                            print(f"Uploaded canonical {canonical_key} -> {uploaded}")
+                            # Remember hash entry
+                            try:
+                                entry = HashDedupeEntry(
+                                    file_hash=file_hash,
+                                    canonical_key=canonical_key,
+                                    canonical_url=uploaded,
+                                    output_ext=".webp",
+                                    source_bytes=input_path.stat().st_size,
+                                    encoded_bytes=normalized_file.stat().st_size,
+                                    phash=phash,
+                                )
+                                if get_hash_dedupe(file_hash) is None:
+                                    remember_hash_dedupe(entry)
+                            except Exception:
+                                pass
+                            try:
+                                author_slug = Path(prefix).name
+                                episode_id = Path(filename).with_suffix("").as_posix()
+                                remember_episode_dedupe(
+                                    author_slug, episode_id, file_hash, uploaded
+                                )
+                            except Exception:
+                                pass
+                    except Exception:
+                        # If upload failed, continue with per-file conversion
+                        canonical_url = None
+
+            # Perform the per-file conversion (preserve current behavior)
             _convert_image_to_webp(input_path, output_path)
 
             old_size = input_path.stat().st_size

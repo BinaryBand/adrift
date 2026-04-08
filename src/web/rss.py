@@ -23,7 +23,7 @@ sys.path.insert(0, Path(__file__).parent.parent.parent.as_posix())
 from src.app_common import FeedSource, ensure_feed_source
 from src.files.audio import AUDIO_EXTENSIONS, parse_duration
 from src.files.images import make_square_image_to
-from src.files.s3 import S3_ENDPOINT, exists, upload_file
+from src.files.s3 import S3_ENDPOINT, copy_file, exists, upload_file
 from src.models import RssChannel, RssEpisode
 from src.utils.crypto import get_file_hash
 from src.utils.image_dedupe_index import (
@@ -227,6 +227,53 @@ def _download_and_stage(thumbnail_url: str, id: str) -> _StagedThumbnail | None:
     return _stage_thumbnail(data, id, ext)
 
 
+def _copy_similar_canonical(
+    similar: HashDedupeEntry, staged: _StagedThumbnail, author_slug: str, id: str
+) -> str | None:
+    canonical_key = _canonical_thumbnail_key(staged.file_hash, staged.output_ext)
+    try:
+        copied = copy_file("media", similar.canonical_key, canonical_key)
+        if copied is None:
+            return None
+
+        print(
+            "Thumbnail perceptual dedupe hit for {}: copied canonical from {} to {}".format(
+                id, similar.file_hash, staged.file_hash
+            )
+        )
+
+        _remember_hash_entry(staged, canonical_key, copied)
+        _remember_episode_entry(author_slug, id, staged.file_hash, copied)
+
+        return copied
+    except Exception:
+        return None
+
+
+def _remember_hash_entry(staged: _StagedThumbnail, canonical_key: str, copied: str) -> None:
+    try:
+        remember_hash_dedupe(
+            HashDedupeEntry(
+                file_hash=staged.file_hash,
+                canonical_key=canonical_key,
+                canonical_url=copied,
+                output_ext=staged.output_ext,
+                source_bytes=staged.old_size,
+                encoded_bytes=staged.new_size,
+                phash=staged.phash,
+            )
+        )
+    except Exception:
+        pass
+
+
+def _remember_episode_entry(author_slug: str, id: str, file_hash: str, url: str) -> None:
+    try:
+        remember_episode_dedupe(author_slug, id, file_hash, url)
+    except Exception:
+        pass
+
+
 def _upload_thumbnail_pipeline(thumbnail_url: str, author: str, id: str) -> str | None:
     """Pipeline implementation for thumbnail upload (replaceable stages)."""
     author_slug = create_slug(author)
@@ -254,10 +301,6 @@ def _upload_thumbnail_pipeline(thumbnail_url: str, author: str, id: str) -> str 
 
 
 def _find_canonical_for_staged(staged: _StagedThumbnail, id: str, author_slug: str) -> str | None:
-    """Check exact and perceptual canonical entries for a staged thumbnail.
-
-    Returns the canonical URL if found, otherwise `None`.
-    """
     existing = _canonical_thumbnail_url(staged.file_hash)
     if existing:
         print("Thumbnail dedup hit for {}: using canonical hash {}".format(id, staged.file_hash))
@@ -269,12 +312,15 @@ def _find_canonical_for_staged(staged: _StagedThumbnail, id: str, author_slug: s
     similar = find_similar_by_phash(staged.phash)
     if similar is None:
         return None
-    print(
-        "Thumbnail perceptual dedupe hit for {}: using canonical hash {}".format(
-            id, similar.file_hash
-        )
-    )
-    remember_episode_dedupe(author_slug, id, similar.file_hash, similar.canonical_url)
+
+    # Prefer copying the existing canonical blob to a canonical key for this file_hash
+    copied = _copy_similar_canonical(similar, staged, author_slug, id)
+    if copied is not None:
+        return copied
+
+    # fallback to mapping to the similar existing canonical
+    print(f"Thumbnail perceptual dedupe hit for {id}: using canonical hash {similar.file_hash}")
+    _remember_episode_entry(author_slug, id, similar.file_hash, similar.canonical_url)
     return similar.canonical_url
 
 

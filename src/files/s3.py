@@ -451,6 +451,41 @@ def rename_file(bucket: str, old_key: str, new_key: str) -> None:
     _s3_cache().delete(old_cache_key)
 
 
+@retry(attempts=3, backoff_base=2)
+def copy_file(bucket: str, source_key: str, dest_key: str) -> str | None:
+    """Copy an object within the same bucket and return its public URL.
+
+    Updates the local S3 metadata cache to reflect the copied object when possible.
+    """
+    client: S3Client = get_s3_client()
+    copy_source: CopySourceTypeDef = {"Bucket": bucket, "Key": source_key}
+    client.copy_object(
+        Bucket=bucket,
+        Key=dest_key,
+        CopySource=copy_source,
+        MetadataDirective="COPY",
+        ACL="public-read",
+    )
+
+    src_cache_key = f"s3_metadata:{bucket}:{source_key}"
+    dst_cache_key = f"s3_metadata:{bucket}:{dest_key}"
+    metadata = _s3_cache().get(src_cache_key)
+    if metadata is not None:
+        _s3_cache().set(dst_cache_key, metadata)
+    else:
+        try:
+            head_response = client.head_object(Bucket=bucket, Key=dest_key)
+            metadata = head_response.get("Metadata", {})
+            _s3_cache().set(dst_cache_key, metadata)
+        except Exception:
+            # best-effort: ignore cache update failures
+            pass
+
+    return urljoin(
+        _secret_provider.get("S3_ENDPOINT", S3_ENDPOINT), Path(bucket, dest_key).as_posix()
+    )
+
+
 def get_metadata(bucket: str, key: str) -> MediaMetadata | None:
     key = Path(key).as_posix()
     cache_key = f"s3_metadata:{bucket}:{key}"
