@@ -28,10 +28,12 @@ from src.models import RssChannel, RssEpisode
 from src.utils.crypto import get_file_hash
 from src.utils.image_dedupe_index import (
     HashDedupeEntry,
+    find_similar_by_phash,
     get_hash_dedupe,
     remember_episode_dedupe,
     remember_hash_dedupe,
 )
+from src.utils.image_phash import average_hash
 from src.utils.progress import Callback
 from src.utils.regex import LINK_REGEX, re_compile
 from src.utils.text import create_slug, is_youtube_channel, remove_control_chars
@@ -46,6 +48,7 @@ class _StagedThumbnail:
     output_ext: str
     old_size: int
     new_size: int
+    phash: str | None = None
 
 
 def get_rss_episodes_from_source(
@@ -145,12 +148,20 @@ def _stage_thumbnail_bytes(data: bytes, id: str, ext: str) -> tuple[Path, str, i
 def _stage_thumbnail(data: bytes, id: str, ext: str) -> _StagedThumbnail:
     source_file, output_ext, old_size, new_size = _stage_thumbnail_bytes(data, id, ext)
     output_file = source_file.with_suffix(output_ext)
+    file_hash = get_file_hash(output_file)
+    phash = None
+    try:
+        phash = average_hash(output_file)
+    except Exception:
+        phash = None
+
     return _StagedThumbnail(
         output_file=output_file,
-        file_hash=get_file_hash(output_file),
+        file_hash=file_hash,
         output_ext=output_ext,
         old_size=old_size,
         new_size=new_size,
+        phash=phash,
     )
 
 
@@ -195,14 +206,17 @@ def _remember_dedupe_entries(
     canonical_key = _canonical_thumbnail_key(staged.file_hash, staged.output_ext)
     remember_episode_dedupe(author_slug, id, staged.file_hash, canonical_url)
     if get_hash_dedupe(staged.file_hash) is None:
-        remember_hash_dedupe(HashDedupeEntry(
-            file_hash=staged.file_hash,
-            canonical_key=canonical_key,
-            canonical_url=canonical_url,
-            output_ext=staged.output_ext,
-            source_bytes=staged.old_size,
-            encoded_bytes=staged.new_size,
-        ))
+        remember_hash_dedupe(
+            HashDedupeEntry(
+                file_hash=staged.file_hash,
+                canonical_key=canonical_key,
+                canonical_url=canonical_url,
+                output_ext=staged.output_ext,
+                source_bytes=staged.old_size,
+                encoded_bytes=staged.new_size,
+                phash=staged.phash,
+            )
+        )
 
 
 def _download_and_stage(thumbnail_url: str, id: str) -> _StagedThumbnail | None:
@@ -227,9 +241,8 @@ def _upload_thumbnail_pipeline(thumbnail_url: str, author: str, id: str) -> str 
     if staged is None:
         return None
 
-    if existing := _canonical_thumbnail_url(staged.file_hash):
-        print(f"Thumbnail dedup hit for {id}: using canonical hash {staged.file_hash}")
-        _remember_dedupe_entries(author_slug, id, staged, existing)
+    existing = _find_canonical_for_staged(staged, id, author_slug)
+    if existing:
         return existing
 
     _log_thumbnail_compression(id, staged.old_size, staged.new_size, staged.output_ext)
@@ -238,6 +251,31 @@ def _upload_thumbnail_pipeline(thumbnail_url: str, author: str, id: str) -> str 
         return None
     _remember_dedupe_entries(author_slug, id, staged, uploaded)
     return uploaded
+
+
+def _find_canonical_for_staged(staged: _StagedThumbnail, id: str, author_slug: str) -> str | None:
+    """Check exact and perceptual canonical entries for a staged thumbnail.
+
+    Returns the canonical URL if found, otherwise `None`.
+    """
+    existing = _canonical_thumbnail_url(staged.file_hash)
+    if existing:
+        print("Thumbnail dedup hit for {}: using canonical hash {}".format(id, staged.file_hash))
+        _remember_dedupe_entries(author_slug, id, staged, existing)
+        return existing
+
+    if not staged.phash:
+        return None
+    similar = find_similar_by_phash(staged.phash)
+    if similar is None:
+        return None
+    print(
+        "Thumbnail perceptual dedupe hit for {}: using canonical hash {}".format(
+            id, similar.file_hash
+        )
+    )
+    remember_episode_dedupe(author_slug, id, similar.file_hash, similar.canonical_url)
+    return similar.canonical_url
 
 
 def _extract_image_url(channel: FeedParserDict) -> str:

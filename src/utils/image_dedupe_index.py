@@ -1,9 +1,11 @@
 import functools
+import pickle
 from dataclasses import asdict, dataclass, field
 from datetime import datetime, timezone
-from typing import cast
+from typing import Any, List, Optional, cast
 
 from src.utils.cache import S3Cache
+from src.utils.image_phash import hamming_distance
 
 _IMAGE_DEDUPE_CACHE_DIR = ".cache/image-dedupe"
 _IMAGE_DEDUPE_CACHE_PREFIX = "image-dedupe"
@@ -22,6 +24,7 @@ class HashDedupeEntry:
     output_ext: str
     source_bytes: int
     encoded_bytes: int
+    phash: Optional[str] = None
     seen_at: str = field(default_factory=lambda: datetime.now(timezone.utc).isoformat())
 
 
@@ -62,6 +65,8 @@ def _require_int(d: dict[str, object], key: str) -> int:
 
 def _parse_hash_entry(value: dict[str, object]) -> HashDedupeEntry | None:
     try:
+        phash_raw = value.get("phash")
+        phash_val: Optional[str] = phash_raw if isinstance(phash_raw, str) else None
         return HashDedupeEntry(
             file_hash=_require_str(value, "file_hash"),
             canonical_key=_require_str(value, "canonical_key"),
@@ -69,6 +74,7 @@ def _parse_hash_entry(value: dict[str, object]) -> HashDedupeEntry | None:
             output_ext=_require_str(value, "output_ext"),
             source_bytes=_require_int(value, "source_bytes"),
             encoded_bytes=_require_int(value, "encoded_bytes"),
+            phash=phash_val,
             seen_at=_require_str(value, "seen_at"),
         )
     except TypeError:
@@ -113,6 +119,78 @@ def get_hash_dedupe(file_hash: str) -> HashDedupeEntry | None:
     if not isinstance(raw_value, dict):
         return None
     return _parse_hash_entry(cast(dict[str, object], raw_value))
+
+
+def _list_hash_entries() -> List[HashDedupeEntry]:
+    """Return all stored hash dedupe entries by scanning the local sqlite cache."""
+    try:
+        conn = cast(Any, _image_dedupe_cache().sqlite_cache)._connect()
+    except Exception:
+        return []
+
+    try:
+        query = "SELECT value FROM cache_entries WHERE key LIKE ?"
+        rows = conn.execute(query, ("thumb:hash:%",)).fetchall()
+    except Exception:
+        return []
+
+    # Parse rows in a single comprehension to keep cyclomatic complexity low.
+    return [entry for (val_blob,) in rows if (entry := _parse_blob_row(val_blob)) is not None]
+
+
+def _parse_blob_row(val_blob: bytes) -> HashDedupeEntry | None:
+    val = _safe_unpickle(val_blob)
+    if not isinstance(val, dict):
+        return None
+    return _parse_hash_entry(cast(dict[str, object], val))
+
+
+def find_similar_by_phash(phash: str, max_distance: int = 6) -> HashDedupeEntry | None:
+    """Find the most similar stored hash entry by perceptual hash within `max_distance`.
+
+    Returns the best matching `HashDedupeEntry` or `None` when no candidate is within
+    `max_distance`.
+    """
+    if not phash:
+        return None
+
+    if not phash:
+        return None
+
+    # Delegate candidate generation to a generator kept minimal to reduce CCN.
+    candidates = _iter_phash_candidates(phash)
+    best = min(candidates, default=None, key=lambda t: t[0])
+    if best is None:
+        return None
+    if best[0] <= max_distance:
+        return best[1]
+    return None
+
+
+def _iter_phash_candidates(phash: str):
+    for e in _list_hash_entries():
+        if not e.phash:
+            continue
+        dist = _safe_distance(phash, e.phash)
+        if dist is None:
+            continue
+        yield (dist, e)
+
+
+def _safe_unpickle(blob: bytes) -> object | None:
+    try:
+        return pickle.loads(blob)
+    except Exception:
+        return None
+
+
+def _safe_distance(a: str, b: str | None) -> int | None:
+    try:
+        if b is None:
+            return None
+        return hamming_distance(a, b)
+    except Exception:
+        return None
 
 
 def get_episode_dedupe(author_slug: str, episode_id: str) -> EpisodeDedupeEntry | None:
