@@ -125,7 +125,7 @@ def _try_export_firefox_cookies() -> Optional[Path]:
 
 def _import_browser_cookie3() -> Any | None:
     try:
-        import browser_cookie3
+        import browser_cookie3  # type: ignore[import]
     except Exception:
         print("browser_cookie3 not available; cannot export Firefox cookies")
         return None

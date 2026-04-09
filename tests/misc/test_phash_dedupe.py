@@ -10,9 +10,9 @@ from src.utils.image_dedupe_index import HashDedupeEntry, find_similar_by_phash
 from src.utils.image_phash import average_hash, hamming_distance
 
 
-def test_average_hash_identical(tmp_path):
-    p1 = tmp_path / "img1.png"
-    p2 = tmp_path / "img2.png"
+def test_average_hash_identical(tmp_path: Path) -> None:
+    p1: Path = tmp_path / "img1.png"
+    p2: Path = tmp_path / "img2.png"
     Image.new("RGB", (8, 8), (255, 255, 255)).save(p1)
     Image.new("RGB", (8, 8), (255, 255, 255)).save(p2)
 
@@ -22,9 +22,9 @@ def test_average_hash_identical(tmp_path):
     assert hamming_distance(h1, h2) == 0
 
 
-def test_average_hash_small_change(tmp_path):
-    p1 = tmp_path / "img1.png"
-    p2 = tmp_path / "img2.png"
+def test_average_hash_small_change(tmp_path: Path) -> None:
+    p1: Path = tmp_path / "img1.png"
+    p2: Path = tmp_path / "img2.png"
     img = Image.new("RGB", (8, 8), (255, 255, 255))
     img.save(p1)
     img2 = img.copy()
@@ -37,7 +37,7 @@ def test_average_hash_small_change(tmp_path):
     assert dist > 0
 
 
-def test_find_similar_by_phash_hit(tmp_path):
+def test_find_similar_by_phash_hit(tmp_path: Path) -> None:
     # Create two similar images and compute their phashes
     p1 = tmp_path / "base.png"
     p2 = tmp_path / "near.png"
@@ -66,7 +66,7 @@ def test_find_similar_by_phash_hit(tmp_path):
     assert found.canonical_url == entry.canonical_url
 
 
-def test_find_similar_by_phash_no_match():
+def test_find_similar_by_phash_no_match() -> None:
     entry = HashDedupeEntry(
         file_hash="deadbeef",
         canonical_key="podcasts/_thumbs/by-hash/deadbeef.webp",

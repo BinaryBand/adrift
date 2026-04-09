@@ -26,7 +26,12 @@ class TestUploadThumbnail(unittest.TestCase):
     @patch("src.web.rss.exists")
     @patch("src.web.rss.urljoin")
     @patch("src.web.rss.S3_ENDPOINT")
-    def test_returns_existing_file_url(self, mock_endpoint, mock_urljoin, mock_exists):
+    def test_returns_existing_file_url(
+        self,
+        mock_endpoint: Mock,
+        mock_urljoin: Mock,
+        mock_exists: Mock,
+    ) -> None:
         """Test that existing thumbnail URL is returned without re-uploading."""
         mock_endpoint.__str__ = lambda x: "https://s3.example.com"
         mock_exists.return_value = "existing_thumb.jpg"
@@ -49,19 +54,24 @@ class TestUploadThumbnail(unittest.TestCase):
     @patch("src.web.rss.remember_episode_dedupe")
     def test_downloads_and_uploads_new_thumbnail(
         self,
-        mock_remember_episode,
-        mock_remember_hash,
-        mock_get_hash_dedupe,
-        mock_upload,
-        mock_square,
-        mock_get,
-        mock_exists,
+        mock_remember_episode: Mock,
+        mock_remember_hash: Mock,
+        mock_get_hash_dedupe: Mock,
+        mock_upload: Mock,
+        mock_square: Mock,
+        mock_get: Mock,
+        mock_exists: Mock,
     ):
         """Test downloading and uploading a new thumbnail."""
         mock_exists.return_value = None
         mock_get_hash_dedupe.return_value = None
 
-        def _fake_square(_input_path, output_path, output_format="WEBP", quality=80):
+        def _fake_square(
+            _input_path: Path,
+            output_path: Path,
+            output_format: str = "WEBP",
+            quality: int = 80,
+        ) -> bool:
             output_path.write_bytes(b"fake_transcoded_data")
             return True
 
@@ -87,7 +97,7 @@ class TestUploadThumbnail(unittest.TestCase):
 
     @patch("src.web.rss.exists")
     @patch("src.web.rss.requests.get")
-    def test_returns_none_on_failure(self, mock_get, mock_exists):
+    def test_returns_none_on_failure(self, mock_get: Mock, mock_exists: Mock) -> None:
         """Test that None is returned when upload fails."""
         mock_exists.return_value = None
         mock_get.side_effect = Exception("Network error")
@@ -98,7 +108,7 @@ class TestUploadThumbnail(unittest.TestCase):
 
     @patch("src.web.rss.exists")
     @patch("src.web.rss.requests.get")
-    def test_unknown_mime_type_returns_none(self, mock_get, mock_exists):
+    def test_unknown_mime_type_returns_none(self, mock_get: Mock, mock_exists: Mock) -> None:
         """B4 fix: unrecognised Content-Type must return None, not raise AssertionError."""
         mock_exists.return_value = None
         mock_response = Mock()

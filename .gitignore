@@ -2,7 +2,7 @@
 
 # Byte-compiled / optimized / DLL files
 __pycache__/
-*.py[codz]
+*.py[cod]
 *$py.class
 
 # C extensions
@@ -238,8 +238,6 @@ cookies.txt
 
 # User specific configs
 .vscode/bookmarks.json
-config/**/.*
-config/podcasts.toml
+.vscode/schemas/*.json
+config/**/.*.toml
 runbook/**/.*
-.help
-runbook/systemd
