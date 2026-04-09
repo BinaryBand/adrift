@@ -119,6 +119,9 @@ ipython_config.py
 .pdm-python
 .pdm-build/
 
+# Ignore local database scripts
+runbook/database/
+
 # pixi
 #   Similar to Pipfile.lock, it is generally recommended to include pixi.lock in version control.
 # pixi.lock

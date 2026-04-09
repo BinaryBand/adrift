@@ -1,10 +1,11 @@
 # pyright: reportUnknownVariableType=false, reportUnknownMemberType=false, reportUnknownArgumentType=false
+
 import mimetypes
 import os
 import sys
 import time
 from dataclasses import dataclass
-from functools import cache, wraps
+from functools import wraps
 from pathlib import Path
 from threading import Lock
 from typing import Any, Callable, ParamSpec, TypeVar, cast
@@ -19,12 +20,22 @@ from mypy_boto3_s3.type_defs import CopySourceTypeDef
 from pydantic import BaseModel, ConfigDict
 
 sys.path.insert(0, Path(__file__).parent.parent.as_posix())
+sys.path.insert(0, Path(__file__).parent.parent.as_posix())
+from src.adapters.docker_secrets import DockerSecretProvider
 from src.adapters.env_secrets import EnvironmentSecretProvider
 from src.models import CacheMetadata, MediaMetadata, S3Metadata
 from src.ports.secrets import SecretProviderPort, require_secrets
 from src.utils.progress import Callback
 
-_secret_provider: SecretProviderPort = EnvironmentSecretProvider()
+sys.path.insert(0, Path(__file__).parent.parent.as_posix())
+sys.path.insert(0, Path(__file__).parent.parent.as_posix())
+
+# Select secret provider based on ADRIFT_SECRETS_PROVIDER env var
+_provider_name = os.getenv("ADRIFT_SECRETS_PROVIDER", "env").lower()
+if _provider_name == "docker":
+    _secret_provider: SecretProviderPort = DockerSecretProvider()
+else:
+    _secret_provider: SecretProviderPort = EnvironmentSecretProvider()
 
 S3_ENDPOINT = _secret_provider.get("S3_ENDPOINT", "")
 
@@ -61,7 +72,6 @@ def _require_s3_env() -> tuple[str, str, str, str]:
     )
 
 
-@cache
 def _s3_cache() -> Cache:
     """Get the RSS feed cache instance."""
     return Cache(".cache/s3")
