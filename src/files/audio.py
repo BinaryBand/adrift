@@ -28,7 +28,16 @@ def _duration_weights(part_count: int) -> tuple[int, ...] | None:
 
 
 def _run_ffprobe(file: Path) -> str:
-    cmd = ["ffprobe", "-v", "quiet", "-print_format", "json", "-show_format", str(file)]
+    cmd = [
+        "ffprobe",
+        "-v",
+        "quiet",
+        "-print_format",
+        "json",
+        "-show_format",
+        "-show_streams",
+        str(file),
+    ]
     res = subprocess.run(
         cmd,
         capture_output=True,
@@ -206,9 +215,61 @@ def cut_segments(
         _cut_segments(file, segments, dest, callback=callback)
 
 
+def _ensure_audio_stream(check_file: Path) -> str:
+    """Run ffprobe and ensure the file contains an audio stream; return ffprobe JSON string.
+
+    Raises a RuntimeError with ffprobe output on failure.
+    """
+    ffprobe_out = _run_ffprobe(check_file)
+    data = json.loads(ffprobe_out)
+    streams = data.get("streams", [])
+    if not any(s.get("codec_type") == "audio" for s in streams):
+        raise RuntimeError(f"No audio stream found in {check_file}\nffprobe: {ffprobe_out}")
+    return ffprobe_out
+
+
+def _run_ffmpeg_convert(cmd: list[str], file: Path, output: Path, ffprobe_out: str) -> None:
+    """Run ffmpeg conversion command and raise a RuntimeError with stderr on failure."""
+    try:
+        subprocess.run(cmd, check=True, capture_output=True)
+    except subprocess.CalledProcessError as e:
+        stderr = e.stderr.decode("utf-8", errors="replace") if e.stderr else "No error"
+        raise RuntimeError(
+            f"ffmpeg failed to convert {file} to opus\n"
+            f"Command: {' '.join(cmd)}\n"
+            f"Exit code: {e.returncode}\n"
+            f"Error output: {stderr}\n"
+            f"ffprobe: {ffprobe_out if ffprobe_out else 'no ffprobe output'}"
+        ) from e
+
+
+def _build_opus_cmd(src: Path, dest: Path) -> list[str]:
+    """Return an ffmpeg command list for converting src to Opus at dest."""
+    return _FFMPEG_BASE + [
+        "-i",
+        str(src),
+        "-vn",
+        "-map",
+        "0:a",
+        "-c:a",
+        "libopus",
+        "-b:a",
+        "128k",
+        "-y",
+        str(dest),
+    ]
+
+
 def convert_to_opus(file: Path) -> Path:
     """Convert `file` to Opus (libopus 128k) and return the new Path."""
+    # Use module-level _ensure_audio_stream to validate input
+
     output = file.with_suffix(".opus")
-    cmd = _FFMPEG_BASE + ["-i", str(file), "-c:a", "libopus", "-b:a", "128k", "-y", str(output)]
-    subprocess.run(cmd, check=True, capture_output=True)
+    if file.suffix.lower() == ".opus":
+        return file
+
+    ffprobe_out = _ensure_audio_stream(file)
+
+    cmd = _build_opus_cmd(file, output)
+    _run_ffmpeg_convert(cmd, file, output, ffprobe_out)
     return output
