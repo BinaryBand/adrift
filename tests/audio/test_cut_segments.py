@@ -183,9 +183,18 @@ class TestCutSegments(unittest.TestCase):
         with tempfile.TemporaryDirectory() as tmp_dir:
             m4a_target = Path(tmp_dir) / "test_audio.m4a"
             cmd = [
-                "ffmpeg", "-hide_banner", "-loglevel", "error",
-                "-i", str(self.test_audio),
-                "-c:a", "aac", "-b:a", "128k", "-y", str(m4a_target),
+                "ffmpeg",
+                "-hide_banner",
+                "-loglevel",
+                "error",
+                "-i",
+                str(self.test_audio),
+                "-c:a",
+                "aac",
+                "-b:a",
+                "128k",
+                "-y",
+                str(m4a_target),
             ]
             subprocess.run(cmd, check=True, capture_output=True)
 
