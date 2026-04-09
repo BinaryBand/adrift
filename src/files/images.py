@@ -1,3 +1,5 @@
+# cspell: words LANCZOS
+
 import os
 import sys
 from pathlib import Path

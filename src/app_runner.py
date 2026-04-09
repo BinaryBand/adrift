@@ -1,3 +1,5 @@
+# cspell: words creepcast darknet gladwell smosh
+
 import sys
 from pathlib import Path
 from typing import Any
@@ -85,11 +87,6 @@ _TITLE_CLEANERS = {
 }
 
 
-def _prepare_episode_title(episode: str) -> str:
-    episode = remove_control_chars(episode)
-    return re_compile(r"__adless").sub("", episode)
-
-
 def _apply_title_cleaner(show: str, episode: str) -> str:
     cleaner = _TITLE_CLEANERS.get(show)
     if cleaner is None:
@@ -99,7 +96,7 @@ def _apply_title_cleaner(show: str, episode: str) -> str:
 
 @cached(_TITLE_CACHE)
 def normalize_title(show: str, episode: str) -> str:
-    episode = _prepare_episode_title(episode)
+    episode = remove_control_chars(episode)
     episode = _apply_title_cleaner(show, episode)
     return create_slug(episode).strip("-")
 

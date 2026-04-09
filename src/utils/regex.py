@@ -1,3 +1,5 @@
+# cspell: words youtu
+
 import re
 
 from cachetools import LRUCache, cached

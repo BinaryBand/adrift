@@ -40,12 +40,17 @@
   "cSpell.words": [
     "BYDAY",
     "dateutil",
+    "dedupe",
     "dotenv",
     "DTSTART",
+    "ffprobe",
     "flac",
     "libopus",
+    "phash",
     "rrule",
+    "rrules",
     "sponsorblock",
+    "tobytes",
     "ytdlp"
   ],
   "python.testing.pytestArgs": [

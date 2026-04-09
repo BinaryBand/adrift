@@ -1,3 +1,5 @@
+# cspell: words LANCZOS
+
 from pathlib import Path
 from typing import Any, cast
 
@@ -24,7 +26,7 @@ def average_hash(file: Path, hash_size: int = 8) -> str:
 
 
 def hamming_distance(hex1: str, hex2: str) -> int:
-    """Return the Hamming distance between two hex-represented bitstrings.
+    """Return the Hamming distance between two hex-represented bit-strings.
 
     Pads the shorter hex string with leading zeros before comparison.
     """

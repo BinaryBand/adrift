@@ -1,4 +1,3 @@
-import os
 import sys
 from dataclasses import dataclass, field
 from pathlib import Path
@@ -73,12 +72,7 @@ def _add_episode_metadata(episode: RssEpisode, author: str) -> RssEpisode:
 
 
 def _fetch_video_info(video_id: str) -> ytdlp.VideoInfo | None:
-    """Wrapper around ytdlp.get_video_info with centralized error handling.
-
-    Honors `PODSMITH_SKIP_VIDEO_INFO` for offline/test runs.
-    """
-    if os.getenv("PODSMITH_SKIP_VIDEO_INFO"):
-        return None
+    """Wrapper around ytdlp.get_video_info with centralized error handling."""
 
     try:
         return ytdlp.get_video_info(video_id)

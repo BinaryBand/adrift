@@ -1,3 +1,5 @@
+# cspell: words preferredcodec preferredquality postprocessors
+
 from typing import Any, cast
 
 from pydantic import BaseModel, ConfigDict, field_validator

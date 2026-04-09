@@ -21,7 +21,7 @@ from src.web.rss import (
     RssChannel,
     RssEpisode,
 )
-from src.youtube import metadata as _ytmeta
+from src.youtube import metadata as _yt_meta
 
 
 def _similarity_clean(ac: str, bc: str) -> float:
@@ -393,4 +393,4 @@ def process_feeds(config: PodcastConfig, callback: Callback | None = None) -> li
 
 # Compatibility aliases: tests may patch these names on the `src.catalog` module.
 get_rss_episodes = _rss.get_rss_episodes
-get_youtube_episodes = _ytmeta.get_youtube_episodes
+get_youtube_episodes = _yt_meta.get_youtube_episodes

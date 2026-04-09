@@ -1,3 +1,5 @@
+# cspell: words nokey noprint
+
 import functools
 import hashlib
 import os

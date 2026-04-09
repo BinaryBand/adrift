@@ -1,7 +1,3 @@
-"""
-YouTube video downloader with pytubefix and yt-dlp fallback support.
-"""
-
 import sys
 from pathlib import Path
 from typing import Any, cast
