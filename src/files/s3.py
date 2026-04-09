@@ -555,7 +555,7 @@ def _get_file_map(bucket: str, prefix: str, without_extensions: bool = True) -> 
         return cached_map
 
     file_list = _build_file_map_from_iterator(bucket, prefix, without_extensions)
-    _s3_cache().set(cache_key, file_list, expire=10)
+    _s3_cache().set(cache_key, file_list, expire=300)
     return file_list
 
 

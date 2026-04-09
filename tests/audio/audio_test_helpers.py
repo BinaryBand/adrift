@@ -1,6 +1,6 @@
 """
-Script to download a test video for audio testing.
-Downloads dQw4w9WgXcQ as MP3 for use in audio processing tests.
+Helpers for audio processing tests.
+Generates a short synthetic audio file using ffmpeg (no network required).
 """
 
 import shutil
@@ -12,9 +12,11 @@ from pathlib import Path
 sys.path.insert(0, Path(__file__).parent.parent.parent.as_posix())
 from src.files.audio import MIN_LENGTH
 
-TEST_VIDEO_ID = "dQw4w9WgXcQ"
 OUTPUT_DIR = "tests/resources"
-OUTPUT_FILE = Path(OUTPUT_DIR) / f"{TEST_VIDEO_ID}.mp3"
+OUTPUT_FILE = Path(OUTPUT_DIR) / "test_audio.mp3"
+
+# 65 seconds: long enough for all segment tests (which go up to t=60)
+_DURATION = 65
 
 
 def duration_matches(expected: float = 0, actual: float = 0, tolerance: float = 0.2) -> bool:
@@ -23,33 +25,42 @@ def duration_matches(expected: float = 0, actual: float = 0, tolerance: float = 
     return abs(1 - diff) <= tolerance
 
 
-def download_test_audio():
-    """Download test video as MP3."""
+def download_test_audio() -> Path:
+    """Return a short synthetic MP3 suitable for audio processing tests.
+
+    Generated locally via ffmpeg (sine wave) — no network access required.
+    The file is cached in tests/resources/ and reused across runs.
+    """
     if OUTPUT_FILE.exists():
         return OUTPUT_FILE
 
-    # Skip tests if yt-dlp is not installed on the system.
-    if shutil.which("yt-dlp") is None:
-        raise unittest.SkipTest("yt-dlp not found; skipping audio download tests")
+    if shutil.which("ffmpeg") is None:
+        raise unittest.SkipTest("ffmpeg not found; skipping audio tests")
+
+    OUTPUT_FILE.parent.mkdir(parents=True, exist_ok=True)
 
     cmd = [
-        "yt-dlp",
-        "--extract-audio",
-        "--audio-format",
-        "mp3",
-        "--audio-quality",
-        "128K",
-        "--output",
+        "ffmpeg",
+        "-hide_banner",
+        "-loglevel",
+        "error",
+        "-f",
+        "lavfi",
+        "-i",
+        f"sine=frequency=440:duration={_DURATION}",
+        "-ar",
+        "44100",
+        "-b:a",
+        "128k",
+        "-y",
         str(OUTPUT_FILE),
-        f"https://www.youtube.com/watch?v={TEST_VIDEO_ID}",
     ]
 
     try:
-        subprocess.run(cmd, check=True)
+        subprocess.run(cmd, check=True, capture_output=True)
         return OUTPUT_FILE
     except subprocess.CalledProcessError:
-        # If yt-dlp fails (network, host block, etc.) skip the test instead
-        raise unittest.SkipTest("yt-dlp failed; skipping audio download tests")
+        raise unittest.SkipTest("ffmpeg failed to generate test audio; skipping audio tests")
 
 
 if __name__ == "__main__":

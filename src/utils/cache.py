@@ -4,6 +4,7 @@ import pickle
 import sqlite3
 import sys
 import tempfile
+import threading
 import time
 from pathlib import Path
 from typing import Any
@@ -23,80 +24,89 @@ class _SQLiteCacheStore:
     def __init__(self, db_path: Path):
         self.db_path = db_path
         self.db_path.parent.mkdir(parents=True, exist_ok=True)
+        self._local = threading.local()
         self._init_schema()
 
     def _connect(self) -> sqlite3.Connection:
-        conn = sqlite3.connect(self.db_path.as_posix())
-        conn.execute("PRAGMA journal_mode=WAL")
-        conn.execute("PRAGMA busy_timeout=5000")
+        conn = getattr(self._local, "conn", None)
+        if conn is None:
+            conn = sqlite3.connect(self.db_path.as_posix(), check_same_thread=False)
+            conn.execute("PRAGMA journal_mode=WAL")
+            conn.execute("PRAGMA busy_timeout=5000")
+            self._local.conn = conn
         return conn
 
     def _init_schema(self) -> None:
-        with self._connect() as conn:
-            conn.execute(
-                """
-                CREATE TABLE IF NOT EXISTS cache_entries (
-                    key TEXT PRIMARY KEY,
-                    value BLOB NOT NULL,
-                    created_at_epoch REAL NOT NULL,
-                    expires_at_epoch REAL
-                )
-                """
+        conn = self._connect()
+        conn.execute(
+            """
+            CREATE TABLE IF NOT EXISTS cache_entries (
+                key TEXT PRIMARY KEY,
+                value BLOB NOT NULL,
+                created_at_epoch REAL NOT NULL,
+                expires_at_epoch REAL
             )
-            conn.execute(
-                """
-                CREATE INDEX IF NOT EXISTS idx_cache_entries_expires
-                ON cache_entries(expires_at_epoch)
-                """
-            )
+            """
+        )
+        conn.execute(
+            """
+            CREATE INDEX IF NOT EXISTS idx_cache_entries_expires
+            ON cache_entries(expires_at_epoch)
+            """
+        )
+        conn.commit()
 
     def get(self, key: str) -> Any | None:
         now_epoch = time.time()
-        with self._connect() as conn:
-            row = conn.execute(
-                "SELECT value, expires_at_epoch FROM cache_entries WHERE key = ?",
-                (key,),
-            ).fetchone()
-            if row is None:
-                return None
-            value_blob, expires_at_epoch = row
-            if expires_at_epoch is not None and now_epoch >= float(expires_at_epoch):
-                conn.execute("DELETE FROM cache_entries WHERE key = ?", (key,))
-                return None
+        conn = self._connect()
+        row = conn.execute(
+            "SELECT value, expires_at_epoch FROM cache_entries WHERE key = ?",
+            (key,),
+        ).fetchone()
+        if row is None:
+            return None
+        value_blob, expires_at_epoch = row
+        if expires_at_epoch is not None and now_epoch >= float(expires_at_epoch):
+            conn.execute("DELETE FROM cache_entries WHERE key = ?", (key,))
+            conn.commit()
+            return None
         return pickle.loads(value_blob)
 
     def set(self, key: str, value: Any, expire: int | None = None) -> None:
         created_at_epoch = time.time()
         expires_at_epoch = created_at_epoch + expire if expire is not None else None
         value_blob = pickle.dumps(value)
-        with self._connect() as conn:
-            conn.execute(
-                """
-                INSERT INTO cache_entries(key, value, created_at_epoch, expires_at_epoch)
-                VALUES (?, ?, ?, ?)
-                ON CONFLICT(key)
-                DO UPDATE SET
-                    value = excluded.value,
-                    created_at_epoch = excluded.created_at_epoch,
-                    expires_at_epoch = excluded.expires_at_epoch
-                """,
-                (key, value_blob, created_at_epoch, expires_at_epoch),
-            )
+        conn = self._connect()
+        conn.execute(
+            """
+            INSERT INTO cache_entries(key, value, created_at_epoch, expires_at_epoch)
+            VALUES (?, ?, ?, ?)
+            ON CONFLICT(key)
+            DO UPDATE SET
+                value = excluded.value,
+                created_at_epoch = excluded.created_at_epoch,
+                expires_at_epoch = excluded.expires_at_epoch
+            """,
+            (key, value_blob, created_at_epoch, expires_at_epoch),
+        )
+        conn.commit()
 
     def delete(self, key: str) -> None:
-        with self._connect() as conn:
-            conn.execute("DELETE FROM cache_entries WHERE key = ?", (key,))
+        conn = self._connect()
+        conn.execute("DELETE FROM cache_entries WHERE key = ?", (key,))
+        conn.commit()
 
     def delete_expired(self) -> int:
-        with self._connect() as conn:
-            cursor = conn.execute(
-                (
-                    "DELETE FROM cache_entries "
-                    "WHERE expires_at_epoch IS NOT NULL AND expires_at_epoch <= ?"
-                ),
-                (time.time(),),
-            )
-            return int(cursor.rowcount or 0)
+        conn = self._connect()
+        cursor = conn.execute(
+            (
+                "DELETE FROM cache_entries "
+                "WHERE expires_at_epoch IS NOT NULL AND expires_at_epoch <= ?"
+            ),
+            (time.time(),),
+        )
+        conn.commit()
+        return int(cursor.rowcount or 0)
 
 
 def read_s3_json_cache(cache_path: str, item_id: str) -> Any | None:

@@ -13,7 +13,7 @@ def average_hash(file: Path, hash_size: int = 8) -> str:
         img = img.convert("L")
         # Resize to a small square and compute a simple average hash
         img = img.resize((hash_size, hash_size), Image.Resampling.LANCZOS)
-        pixels = cast(list[int], list(cast(Any, img).getdata()))
+        pixels: list[int] = list(cast(Any, img).tobytes())
         avg = sum(pixels) / len(pixels)
         bits = 0
         for p in pixels:

@@ -58,6 +58,9 @@ def get_youtube_channel(url: str, author: str) -> RssChannel:
 
 def _add_episode_metadata(episode: RssEpisode, author: str) -> RssEpisode:
     """Add pub_date and thumbnail to episode if detailed=True."""
+    if episode.pub_date is not None and episode.image is not None:
+        return episode
+
     # Allow tests/offline runs to skip network/video-info fetches
     info = _fetch_video_info(episode.id)
     if info is None:

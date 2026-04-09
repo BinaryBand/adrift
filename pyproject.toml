@@ -42,6 +42,12 @@ vulture = "*"
 grimp = "*"
 networkx = "*"
 
+[tool.pytest.ini_options]
+addopts = "-m 'not slow'"
+markers = [
+    "slow: marks tests that invoke real ffmpeg/ffprobe processes (run with -m slow)",
+]
+
 [tool.mypy]
 mypy_path = "typings"
 python_version = "3.11"
