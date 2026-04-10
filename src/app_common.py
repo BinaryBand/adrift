@@ -163,7 +163,9 @@ def ensure_podcast_config(podcast: PodcastConfig | dict[str, Any]) -> PodcastCon
     return PodcastConfig.model_validate(payload)
 
 
-def parse_podcasts_raw(raw: list[PodcastConfig | dict[str, Any]]) -> list[PodcastConfig]:
+def parse_podcasts_raw(
+    raw: list[PodcastConfig | dict[str, Any]],
+) -> list[PodcastConfig]:
     return [ensure_podcast_config(entry) for entry in raw]
 
 

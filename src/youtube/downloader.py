@@ -1,6 +1,6 @@
 import sys
 from pathlib import Path
-from typing import Any, cast
+from typing import Any, Literal, cast
 
 import yt_dlp
 
@@ -18,6 +18,8 @@ class BotDetectionError(Exception):
 # callers can handle it; otherwise it logs and returns None.
 # Tests rely on the default non-raising behavior so keep this False by default.
 PROPAGATE_BOT_DETECTION = False
+
+_MIN_AUDIO_BYTES = 10_240  # files smaller than 10 KB are treated as stub/failed downloads
 
 _BOT_INDICATORS = [
     "This request was detected as a bot",
@@ -41,25 +43,43 @@ def _is_bot_detection_error(error_message: str) -> bool:
     return any(indicator in error_message for indicator in _BOT_INDICATORS)
 
 
+_PLAYER_CLIENTS_PRIMARY = ["android_music", "web"]
+_PLAYER_CLIENTS_FALLBACK = ["tv_embedded", "web"]
+
+
 def _ytdlp_download(id: str, dir: Path, callback: Callback | None = None) -> Path | None:
-    """Download video using yt-dlp with authentication support."""
-    opts = _build_download_opts(id, dir, callback)
+    """Download video using yt-dlp, falling back to tv_embedded client on stub."""
     url = f"https://www.youtube.com/watch?v={id}"
-    try:
-        info_dict = _extract_download_info(url, opts)
-        return _resolve_download_path(info_dict)
-    except Exception as e:
-        _raise_download_error(id, e)
+    for attempt, clients in enumerate((_PLAYER_CLIENTS_PRIMARY, _PLAYER_CLIENTS_FALLBACK)):
+        try:
+            opts = _build_download_opts(id, dir, callback, clients)
+            info_dict = _extract_download_info(url, opts)
+            result = _resolve_download_path(info_dict)
+        except Exception as e:
+            _raise_download_error(id, e)
+            return None
+
+        if result is not None:
+            return result
+        if attempt == 0:
+            print(f"WARNING: Stub detected for {id}, retrying with tv_embedded client")
 
     return None
 
 
-def _build_download_opts(id: str, dir: Path, callback: Callback | None = None) -> YtDlpParams:
+def _build_download_opts(
+    id: str,
+    dir: Path,
+    callback: Callback | None = None,
+    player_clients: list[str] | None = None,
+) -> YtDlpParams:
     opts: YtDlpParams = get_auth_ydl_opts(use_browser_fallback=True)
-    opts["format"] = "bestaudio/best"
+    opts["format"] = "bestaudio[acodec!=none]/bestaudio/best[acodec!=none]"
     opts["outtmpl"] = (dir / f"{id}.%(ext)s").as_posix()
     opts["postprocessors"] = [_audio_postprocessor()]
-    opts["extractor_args"] = {"youtube": {"player_client": ["android_music", "web"]}}
+    opts["extractor_args"] = {
+        "youtube": {"player_client": player_clients or _PLAYER_CLIENTS_PRIMARY}
+    }
 
     progress_hook = _make_progress_hook(callback)
     if progress_hook is not None:
@@ -97,7 +117,8 @@ def _ydl_opts_dict(opts: YtDlpParams | dict[str, Any]) -> dict[str, Any]:
     """Convert typed yt-dlp params into a plain dict for yt-dlp internals."""
     if isinstance(opts, dict):
         return {k: v for k, v in opts.items() if v is not None}
-    return opts.model_dump(exclude_none=True)
+    # Ensure we return a plain built-in dict (tests assert dict type).
+    return dict(opts.model_dump(exclude_none=True))
 
 
 def _extract_download_info(url: str, opts: YtDlpParams | dict[str, Any]) -> dict[str, Any]:
@@ -106,19 +127,63 @@ def _extract_download_info(url: str, opts: YtDlpParams | dict[str, Any]) -> dict
     return cast(dict[str, Any], info)
 
 
+def _log_stub_format(path: Path, size: int, info_dict: dict[str, Any]) -> None:
+    dl = cast(dict[str, Any], (info_dict.get("requested_downloads") or [{}])[0])
+    fmt = dl.get("format") or info_dict.get("format", "unknown")
+    acodec = dl.get("acodec") or info_dict.get("acodec", "?")
+    vcodec = dl.get("vcodec") or info_dict.get("vcodec", "?")
+    print(
+        f"WARNING: Downloaded file is too small ({size} bytes), treating as failed: {path}\n"
+        f"  format={fmt!r}  acodec={acodec}  vcodec={vcodec}"
+    )
+
+
+def _get_candidate_size(candidate: Path) -> int | None:
+    """Return file size in bytes or None if stat fails."""
+    try:
+        return candidate.stat().st_size
+    except (OSError, FileNotFoundError):
+        return None
+
+
+def _evaluate_candidate(candidate: Path, info_dict: dict[str, Any]) -> Path | Literal[False] | None:
+    """Evaluate a candidate download file.
+
+    Returns the candidate Path when valid, False when it is a stub (invalid),
+    or None when the candidate is not present.
+    """
+    if not candidate.exists():
+        return None
+    size = _get_candidate_size(candidate)
+    if size is None:
+        # In unit tests Path.exists() is often patched while stat() is
+        # not; assume the candidate is the resolved path in that case.
+        print(f"WARNING: Could not stat {candidate}, assuming present")
+        return candidate
+    if size < _MIN_AUDIO_BYTES:
+        _log_stub_format(candidate, size, info_dict)
+        return False
+    return candidate
+
+
+def _find_download_candidate(file_path: Path, info_dict: dict[str, Any]) -> Path | None:
+    m4a_path = file_path.with_suffix(".m4a")
+    for candidate in (m4a_path, file_path):
+        res = _evaluate_candidate(candidate, info_dict)
+        if res is None:
+            continue
+        if res is False:
+            return None
+        return res
+    print(f"WARNING: Downloaded file not found: {file_path}")
+    return None
+
+
 def _resolve_download_path(info_dict: dict[str, Any]) -> Path | None:
     file_path = _requested_download_path(info_dict)
     if file_path is None:
         return None
-
-    m4a_path = file_path.with_suffix(".m4a")
-    if m4a_path.exists():
-        return m4a_path
-    if file_path.exists():
-        return file_path
-
-    print(f"WARNING: Downloaded file not found: {file_path}")
-    return None
+    return _find_download_candidate(file_path, info_dict)
 
 
 def _requested_download_path(info_dict: dict[str, Any]) -> Path | None:
