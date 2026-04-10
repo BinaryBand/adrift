@@ -187,12 +187,16 @@ def _load_config(name_or_path: str) -> list[PodcastConfig]:
     podcasts_raw = data.get("podcasts", [])
     if not isinstance(podcasts_raw, list):
         return []
-    configs = parse_podcasts_raw(cast(list[PodcastConfig | dict[str, Any]], podcasts_raw))
+    configs = parse_podcasts_raw(
+        cast(list[PodcastConfig | dict[str, Any]], podcasts_raw)
+    )
     random.shuffle(configs)
     return configs
 
 
-def schedule_matches_today(schedule: str, title: str, today: datetime | None = None) -> bool:
+def schedule_matches_today(
+    schedule: str, title: str, today: datetime | None = None
+) -> bool:
     """Return True if *schedule* yields an occurrence within today's day window."""
     del title
     current = today or datetime.now()
@@ -234,7 +238,9 @@ def load_podcasts_config(include: list[str]) -> list[PodcastConfig]:
     configs: list[PodcastConfig] = [c for t in targets for c in _load_config(t)]
 
     # Filter configs by schedule and return (shuffle to randomize order)
-    filtered: list[PodcastConfig] = [it for it in configs if _config_schedule_matches_today(it)]
+    filtered: list[PodcastConfig] = [
+        it for it in configs if _config_schedule_matches_today(it)
+    ]
     random.shuffle(filtered)
     return filtered
 

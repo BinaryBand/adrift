@@ -19,7 +19,9 @@ class BotDetectionError(Exception):
 # Tests rely on the default non-raising behavior so keep this False by default.
 PROPAGATE_BOT_DETECTION = False
 
-_MIN_AUDIO_BYTES = 10_240  # files smaller than 10 KB are treated as stub/failed downloads
+_MIN_AUDIO_BYTES = (
+    10_240  # files smaller than 10 KB are treated as stub/failed downloads
+)
 
 _BOT_INDICATORS = [
     "This request was detected as a bot",
@@ -47,10 +49,14 @@ _PLAYER_CLIENTS_PRIMARY = ["android_music", "web"]
 _PLAYER_CLIENTS_FALLBACK = ["tv_embedded", "web"]
 
 
-def _ytdlp_download(id: str, dir: Path, callback: Callback | None = None) -> Path | None:
+def _ytdlp_download(
+    id: str, dir: Path, callback: Callback | None = None
+) -> Path | None:
     """Download video using yt-dlp, falling back to tv_embedded client on stub."""
     url = f"https://www.youtube.com/watch?v={id}"
-    for attempt, clients in enumerate((_PLAYER_CLIENTS_PRIMARY, _PLAYER_CLIENTS_FALLBACK)):
+    for attempt, clients in enumerate(
+        (_PLAYER_CLIENTS_PRIMARY, _PLAYER_CLIENTS_FALLBACK)
+    ):
         try:
             opts = _build_download_opts(id, dir, callback, clients)
             info_dict = _extract_download_info(url, opts)
@@ -121,7 +127,9 @@ def _ydl_opts_dict(opts: YtDlpParams | dict[str, Any]) -> dict[str, Any]:
     return dict(opts.model_dump(exclude_none=True))
 
 
-def _extract_download_info(url: str, opts: YtDlpParams | dict[str, Any]) -> dict[str, Any]:
+def _extract_download_info(
+    url: str, opts: YtDlpParams | dict[str, Any]
+) -> dict[str, Any]:
     with yt_dlp.YoutubeDL(cast(Any, _ydl_opts_dict(opts))) as ydl:
         info = ydl.extract_info(url, download=True)
     return cast(dict[str, Any], info)
@@ -146,7 +154,9 @@ def _get_candidate_size(candidate: Path) -> int | None:
         return None
 
 
-def _evaluate_candidate(candidate: Path, info_dict: dict[str, Any]) -> Path | Literal[False] | None:
+def _evaluate_candidate(
+    candidate: Path, info_dict: dict[str, Any]
+) -> Path | Literal[False] | None:
     """Evaluate a candidate download file.
 
     Returns the candidate Path when valid, False when it is a stub (invalid),
@@ -204,7 +214,9 @@ def _raise_download_error(id: str, error: Exception) -> None:
     raise error
 
 
-def download_video(url: str, dir: Path, callback: Callback | None = None) -> Path | None:
+def download_video(
+    url: str, dir: Path, callback: Callback | None = None
+) -> Path | None:
     """Download a YouTube video as audio.
 
     Args:
