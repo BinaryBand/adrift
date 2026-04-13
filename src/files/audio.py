@@ -241,11 +241,33 @@ def _run_ffmpeg_convert(cmd: list[str], file: Path, output: Path, ffprobe_out: s
             f"Error output: {stderr}\n"
             f"ffprobe: {ffprobe_out if ffprobe_out else 'no ffprobe output'}"
         ) from e
+    
 
 
-def _build_opus_cmd(src: Path, dest: Path) -> list[str]:
-    """Return an ffmpeg command list for converting src to Opus at dest."""
-    return _FFMPEG_BASE + [
+def _extract_stream_bitrate_kbps(ffprobe_out: str) -> int | None:
+    """Return the first audio stream bitrate in kbps, or None if unknown."""
+    data = _parse_ffprobe_json(ffprobe_out)
+    return _get_bitrate_from_data(data)
+
+
+def _decide_final_bitrate(
+    src_kbps: int | None, target_bitrate_kbps: int | None, force_bitrate: bool
+) -> int | None:
+    """Return final bitrate (kbps) to pass to ffmpeg, or None to use default."""
+    if target_bitrate_kbps is None:
+        return None
+    if src_kbps is not None and not force_bitrate:
+        return min(src_kbps, target_bitrate_kbps)
+    return target_bitrate_kbps
+
+
+def _build_opus_cmd(src: Path, dest: Path, bitrate_kbps: int | None = None) -> list[str]:
+    """Return an ffmpeg command list for converting src to Opus at dest.
+
+    If `bitrate_kbps` is provided it is passed to ffmpeg as `-b:a {bitrate}k`.
+    Otherwise a sensible default of 128k is used.
+    """
+    cmd = _FFMPEG_BASE + [
         "-i",
         str(src),
         "-vn",
@@ -253,23 +275,104 @@ def _build_opus_cmd(src: Path, dest: Path) -> list[str]:
         "0:a",
         "-c:a",
         "libopus",
-        "-b:a",
-        "128k",
-        "-y",
-        str(dest),
     ]
+    if bitrate_kbps is not None:
+        cmd += ["-b:a", f"{bitrate_kbps}k"]
+    else:
+        cmd += ["-b:a", "128k"]
+    cmd += ["-y", str(dest)]
+    return cmd
 
 
-def convert_to_opus(file: Path) -> Path:
-    """Convert `file` to Opus (libopus 128k) and return the new Path."""
-    # Use module-level _ensure_audio_stream to validate input
+def _parse_ffprobe_json(ffprobe_out: str) -> dict | None:
+    try:
+        return json.loads(ffprobe_out)
+    except Exception:
+        return None
 
+
+def _kbps_from_br(br: object) -> int | None:
+    if br is None:
+        return None
+    try:
+        return int(round(int(br) / 1000))
+    except Exception:
+        return None
+
+
+def _get_bitrate_from_data(data: dict | None) -> int | None:
+    if not isinstance(data, dict):
+        return None
+
+    streams = data.get("streams", [])
+    for s in streams:
+        if s.get("codec_type") == "audio":
+            kbps = _kbps_from_br(s.get("bit_rate"))
+            if kbps is not None:
+                return kbps
+
+    return _kbps_from_br(data.get("format", {}).get("bit_rate"))
+
+
+def _format_bytes(num: int) -> str:
+    """Return human-readable file size string for `num` bytes."""
+    try:
+        n = float(num)
+    except Exception:
+        return "0B"
+    for unit in ("B", "KB", "MB", "GB", "TB"):
+        if n < 1024.0:
+            return f"{n:.1f}{unit}"
+        n /= 1024.0
+    return f"{n:.1f}PB"
+
+
+def _file_size_or_none(p: Path) -> int | None:
+    try:
+        return p.stat().st_size
+    except Exception:
+        return None
+
+
+def _log_space_change(src: Path, dest: Path) -> None:
+    """Log the change in file size between `src` and `dest` (human-readable)."""
+    original_size = _file_size_or_none(src)
+    new_size = _file_size_or_none(dest)
+
+    if original_size is None or new_size is None:
+        print(f"Converted {src} -> {dest}: size info unavailable")
+        return
+
+    diff = original_size - new_size
+    if diff >= 0:
+        print(f"Converted {src} -> {dest}: saved {_format_bytes(diff)} ({diff} bytes)")
+    else:
+        print(f"Converted {src} -> {dest}: increased size by {_format_bytes(-diff)} ({-diff} bytes)")
+
+
+def _determine_final_bitrate_for_file(
+    file: Path, target_bitrate_kbps: int | None, force_bitrate: bool
+) -> tuple[int | None, str]:
+    ffprobe_out = _ensure_audio_stream(file)
+    src_kbps = _extract_stream_bitrate_kbps(ffprobe_out)
+    final_bitrate = _decide_final_bitrate(src_kbps, target_bitrate_kbps, force_bitrate)
+    return final_bitrate, ffprobe_out
+
+
+def convert_to_opus(file: Path, target_bitrate_kbps: int | None = None, force_bitrate: bool = False) -> Path:
+    """Convert `file` to Opus and return the new Path."""
     output = file.with_suffix(".opus")
     if file.suffix.lower() == ".opus":
         return file
 
-    ffprobe_out = _ensure_audio_stream(file)
+    final_bitrate, ffprobe_out = _determine_final_bitrate_for_file(
+        file, target_bitrate_kbps, force_bitrate
+    )
 
-    cmd = _build_opus_cmd(file, output)
+    cmd = _build_opus_cmd(file, output, final_bitrate)
     _run_ffmpeg_convert(cmd, file, output, ffprobe_out)
+
+    # log size change in a helper to keep this function small
+    _log_space_change(file, output)
+
     return output
