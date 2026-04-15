@@ -132,14 +132,23 @@ def invert_segments(file: Path, segments: list[Segment]) -> list[Segment]:
 
 
 def _extract_segment(file: Path, start: float, duration: float, dest: Path) -> None:
-    """Extract one time-bounded segment from a source file."""
+    """Extract one time-bounded segment from a source file.
+
+    -ss is placed before -i so ffmpeg uses input-side (keyframe) seeking instead
+    of decoding from the start of the file.  Combined with -c:a copy this makes
+    the cut essentially free: no decode, no encode, just byte copying.  Cut
+    precision is within one keyframe interval (~0.1-0.5 s for typical podcasts),
+    which is more than accurate enough for sponsor removal.
+    """
     cmd = _FFMPEG_BASE + [
-        "-i",
-        str(file),
         "-ss",
         str(start),
+        "-i",
+        str(file),
         "-t",
         str(duration),
+        "-c:a",
+        "copy",
         "-y",
         str(dest),
     ]
@@ -190,7 +199,7 @@ def _cut_segments(
     dest: Path,
     callback: Callback | None = None,
 ) -> None:
-    """Cut segments using re-encoding (slower but no artifacts at join points)."""
+    """Cut segments using stream copy (fast: keyframe seek + no re-encode)."""
     keep_segs = [(s, e) for s, e in invert_segments(file, segments) if e - s >= MIN_LENGTH]
     with tempfile.TemporaryDirectory() as temp_dir:
         seg_files = _extract_all_segments(keep_segs, file, Path(temp_dir), callback)
@@ -421,6 +430,25 @@ def _log_space_change(src: Path, dest: Path) -> None:
         )
 
 
+def _prepare_opus_conversion(
+    file: Path,
+    target_bitrate_kbps: int | None,
+    force_bitrate: bool,
+    application: str,
+) -> tuple[Path, list[str], str]:
+    output = file.with_suffix(".opus")
+    ffprobe_out = _ensure_audio_stream(file)
+    data = _parse_ffprobe_json(ffprobe_out)
+    streams = _normalize_streams(data) if isinstance(data, dict) else []
+    audio_stream = _find_audio_stream(streams) or {}
+    if audio_stream.get("codec_name") == "opus":
+        return output, _build_opus_copy_cmd(file, output), ffprobe_out
+    src_kbps = _extract_stream_bitrate_kbps(ffprobe_out)
+    final_bitrate = _decide_final_bitrate(src_kbps, target_bitrate_kbps, force_bitrate)
+    cmd = _build_opus_cmd(file, output, final_bitrate, application)
+    return output, cmd, ffprobe_out
+
+
 def convert_to_opus(
     file: Path,
     target_bitrate_kbps: int | None = None,
@@ -428,26 +456,14 @@ def convert_to_opus(
     application: str = "audio",
 ) -> Path:
     """Convert `file` to Opus."""
-    output = file.with_suffix(".opus")
     if file.suffix.lower() == ".opus":
         return file
 
-    # Probe the file to ensure it has an audio stream and to extract bitrate.
-    ffprobe_out = _ensure_audio_stream(file)
-    data = _parse_ffprobe_json(ffprobe_out)
-    streams = _normalize_streams(data) if isinstance(data, dict) else []
-    audio_stream = _find_audio_stream(streams) or {}
-    already_opus = audio_stream.get("codec_name") == "opus"
-
-    if already_opus:
-        cmd = _build_opus_copy_cmd(file, output)
-    else:
-        src_kbps = _extract_stream_bitrate_kbps(ffprobe_out)
-        final_bitrate = _decide_final_bitrate(src_kbps, target_bitrate_kbps, force_bitrate)
-        cmd = _build_opus_cmd(file, output, final_bitrate, application)
+    output, cmd, ffprobe_out = _prepare_opus_conversion(
+        file, target_bitrate_kbps, force_bitrate, application
+    )
     _run_ffmpeg_convert(cmd, file, output, ffprobe_out)
 
-    # Log space change
     _log_space_change(file, output)
 
     return output

@@ -6,6 +6,7 @@ from pathlib import Path
 from unittest.mock import MagicMock, patch
 
 sys.path.insert(0, Path(__file__).parent.parent.parent.as_posix())
+
 import src.youtube.downloader as yt_downloader
 from src.models import YtDlpParams
 from src.youtube.downloader import (
@@ -14,6 +15,7 @@ from src.youtube.downloader import (
     _PLAYER_CLIENTS_STUB_FALLBACK,
     BotDetectionError,
     _build_download_opts,
+    _DownloadAttemptConfig,
     _extract_video_id,
     _is_bot_detection_error,
     _ytdlp_download,
@@ -220,7 +222,9 @@ class TestDownloadAttemptSequence(unittest.TestCase):
 
     @patch("src.youtube.downloader.get_ydl_opts", return_value=YtDlpParams.model_validate({}))
     def test_build_opts_unauthenticated_calls_get_ydl_opts(self, mock_get_ydl):
-        _build_download_opts("abc", Path("/tmp"), authenticated=False)
+        _build_download_opts(
+            "abc", Path("/tmp"), attempt=_DownloadAttemptConfig(authenticated=False)
+        )
         mock_get_ydl.assert_called_once()
 
     @patch(
@@ -228,24 +232,37 @@ class TestDownloadAttemptSequence(unittest.TestCase):
         return_value=YtDlpParams.model_validate({}),
     )
     def test_build_opts_authenticated_calls_get_auth_ydl_opts(self, mock_get_auth):
-        _build_download_opts("abc", Path("/tmp"), authenticated=True)
+        _build_download_opts(
+            "abc", Path("/tmp"), attempt=_DownloadAttemptConfig(authenticated=True)
+        )
         mock_get_auth.assert_called_once_with(use_browser_fallback=True)
 
     @patch("src.youtube.downloader.get_ydl_opts", return_value=YtDlpParams.model_validate({}))
     def test_build_opts_sets_format_when_provided(self, _opts):
-        result = _build_download_opts("abc", Path("/tmp"), format_selector="bestaudio/best")
+        result = _build_download_opts(
+            "abc",
+            Path("/tmp"),
+            attempt=_DownloadAttemptConfig(format_selector="bestaudio/best"),
+        )
         self.assertEqual(result["format"], "bestaudio/best")
 
     @patch("src.youtube.downloader.get_ydl_opts", return_value=YtDlpParams.model_validate({}))
     def test_build_opts_omits_format_when_none(self, _opts):
-        result = _build_download_opts("abc", Path("/tmp"), format_selector=None)
+        result = _build_download_opts(
+            "abc", Path("/tmp"), attempt=_DownloadAttemptConfig(format_selector=None)
+        )
         dumped = result.model_dump(exclude_none=True)
         self.assertNotIn("format", dumped)
 
     @patch("src.youtube.downloader.get_ydl_opts", return_value=YtDlpParams.model_validate({}))
     def test_build_opts_sets_player_clients_when_provided(self, _opts):
         result = _build_download_opts(
-            "abc", Path("/tmp"), player_clients=["tv_embedded"], authenticated=False
+            "abc",
+            Path("/tmp"),
+            attempt=_DownloadAttemptConfig(
+                authenticated=False,
+                player_clients=["tv_embedded"],
+            ),
         )
         self.assertEqual(result["extractor_args"], {"youtube": {"player_client": ["tv_embedded"]}})
 

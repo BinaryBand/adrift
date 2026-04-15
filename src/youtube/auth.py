@@ -1,10 +1,15 @@
 import os
+import shutil
 import sys
 from pathlib import Path
 from typing import Any
 
 sys.path.insert(0, Path(__file__).parent.parent.as_posix())
 from src.models import YtDlpParams
+
+
+def _node_path() -> str | None:
+    return shutil.which("node")
 
 
 def get_ydl_opts() -> YtDlpParams:
@@ -48,7 +53,12 @@ def get_auth_ydl_opts(
 
 def _apply_authenticated_download_defaults(opts: YtDlpParams) -> None:
     opts["ratelimit"] = 2 * 1024 * 1024  # 2 MB/s — throttle media downloads only
-    opts["js_runtimes"] = {"node": {}}
+    # Provide Node.js so yt-dlp can solve YouTube's n-challenge (required for
+    # age-restricted and some other videos). remote_components lets it fetch the
+    # challenge solver script from GitHub on first use.
+    node = _node_path()
+    opts["js_runtimes"] = {"node": {"path": node} if node else {}}
+    opts["remote_components"] = {"ejs:github"}
     # Age-restricted videos require JS for auth token verification; remove the
     # skip that get_ydl_opts sets for unauthenticated use.
     opts["extractor_args"] = {"youtube": {}}

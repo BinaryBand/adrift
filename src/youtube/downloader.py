@@ -1,4 +1,5 @@
 import sys
+from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Literal, cast
 
@@ -59,21 +60,24 @@ _DOWNLOAD_ATTEMPTS: list[tuple[bool, list[str] | None, str | None]] = [
 ]
 
 
+@dataclass(frozen=True)
+class _DownloadAttemptConfig:
+    authenticated: bool = True
+    player_clients: list[str] | None = None
+    format_selector: str | None = None
+
+
 def _ytdlp_download(id: str, dir: Path, callback: Callback | None = None) -> Path | None:
     """Download video using yt-dlp.
 
     Tries unauthenticated first (avoids cookie-induced format restrictions), then
     falls back to authenticated for age-restricted content.
     """
-    url = f"https://www.youtube.com/watch?v={id}"
-    last = len(_DOWNLOAD_ATTEMPTS) - 1
-    for attempt, (authenticated, clients, format_selector) in enumerate(_DOWNLOAD_ATTEMPTS):
+    for attempt, raw_attempt in enumerate(_DOWNLOAD_ATTEMPTS):
         try:
-            opts = _build_download_opts(id, dir, callback, clients, format_selector, authenticated)
-            info_dict = _extract_download_info(url, opts)
-            result = _resolve_download_path(info_dict)
+            result = _run_download_attempt(id, dir, callback, raw_attempt)
         except Exception as e:
-            if _is_unavailable_format_error(e) and attempt < last:
+            if _should_retry_attempt(e, attempt):
                 continue
             _raise_download_error(id, e)
             return None
@@ -88,25 +92,56 @@ def _build_download_opts(
     id: str,
     dir: Path,
     callback: Callback | None = None,
-    player_clients: list[str] | None = None,
-    format_selector: str | None = None,
-    authenticated: bool = True,
+    attempt: _DownloadAttemptConfig | None = None,
 ) -> YtDlpParams:
-    opts: YtDlpParams = (
-        get_auth_ydl_opts(use_browser_fallback=True) if authenticated else get_ydl_opts()
-    )
-    if format_selector is not None:
-        opts["format"] = format_selector
+    attempt_config = _coerce_attempt_config(attempt)
+    opts: YtDlpParams = _base_download_opts(attempt_config)
+    if attempt_config.format_selector is not None:
+        opts["format"] = attempt_config.format_selector
     opts["outtmpl"] = (dir / f"{id}.%(ext)s").as_posix()
     opts["postprocessors"] = [_audio_postprocessor()]
-    if player_clients is not None:
-        opts["extractor_args"] = {"youtube": {"player_client": player_clients}}
+    if attempt_config.player_clients is not None:
+        opts["extractor_args"] = {"youtube": {"player_client": attempt_config.player_clients}}
 
     progress_hook = _make_progress_hook(callback)
     if progress_hook is not None:
         opts["progress_hooks"] = [progress_hook]
 
     return opts
+
+
+def _coerce_attempt_config(attempt: _DownloadAttemptConfig | None) -> _DownloadAttemptConfig:
+    if attempt is None:
+        return _DownloadAttemptConfig()
+    return attempt
+
+
+def _base_download_opts(attempt: _DownloadAttemptConfig) -> YtDlpParams:
+    if attempt.authenticated:
+        return get_auth_ydl_opts(use_browser_fallback=True)
+    return get_ydl_opts()
+
+
+def _run_download_attempt(
+    id: str,
+    dir: Path,
+    callback: Callback | None,
+    raw_attempt: tuple[bool, list[str] | None, str | None],
+) -> Path | None:
+    authenticated, player_clients, format_selector = raw_attempt
+    attempt = _DownloadAttemptConfig(
+        authenticated=authenticated,
+        player_clients=player_clients,
+        format_selector=format_selector,
+    )
+    opts = _build_download_opts(id, dir, callback, attempt)
+    url = f"https://www.youtube.com/watch?v={id}"
+    info_dict = _extract_download_info(url, opts)
+    return _resolve_download_path(info_dict)
+
+
+def _should_retry_attempt(error: Exception, attempt_index: int) -> bool:
+    return _is_unavailable_format_error(error) and attempt_index < len(_DOWNLOAD_ATTEMPTS) - 1
 
 
 def _audio_postprocessor() -> dict[str, str]:
