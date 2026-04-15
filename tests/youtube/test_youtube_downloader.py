@@ -9,7 +9,11 @@ sys.path.insert(0, Path(__file__).parent.parent.parent.as_posix())
 import src.youtube.downloader as yt_downloader
 from src.models import YtDlpParams
 from src.youtube.downloader import (
+    _AUDIO_FORMATS_FALLBACK,
+    _DOWNLOAD_ATTEMPTS,
+    _PLAYER_CLIENTS_STUB_FALLBACK,
     BotDetectionError,
+    _build_download_opts,
     _extract_video_id,
     _is_bot_detection_error,
     _ytdlp_download,
@@ -164,6 +168,129 @@ class TestDownloadVideo(unittest.TestCase):
         with patch("pathlib.Path.mkdir") as mock_mkdir:
             download_video("https://www.youtube.com/watch?v=abc1234abcd", Path("/tmp/new"))
             mock_mkdir.assert_called_once_with(parents=True, exist_ok=True)
+
+
+class TestDownloadAttemptSequence(unittest.TestCase):
+    """Lock in the _DOWNLOAD_ATTEMPTS sequence and _build_download_opts behaviour.
+
+    These tests exist so that changes to the attempt order or auth strategy
+    require an explicit, reviewed update here rather than an accidental diff.
+    """
+
+    def test_attempts_start_unauthenticated(self):
+        """Unauthenticated for two attempts to avoid cookie-induced format restrictions."""
+        unauth = [(a, c, f) for a, c, f in _DOWNLOAD_ATTEMPTS if not a]
+        self.assertGreaterEqual(len(unauth), 2, "expected at least 2 unauthenticated attempts")
+        first_auth_index = next(i for i, (a, _, _) in enumerate(_DOWNLOAD_ATTEMPTS) if a)
+        self.assertGreater(
+            first_auth_index,
+            0,
+            "first attempt must be unauthenticated",
+        )
+
+    def test_attempts_include_authenticated_fallback(self):
+        """At least one authenticated attempt must exist (for age-restricted content)."""
+        auth = [t for t in _DOWNLOAD_ATTEMPTS if t[0]]
+        self.assertGreater(len(auth), 0)
+
+    def test_attempts_include_no_format_selector(self):
+        """At least one attempt must use no format selector so yt-dlp can choose freely."""
+        no_format = [t for t in _DOWNLOAD_ATTEMPTS if t[2] is None]
+        self.assertGreater(len(no_format), 0)
+
+    def test_attempts_include_player_client_fallback(self):
+        """At least one attempt must use the stub player-client fallback."""
+        with_clients = [t for t in _DOWNLOAD_ATTEMPTS if t[1] is not None]
+        self.assertGreater(len(with_clients), 0)
+
+    def test_attempt_format_selectors_use_fallback_constant(self):
+        """Any non-None format selector must be _AUDIO_FORMATS_FALLBACK (bestaudio/best)."""
+        for auth, clients, fmt in _DOWNLOAD_ATTEMPTS:
+            if fmt is not None:
+                self.assertEqual(
+                    fmt,
+                    _AUDIO_FORMATS_FALLBACK,
+                    f"Unexpected format selector {fmt!r} in attempt ({auth}, {clients}, {fmt})",
+                )
+
+    def test_player_client_fallback_constant(self):
+        """_PLAYER_CLIENTS_STUB_FALLBACK must contain tv_embedded and web."""
+        self.assertIn("tv_embedded", _PLAYER_CLIENTS_STUB_FALLBACK)
+        self.assertIn("web", _PLAYER_CLIENTS_STUB_FALLBACK)
+
+    @patch("src.youtube.downloader.get_ydl_opts", return_value=YtDlpParams.model_validate({}))
+    def test_build_opts_unauthenticated_calls_get_ydl_opts(self, mock_get_ydl):
+        _build_download_opts("abc", Path("/tmp"), authenticated=False)
+        mock_get_ydl.assert_called_once()
+
+    @patch(
+        "src.youtube.downloader.get_auth_ydl_opts",
+        return_value=YtDlpParams.model_validate({}),
+    )
+    def test_build_opts_authenticated_calls_get_auth_ydl_opts(self, mock_get_auth):
+        _build_download_opts("abc", Path("/tmp"), authenticated=True)
+        mock_get_auth.assert_called_once_with(use_browser_fallback=True)
+
+    @patch("src.youtube.downloader.get_ydl_opts", return_value=YtDlpParams.model_validate({}))
+    def test_build_opts_sets_format_when_provided(self, _opts):
+        result = _build_download_opts("abc", Path("/tmp"), format_selector="bestaudio/best")
+        self.assertEqual(result["format"], "bestaudio/best")
+
+    @patch("src.youtube.downloader.get_ydl_opts", return_value=YtDlpParams.model_validate({}))
+    def test_build_opts_omits_format_when_none(self, _opts):
+        result = _build_download_opts("abc", Path("/tmp"), format_selector=None)
+        dumped = result.model_dump(exclude_none=True)
+        self.assertNotIn("format", dumped)
+
+    @patch("src.youtube.downloader.get_ydl_opts", return_value=YtDlpParams.model_validate({}))
+    def test_build_opts_sets_player_clients_when_provided(self, _opts):
+        result = _build_download_opts(
+            "abc", Path("/tmp"), player_clients=["tv_embedded"], authenticated=False
+        )
+        self.assertEqual(result["extractor_args"], {"youtube": {"player_client": ["tv_embedded"]}})
+
+    @patch("src.youtube.downloader.get_ydl_opts", return_value=YtDlpParams.model_validate({}))
+    @patch("src.youtube.downloader.get_auth_ydl_opts", return_value=YtDlpParams.model_validate({}))
+    def test_ytdlp_download_retries_on_format_error(self, mock_auth, mock_unauth):
+        """Format errors on early attempts must be swallowed and retried."""
+        format_error = Exception("Requested format is not available")
+        success_info = {"requested_downloads": [{"filepath": "/tmp/abc.m4a"}]}
+        call_count = 0
+
+        def fake_extract_info(url, download):
+            nonlocal call_count
+            call_count += 1
+            if call_count < 3:
+                raise format_error
+            return success_info
+
+        with (
+            patch("src.youtube.downloader.yt_dlp.YoutubeDL") as mock_cls,
+            patch("pathlib.Path.exists", return_value=True),
+        ):
+            mock_ydl = MagicMock()
+            mock_ydl.__enter__.return_value.extract_info.side_effect = fake_extract_info
+            mock_cls.return_value = mock_ydl
+            result = _ytdlp_download("abc", Path("/tmp"))
+
+        self.assertEqual(result, Path("/tmp/abc.m4a"))
+        self.assertEqual(call_count, 3)
+
+    @patch("src.youtube.downloader.get_ydl_opts", return_value=YtDlpParams.model_validate({}))
+    @patch("src.youtube.downloader.get_auth_ydl_opts", return_value=YtDlpParams.model_validate({}))
+    def test_ytdlp_download_raises_after_all_attempts_fail(self, mock_auth, mock_unauth):
+        """If every attempt raises a format error the last exception must propagate."""
+        with patch("src.youtube.downloader.yt_dlp.YoutubeDL") as mock_cls:
+            mock_ydl = MagicMock()
+            mock_ydl.__enter__.return_value.extract_info.side_effect = Exception(
+                "Requested format is not available"
+            )
+            mock_cls.return_value = mock_ydl
+            with self.assertRaises(Exception, msg="Requested format is not available"):
+                _ytdlp_download("abc", Path("/tmp"))
+        self.assertEqual(
+            mock_ydl.__enter__.return_value.extract_info.call_count, len(_DOWNLOAD_ATTEMPTS)
+        )
 
 
 if __name__ == "__main__":

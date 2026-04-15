@@ -20,7 +20,6 @@ from mypy_boto3_s3.type_defs import CopySourceTypeDef
 from pydantic import BaseModel, ConfigDict
 
 sys.path.insert(0, Path(__file__).parent.parent.as_posix())
-sys.path.insert(0, Path(__file__).parent.parent.as_posix())
 from src.adapters.docker_secrets import DockerSecretProvider
 from src.adapters.env_secrets import EnvironmentSecretProvider
 from src.models import CacheMetadata, MediaMetadata, S3Metadata
@@ -209,6 +208,23 @@ def _do_s3_upload(spec: _UploadSpec) -> None:
     )
 
 
+def _invalidate_file_map_cache(bucket: str, key: str) -> None:
+    """Invalidate the file-map cache for the directory containing `key`.
+
+    Called after any mutation (upload, rename, delete) so that the next call
+    to `exists()` / `get_file_list()` re-lists the directory from S3 rather
+    than returning a stale cached result.
+    """
+    parent_dir = Path(key).parent.as_posix()
+    if parent_dir == ".":
+        parent_dir = ""
+    if parent_dir and not parent_dir.endswith("/"):
+        parent_dir += "/"
+    for ext_agnostic in (True, False):
+        cache_key = f"s3_file_map:{bucket}:{parent_dir}:{ext_agnostic}"
+        _s3_cache().delete(cache_key)
+
+
 def _sync_upload_cache(bucket: str, key: str, metadata_dict: dict[str, str] | None) -> None:
     """Update the local S3 metadata cache after an upload."""
     cache_key = f"s3_metadata:{bucket}:{key}"
@@ -216,6 +232,7 @@ def _sync_upload_cache(bucket: str, key: str, metadata_dict: dict[str, str] | No
         _s3_cache().set(cache_key, metadata_dict)
     else:
         _s3_cache().delete(cache_key)
+    _invalidate_file_map_cache(bucket, key)
 
 
 def _get_effective_s3_endpoint() -> str:
@@ -443,6 +460,7 @@ def delete_file(bucket: str, key: str) -> None:
 
     cache_key = f"s3_metadata:{bucket}:{key}"
     _s3_cache().delete(cache_key)
+    _invalidate_file_map_cache(bucket, key)
 
 
 def rename_file(bucket: str, old_key: str, new_key: str) -> None:
@@ -459,6 +477,8 @@ def rename_file(bucket: str, old_key: str, new_key: str) -> None:
     new_cache_key = f"s3_metadata:{bucket}:{new_key}"
     _s3_cache().set(new_cache_key, _s3_cache().get(old_cache_key))
     _s3_cache().delete(old_cache_key)
+    _invalidate_file_map_cache(bucket, old_key)
+    _invalidate_file_map_cache(bucket, new_key)
 
 
 @retry(attempts=3, backoff_base=2)
@@ -502,10 +522,13 @@ def get_metadata(bucket: str, key: str) -> MediaMetadata | None:
     metadata = _s3_cache().get(cache_key)
 
     if metadata is None and exists(bucket, key) is not None:
-        client: S3Client = get_s3_client()
-        head_response = client.head_object(Bucket=bucket, Key=key)
-        metadata = head_response.get("Metadata", {})
-        _s3_cache().set(cache_key, metadata)
+        try:
+            client: S3Client = get_s3_client()
+            head_response = client.head_object(Bucket=bucket, Key=key)
+            metadata = head_response.get("Metadata", {})
+            _s3_cache().set(cache_key, metadata)
+        except Exception:
+            pass
 
     try:
         return MediaMetadata.model_validate(metadata)

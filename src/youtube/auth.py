@@ -49,6 +49,9 @@ def get_auth_ydl_opts(
 def _apply_authenticated_download_defaults(opts: YtDlpParams) -> None:
     opts["ratelimit"] = 2 * 1024 * 1024  # 2 MB/s — throttle media downloads only
     opts["js_runtimes"] = {"node": {}}
+    # Age-restricted videos require JS for auth token verification; remove the
+    # skip that get_ydl_opts sets for unauthenticated use.
+    opts["extractor_args"] = {"youtube": {}}
 
 
 def _apply_cookiefile(

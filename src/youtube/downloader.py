@@ -7,7 +7,7 @@ import yt_dlp
 sys.path.insert(0, Path(__file__).parent.parent.as_posix())
 from src.utils.progress import Callback
 from src.utils.regex import YOUTUBE_VIDEO_REGEX
-from src.youtube.auth import YtDlpParams, get_auth_ydl_opts
+from src.youtube.auth import YtDlpParams, get_auth_ydl_opts, get_ydl_opts
 
 
 class BotDetectionError(Exception):
@@ -43,26 +43,43 @@ def _is_bot_detection_error(error_message: str) -> bool:
     return any(indicator in error_message for indicator in _BOT_INDICATORS)
 
 
-_PLAYER_CLIENTS_PRIMARY = ["android_music", "web"]
-_PLAYER_CLIENTS_FALLBACK = ["tv_embedded", "web"]
+_PLAYER_CLIENTS_STUB_FALLBACK = ["tv_embedded", "web"]
+_AUDIO_FORMATS_FALLBACK = "bestaudio/best"
+
+# (authenticated, player_clients, format_selector)
+# Unauthenticated attempts first: stale/mismatched browser cookies can cause
+# YouTube to serve a restricted format list even for non-age-restricted videos.
+# "Sign in" errors from unauthenticated attempts are caught and retried with auth.
+_DOWNLOAD_ATTEMPTS: list[tuple[bool, list[str] | None, str | None]] = [
+    (False, None, _AUDIO_FORMATS_FALLBACK),
+    (False, None, None),
+    (True, None, _AUDIO_FORMATS_FALLBACK),
+    (True, None, None),
+    (True, _PLAYER_CLIENTS_STUB_FALLBACK, None),
+]
 
 
 def _ytdlp_download(id: str, dir: Path, callback: Callback | None = None) -> Path | None:
-    """Download video using yt-dlp, falling back to tv_embedded client on stub."""
+    """Download video using yt-dlp.
+
+    Tries unauthenticated first (avoids cookie-induced format restrictions), then
+    falls back to authenticated for age-restricted content.
+    """
     url = f"https://www.youtube.com/watch?v={id}"
-    for attempt, clients in enumerate((_PLAYER_CLIENTS_PRIMARY, _PLAYER_CLIENTS_FALLBACK)):
+    last = len(_DOWNLOAD_ATTEMPTS) - 1
+    for attempt, (authenticated, clients, format_selector) in enumerate(_DOWNLOAD_ATTEMPTS):
         try:
-            opts = _build_download_opts(id, dir, callback, clients)
+            opts = _build_download_opts(id, dir, callback, clients, format_selector, authenticated)
             info_dict = _extract_download_info(url, opts)
             result = _resolve_download_path(info_dict)
         except Exception as e:
+            if _is_unavailable_format_error(e) and attempt < last:
+                continue
             _raise_download_error(id, e)
             return None
 
         if result is not None:
             return result
-        if attempt == 0:
-            print(f"WARNING: Stub detected for {id}, retrying with tv_embedded client")
 
     return None
 
@@ -72,14 +89,18 @@ def _build_download_opts(
     dir: Path,
     callback: Callback | None = None,
     player_clients: list[str] | None = None,
+    format_selector: str | None = None,
+    authenticated: bool = True,
 ) -> YtDlpParams:
-    opts: YtDlpParams = get_auth_ydl_opts(use_browser_fallback=True)
-    opts["format"] = "bestaudio[acodec!=none]/bestaudio/best[acodec!=none]"
+    opts: YtDlpParams = (
+        get_auth_ydl_opts(use_browser_fallback=True) if authenticated else get_ydl_opts()
+    )
+    if format_selector is not None:
+        opts["format"] = format_selector
     opts["outtmpl"] = (dir / f"{id}.%(ext)s").as_posix()
     opts["postprocessors"] = [_audio_postprocessor()]
-    opts["extractor_args"] = {
-        "youtube": {"player_client": player_clients or _PLAYER_CLIENTS_PRIMARY}
-    }
+    if player_clients is not None:
+        opts["extractor_args"] = {"youtube": {"player_client": player_clients}}
 
     progress_hook = _make_progress_hook(callback)
     if progress_hook is not None:
@@ -125,6 +146,15 @@ def _extract_download_info(url: str, opts: YtDlpParams | dict[str, Any]) -> dict
     with yt_dlp.YoutubeDL(cast(Any, _ydl_opts_dict(opts))) as ydl:
         info = ydl.extract_info(url, download=True)
     return cast(dict[str, Any], info)
+
+
+def _is_unavailable_format_error(error: Exception) -> bool:
+    err_str = str(error)
+    return (
+        "Requested format is not available" in err_str
+        or "This video is only available for" in err_str
+        or "Sign in" in err_str
+    )
 
 
 def _log_stub_format(path: Path, size: int, info_dict: dict[str, Any]) -> None:
