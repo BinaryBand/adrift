@@ -64,3 +64,17 @@ def test_complexity_checks():
     ceiling = mod.Ceiling(ccn=5, length=25, params=4)
     rc = mod.check_metrics(output, ceiling, warn_at_ceiling=False)
     assert rc == 0, f"Complexity checks reported {rc} diagnostics"
+
+
+def test_pyright_checks():
+    mod = _load_module(
+        Path(__file__).parents[2] / "runbook" / "quality" / "check_static.py",
+        "check_static",
+    )
+    paths = getattr(mod, "_DEFAULT_PATHS", ["src", "runbook", "tests", "typings"])
+    # Run pyright only (exclude tests by default)
+    py_paths = [p for p in paths if p != "tests"]
+    py_return, py_diags = mod._run_pyright(py_paths, None)
+    if py_return == 2:
+        pytest.skip("pyright not available")
+    assert py_return == 0, f"Pyright reported {len(py_diags)} diagnostics"
