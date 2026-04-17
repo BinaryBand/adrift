@@ -216,6 +216,14 @@ def _config_schedule_matches_today(config: "PodcastConfig") -> bool:
     return any(_schedule_matches_today(rule, config.name) for rule in config.schedule)
 
 
+def _load_configs_for_targets(targets: list[str]) -> list[PodcastConfig]:
+    return [config for target in targets for config in _load_config(target)]
+
+
+def _schedule_filtered_configs(configs: list[PodcastConfig]) -> list[PodcastConfig]:
+    return [config for config in configs if _config_schedule_matches_today(config)]
+
+
 def load_podcasts_config(
     include: list[str], skip_schedule_filter: bool = False
 ) -> list[PodcastConfig]:
@@ -225,14 +233,13 @@ def load_podcasts_config(
     :func:`_load_config`. Entries whose ``schedule`` RRULE does not
     match today are excluded unless ``skip_schedule_filter`` is true.
     """
-    targets = _expand_include_targets(include)
-    configs: list[PodcastConfig] = [c for t in targets for c in _load_config(t)]
+    configs = _load_configs_for_targets(_expand_include_targets(include))
 
     if skip_schedule_filter:
         random.shuffle(configs)
         return configs
 
-    filtered: list[PodcastConfig] = [it for it in configs if _config_schedule_matches_today(it)]
+    filtered = _schedule_filtered_configs(configs)
     random.shuffle(filtered)
     return filtered
 
