@@ -119,23 +119,19 @@ class YtFetchOptions:
     refresh: bool = False
 
 
-def get_youtube_episodes(
-    url: str, author: str, opts: YtFetchOptions | None = None
-) -> list[RssEpisode]:
-    """Fetch RSS episodes from a given URL."""
-    if opts is None:
-        opts = YtFetchOptions()
+def _coerce_fetch_options(opts: YtFetchOptions | None) -> YtFetchOptions:
+    return opts if opts is not None else YtFetchOptions()
 
-    normalized_url = _normalize_youtube_link(url)
-    episodes = ytdlp.get_youtube_videos(
-        normalized_url,
-        author,
-        opts.callback,
-        refresh=opts.refresh,
-    )
+
+def _post_process_episodes(
+    episodes: list[RssEpisode],
+    url: str,
+    author: str,
+    opts: YtFetchOptions,
+) -> list[RssEpisode]:
     print(f"Fetched {len(episodes)} episodes from {url}")
 
-    if opts.filter is not None and opts.filter != "":
+    if opts.filter:
         episodes = _filter_episodes(episodes, opts.filter)
     if opts.detailed:
         episodes = _enrich_episodes(episodes, author, opts.callback)
@@ -143,6 +139,21 @@ def get_youtube_episodes(
         opts.callback(len(episodes), len(episodes))
 
     return episodes
+
+
+def get_youtube_episodes(
+    url: str, author: str, opts: YtFetchOptions | None = None
+) -> list[RssEpisode]:
+    """Fetch RSS episodes from a given URL."""
+    fetch_opts = _coerce_fetch_options(opts)
+    normalized_url = _normalize_youtube_link(url)
+    episodes = ytdlp.get_youtube_videos(
+        normalized_url,
+        author,
+        fetch_opts.callback,
+        refresh=fetch_opts.refresh,
+    )
+    return _post_process_episodes(episodes, url, author, fetch_opts)
 
 
 def get_video_info(id: str) -> ytdlp.VideoInfo | None:

@@ -293,13 +293,14 @@ def _load_cached_episode_bundle(cache_key: str) -> tuple[dict[str, RssEpisode], 
     if not isinstance(cached, dict):
         return {}, None
 
-    raw_episodes = cached.get("episodes")
+    cached_payload = cast(dict[str, object], cached)
+    raw_episodes = cached_payload.get("episodes")
     if isinstance(raw_episodes, dict):
         return cast(dict[str, RssEpisode], raw_episodes), _parse_cached_timestamp(
-            cached.get("fetched_at")
+            cached_payload.get("fetched_at")
         )
 
-    return cast(dict[str, RssEpisode], cached), None
+    return cast(dict[str, RssEpisode], cached_payload), None
 
 
 def _episode_cache_is_fresh(fetched_at: datetime | None) -> bool:
@@ -365,6 +366,40 @@ def _cache_youtube_videos(cache_key: str, episodes: dict[str, RssEpisode]) -> No
     )
 
 
+def _use_cached_youtube_videos(
+    episodes: dict[str, RssEpisode],
+    author: str,
+    callback: Callback | None,
+) -> list[RssEpisode]:
+    print(f"Using fresh cached YouTube episodes for {author}")
+    _report_cached_video_progress(callback, len(episodes))
+    return list(episodes.values())
+
+
+def _should_use_cached_youtube_videos(
+    episodes: dict[str, RssEpisode],
+    fetched_at: datetime | None,
+    refresh: bool,
+) -> bool:
+    return bool(episodes) and not refresh and _episode_cache_is_fresh(fetched_at)
+
+
+def _refresh_youtube_videos(
+    url: str,
+    author: str,
+    callback: Callback | None,
+    episodes: dict[str, RssEpisode],
+) -> list[RssEpisode]:
+    for batch_index, batch_size in enumerate(BATCHES, start=1):
+        video_entries = _fetch_video_batch(url, author, batch_index, batch_size)
+        has_new = _add_new_public_episodes(video_entries, author, episodes)
+        _report_video_fetch_progress(callback, batch_size, len(episodes))
+        if not has_new:
+            break
+
+    return list(episodes.values())
+
+
 def get_youtube_videos(
     url: str,
     author: str,
@@ -374,20 +409,12 @@ def get_youtube_videos(
     cache_key = f"get_youtube_videos:{url}:{author}"
     stale_episodes, fetched_at = _load_cached_episode_bundle(cache_key)
 
-    if stale_episodes and not refresh and _episode_cache_is_fresh(fetched_at):
-        print(f"Using fresh cached YouTube episodes for {author}")
-        _report_cached_video_progress(callback, len(stale_episodes))
-        return list(stale_episodes.values())
+    if _should_use_cached_youtube_videos(stale_episodes, fetched_at, refresh):
+        return _use_cached_youtube_videos(stale_episodes, author, callback)
 
-    for batch_index, batch_size in enumerate(BATCHES, start=1):
-        video_entries = _fetch_video_batch(url, author, batch_index, batch_size)
-        has_new = _add_new_public_episodes(video_entries, author, stale_episodes)
-        _report_video_fetch_progress(callback, batch_size, len(stale_episodes))
-        if not has_new:
-            break
-
+    episodes = _refresh_youtube_videos(url, author, callback, stale_episodes)
     _cache_youtube_videos(cache_key, stale_episodes)
-    return list(stale_episodes.values())
+    return episodes
 
 
 if __name__ == "__main__":

@@ -1,5 +1,6 @@
+from dataclasses import dataclass
 from datetime import datetime
-from typing import Any
+from typing import Any, cast
 
 from rapidfuzz import fuzz
 
@@ -315,18 +316,47 @@ def merge_episode_pairs(
 # ---------------------------------------------------------------------------
 
 
+@dataclass(frozen=True)
+class EpisodeFetchContext:
+    title: str
+    is_reference: bool
+    callback: Callback | None = None
+    refresh_sources: bool = False
+
+
+def _legacy_fetch_arg(legacy_args: tuple[object, ...], index: int) -> object | None:
+    return legacy_args[index] if len(legacy_args) > index else None
+
+
+def _coerce_legacy_callback(value: object | None) -> Callback | None:
+    if value is None or callable(value):
+        return cast(Callback | None, value)
+    return None
+
+
+def _coerce_episode_fetch_context(
+    context_or_title: EpisodeFetchContext | str,
+    legacy_args: tuple[object, ...],
+) -> EpisodeFetchContext:
+    if isinstance(context_or_title, EpisodeFetchContext):
+        return context_or_title
+
+    return EpisodeFetchContext(
+        title=context_or_title,
+        is_reference=bool(_legacy_fetch_arg(legacy_args, 0)),
+        callback=_coerce_legacy_callback(_legacy_fetch_arg(legacy_args, 1)),
+        refresh_sources=bool(_legacy_fetch_arg(legacy_args, 2)),
+    )
+
+
 def _collect_episodes(
     sources: list[FeedSource],
-    title: str,
-    is_reference: bool,
-    callback: Callback | None = None,
-    refresh_sources: bool = False,
+    context_or_title: EpisodeFetchContext | str,
+    *legacy_args: object,
 ) -> list[RssEpisode]:
     """Fetch and deduplicate episodes from a list of FeedSource objects."""
-    albums = [
-        _fetch_source_episodes(source, title, is_reference, callback, refresh_sources)
-        for source in sources
-    ]
+    context = _coerce_episode_fetch_context(context_or_title, legacy_args)
+    albums = [_fetch_source_episodes(source, context) for source in sources]
 
     if not albums:
         return []
@@ -340,10 +370,7 @@ def _collect_episodes(
 
 def _fetch_source_episodes(
     source: FeedSource | dict[str, Any],
-    title: str,
-    is_reference: bool,
-    callback: Callback | None = None,
-    refresh_sources: bool = False,
+    context: EpisodeFetchContext,
 ) -> list[RssEpisode]:
     from src.adapters import get_episode_source_adapter
 
@@ -354,10 +381,10 @@ def _fetch_source_episodes(
 
     # Build options dict for adapter
     options = {
-        "title": title,
-        "detailed": is_reference,  # is_reference maps to detailed flag for YouTube
-        "callback": callback,
-        "refresh": refresh_sources,
+        "title": context.title,
+        "detailed": context.is_reference,  # is_reference maps to detailed flag for YouTube
+        "callback": context.callback,
+        "refresh": context.refresh_sources,
     }
 
     # Delegate to adapter
@@ -382,10 +409,12 @@ def process_sources(
     """Collect and deduplicate download-side episodes (thin wrapper)."""
     episodes = _collect_episodes(
         config.downloads,
-        config.name,
-        False,
-        callback,
-        refresh_sources=refresh_sources,
+        EpisodeFetchContext(
+            title=config.name,
+            is_reference=False,
+            callback=callback,
+            refresh_sources=refresh_sources,
+        ),
     )
     if callback:
         callback(len(episodes), len(episodes))
@@ -398,13 +427,14 @@ def process_feeds(
     refresh_sources: bool = False,
 ) -> list[RssEpisode]:
     """Collect and deduplicate reference-side episodes (thin wrapper)."""
-    title = config.name
     source_episodes = _collect_episodes(
         config.references,
-        title,
-        True,
-        callback,
-        refresh_sources=refresh_sources,
+        EpisodeFetchContext(
+            title=config.name,
+            is_reference=True,
+            callback=callback,
+            refresh_sources=refresh_sources,
+        ),
     )
 
     return source_episodes
