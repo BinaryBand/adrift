@@ -1,11 +1,8 @@
 """Tests for get_youtube_episodes with focus on caching, early termination, and completeness."""
 
-import sys
 import unittest
-from pathlib import Path
 from unittest.mock import MagicMock, patch
 
-sys.path.insert(0, Path(__file__).parent.parent.parent.as_posix())
 from src.models import RssEpisode
 from src.youtube.metadata import YtFetchOptions, get_youtube_episodes
 

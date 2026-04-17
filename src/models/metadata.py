@@ -1,14 +1,10 @@
 import os
-import sys
 from datetime import datetime, timezone
-from pathlib import Path
 from typing import Any, Callable, cast
 
 from dotenv import find_dotenv, load_dotenv
 from pydantic import BaseModel, ConfigDict
 
-# Ensure project root is on sys.path when executed as script
-sys.path.insert(0, Path(__file__).parent.parent.as_posix())
 load_dotenv(find_dotenv())
 DEVICE = os.getenv("DEVICE", "UnknownDevice")
 PROJECT = os.getenv("PROJECT", "UnknownProject")

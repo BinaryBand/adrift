@@ -17,10 +17,10 @@ poetry install
 # Run quality checks manually (examples):
 #   .venv/bin/ruff check src runbook tests typings
 #   .venv/bin/ruff format --check src runbook tests typings
-#   .venv/bin/python runbook/quality/check_static.py src runbook tests typings
-#   .venv/bin/python runbook/quality/check_dead_code.py src
-#   .venv/bin/python runbook/quality/check_complexity.py src --ccn 5 --length 25 --params 4
-#   .venv/bin/python runbook/quality/validate_configs.py --problems config/*.toml
+#   .venv/bin/python -m runbook.quality.check_static src runbook tests typings
+#   .venv/bin/python -m runbook.quality.check_dead_code src
+#   .venv/bin/python -m runbook.quality.check_complexity src --ccn 5 --length 25 --params 4
+#   .venv/bin/python -m runbook.quality.validate_configs --problems config/*.toml
 ```
 
 Open in VS Code from inside WSL:
@@ -109,7 +109,7 @@ included in this repository.
       "label": "Complexity: Lizard Check",
       "type": "shell",
       "command": "${config:python.defaultInterpreterPath}",
-      "args": ["runbook/quality/check_complexity.py", "src", "--ccn", "5", "--length", "25", "--params", "4"]
+      "args": ["-m", "runbook.quality.check_complexity", "src", "--ccn", "5", "--length", "25", "--params", "4"]
     }
   ]
 }
@@ -149,10 +149,10 @@ Prefer early returns over nested conditionals. If a function needs more than 25 
                               (see `.vscode/tasks.json`). Example:
                               `.venv/bin/ruff format --check src runbook tests typings`
                               `.venv/bin/ruff check src runbook tests typings`
-                              `.venv/bin/python runbook/quality/check_complexity.py src --ccn 5 --length 25 --params 4`
-                              `.venv/bin/python runbook/quality/check_dead_code.py src`
-                              `.venv/bin/python runbook/quality/validate_configs.py --problems config/*.toml`
-                              `.venv/bin/python runbook/quality/check_static.py src runbook tests typings`
+                              `.venv/bin/python -m runbook.quality.check_complexity src --ccn 5 --length 25 --params 4`
+                              `.venv/bin/python -m runbook.quality.check_dead_code src`
+                              `.venv/bin/python -m runbook.quality.validate_configs --problems config/*.toml`
+                              `.venv/bin/python -m runbook.quality.check_static src runbook tests typings`
 3. Run tests:                  pytest
 4. Push
 5. Open PR — check checklist

@@ -1,11 +1,8 @@
 """Tests for the local SQLite-backed cache compatibility wrapper."""
 
-import sys
 import tempfile
 import unittest
-from pathlib import Path
 
-sys.path.insert(0, Path(__file__).parent.parent.parent.as_posix())
 from src.utils.cache import S3Cache
 
 

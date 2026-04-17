@@ -4,16 +4,15 @@
 Uses grimp to build the import graph and networkx for hub analysis.
 
 Usage:
-    python runbook/analysis/build_diagram.py            # write to playbook
-    python runbook/analysis/build_diagram.py --print    # print to stdout only
-    python runbook/analysis/build_diagram.py --check    # exit 1 if playbook is stale
+    python -m runbook.analysis.build_diagram            # write to playbook
+    python -m runbook.analysis.build_diagram --print    # print to stdout only
+    python -m runbook.analysis.build_diagram --check    # exit 1 if playbook is stale
 """
 
 from __future__ import annotations
 
 import argparse
 import shutil
-import sys
 import tempfile
 from collections import defaultdict
 from pathlib import Path
@@ -88,8 +87,6 @@ def _add_edges(G: nx.DiGraph, g: Any, mod: str, key: str) -> None:
 
 
 def _build_graph() -> nx.DiGraph:
-    if str(_ROOT) not in sys.path:
-        sys.path.insert(0, str(_ROOT))
     g: Any = grimp.build_graph(_PACKAGE, include_external_packages=False)
     G: nx.DiGraph = nx.DiGraph()
     for mod in sorted(m for m in g.modules if _is_leaf(m)):

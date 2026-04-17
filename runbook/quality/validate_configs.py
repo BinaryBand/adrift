@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Validate TOML podcast config files using the project's Pydantic models.
 
-Usage: runbook/quality/validate_configs.py [files...]
+Usage: python -m runbook.quality.validate_configs [files...]
 If no files are provided, all `config/*.toml` files will be validated.
 
 Exits with status 0 when all files validate, or 1 on validation errors.
@@ -20,8 +20,6 @@ import tomllib
 from typing import Any, cast
 
 _ROOT = Path(__file__).parent.parent.parent.resolve()
-sys.path.insert(0, _ROOT.as_posix())
-
 
 _BEGIN_MARKER = "[toml-validator] Scanning..."
 _END_MARKER = "[toml-validator] Done."

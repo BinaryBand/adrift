@@ -7,16 +7,13 @@ Similar to the SponsorBlock module, it uses Pydantic models for type safety.
 """
 
 import random
-import sys
 from datetime import datetime
-from pathlib import Path
 from typing import Any, Callable, cast
 
 from dateutil import parser
 from pydantic import BaseModel, ValidationError, field_validator
 from yt_dlp import YoutubeDL
 
-sys.path.insert(0, Path(__file__).parent.parent.parent.as_posix())
 from src.models import RssEpisode, YtDlpParams
 from src.models.ytdlp import YtDlpImage
 from src.utils.cache import S3Cache

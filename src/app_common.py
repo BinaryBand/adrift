@@ -1,16 +1,13 @@
 # cspell: ignore-word rrulestr
 import glob
 import random
-import sys
+from datetime import datetime, timedelta
 from pathlib import Path
 from typing import Any, cast
 
 import tomllib
 from dateutil.rrule import rrulestr
 from pydantic import BaseModel, ConfigDict, computed_field
-
-sys.path.insert(0, Path(__file__).parent.parent.as_posix())
-from datetime import datetime, timedelta
 
 from src.utils.text import create_slug
 

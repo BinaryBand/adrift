@@ -11,11 +11,5 @@
   "venvPath": ".",
   "venv": ".venv",
   "stubPath": "typings",
-  "reportMissingImports": true,
-  "executionEnvironments": [
-    {
-      "root": ".",
-      "extraPaths": ["src"]
-    }
-  ]
+  "reportMissingImports": true
 }

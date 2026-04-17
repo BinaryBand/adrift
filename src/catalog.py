@@ -1,11 +1,8 @@
-import sys
 from datetime import datetime
-from pathlib import Path
 from typing import Any
 
 from rapidfuzz import fuzz
 
-sys.path.insert(0, Path(__file__).parent.parent.as_posix())
 from src.app_common import (
     MATCH_TOLERANCE,
     FeedSource,

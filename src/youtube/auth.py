@@ -1,10 +1,8 @@
 import os
 import shutil
-import sys
 from pathlib import Path
 from typing import Any
 
-sys.path.insert(0, Path(__file__).parent.parent.as_posix())
 from src.models import YtDlpParams
 
 

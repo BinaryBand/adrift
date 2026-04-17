@@ -48,13 +48,13 @@ Then add `%APPDATA%\Python\Scripts` to your PATH (the installer will show the ex
 
 ```bash
 # Install all dependencies (creates .venv in the project folder)
-poetry install
+poetry install --with dev
 
 # Activate the virtual environment
 .venv\Scripts\activate
 
 # Or run a command directly without activating
-poetry run python runbook/merge.py --pretty
+poetry run python -m runbook.merge --pretty
 
 # When done, deactivate
 deactivate
@@ -92,7 +92,7 @@ poetry show --outdated
 Run the merge pipeline across one or more config files:
 
 ```bash
-poetry run python runbook/merge.py --include config/*.toml --pretty
+poetry run python -m runbook.merge --include config/*.toml --pretty
 ```
 
 Useful options:

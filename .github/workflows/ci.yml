@@ -22,7 +22,7 @@ jobs:
           pip install poetry
           poetry config virtualenvs.create false || true
           poetry check --lock --no-interaction
-          poetry install --no-root --with dev --no-interaction --no-ansi
+          poetry install --with dev --no-interaction --no-ansi
 
       - name: Ruff format check
         run: poetry run ruff format --check src runbook tests typings
@@ -31,13 +31,13 @@ jobs:
         run: poetry run ruff check src runbook tests typings
 
       - name: Complexity check (lizard)
-        run: poetry run python runbook/quality/check_complexity.py src --ccn 5 --length 25 --params 4 --strict
+        run: poetry run python -m runbook.quality.check_complexity src --ccn 5 --length 25 --params 4 --strict
 
       - name: Dead code check (vulture)
-        run: poetry run python runbook/quality/check_dead_code.py src
+        run: poetry run python -m runbook.quality.check_dead_code src
 
       - name: Validate TOML configs
-        run: poetry run python runbook/quality/validate_configs.py --problems config/*.toml
+        run: poetry run python -m runbook.quality.validate_configs --problems config/*.toml
 
       - name: Run tests
         run: poetry run pytest -q

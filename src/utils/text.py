@@ -1,10 +1,7 @@
-import sys
 from functools import lru_cache
-from pathlib import Path
 
 from unidecode import unidecode
 
-sys.path.insert(0, Path(__file__).parent.parent.parent.as_posix())
 # from src.app_common import load_static_config
 from src.utils.regex import (
     YT_CHANNEL,

@@ -1,9 +1,7 @@
 import re
-import sys
 import unittest
 from pathlib import Path
 
-sys.path.insert(0, Path(__file__).parent.parent.parent.as_posix())
 from src.app_common import PodcastConfig, SourceFilter
 from src.utils.regex import (
     LINK_REGEX,

@@ -38,7 +38,8 @@
             "type": "shell",
             "command": "${config:python.defaultInterpreterPath}",
             "args": [
-                "runbook/quality/check_complexity.py",
+                "-m",
+                "runbook.quality.check_complexity",
                 "src",
                 "--ccn",
                 "5",
@@ -79,7 +80,8 @@
             "type": "shell",
             "command": "${config:python.defaultInterpreterPath}",
             "args": [
-                "runbook/quality/check_dead_code.py",
+                "-m",
+                "runbook.quality.check_dead_code",
                 "src"
             ],
             "group": "build",
@@ -112,7 +114,8 @@
             "type": "shell",
             "command": "${config:python.defaultInterpreterPath}",
             "args": [
-                "runbook/quality/check_dead_code.py",
+                "-m",
+                "runbook.quality.check_dead_code",
                 "src",
                 "--watch"
             ],
@@ -169,7 +172,8 @@
             "type": "shell",
             "command": "${config:python.defaultInterpreterPath}",
             "args": [
-                "runbook/quality/validate_configs.py",
+                "-m",
+                "runbook.quality.validate_configs",
                 "--problems",
                 "${file}"
             ],
@@ -199,7 +203,8 @@
             "type": "shell",
             "command": "${config:python.defaultInterpreterPath}",
             "args": [
-                "runbook/quality/validate_configs.py",
+                "-m",
+                "runbook.quality.validate_configs",
                 "--problems",
                 "--watch"
             ],

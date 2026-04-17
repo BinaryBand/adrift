@@ -1,9 +1,6 @@
-import sys
 from dataclasses import dataclass, field
-from pathlib import Path
 from urllib.parse import urljoin
 
-sys.path.insert(0, Path(__file__).parent.parent.parent.as_posix())
 from src.models import RssChannel, RssEpisode
 from src.utils.progress import Callback
 from src.utils.regex import YT_CHANNEL, YT_CHANNEL_SHORTHAND, re_compile

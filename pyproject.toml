@@ -3,7 +3,16 @@ name = "adrift"
 version = "0.1.0"
 description = "Podcast source aggregation and reference alignment"
 authors = []
-package-mode = false
+package-mode = true
+packages = [
+    { include = "src" },
+    { include = "runbook" },
+]
+
+[tool.poetry.scripts]
+adrift-merge = "runbook.merge:main"
+adrift-validate-configs = "runbook.quality.validate_configs:main"
+adrift-build-diagram = "runbook.analysis.build_diagram:main"
 
 [tool.poetry.dependencies]
 python = "^3.11"

@@ -3,12 +3,8 @@
 import importlib
 import os
 import re
-import sys
 import unittest
 from datetime import datetime
-from pathlib import Path
-
-sys.path.insert(0, Path(__file__).parent.parent.parent.as_posix())
 
 # Provide placeholder S3 credentials so importing src.app_common does not
 # fail the module-level assertions in src/files/s3.py.  setdefault leaves

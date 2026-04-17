@@ -1,11 +1,8 @@
 """Tests for RSS feed filtering functionality (feed_filter and feed_day_of_week_filter)."""
 
-import sys
 import unittest
-from pathlib import Path
 from unittest.mock import Mock, patch
 
-sys.path.insert(0, Path(__file__).parent.parent.parent.as_posix())
 from src.web.rss import get_rss_episodes
 
 

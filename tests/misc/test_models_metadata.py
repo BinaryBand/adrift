@@ -1,10 +1,6 @@
 import os
-import sys
 import unittest
 from datetime import datetime, timezone
-from pathlib import Path
-
-sys.path.insert(0, Path(__file__).parent.parent.parent.as_posix())
 
 os.environ.setdefault("S3_USERNAME", "_test")
 os.environ.setdefault("S3_SECRET_KEY", "_test")

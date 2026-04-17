@@ -1,12 +1,9 @@
 import pickle
 import sqlite3
-import sys
 import threading
 import time
 from pathlib import Path
 from typing import Any
-
-sys.path.insert(0, Path(__file__).parent.parent.parent.as_posix())
 
 
 class _SQLiteCacheStore:

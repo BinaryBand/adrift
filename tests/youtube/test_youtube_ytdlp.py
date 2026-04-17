@@ -1,12 +1,9 @@
 """Tests for YouTube yt-dlp module with focus on caching and error handling."""
 
-import sys
 import unittest
 from datetime import datetime
-from pathlib import Path
 from unittest.mock import MagicMock, patch
 
-sys.path.insert(0, Path(__file__).parent.parent.parent.as_posix())
 from src.models import YtDlpParams
 from src.models.ytdlp import YtDlpImage
 from src.youtube.ytdlp import (

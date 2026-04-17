@@ -1,7 +1,5 @@
 import functools
-import sys
 from datetime import datetime, timedelta, timezone
-from pathlib import Path
 from typing import cast
 
 import feedparser
@@ -11,7 +9,6 @@ from dateutil.rrule import rrulestr
 from diskcache import Cache
 from feedparser import FeedParserDict
 
-sys.path.insert(0, Path(__file__).parent.parent.parent.as_posix())
 from src.models import RssChannel, RssEpisode
 from src.utils.progress import Callback
 from src.utils.regex import LINK_REGEX, re_compile

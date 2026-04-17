@@ -1,13 +1,8 @@
 import argparse
 import json
 import sys
-from pathlib import Path
 
 import dotenv
-
-PROJECT_ROOT = Path(dotenv.find_dotenv()).parent
-
-sys.path.insert(0, PROJECT_ROOT.as_posix())
 
 DF_TARGETS = ["config/*.toml"]
 

@@ -1,0 +1,1 @@
+"""Quality-check entrypoints used by CI and local tooling."""
