@@ -1,11 +1,9 @@
 # cspell: ignore-word rrulestr
 import glob
-import os
 import random
 import sys
 from pathlib import Path
 from typing import Any, cast
-from urllib.parse import urljoin
 
 import tomllib
 from dateutil.rrule import rrulestr
@@ -17,7 +15,6 @@ from datetime import datetime, timedelta
 from src.utils.text import create_slug
 
 MATCH_TOLERANCE = 0.75
-S3_ENDPOINT = os.getenv("S3_ENDPOINT", "")
 
 
 def _exclude_lookahead(pattern: str) -> str:
@@ -119,12 +116,8 @@ class PodcastConfig(BaseModel):
         return f"/media/podcasts/{self.slug}"
 
     # iCalendar RRULE strings that control when downloads run, e.g.
-    # ["FREQ=WEEKLY;BYDAY=WE,FR"].  Empty list = always run.
+    # ["FREQ=WEEKLY;BYDAY=WE,FR"]. Empty list = always include.
     schedule: list[str] = []
-
-    @computed_field(return_type=str)
-    def link(self) -> str:
-        return urljoin(S3_ENDPOINT, self.path + ".rss")
 
 
 def ensure_source_filter(filters: SourceFilter | dict[str, Any] | None) -> SourceFilter:
@@ -223,17 +216,22 @@ def _config_schedule_matches_today(config: "PodcastConfig") -> bool:
     return any(_schedule_matches_today(rule, config.name) for rule in config.schedule)
 
 
-def load_podcasts_config(include: list[str]) -> list[PodcastConfig]:
-    """Load and schedule-filter podcast configurations.
+def load_podcasts_config(
+    include: list[str], skip_schedule_filter: bool = False
+) -> list[PodcastConfig]:
+    """Load podcast configurations, optionally filtering by schedule.
 
     *include* is a list of config names or file paths passed to
-    :func:`_load_config`.  Entries whose ``schedule`` RRULE does not
-    match today are excluded.
+    :func:`_load_config`. Entries whose ``schedule`` RRULE does not
+    match today are excluded unless ``skip_schedule_filter`` is true.
     """
     targets = _expand_include_targets(include)
     configs: list[PodcastConfig] = [c for t in targets for c in _load_config(t)]
 
-    # Filter configs by schedule and return (shuffle to randomize order)
+    if skip_schedule_filter:
+        random.shuffle(configs)
+        return configs
+
     filtered: list[PodcastConfig] = [it for it in configs if _config_schedule_matches_today(it)]
     random.shuffle(filtered)
     return filtered

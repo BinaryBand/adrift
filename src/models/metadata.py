@@ -1,11 +1,9 @@
 import os
 import sys
-from abc import ABC, abstractmethod
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Callable, Sequence, cast
 
-import pydantic
 from dotenv import find_dotenv, load_dotenv
 from pydantic import BaseModel, ConfigDict
 
@@ -14,56 +12,6 @@ sys.path.insert(0, Path(__file__).parent.parent.as_posix())
 load_dotenv(find_dotenv())
 DEVICE = os.getenv("DEVICE", "UnknownDevice")
 PROJECT = os.getenv("PROJECT", "UnknownProject")
-
-
-class S3Metadata(pydantic.BaseModel, ABC):
-    """Abstract base class for S3 metadata models."""
-
-    uploader: str | None = pydantic.Field(default=DEVICE, description="Device identifier")
-
-    @abstractmethod
-    def to_dict(self) -> dict[str, str]:
-        """Convert to S3-compatible metadata dictionary (all string values)."""
-        pass
-
-
-class CacheMetadata(S3Metadata):
-    """S3 object metadata for cached items."""
-
-    created_at: datetime = pydantic.Field(description="Creation timestamp")
-    expires_at: datetime | None = pydantic.Field(default=None, description="Expiration timestamp")
-
-    def to_dict(self) -> dict[str, str]:
-        """Convert to S3-compatible metadata dictionary (all string values)."""
-        result: dict[str, str] = {
-            "created_at": self.created_at.isoformat(),
-        }
-        if self.expires_at is not None:
-            result["expires_at"] = self.expires_at.isoformat()
-        if self.uploader is not None:
-            result["uploader"] = self.uploader
-        return result
-
-
-class MediaMetadata(S3Metadata):
-    """S3 object metadata for media files."""
-
-    duration: float = pydantic.Field(description="Duration in seconds")
-    source: str = pydantic.Field(description="Source URL of the media")
-    upload_date: datetime = pydantic.Field(description="Date the media was uploaded")
-    sponsors_removed: bool | None = pydantic.Field(
-        default=False, description="Whether ads were removed"
-    )
-
-    def to_dict(self) -> dict[str, str]:
-        """Convert to S3-compatible metadata dictionary (all string values)."""
-        return {
-            "duration": str(self.duration),
-            "source": self.source,
-            "upload_date": self.upload_date.isoformat(),
-            "sponsors_removed": "true" if self.sponsors_removed else "false",
-            "uploader": self.uploader if self.uploader is not None else "unknown",
-        }
 
 
 class YtDlpParams(BaseModel):

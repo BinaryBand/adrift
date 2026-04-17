@@ -275,6 +275,26 @@ def merge_episode(ref: RssEpisode, dl: RssEpisode) -> EpisodeData:
     )
 
 
+def merge_config(
+    config: PodcastConfig,
+    callback: Callback | None = None,
+) -> list[EpisodeData]:
+    """Fetch, align, and merge episodes for a single podcast config."""
+    references = process_feeds(config, callback)
+    downloads = process_sources(config, callback)
+    return merge_episode_pairs(references, downloads, config.name)
+
+
+def merge_episode_pairs(
+    references: list[RssEpisode],
+    downloads: list[RssEpisode],
+    show: str = "",
+) -> list[EpisodeData]:
+    """Merge matched reference/download pairs into canonical episodes."""
+    pairs = align_episodes(references, downloads, show)
+    return [merge_episode(references[r_idx], downloads[d_idx]) for r_idx, d_idx in pairs]
+
+
 # ---------------------------------------------------------------------------
 # Episode collection helpers
 # ---------------------------------------------------------------------------

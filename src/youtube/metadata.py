@@ -7,7 +7,6 @@ sys.path.insert(0, Path(__file__).parent.parent.parent.as_posix())
 from src.models import RssChannel, RssEpisode
 from src.utils.progress import Callback
 from src.utils.regex import YT_CHANNEL, YT_CHANNEL_SHORTHAND, re_compile
-from src.web.rss import upload_thumbnail
 from src.youtube import ytdlp
 
 
@@ -45,14 +44,9 @@ def _get_youtube_channel(url: str) -> RssChannel:
 
 def get_youtube_channel(url: str, author: str) -> RssChannel:
     """Fetch RSS channel from a given URL."""
+    del author
     normalized_url = _normalize_youtube_link(url)
-
-    rss_channel = _get_youtube_channel(normalized_url)
-    if rss_channel.image:
-        img = rss_channel.image
-        rss_channel.image = upload_thumbnail(img, author, "channel") or img
-
-    return rss_channel
+    return _get_youtube_channel(normalized_url)
 
 
 def _add_episode_metadata(episode: RssEpisode, author: str) -> RssEpisode:
@@ -91,14 +85,13 @@ def _maybe_update_pub_date(episode: RssEpisode, info: ytdlp.VideoInfo) -> None:
 
 
 def _maybe_update_thumbnail(episode: RssEpisode, info: ytdlp.VideoInfo, author: str) -> None:
-    """Download/upload thumbnail if present and update `episode.image`."""
+    """Update ``episode.image`` from video info when available."""
+    del author
     try:
         if thumbnail := getattr(info, "thumbnail", None):
-            image = upload_thumbnail(thumbnail, author, episode.id) or thumbnail
-            if image:
-                episode.image = image
+            episode.image = thumbnail
     except Exception:
-        # Non-fatal: do not break the enrichment pipeline for thumbnail errors
+        # Non-fatal: do not break the enrichment pipeline for thumbnail errors.
         pass
 
 

@@ -1,7 +1,7 @@
 [tool.poetry]
 name = "adrift"
 version = "0.1.0"
-description = "Podcast aggregation and ad-removal platform"
+description = "Podcast source aggregation and reference alignment"
 authors = []
 package-mode = false
 
@@ -9,9 +9,7 @@ package-mode = false
 python = "^3.11"
 attrs = "*"
 pydantic = "*"
-boto3 = "*"
 feedparser = "*"
-Pillow = "*"
 python-dotenv = "*"
 requests = "*"
 tqdm = "*"
@@ -24,8 +22,6 @@ yarl = "*"
 
 [tool.poetry.group.dev.dependencies]
 # Type stubs
-mypy-boto3-s3 = "*"
-boto3-stubs = { extras = ["s3"], version = "*" }
 types-tqdm = "*"
 types-cachetools = "*"
 types-yt-dlp = "*"
@@ -40,12 +36,11 @@ lizard = "*"
 vulture = "*"
 grimp = "*"
 networkx = "*"
-types-pillow = "^10.2.0.20240822"
 
 [tool.pytest.ini_options]
 addopts = "-m 'not slow'"
 markers = [
-    "slow: marks tests that invoke real ffmpeg/ffprobe processes (run with -m slow)",
+    "slow: marks slower integration-oriented tests (run with -m slow)",
 ]
 
 [tool.mypy]

@@ -1,33 +1,12 @@
 # adrift
 
-A podcast aggregation and ad-removal platform that downloads episodes from RSS feeds and YouTube, filters content, removes ads/sponsors, and manages custom RSS feeds with S3 storage.
+A podcast source aggregation and reference alignment tool. It fetches podcast metadata from RSS feeds and YouTube, filters episodes, and merges matched reference/source entries into a canonical output set.
 
 ## Install Dependencies
 
-### FFmpeg (Required)
-
-FFmpeg is required for audio processing and format conversion.
-
-**Linux/WSL:**
-
-```bash
-sudo apt update
-sudo apt install ffmpeg
-```
-
-**Windows:**
-<!-- cspell:words choco winget -->
-Download from [ffmpeg.org](https://ffmpeg.org/download.html) and add to PATH, or use:
-
-```bash
-choco install ffmpeg  # Using Chocolatey
-# or
-winget install ffmpeg  # Using winget
-```
-
 ### Node.js (Recommended for YouTube Downloads)
 
-Node.js helps yt-dlp handle YouTube's bot detection and solve JavaScript challenges.
+Node.js helps yt-dlp handle YouTube's metadata extraction edge cases and solve JavaScript challenges.
 
 **Linux/WSL:**
 
@@ -75,7 +54,7 @@ poetry install
 .venv\Scripts\activate
 
 # Or run a command directly without activating
-poetry run python runbook/download.py
+poetry run python runbook/merge.py --pretty
 
 # When done, deactivate
 deactivate
@@ -99,14 +78,27 @@ poetry show --outdated
 
 ## Project Structure
 
-- `runbook/` - Main scripts (`download.py`, `podcasts/`)
+- `runbook/` - Main scripts (`merge.py` and project analysis helpers)
 - `src/` - Core source code
-  - `files/` - Audio processing, feature extraction, S3 operations
-  - `web/` - RSS feed parsing, SponsorBlock integration
-  - `youtube/` - YouTube downloading and metadata extraction
-  - `utils/` - Logging, caching, progress tracking
+  - `adapters/` - Source adapters for RSS and YouTube
+  - `web/` - RSS feed parsing and serialization
+  - `youtube/` - YouTube metadata extraction
+  - `utils/` - Normalization, caching, and progress helpers
 - `config/` - Podcast configurations in TOML format
 - `tests/` - Unit tests
+
+## Usage
+
+Run the merge pipeline across one or more config files:
+
+```bash
+poetry run python runbook/merge.py --include config/*.toml --pretty
+```
+
+Useful options:
+
+- `--skip-schedule-filter` to include podcasts even when their configured schedule does not match today.
+- `--include-counts` to include reference and source counts alongside merged episodes.
 
 ## Configuration
 
@@ -150,7 +142,7 @@ patterns (case-insensitive):
 | `include` | When non-empty, episode is **rejected** unless its title matches *at least one* pattern. |
 | `r_rules` | RFC 5545 RRULE strings; only keep episodes whose publish date matches any of the given recurrence rules (e.g. `"FREQ=WEEKLY;BYDAY=MO"` for Monday-only). |
 
-### Download schedule (RRULE)
+### Schedule filter (RRULE)
 
 The `schedule` field accepts a subset of the
 [iCalendar RRULE](https://icalendar.org/iCalendar-RFC-5545/3-8-5-3-recurrence-rule.html)
@@ -161,6 +153,6 @@ format:
 | `"FREQ=WEEKLY;BYDAY=WE,FR"` | Every Wednesday and Friday |
 | `"FREQ=WEEKLY;BYDAY=MO"` | Every Monday |
 | `"FREQ=WEEKLY"` | Once per week on a day derived deterministically from the show title |
-| *(omitted)* | Download every time the script runs |
+| *(omitted)* | Include every time the script runs |
 
 BYDAY codes: `MO` `TU` `WE` `TH` `FR` `SA` `SU`

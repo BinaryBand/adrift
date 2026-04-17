@@ -1,21 +1,12 @@
-import json
-import os
 import pickle
 import sqlite3
 import sys
-import tempfile
 import threading
 import time
 from pathlib import Path
 from typing import Any
 
 sys.path.insert(0, Path(__file__).parent.parent.parent.as_posix())
-from src.files.s3 import (
-    delete_file,
-    download_file,
-    exists,
-    upload_file,
-)
 
 
 class _SQLiteCacheStore:
@@ -109,40 +100,10 @@ class _SQLiteCacheStore:
         return int(cursor.rowcount or 0)
 
 
-def read_s3_json_cache(cache_path: str, item_id: str) -> Any | None:
-    """Read JSON data from S3 cache."""
-    if not exists("cache", cache_path, False):
-        return None
-
-    fd, tmp_str = tempfile.mkstemp(suffix=".json")
-    tmp_path = Path(tmp_str)
-    try:
-        os.close(fd)
-        download_file("cache", cache_path, tmp_path)
-        return json.loads(tmp_path.read_text(encoding="utf-8"))
-    except Exception as e:
-        delete_file("cache", cache_path)
-        print(f"WARNING: Cache read failed for {item_id}: {e}")
-        return None
-    finally:
-        tmp_path.unlink(missing_ok=True)
-
-
-def write_s3_json_cache(cache_path: str, item_id: str, data: Any) -> None:
-    """Write JSON data to S3 cache (best-effort)."""
-    try:
-        with tempfile.TemporaryDirectory() as temp_dir:
-            temp_path = Path(temp_dir) / f"{item_id}.json"
-            temp_path.write_text(json.dumps(data), encoding="utf-8")
-            upload_file("cache", cache_path, temp_path)
-    except Exception as e:
-        print(f"WARNING: Cache write failed for {item_id}: {e}")
-
-
 class S3Cache:
-    """Compatibility cache wrapper now backed by local SQLite.
+    """Compatibility cache wrapper backed by local SQLite.
 
-    `s3_prefix` is retained for API compatibility but is no longer used.
+    ``s3_prefix`` is retained for API compatibility with older callers.
     """
 
     def __init__(self, directory: str, s3_prefix: str):

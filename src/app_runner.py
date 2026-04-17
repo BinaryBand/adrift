@@ -3,12 +3,10 @@
 import sys
 from pathlib import Path
 from typing import Any
-from urllib.parse import urljoin
 
 from cachetools import LRUCache, cached
 
 sys.path.insert(0, Path(__file__).parent.parent.as_posix())
-from src.files.s3 import S3_ENDPOINT, get_file_list
 from src.utils.regex import re_compile
 from src.utils.text import create_slug, remove_control_chars
 
@@ -99,16 +97,3 @@ def normalize_title(show: str, episode: str) -> str:
     episode = remove_control_chars(episode)
     episode = _apply_title_cleaner(show, episode)
     return create_slug(episode).strip("-")
-
-
-def get_s3_files(bucket: str, prefix: str) -> list[str]:
-    file_list = get_file_list(bucket, prefix)
-    root_path = Path(bucket) / prefix
-
-    files: list[str] = []
-    for file_key in file_list:
-        filename = Path(file_key).name
-        location = urljoin(S3_ENDPOINT, (root_path / filename).as_posix())
-        files.append(location)
-
-    return files

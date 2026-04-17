@@ -1,15 +1,10 @@
 import functools
 import mimetypes
-import shutil
 import sys
-import tempfile
-import uuid
 import xml.etree.ElementTree as ET
-from dataclasses import dataclass
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import Any, cast
-from urllib.parse import urljoin
 from xml.dom import minidom
 
 import feedparser
@@ -21,34 +16,12 @@ from feedparser import FeedParserDict
 
 sys.path.insert(0, Path(__file__).parent.parent.parent.as_posix())
 from src.app_common import FeedSource, ensure_feed_source
-from src.files.audio import AUDIO_EXTENSIONS, parse_duration
-from src.files.images import make_square_image_to
-from src.files.s3 import S3_ENDPOINT, copy_file, exists, upload_file
 from src.models import RssChannel, RssEpisode
-from src.utils.crypto import get_file_hash
-from src.utils.image_dedupe_index import (
-    HashDedupeEntry,
-    find_similar_by_phash,
-    get_hash_dedupe,
-    remember_episode_dedupe,
-    remember_hash_dedupe,
-)
-from src.utils.image_phash import average_hash
 from src.utils.progress import Callback
 from src.utils.regex import LINK_REGEX, re_compile
-from src.utils.text import create_slug, is_youtube_channel, remove_control_chars
+from src.utils.text import is_youtube_channel, remove_control_chars
 
-_THUMB_HASH_BASE = Path("podcasts/_thumbs/by-hash")
-
-
-@dataclass(frozen=True)
-class _StagedThumbnail:
-    output_file: Path
-    file_hash: str
-    output_ext: str
-    old_size: int
-    new_size: int
-    phash: str | None = None
+AUDIO_EXTENSIONS = {".mp3", ".m4a", ".aac", ".wav", ".flac", ".ogg", ".mp4", ".opus"}
 
 
 def get_rss_episodes_from_source(
@@ -82,246 +55,6 @@ def get_rss_episodes_from_source(
 def _rss_cache() -> Cache:
     """Get the RSS feed cache instance."""
     return Cache(".cache/rss")
-
-
-def upload_thumbnail(thumbnail_url: str, author: str, id: str) -> str | None:
-    """Top-level wrapper that runs the thumbnail upload pipeline.
-
-    Keeps a small, replaceable root so the heavy-lifting lives in testable
-    helpers below.
-    """
-    try:
-        return _upload_thumbnail_pipeline(thumbnail_url, author, id)
-    except Exception as e:
-        print(f"WARNING: Failed to upload thumbnail for {id}: {e}")
-        return None
-
-
-def _download_thumbnail_bytes(thumbnail_url: str, timeout: int = 30) -> tuple[bytes, str]:
-    resp = requests.get(thumbnail_url, timeout=timeout)
-    resp.raise_for_status()
-    content_type = resp.headers.get("Content-Type", "")
-    return resp.content, content_type
-
-
-def _ext_for_content_type(content_type: str) -> str | None:
-    ext = mimetypes.guess_extension(content_type) or ".bin"
-    if ext in {".bin", ""}:
-        return None
-    return ext
-
-
-def _format_bytes(size: int) -> str:
-    units = ["B", "KB", "MB", "GB", "TB"]
-    value = float(size)
-    for unit in units:
-        if value < 1024 or unit == units[-1]:
-            if unit == "B":
-                return f"{int(value)} {unit}"
-            return f"{value:.2f} {unit}"
-        value /= 1024
-    return f"{size} B"
-
-
-def _stage_thumbnail_bytes(data: bytes, id: str, ext: str) -> tuple[Path, str, int, int]:
-    """Write bytes to temp, transcode square image, and return file info.
-
-    Returns: (output_path, output_ext, original_size, encoded_size)
-    """
-    temp_dir = tempfile.mkdtemp()
-    source_file = Path(temp_dir) / f"{create_slug(id)}{ext}"
-    source_size = len(data)
-    with open(source_file, "wb") as f:
-        f.write(data)
-
-    webp_file = Path(temp_dir) / f"{create_slug(id)}.webp"
-    if make_square_image_to(source_file, webp_file, output_format="WEBP", quality=80):
-        return source_file, ".webp", source_size, webp_file.stat().st_size
-
-    jpg_file = Path(temp_dir) / f"{create_slug(id)}.jpg"
-    if make_square_image_to(source_file, jpg_file, output_format="JPEG", quality=85):
-        return source_file, ".jpg", source_size, jpg_file.stat().st_size
-
-    raise RuntimeError(f"Failed to transcode thumbnail for {id}")
-
-
-def _stage_thumbnail(data: bytes, id: str, ext: str) -> _StagedThumbnail:
-    source_file, output_ext, old_size, new_size = _stage_thumbnail_bytes(data, id, ext)
-    output_file = source_file.with_suffix(output_ext)
-    file_hash = get_file_hash(output_file)
-    phash = None
-    try:
-        phash = average_hash(output_file)
-    except Exception:
-        phash = None
-
-    return _StagedThumbnail(
-        output_file=output_file,
-        file_hash=file_hash,
-        output_ext=output_ext,
-        old_size=old_size,
-        new_size=new_size,
-        phash=phash,
-    )
-
-
-def _existing_thumbnail_s3_path(path_base: Path, image_path: str) -> str | None:
-    existing_name = exists("media", image_path)
-    if not existing_name:
-        return None
-    return urljoin(S3_ENDPOINT, (Path("media") / path_base / existing_name).as_posix())
-
-
-def _canonical_thumbnail_url(file_hash: str) -> str | None:
-    canonical_stem = (_THUMB_HASH_BASE / file_hash).as_posix()
-    existing_canonical = exists("media", canonical_stem)
-    if not existing_canonical:
-        return None
-    canonical_path = (Path("media") / _THUMB_HASH_BASE / existing_canonical).as_posix()
-    return urljoin(S3_ENDPOINT, canonical_path)
-
-
-def _log_thumbnail_compression(id: str, old_size: int, new_size: int, output_ext: str) -> None:
-    saved = max(0, old_size - new_size)
-    saved_pct = (saved / old_size * 100) if old_size > 0 else 0.0
-    print(
-        f"Thumbnail compressed for {id}: "
-        f"{_format_bytes(old_size)} -> {_format_bytes(new_size)} "
-        f"(-{_format_bytes(saved)}, {saved_pct:.1f}%, {output_ext})"
-    )
-
-
-def _upload_canonical_thumbnail(output_file: Path, output_ext: str, file_hash: str) -> str | None:
-    return upload_file("media", _canonical_thumbnail_key(file_hash, output_ext), output_file)
-
-
-def _canonical_thumbnail_key(file_hash: str, output_ext: str) -> str:
-    canonical_stem = (_THUMB_HASH_BASE / file_hash).as_posix()
-    return f"{canonical_stem}{output_ext}"
-
-
-def _remember_dedupe_entries(
-    author_slug: str, id: str, staged: _StagedThumbnail, canonical_url: str
-) -> None:
-    canonical_key = _canonical_thumbnail_key(staged.file_hash, staged.output_ext)
-    remember_episode_dedupe(author_slug, id, staged.file_hash, canonical_url)
-    if get_hash_dedupe(staged.file_hash) is None:
-        remember_hash_dedupe(
-            HashDedupeEntry(
-                file_hash=staged.file_hash,
-                canonical_key=canonical_key,
-                canonical_url=canonical_url,
-                output_ext=staged.output_ext,
-                source_bytes=staged.old_size,
-                encoded_bytes=staged.new_size,
-                phash=staged.phash,
-            )
-        )
-
-
-def _download_and_stage(thumbnail_url: str, id: str) -> _StagedThumbnail | None:
-    data, content_type = _download_thumbnail_bytes(thumbnail_url)
-    ext = _ext_for_content_type(content_type)
-    if ext is None:
-        return None
-    return _stage_thumbnail(data, id, ext)
-
-
-def _copy_similar_canonical(
-    similar: HashDedupeEntry, staged: _StagedThumbnail, author_slug: str, id: str
-) -> str | None:
-    canonical_key = _canonical_thumbnail_key(staged.file_hash, staged.output_ext)
-    try:
-        copied = copy_file("media", similar.canonical_key, canonical_key)
-        if copied is None:
-            return None
-
-        print(
-            "Thumbnail perceptual dedupe hit for {}: copied canonical from {} to {}".format(
-                id, similar.file_hash, staged.file_hash
-            )
-        )
-
-        _remember_hash_entry(staged, canonical_key, copied)
-        _remember_episode_entry(author_slug, id, staged.file_hash, copied)
-
-        return copied
-    except Exception:
-        return None
-
-
-def _remember_hash_entry(staged: _StagedThumbnail, canonical_key: str, copied: str) -> None:
-    try:
-        remember_hash_dedupe(
-            HashDedupeEntry(
-                file_hash=staged.file_hash,
-                canonical_key=canonical_key,
-                canonical_url=copied,
-                output_ext=staged.output_ext,
-                source_bytes=staged.old_size,
-                encoded_bytes=staged.new_size,
-                phash=staged.phash,
-            )
-        )
-    except Exception:
-        pass
-
-
-def _remember_episode_entry(author_slug: str, id: str, file_hash: str, url: str) -> None:
-    try:
-        remember_episode_dedupe(author_slug, id, file_hash, url)
-    except Exception:
-        pass
-
-
-def _upload_thumbnail_pipeline(thumbnail_url: str, author: str, id: str) -> str | None:
-    """Pipeline implementation for thumbnail upload (replaceable stages)."""
-    author_slug = create_slug(author)
-    path_base = Path(f"podcasts/{author_slug}/thumbnails")
-    image_path = (path_base / id).as_posix()
-
-    existing = _existing_thumbnail_s3_path(path_base, image_path)
-    if existing:
-        return existing
-
-    staged = _download_and_stage(thumbnail_url, id)
-    if staged is None:
-        return None
-
-    existing = _find_canonical_for_staged(staged, id, author_slug)
-    if existing:
-        return existing
-
-    _log_thumbnail_compression(id, staged.old_size, staged.new_size, staged.output_ext)
-    uploaded = _upload_canonical_thumbnail(staged.output_file, staged.output_ext, staged.file_hash)
-    if uploaded is None:
-        return None
-    _remember_dedupe_entries(author_slug, id, staged, uploaded)
-    return uploaded
-
-
-def _find_canonical_for_staged(staged: _StagedThumbnail, id: str, author_slug: str) -> str | None:
-    existing = _canonical_thumbnail_url(staged.file_hash)
-    if existing:
-        print("Thumbnail dedup hit for {}: using canonical hash {}".format(id, staged.file_hash))
-        _remember_dedupe_entries(author_slug, id, staged, existing)
-        return existing
-
-    if not staged.phash:
-        return None
-    similar = find_similar_by_phash(staged.phash)
-    if similar is None:
-        return None
-
-    # Prefer copying the existing canonical blob to a canonical key for this file_hash
-    copied = _copy_similar_canonical(similar, staged, author_slug, id)
-    if copied is not None:
-        return copied
-
-    # fallback to mapping to the similar existing canonical
-    print(f"Thumbnail perceptual dedupe hit for {id}: using canonical hash {similar.file_hash}")
-    _remember_episode_entry(author_slug, id, similar.file_hash, similar.canonical_url)
-    return similar.canonical_url
 
 
 def _extract_image_url(channel: FeedParserDict) -> str:
@@ -384,6 +117,24 @@ def _extract_image_from_attrs(obj: object) -> str:
     if isinstance(url, str) and url:
         return url
     return ""
+
+
+def parse_duration(duration_str: str | None) -> float | None:
+    """Parse duration string in HH:MM:SS or MM:SS format to total seconds."""
+    if duration_str is None or duration_str == "":
+        return None
+
+    parts = duration_str.split(":")
+    weights_map: dict[int, tuple[int, ...]] = {
+        1: (1,),
+        2: (60, 1),
+        3: (3600, 60, 1),
+    }
+    weights = weights_map.get(len(parts))
+    if weights is None:
+        print(f"WARNING: Unrecognized duration format: {duration_str}")
+        return None
+    return sum(weight * float(part) for weight, part in zip(weights, parts))
 
 
 def get_rss_channel(rss_url: str) -> RssChannel:
@@ -714,37 +465,3 @@ def _serialize_rss(rss: ET.Element) -> str:
     rough_string = ET.tostring(rss, "utf-8")
     re_parsed = minidom.parseString(rough_string)
     return re_parsed.toprettyxml(indent="\t")
-
-
-def download_direct(url: str, dest: Path) -> tuple[Path, bool]:
-    """Download from direct HTTP source."""
-    headers = _browser_headers_for(url)
-
-    # Stream with a timeout and write to a temporary staging file
-    with requests.get(url, stream=True, headers=headers, timeout=60) as response:
-        response.raise_for_status()
-
-        content_type = response.headers.get("Content-Type", "")
-        ext = mimetypes.guess_extension(content_type) or ".mp3"
-
-        dest.mkdir(parents=True, exist_ok=True)
-        staging_file = dest / f"{uuid.uuid4().hex}{ext}"
-
-        response.raw.decode_content = True
-        with open(staging_file, "wb") as f:
-            shutil.copyfileobj(response.raw, f)
-
-    return staging_file, False
-
-
-def _browser_headers_for(url: str) -> dict[str, str]:
-    return {
-        "User-Agent": (
-            "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
-            "AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120 Safari/537.36"
-        ),
-        "Accept": "*/*",
-        "Accept-Encoding": "identity, deflate, br",
-        "Connection": "keep-alive",
-        "Referer": url,
-    }
