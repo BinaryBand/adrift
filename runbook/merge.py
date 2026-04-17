@@ -9,6 +9,7 @@ from typing import TYPE_CHECKING, cast
 
 import dotenv
 from pydantic import BaseModel
+from tqdm import tqdm
 
 if TYPE_CHECKING:
     from src.models.pipeline import MergeResult
@@ -34,7 +35,6 @@ def _build_series_report(
 
 def _model_payloads(items: Sequence[BaseModel]) -> list[dict[str, object]]:
     return [item.model_dump(mode="json") for item in items]
-
 
 
 def _write_json(path: Path, payload: object) -> None:
@@ -118,9 +118,7 @@ def _emit_timings(config_name: str, timings: dict[str, float]) -> None:
         "podcast_total",
     ]
     rendered_parts = [
-        f"{key}={_format_duration(timings[key])}"
-        for key in ordered_keys
-        if key in timings
+        f"{key}={_format_duration(timings[key])}" for key in ordered_keys if key in timings
     ]
     if rendered_parts:
         sys.stderr.write(f"TIMING {config_name}: {' '.join(rendered_parts)}\n")
@@ -181,6 +179,18 @@ def main() -> None:
         default=False,
         help="Emit per-podcast stage timings to stderr.",
     )
+    parser.add_argument(
+        "--skip-sankey",
+        action="store_true",
+        default=False,
+        help="Skip generating Mermaid sankey diagrams (enabled by default).",
+    )
+    parser.add_argument(
+        "--sankey-format",
+        choices=["sankey", "flowchart"],
+        default="sankey",
+        help="Mermaid diagram format to generate (sankey or flowchart).",
+    )
     args = parser.parse_args()
 
     load_start = perf_counter()
@@ -194,17 +204,18 @@ def main() -> None:
 
     output: list[dict[str, object]] = []
     series_entries: list[dict[str, object]] = []
-    for config in configs:
+    bar = tqdm(configs, desc="Matching", unit="podcast", file=sys.stderr)
+    for config in bar:
+        bar.set_description(config.name)
         timings: dict[str, float] = {}
         podcast_start = perf_counter()
-        if args.timings:
-            result = merge_config(
-                config,
-                refresh_sources=args.refresh_sources,
-                timings=timings,
-            )
-        else:
-            result = merge_config(config, refresh_sources=args.refresh_sources)
+        result = merge_config(
+            config,
+            refresh_sources=args.refresh_sources,
+            timings=timings if args.timings else None,
+            on_stage=bar.set_postfix_str,
+        )
+        bar.set_postfix_str("done")
         report = _build_series_report(config.name, args.include_counts, len(result.episodes))
         if args.include_counts:
             report["references_count"] = len(result.references)
@@ -217,6 +228,23 @@ def main() -> None:
             output_root = Path(args.output_dir)
             series_entries.append(_write_series_outputs(output_root, result))
             _write_output_bundle(args.output_dir, output, series_entries)
+            # Generate Mermaid diagrams by default (can be skipped with --skip-sankey)
+            if not args.skip_sankey:
+                try:
+                    from src.adapters import get_mermaid_adapter
+                    from src.ports.mermaid import MermaidRenderOptions
+
+                    adapter = get_mermaid_adapter()
+                    adapter.generate_diagrams(
+                        result,
+                        output_root,
+                        MermaidRenderOptions(
+                            format=args.sankey_format,
+                            overwrite=True,
+                        ),
+                    )
+                except Exception as exc:  # pragma: no cover - non-fatal optional feature
+                    sys.stderr.write(f"MERMAID generation failed for {config.name}: {exc}\n")
         if args.output_file:
             _write_report_file(args.output_file, output)
         if args.timings:

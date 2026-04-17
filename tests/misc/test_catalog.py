@@ -23,6 +23,7 @@ from src.app_common import FeedSource, PodcastConfig, SourceFilter
 from src.catalog import (
     _collect_episodes,
     align_episodes,
+    merge_config,
     process_feeds,
     process_sources,
 )
@@ -219,6 +220,33 @@ class TestFullPipeline(unittest.TestCase):
         self.assertIn("The Show: Episode 101", survived_titles)
         self.assertIn("The Show: Episode 102", survived_titles)
         self.assertNotIn("Science Quarterly: Quantum Tunneling", survived_titles)
+
+    @patch("src.catalog.get_rss_episodes")
+    @patch("src.catalog.get_youtube_episodes")
+    def test_merge_config_records_source_traces(self, mock_yt, mock_rss):
+        mock_rss.return_value = [_ep("r1", "RSS Episode", pub_date=_dt(2024, 2, 6))]
+        mock_yt.return_value = [_ep("d1", "YT Episode", pub_date=_dt(2024, 2, 6))]
+
+        config = _config(
+            references=[
+                FeedSource(
+                    url="https://example.com/feed.rss",
+                    filters=SourceFilter(include=["Audit"]),
+                )
+            ],
+            downloads=[_yt_source()],
+        )
+
+        result = merge_config(config)
+
+        self.assertEqual(len(result.source_traces), 2)
+        reference_trace = next(trace for trace in result.source_traces if trace.role == "reference")
+        download_trace = next(trace for trace in result.source_traces if trace.role == "download")
+        self.assertTrue(reference_trace.has_filters)
+        self.assertEqual(reference_trace.episode_count, 1)
+        self.assertEqual(reference_trace.source_type, "rss")
+        self.assertFalse(download_trace.has_filters)
+        self.assertEqual(download_trace.source_type, "youtube")
 
     @patch("src.catalog.get_rss_episodes")
     @patch("src.catalog.get_youtube_episodes")

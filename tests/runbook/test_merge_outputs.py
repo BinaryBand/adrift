@@ -109,7 +109,10 @@ def test_main_writes_bundle_and_stdout(tmp_path: Path, capsys) -> None:
     assert stdout_payload[0]["references_count"] == 1
     assert stdout_payload[0]["downloads_count"] == 1
     assert (tmp_path / config.slug / "feeds" / "combined.json").exists()
-    mock_merge_config.assert_called_once_with(config, refresh_sources=True)
+    call = mock_merge_config.call_args
+    assert call.args[0] == config
+    assert call.kwargs["refresh_sources"] is True
+    assert callable(call.kwargs.get("on_stage"))
 
 
 def test_main_updates_output_file_after_each_podcast(tmp_path: Path, capsys) -> None:

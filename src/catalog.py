@@ -1,3 +1,5 @@
+# cspell: ignore cdist
+from collections.abc import Callable
 from dataclasses import dataclass
 from datetime import datetime
 from time import perf_counter
@@ -13,9 +15,9 @@ from src.app_common import (
 )
 from src.app_runner import normalize_title
 from src.models.output import EpisodeData
-from src.models.pipeline import MergeResult
+from src.models.pipeline import MergeResult, SourceTrace
 from src.utils.progress import Callback
-from src.utils.text import normalize_text
+from src.utils.text import is_youtube_channel, normalize_text
 from src.web import rss as _rss
 from src.web.rss import (
     RssEpisode,
@@ -29,6 +31,18 @@ def _similarity_clean(ac: str, bc: str) -> float:
     ts = fuzz.token_sort_ratio(ac, bc) / 100.0
     tset = fuzz.token_set_ratio(ac, bc) / 100.0
     return r * 0.4 + ts * 0.3 + tset * 0.3
+
+
+StringSimilarityFn = Callable[[list[str], list[str]], list[list[float]]]
+
+
+def _cdist_similarity(a: list[str], b: list[str]) -> list[list[float]]:
+    from rapidfuzz.process import cdist
+
+    ratio_scores = cdist(a, b, scorer=fuzz.ratio, workers=-1) / 100.0
+    token_sort_scores = cdist(a, b, scorer=fuzz.token_sort_ratio, workers=-1) / 100.0
+    token_set_scores = cdist(a, b, scorer=fuzz.token_set_ratio, workers=-1) / 100.0
+    return (ratio_scores * 0.4 + token_sort_scores * 0.3 + token_set_scores * 0.3).tolist()
 
 
 def match(
@@ -132,6 +146,14 @@ class _AlignmentCandidate:
     description: str
 
 
+@dataclass(frozen=True)
+class MergeConfigOptions:
+    callback: Callback | None = None
+    refresh_sources: bool = False
+    timings: dict[str, float] | None = None
+    on_stage: Callable[[str], None] | None = None
+
+
 def _normalized_alignment_title(show: str, episode: RssEpisode) -> str:
     title = normalize_title(show, episode.title) if show else episode.title
     return normalize_text(title)
@@ -141,9 +163,7 @@ def _normalized_alignment_description(episode: RssEpisode) -> str:
     return normalize_text(episode.description or "")
 
 
-def _build_alignment_candidates(
-    episodes: list[RssEpisode], show: str
-) -> list[_AlignmentCandidate]:
+def _build_alignment_candidates(episodes: list[RssEpisode], show: str) -> list[_AlignmentCandidate]:
     return [
         _AlignmentCandidate(
             episode=episode,
@@ -162,17 +182,14 @@ def _has_description_signal(ref: _AlignmentCandidate, dl: _AlignmentCandidate) -
     return bool(ref.description and dl.description)
 
 
-def _description_similarity(ref: _AlignmentCandidate, dl: _AlignmentCandidate) -> float:
-    if not ref.description and not dl.description:
-        return 0.0
-    return _similarity_clean(ref.description, dl.description)
-
-
-def _weighted_score(ref: _AlignmentCandidate, dl: _AlignmentCandidate) -> float:
+def _weighted_score(
+    ref: _AlignmentCandidate,
+    dl: _AlignmentCandidate,
+    s_title: float,
+    s_desc: float,
+) -> float:
     """Metadata-aware similarity score with ID as a small bonus."""
     s_id = _id_similarity(ref.episode, dl.episode)
-    s_title = _similarity_clean(ref.title, dl.title)
-    has_date = _has_date_signal(ref, dl)
     has_desc = _has_description_signal(ref, dl)
     if not s_id and not has_desc and s_title < SPARSE_TITLE_MIN:
         return 0.0
@@ -180,8 +197,7 @@ def _weighted_score(ref: _AlignmentCandidate, dl: _AlignmentCandidate) -> float:
     weighted_sum = W_TITLE * s_title
     total_weight = W_TITLE
 
-    # Compute optional contributions (date / description) in a helper
-    opt_sum, opt_total = _compute_optional_weights(ref, dl, has_date, has_desc)
+    opt_sum, opt_total = _compute_optional_weights(ref, dl, s_desc)
     weighted_sum += opt_sum
     total_weight += opt_total
 
@@ -192,30 +208,76 @@ def _weighted_score(ref: _AlignmentCandidate, dl: _AlignmentCandidate) -> float:
 def _compute_optional_weights(
     ref: _AlignmentCandidate,
     dl: _AlignmentCandidate,
-    has_date: bool,
-    has_desc: bool,
+    s_desc: float,
 ) -> tuple[float, float]:
     """Return (weighted_sum, total_weight) for optional metadata contributions."""
     weighted = 0.0
     total = 0.0
+    has_date = _has_date_signal(ref, dl)
+    has_desc = _has_description_signal(ref, dl)
     if has_date:
         weighted += W_DATE * sim_date(ref.episode.pub_date, dl.episode.pub_date)
         total += W_DATE
     if has_desc:
-        weighted += W_DESC * _description_similarity(ref, dl)
+        weighted += W_DESC * s_desc
         total += W_DESC
     return weighted, total
 
 
 def _build_alignment_scores(
-    references: list[RssEpisode], downloads: list[RssEpisode], show: str = ""
+    references: list[RssEpisode],
+    downloads: list[RssEpisode],
+    show: str = "",
+    *,
+    similarity: StringSimilarityFn = _cdist_similarity,
 ) -> dict[tuple[int, int], float]:
-    reference_candidates = _build_alignment_candidates(references, show)
-    download_candidates = _build_alignment_candidates(downloads, show)
+    ref_candidates = _build_alignment_candidates(references, show)
+    dl_candidates = _build_alignment_candidates(downloads, show)
+
+    title_matrix, desc_matrix = _build_similarity_matrices(
+        ref_candidates,
+        dl_candidates,
+        similarity,
+    )
+    return _score_alignment_candidates(
+        ref_candidates,
+        dl_candidates,
+        title_matrix,
+        desc_matrix,
+    )
+
+
+def _build_similarity_matrices(
+    ref_candidates: list[_AlignmentCandidate],
+    dl_candidates: list[_AlignmentCandidate],
+    similarity: StringSimilarityFn,
+) -> tuple[list[list[float]], list[list[float]]]:
+    title_matrix = similarity(
+        [candidate.title for candidate in ref_candidates],
+        [candidate.title for candidate in dl_candidates],
+    )
+    desc_matrix = similarity(
+        [candidate.description for candidate in ref_candidates],
+        [candidate.description for candidate in dl_candidates],
+    )
+    return title_matrix, desc_matrix
+
+
+def _score_alignment_candidates(
+    ref_candidates: list[_AlignmentCandidate],
+    dl_candidates: list[_AlignmentCandidate],
+    title_matrix: list[list[float]],
+    desc_matrix: list[list[float]],
+) -> dict[tuple[int, int], float]:
     scores: dict[tuple[int, int], float] = {}
-    for r_idx, ref in enumerate(reference_candidates):
-        for d_idx, dl in enumerate(download_candidates):
-            scores[(r_idx, d_idx)] = _weighted_score(ref, dl)
+    for r_idx, ref in enumerate(ref_candidates):
+        for d_idx, dl in enumerate(dl_candidates):
+            scores[(r_idx, d_idx)] = _weighted_score(
+                ref,
+                dl,
+                float(title_matrix[r_idx][d_idx]),
+                float(desc_matrix[r_idx][d_idx]),
+            )
     return scores
 
 
@@ -335,14 +397,12 @@ def _maybe_record_timing(
         timings[key] = perf_counter() - started_at
 
 
-def _timed_stage(
-    timings: dict[str, float] | None,
-    key: str,
-    fn: Any,
-) -> Any:
+def _timed_stage(key: str, fn: Any, options: MergeConfigOptions) -> Any:
+    if options.on_stage:
+        options.on_stage(key)
     started_at = perf_counter()
     value = fn()
-    _maybe_record_timing(timings, key, started_at)
+    _maybe_record_timing(options.timings, key, started_at)
     return value
 
 
@@ -354,20 +414,36 @@ def _merge_episode_list(
     return [merge_episode(references[r], downloads[d]) for r, d in pairs]
 
 
-def _collect_reference_episodes(
+def _collect_reference_episodes_with_traces(
     config: PodcastConfig,
     callback: Callback | None,
     refresh_sources: bool,
-) -> list[RssEpisode]:
-    return process_feeds(config, callback, refresh_sources=refresh_sources)
+) -> tuple[list[RssEpisode], list[SourceTrace]]:
+    return _collect_episodes_with_traces(
+        config.references,
+        EpisodeFetchContext(
+            title=config.name,
+            is_reference=True,
+            callback=callback,
+            refresh_sources=refresh_sources,
+        ),
+    )
 
 
-def _collect_download_episodes(
+def _collect_download_episodes_with_traces(
     config: PodcastConfig,
     callback: Callback | None,
     refresh_sources: bool,
-) -> list[RssEpisode]:
-    return process_sources(config, callback, refresh_sources=refresh_sources)
+) -> tuple[list[RssEpisode], list[SourceTrace]]:
+    return _collect_episodes_with_traces(
+        config.downloads,
+        EpisodeFetchContext(
+            title=config.name,
+            is_reference=False,
+            callback=callback,
+            refresh_sources=refresh_sources,
+        ),
+    )
 
 
 def _align_config_episodes(
@@ -380,64 +456,112 @@ def _align_config_episodes(
 
 def _collect_feed_sets(
     config: PodcastConfig,
-    callback: Callback | None,
-    refresh_sources: bool,
-    timings: dict[str, float] | None,
-) -> tuple[list[RssEpisode], list[RssEpisode]]:
-    references = _timed_stage(
-        timings,
+    options: MergeConfigOptions,
+) -> tuple[list[RssEpisode], list[RssEpisode], list[SourceTrace]]:
+    references, reference_traces = _timed_stage(
         "process_feeds",
-        lambda: _collect_reference_episodes(config, callback, refresh_sources),
+        lambda: _collect_reference_episodes_with_traces(
+            config,
+            options.callback,
+            options.refresh_sources,
+        ),
+        options,
     )
-    downloads = _timed_stage(
-        timings,
+    downloads, download_traces = _timed_stage(
         "process_sources",
-        lambda: _collect_download_episodes(config, callback, refresh_sources),
+        lambda: _collect_download_episodes_with_traces(
+            config,
+            options.callback,
+            options.refresh_sources,
+        ),
+        options,
     )
-    return references, downloads
+    return references, downloads, [*reference_traces, *download_traces]
 
 
 def _collect_merge_parts(
     config_name: str,
     references: list[RssEpisode],
     downloads: list[RssEpisode],
-    timings: dict[str, float] | None,
+    options: MergeConfigOptions,
 ) -> tuple[list[tuple[int, int]], list[EpisodeData]]:
     pairs = _timed_stage(
-        timings,
         "align_episodes",
         lambda: _align_config_episodes(config_name, references, downloads),
+        options,
     )
     episodes = _timed_stage(
-        timings,
         "merge_episodes",
         lambda: _merge_episode_list(references, downloads, pairs),
+        options,
     )
     return pairs, episodes
 
 
+def _coerce_merge_config_options(
+    options: MergeConfigOptions | None,
+    legacy_kwargs: dict[str, Any],
+) -> MergeConfigOptions:
+    if options is not None and not legacy_kwargs:
+        return options
+    if options is not None:
+        return MergeConfigOptions(
+            callback=legacy_kwargs.get("callback", options.callback),
+            refresh_sources=legacy_kwargs.get(
+                "refresh_sources",
+                options.refresh_sources,
+            ),
+            timings=legacy_kwargs.get("timings", options.timings),
+            on_stage=legacy_kwargs.get("on_stage", options.on_stage),
+        )
+    return MergeConfigOptions(
+        callback=legacy_kwargs.get("callback"),
+        refresh_sources=legacy_kwargs.get("refresh_sources", False),
+        timings=legacy_kwargs.get("timings"),
+        on_stage=legacy_kwargs.get("on_stage"),
+    )
+
+
+def _collect_merge_result_parts(
+    config: PodcastConfig,
+    options: MergeConfigOptions,
+) -> tuple[
+    list[RssEpisode],
+    list[RssEpisode],
+    list[SourceTrace],
+    list[tuple[int, int]],
+    list[EpisodeData],
+]:
+    references, downloads, source_traces = _collect_feed_sets(config, options)
+    pairs, episodes = _collect_merge_parts(
+        config.name,
+        references,
+        downloads,
+        options,
+    )
+    return references, downloads, source_traces, pairs, episodes
+
+
 def merge_config(
     config: PodcastConfig,
-    callback: Callback | None = None,
-    refresh_sources: bool = False,
-    timings: dict[str, float] | None = None,
+    options: MergeConfigOptions | None = None,
+    **legacy_kwargs: Any,
 ) -> MergeResult:
     """Fetch, align, and merge episodes for a single podcast config."""
+    merged_options = _coerce_merge_config_options(options, legacy_kwargs)
     total_start = perf_counter()
 
-    references, downloads = _collect_feed_sets(
+    references, downloads, source_traces, pairs, episodes = _collect_merge_result_parts(
         config,
-        callback,
-        refresh_sources,
-        timings,
+        merged_options,
     )
-    pairs, episodes = _collect_merge_parts(config.name, references, downloads, timings)
-    _maybe_record_timing(timings, "merge_config_total", total_start)
+    _maybe_record_timing(merged_options.timings, "merge_config_total", total_start)
 
     return MergeResult(
         config=config,
         references=references,
         downloads=downloads,
+        source_traces=source_traces,
         pairs=pairs,
         episodes=episodes,
     )
@@ -497,17 +621,56 @@ def _collect_episodes(
     *legacy_args: object,
 ) -> list[RssEpisode]:
     """Fetch and deduplicate episodes from a list of FeedSource objects."""
+    merged, _traces = _collect_episodes_with_traces(sources, context_or_title, *legacy_args)
+    return merged
+
+
+def _source_has_filters(source: FeedSource) -> bool:
+    filters = source.filters
+    return bool(filters.include or filters.exclude or filters.r_rules)
+
+
+def _source_type(source: FeedSource) -> str:
+    return "youtube" if is_youtube_channel(source.url) else "rss"
+
+
+def _build_source_trace(
+    source: FeedSource,
+    context: EpisodeFetchContext,
+    episode_count: int,
+) -> SourceTrace:
+    return SourceTrace(
+        role="reference" if context.is_reference else "download",
+        url=source.url,
+        source_type=_source_type(source),
+        episode_count=episode_count,
+        filters=source.filters,
+        has_filters=_source_has_filters(source),
+    )
+
+
+def _collect_episodes_with_traces(
+    sources: list[FeedSource],
+    context_or_title: EpisodeFetchContext | str,
+    *legacy_args: object,
+) -> tuple[list[RssEpisode], list[SourceTrace]]:
+    """Fetch, trace, and deduplicate episodes from a list of FeedSource objects."""
     context = _coerce_episode_fetch_context(context_or_title, legacy_args)
-    albums = [_fetch_source_episodes(source, context) for source in sources]
+    albums: list[list[RssEpisode]] = []
+    traces: list[SourceTrace] = []
+    for source in sources:
+        album = _fetch_source_episodes(source, context)
+        albums.append(album)
+        traces.append(_build_source_trace(source, context, len(album)))
 
     if not albums:
-        return []
+        return [], traces
 
     merged: list[RssEpisode] = albums[0]
     for album in albums[1:]:
         _merge_episode_album(merged, album)
 
-    return merged
+    return merged, traces
 
 
 def _fetch_source_episodes(
