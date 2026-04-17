@@ -15,10 +15,12 @@ poetry install
 # Optional: create/activate a virtual environment with `poetry shell` or a `.venv`.
 # This repository does not include a `.pre-commit-config.yaml` by default.
 # Run quality checks manually (examples):
-#   .venv/bin/ruff check
-#   .venv/bin/ruff format --check
+#   .venv/bin/ruff check src runbook tests typings
+#   .venv/bin/ruff format --check src runbook tests typings
+#   .venv/bin/python runbook/quality/check_static.py src runbook tests typings
 #   .venv/bin/python runbook/quality/check_dead_code.py src
 #   .venv/bin/python runbook/quality/check_complexity.py src --ccn 5 --length 25 --params 4
+#   .venv/bin/python runbook/quality/validate_configs.py --problems config/*.toml
 ```
 
 Open in VS Code from inside WSL:
@@ -31,83 +33,38 @@ code .
 
 All tooling behaviour is driven by committed config files — editor-agnostic, picked up automatically by any LSP-capable editor.
 
-**`pyproject.toml`** — includes the following configurations:
+**`pyproject.toml`** — repository defaults for runtime and tooling:
 
 ```toml
 [tool.ruff]
-target-version = "py311"
-line-length = 88
+line-length = 100
 
 [tool.ruff.lint]
-select = ["E", "F", "I", "UP", "B", "SIM"]
+select = ["E", "F", "I"]
 
 [tool.pyright]
-pythonVersion = "3.13"
-typeCheckingMode = "off" # prefer a committed pyrightconfig.json for repo-specific rules
 venvPath = "."
 venv = ".venv"
+include = ["src", "runbook", "tests", "typings"]
+exclude = ["runbook/analysis"]
 
 [tool.pytest.ini_options]
-testpaths = ["tests"]
-
-[tool.importlinter]
-root_package = "src"
-
-[[tool.importlinter.contracts]]
-name = "Reconciler must not import utils"
-type = "forbidden"
-source_modules = ["src.reconciler"]
-forbidden_modules = ["src.utils"]
-
-[[tool.importlinter.contracts]]
-name = "Utils must not import reconciler"
-type = "forbidden"
-source_modules = ["src.utils"]
-forbidden_modules = ["src.reconciler"]
-
-[[tool.importlinter.contracts]]
-name = "Models must not import anything internal"
-type = "forbidden"
-source_modules = ["src.models"]
-forbidden_modules = ["src.reconciler", "src.utils"]
+addopts = "-m 'not slow'"
 ```
 
-**`.ansible-lint`:**
+**`pyrightconfig.json`** — project type-checking policy:
 
-```yaml
-profile: production
-exclude_paths:
-  - ansible/molecule.yml
-warn_list:
-  - experimental
-skip_list: []
+```json
+{
+  "typeCheckingMode": "strict",
+  "include": ["src", "runbook", "tests", "typings"],
+  "exclude": ["runbook/analysis", "**/node_modules", "**/__pycache__", "**/.*", ".venv"]
+}
 ```
 
-**`.editorconfig`:**
-
-```ini
-root = true
-
-[*]
-charset = utf-8
-end_of_line = lf
-insert_final_newline = true
-trim_trailing_whitespace = true
-
-[*.py]
-indent_style = space
-indent_size = 4
-
-[*.{yml,yaml,toml,json,j2}]
-indent_style = space
-indent_size = 2
-```
-
-Note: earlier versions of these docs described a `.pre-commit-config.yaml` and local wrapper scripts
-(import-linter, `src.utils.validate_contract`, `src.utils.validate_no_duplicates`). Those files are
-not included in this repository. If you want pre-push hooks, add a `.pre-commit-config.yaml` and any
-required wrapper scripts; otherwise run the checks manually using the examples in the Setup section
-or use the tasks in `.vscode/tasks.json`.
+Note: earlier versions of these docs referenced import-linter and local wrapper scripts
+(`src.utils.validate_contract`, `src.utils.validate_no_duplicates`). Those files are not
+included in this repository.
 
 ### VS Code
 
@@ -117,22 +74,14 @@ or use the tasks in `.vscode/tasks.json`.
 | Python | `ms-python.python` | Yes |
 | Pylance | `ms-python.vscode-pylance` | Optional |
 | Ruff | `charliermarsh.ruff` | Optional |
-| Ansible | `redhat.ansible` | Optional |
 | Error Lens | `usernamehehe.errorlens` | Optional |
 | Even Better TOML | `tamasfe.even-better-toml` | Optional |
-| Jinja | `samuelcolvin.jinjahtml` | Optional |
 
 **`.vscode/settings.json`:**
 
 ```json
 {
   "python.defaultInterpreterPath": "${workspaceFolder}/.venv/bin/python",
-  "python.terminal.activateEnvironment": true,
-  "python.languageServer": "Pylance",
-  "python.analysis.typeCheckingMode": "off",
-  "terminal.integrated.defaultProfile.linux": "bash",
-  "terminal.integrated.shell.linux": "/bin/bash",
-  "files.associations": { "*.j2": "jinja-yaml", "*.toml": "toml" },
   "editor.formatOnSave": true,
   "[python]": { "editor.defaultFormatter": "charliermarsh.ruff" }
 }
@@ -145,43 +94,22 @@ or use the tasks in `.vscode/tasks.json`.
   "version": "2.0.0",
   "tasks": [
     {
-      "label": "Validate: Service Contract",
+      "label": "Ruff: Check",
       "type": "shell",
-      "command": "${workspaceFolder}/.venv/bin/python -m src.utils.validate_contract",
-      "group": "test",
-      "presentation": { "reveal": "always", "panel": "shared", "clear": true },
-      "problemMatcher": {
-        "owner": "contract",
-        "fileLocation": ["relative", "${workspaceFolder}"],
-        "pattern": {
-          "regexp": "^(ERROR|WARN)\\s+(.+):(\\d+):\\s+(.+)$",
-          "severity": 1, "file": 2, "line": 3, "message": 4
-        }
-      },
-      "runOptions": { "runOn": "folderOpen" }
+      "command": "${config:python.defaultInterpreterPath}",
+      "args": ["-m", "ruff", "check", "src", "runbook", "tests", "typings"]
     },
     {
-      "label": "Test: Molecule",
+      "label": "Ruff: Format Check",
       "type": "shell",
-      "command": "${workspaceFolder}/.venv/bin/molecule test -c ansible/molecule.yml",
-      "group": "test",
-      "presentation": { "reveal": "always", "panel": "dedicated", "clear": true },
-      "problemMatcher": []
+      "command": "${config:python.defaultInterpreterPath}",
+      "args": ["-m", "ruff", "format", "--check", "src", "runbook", "tests", "typings"]
     },
     {
-      "label": "Check: Complexity",
+      "label": "Complexity: Lizard Check",
       "type": "shell",
-      "command": "${workspaceFolder}/.venv/bin/lizard src/ -C 5 -L 25 -a 4 --output-file /tmp/lizard_out.txt; cat /tmp/lizard_out.txt",
-      "group": "test",
-      "presentation": { "reveal": "always", "panel": "shared", "clear": true },
-      "problemMatcher": {
-        "owner": "lizard",
-        "fileLocation": ["relative", "${workspaceFolder}"],
-        "pattern": {
-          "regexp": "^(.+):(\\d+):\\s+(.+)\\s+\\(complexity:\\s*(\\d+)\\)$",
-          "file": 1, "line": 2, "message": 3
-        }
-      }
+      "command": "${config:python.defaultInterpreterPath}",
+      "args": ["runbook/quality/check_complexity.py", "src", "--ccn", "5", "--length", "25", "--params", "4"]
     }
   ]
 }
@@ -195,18 +123,15 @@ Every rule is paired with its enforcement tier. Rules marked **review** have no 
 
 | Rule | Tier | Mechanism |
 | --- | --- | --- |
-| Function length ≤ 25 lines | Automated | Ruff |
+| Function length ≤ 25 lines | Automated | Lizard via `runbook/quality/check_complexity.py` |
 | Cyclomatic complexity ≤ 5 | Automated | Lizard |
 | Nesting depth ≤ 3 | Review | — |
-| Parameters per function ≤ 4 | Automated | Ruff |
-| No type errors | Automated | Pyright (per-project) |
+| Parameters per function ≤ 4 | Automated | Lizard via `runbook/quality/check_complexity.py` |
+| No type errors | Advisory | Pyright strict config in `pyrightconfig.json`; run via `check_static.py` |
 | No lint violations | Automated | Ruff |
-| No mutable globals | Automated | Pyright (per-project) |
-| No silent exception swallowing | Automated | Ruff (`B001`, `S110`) |
-| No shell scripts — Python only | Automated | Ruff + pre-commit |
-| Service contract consistent | Automated | `src.utils.validate_contract` — pre-push hook |
-| No value declared in two places | Automated | `src.utils.validate_no_duplicates` — pre-push hook |
-| No business logic outside `src/reconciler/` and `src/models/` | Automated | `import-linter` — pre-push hook |
+| Dead code confidence floor (80%+) | Automated | Vulture via `runbook/quality/check_dead_code.py` |
+| No mutable globals | Review | Pyright can detect some cases when run |
+| No silent exception swallowing | Review | Not currently selected in Ruff rules |
 | No vars, secrets, or paths outside Ansible | Review | — |
 | No Ansible queries mid-reconciliation | Review | — |
 | No CQS violations — functions either mutate or return, not both | Review | — |
@@ -222,9 +147,14 @@ Prefer early returns over nested conditionals. If a function needs more than 25 
 1. Branch from main
 2. Run quality checks:         run the runbook quality scripts or use the VS Code tasks
                               (see `.vscode/tasks.json`). Example:
-                              `.venv/bin/ruff check && .venv/bin/python runbook/quality/check_dead_code.py src && .venv/bin/python runbook/quality/check_complexity.py src --ccn 5 --length 25 --params 4`
+                              `.venv/bin/ruff format --check src runbook tests typings`
+                              `.venv/bin/ruff check src runbook tests typings`
+                              `.venv/bin/python runbook/quality/check_complexity.py src --ccn 5 --length 25 --params 4`
+                              `.venv/bin/python runbook/quality/check_dead_code.py src`
+                              `.venv/bin/python runbook/quality/validate_configs.py --problems config/*.toml`
+                              `.venv/bin/python runbook/quality/check_static.py src runbook tests typings`
 3. Run tests:                  pytest
-4. Push — pre-commit hooks run automatically
+4. Push — optional `.githooks/pre-push` runs local checks if your git hooks path is configured
 5. Open PR — check checklist
 ```
 
