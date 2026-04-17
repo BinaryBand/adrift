@@ -66,6 +66,12 @@ class TestSimDate(unittest.TestCase):
     def test_beyond_35_days(self):
         self.assertEqual(sim_date(_dt(2024, 1, 1), _dt(2024, 3, 1)), 0.00)
 
+    def test_mixed_naive_and_aware_dates(self):
+        aware = _dt(2024, 1, 1)
+        naive = datetime(2024, 1, 2)
+        self.assertEqual(sim_date(aware, naive), 1.00)
+        self.assertEqual(sim_date(naive, aware), 1.00)
+
 
 # ---------------------------------------------------------------------------
 # align_episodes

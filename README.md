@@ -99,6 +99,16 @@ Useful options:
 
 - `--skip-schedule-filter` to include podcasts even when their configured schedule does not match today.
 - `--include-counts` to include reference and source counts alongside merged episodes.
+- `--output-dir downloads` to write a navigable output bundle per config under `./downloads`.
+
+When `--output-dir` is set, the merge run writes:
+
+- `downloads/report.json` for the aggregate JSON report.
+- `downloads/index.json` as a directory map from config to generated feed snapshots.
+- `downloads/<slug>/config.json` for the resolved config.
+- `downloads/<slug>/feeds/references.json` for fetched reference-side episodes.
+- `downloads/<slug>/feeds/downloads.json` for fetched download-side episodes.
+- `downloads/<slug>/feeds/combined.json` for merged episodes.
 
 ## Configuration
 

@@ -11,6 +11,7 @@ from src.app_common import (
 )
 from src.app_runner import normalize_title
 from src.models.output import EpisodeData
+from src.models.pipeline import MergeResult
 from src.utils.progress import Callback
 from src.utils.text import normalize_text
 from src.web import rss as _rss
@@ -101,10 +102,19 @@ DATE_SCORE_TIERS: tuple[tuple[int, float], ...] = ((2, 1.00), (10, 0.70), (35, 0
 SPARSE_TITLE_MIN = 0.98
 
 
+def _align_datetime_pair(a: datetime, b: datetime) -> tuple[datetime, datetime]:
+    if a.tzinfo is not None and b.tzinfo is None:
+        return a, b.replace(tzinfo=a.tzinfo)
+    if a.tzinfo is None and b.tzinfo is not None:
+        return a.replace(tzinfo=b.tzinfo), b
+    return a, b
+
+
 def sim_date(a: datetime | None, b: datetime | None) -> float:
     """Tiered date similarity per the spec."""
     if a is None or b is None:
         return 0.0
+    a, b = _align_datetime_pair(a, b)
     delta = abs((a - b).days)
     return next((score for max_days, score in DATE_SCORE_TIERS if delta <= max_days), 0.0)
 
@@ -274,11 +284,19 @@ def merge_episode(ref: RssEpisode, dl: RssEpisode) -> EpisodeData:
 def merge_config(
     config: PodcastConfig,
     callback: Callback | None = None,
-) -> list[EpisodeData]:
+) -> MergeResult:
     """Fetch, align, and merge episodes for a single podcast config."""
     references = process_feeds(config, callback)
     downloads = process_sources(config, callback)
-    return merge_episode_pairs(references, downloads, config.name)
+    pairs = align_episodes(references, downloads, config.name)
+    episodes = [merge_episode(references[r], downloads[d]) for r, d in pairs]
+    return MergeResult(
+        config=config,
+        references=references,
+        downloads=downloads,
+        pairs=pairs,
+        episodes=episodes,
+    )
 
 
 def merge_episode_pairs(

@@ -4,10 +4,7 @@ version = "0.1.0"
 description = "Podcast source aggregation and reference alignment"
 authors = []
 package-mode = true
-packages = [
-    { include = "src" },
-    { include = "runbook" },
-]
+packages = [{ include = "src" }, { include = "runbook" }]
 
 [tool.poetry.scripts]
 adrift-merge = "runbook.merge:main"
@@ -49,9 +46,7 @@ networkx = "*"
 
 [tool.pytest.ini_options]
 addopts = "-m 'not slow'"
-markers = [
-    "slow: marks slower integration-oriented tests (run with -m slow)",
-]
+markers = ["slow: marks slower integration-oriented tests (run with -m slow)"]
 
 [tool.mypy]
 mypy_path = "typings"

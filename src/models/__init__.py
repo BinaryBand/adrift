@@ -8,6 +8,7 @@ from .metadata import (
     YtDlpParams,
 )
 from .output import EpisodeData, PodcastFeed
+from .pipeline import MergeResult
 
 __all__ = [
     "DEVICE",
@@ -17,4 +18,5 @@ __all__ = [
     "RssEpisode",
     "EpisodeData",
     "PodcastFeed",
+    "MergeResult",
 ]
