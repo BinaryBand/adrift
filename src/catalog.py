@@ -1,5 +1,6 @@
 from dataclasses import dataclass
 from datetime import datetime
+from time import perf_counter
 from typing import Any, cast
 
 from rapidfuzz import fuzz
@@ -282,16 +283,114 @@ def merge_episode(ref: RssEpisode, dl: RssEpisode) -> EpisodeData:
     )
 
 
+def _maybe_record_timing(
+    timings: dict[str, float] | None,
+    key: str,
+    started_at: float,
+) -> None:
+    if timings is not None:
+        timings[key] = perf_counter() - started_at
+
+
+def _timed_stage(
+    timings: dict[str, float] | None,
+    key: str,
+    fn: Any,
+) -> Any:
+    started_at = perf_counter()
+    value = fn()
+    _maybe_record_timing(timings, key, started_at)
+    return value
+
+
+def _merge_episode_list(
+    references: list[RssEpisode],
+    downloads: list[RssEpisode],
+    pairs: list[tuple[int, int]],
+) -> list[EpisodeData]:
+    return [merge_episode(references[r], downloads[d]) for r, d in pairs]
+
+
+def _collect_reference_episodes(
+    config: PodcastConfig,
+    callback: Callback | None,
+    refresh_sources: bool,
+) -> list[RssEpisode]:
+    return process_feeds(config, callback, refresh_sources=refresh_sources)
+
+
+def _collect_download_episodes(
+    config: PodcastConfig,
+    callback: Callback | None,
+    refresh_sources: bool,
+) -> list[RssEpisode]:
+    return process_sources(config, callback, refresh_sources=refresh_sources)
+
+
+def _align_config_episodes(
+    config_name: str,
+    references: list[RssEpisode],
+    downloads: list[RssEpisode],
+) -> list[tuple[int, int]]:
+    return align_episodes(references, downloads, config_name)
+
+
+def _collect_feed_sets(
+    config: PodcastConfig,
+    callback: Callback | None,
+    refresh_sources: bool,
+    timings: dict[str, float] | None,
+) -> tuple[list[RssEpisode], list[RssEpisode]]:
+    references = _timed_stage(
+        timings,
+        "process_feeds",
+        lambda: _collect_reference_episodes(config, callback, refresh_sources),
+    )
+    downloads = _timed_stage(
+        timings,
+        "process_sources",
+        lambda: _collect_download_episodes(config, callback, refresh_sources),
+    )
+    return references, downloads
+
+
+def _collect_merge_parts(
+    config_name: str,
+    references: list[RssEpisode],
+    downloads: list[RssEpisode],
+    timings: dict[str, float] | None,
+) -> tuple[list[tuple[int, int]], list[EpisodeData]]:
+    pairs = _timed_stage(
+        timings,
+        "align_episodes",
+        lambda: _align_config_episodes(config_name, references, downloads),
+    )
+    episodes = _timed_stage(
+        timings,
+        "merge_episodes",
+        lambda: _merge_episode_list(references, downloads, pairs),
+    )
+    return pairs, episodes
+
+
 def merge_config(
     config: PodcastConfig,
     callback: Callback | None = None,
     refresh_sources: bool = False,
+    timings: dict[str, float] | None = None,
 ) -> MergeResult:
     """Fetch, align, and merge episodes for a single podcast config."""
-    references = process_feeds(config, callback, refresh_sources=refresh_sources)
-    downloads = process_sources(config, callback, refresh_sources=refresh_sources)
-    pairs = align_episodes(references, downloads, config.name)
-    episodes = [merge_episode(references[r], downloads[d]) for r, d in pairs]
+    total_start = perf_counter()
+
+    references, downloads = _collect_feed_sets(
+        config,
+        callback,
+        refresh_sources,
+        timings,
+    )
+    pairs, episodes = _collect_merge_parts(config.name, references, downloads, timings)
+    _maybe_record_timing(timings, "merge_config_total", total_start)
+
     return MergeResult(
         config=config,
         references=references,

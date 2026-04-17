@@ -4,6 +4,7 @@ import sys
 from collections.abc import Sequence
 from datetime import datetime, timezone
 from pathlib import Path
+from time import perf_counter
 from typing import TYPE_CHECKING, cast
 
 import dotenv
@@ -13,6 +14,7 @@ if TYPE_CHECKING:
     from src.models.pipeline import MergeResult
 
 DF_TARGETS = ["config/*.toml"]
+DEFAULT_OUTPUT_DIR = "downloads"
 
 
 def _build_series_report(
@@ -34,21 +36,6 @@ def _model_payloads(items: Sequence[BaseModel]) -> list[dict[str, object]]:
     return [item.model_dump(mode="json") for item in items]
 
 
-def _feed_snapshot(
-    kind: str,
-    config_name: str,
-    source_payloads: list[dict[str, object]],
-    episode_payloads: list[dict[str, object]],
-) -> dict[str, object]:
-    return {
-        "kind": kind,
-        "name": config_name,
-        "source_count": len(source_payloads),
-        "episode_count": len(episode_payloads),
-        "sources": source_payloads,
-        "episodes": episode_payloads,
-    }
-
 
 def _write_json(path: Path, payload: object) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
@@ -61,8 +48,6 @@ def _series_output_paths(output_root: Path, slug: str) -> dict[str, Path]:
     return {
         "series_dir": series_dir,
         "config": series_dir / "config.json",
-        "references": feeds_dir / "references.json",
-        "downloads": feeds_dir / "downloads.json",
         "combined": feeds_dir / "combined.json",
     }
 
@@ -75,40 +60,16 @@ def _write_series_outputs(
     slug = str(config_payload["slug"])
     paths = _series_output_paths(output_root, slug)
 
-    reference_sources = cast(list[dict[str, object]], config_payload.get("references", []))
-    download_sources = cast(list[dict[str, object]], config_payload.get("downloads", []))
-    reference_payloads = _model_payloads(result.references)
-    download_payloads = _model_payloads(result.downloads)
-    merged_payloads = _model_payloads(result.episodes)
+    # Previous implementation produced separate per-feed snapshots. The
+    # current behavior writes the full `MergeResult` into the combined file
+    # so we no longer need the individual source/episode payload variables.
 
     _write_json(paths["config"], config_payload)
-    _write_json(
-        paths["references"],
-        _feed_snapshot(
-            "references",
-            str(config_payload["name"]),
-            reference_sources,
-            reference_payloads,
-        ),
-    )
-    _write_json(
-        paths["downloads"],
-        _feed_snapshot(
-            "downloads",
-            str(config_payload["name"]),
-            download_sources,
-            download_payloads,
-        ),
-    )
-    _write_json(
-        paths["combined"],
-        {
-            "kind": "combined",
-            "name": config_payload["name"],
-            "episode_count": len(merged_payloads),
-            "episodes": merged_payloads,
-        },
-    )
+    # Write the full MergeResult payload into the per-series combined file.
+    # This replaces the previous separate references/downloads/combined files
+    # with a single per-podcast file containing the complete `MergeResult`.
+    combined_payload = cast(dict[str, object], result.model_dump(mode="json"))
+    _write_json(paths["combined"], combined_payload)
 
     return {
         "name": config_payload["name"],
@@ -116,8 +77,6 @@ def _write_series_outputs(
         "directory": paths["series_dir"].relative_to(output_root).as_posix(),
         "config": paths["config"].relative_to(output_root).as_posix(),
         "feeds": {
-            "references": paths["references"].relative_to(output_root).as_posix(),
-            "downloads": paths["downloads"].relative_to(output_root).as_posix(),
             "combined": paths["combined"].relative_to(output_root).as_posix(),
         },
     }
@@ -138,6 +97,33 @@ def _write_output_bundle(
             "series": series_entries,
         },
     )
+
+
+def _write_report_file(output_file: str, reports: list[dict[str, object]]) -> None:
+    _write_json(Path(output_file), reports)
+
+
+def _format_duration(duration_seconds: float) -> str:
+    return f"{duration_seconds * 1000:.1f}ms"
+
+
+def _emit_timings(config_name: str, timings: dict[str, float]) -> None:
+    ordered_keys = [
+        "process_feeds",
+        "process_sources",
+        "align_episodes",
+        "merge_episodes",
+        "write_outputs",
+        "merge_config_total",
+        "podcast_total",
+    ]
+    rendered_parts = [
+        f"{key}={_format_duration(timings[key])}"
+        for key in ordered_keys
+        if key in timings
+    ]
+    if rendered_parts:
+        sys.stderr.write(f"TIMING {config_name}: {' '.join(rendered_parts)}\n")
 
 
 def main() -> None:
@@ -170,12 +156,18 @@ def main() -> None:
     )
     parser.add_argument(
         "--output-dir",
-        default=None,
+        default=DEFAULT_OUTPUT_DIR,
         help=(
-            "Write per-config output bundles under this directory, including config.json, "
-            "feeds/references.json, feeds/downloads.json, feeds/combined.json, and top-level "
+            "Write per-config output bundles under this directory (defaults to downloads/), "
+            "including config.json, "
+            "feeds/combined.json, and top-level "
             "report.json/index.json."
         ),
+    )
+    parser.add_argument(
+        "--output-file",
+        default=None,
+        help="Write the cumulative JSON report to this file after each processed podcast.",
     )
     parser.add_argument(
         "--refresh-sources",
@@ -183,29 +175,54 @@ def main() -> None:
         default=False,
         help="Bypass fresh source caches and refetch source data.",
     )
+    parser.add_argument(
+        "--timings",
+        action="store_true",
+        default=False,
+        help="Emit per-podcast stage timings to stderr.",
+    )
     args = parser.parse_args()
 
+    load_start = perf_counter()
     configs = load_podcasts_config(
         include=args.include,
         skip_schedule_filter=args.skip_schedule_filter,
     )
+    load_duration = perf_counter() - load_start
+    if args.timings:
+        sys.stderr.write(f"TIMING load_configs: {_format_duration(load_duration)}\n")
 
     output: list[dict[str, object]] = []
     series_entries: list[dict[str, object]] = []
     for config in configs:
-        result = merge_config(config, refresh_sources=args.refresh_sources)
+        timings: dict[str, float] = {}
+        podcast_start = perf_counter()
+        if args.timings:
+            result = merge_config(
+                config,
+                refresh_sources=args.refresh_sources,
+                timings=timings,
+            )
+        else:
+            result = merge_config(config, refresh_sources=args.refresh_sources)
         report = _build_series_report(config.name, args.include_counts, len(result.episodes))
         if args.include_counts:
             report["references_count"] = len(result.references)
             report["downloads_count"] = len(result.downloads)
         report["episodes"] = _model_payloads(result.episodes)
         output.append(report)
+
+        write_start = perf_counter()
         if args.output_dir:
             output_root = Path(args.output_dir)
             series_entries.append(_write_series_outputs(output_root, result))
-
-    if args.output_dir:
-        _write_output_bundle(args.output_dir, output, series_entries)
+            _write_output_bundle(args.output_dir, output, series_entries)
+        if args.output_file:
+            _write_report_file(args.output_file, output)
+        if args.timings:
+            timings["write_outputs"] = perf_counter() - write_start
+            timings["podcast_total"] = perf_counter() - podcast_start
+            _emit_timings(config.name, timings)
 
     json.dump(output, sys.stdout, indent=2 if args.pretty else None)
     sys.stdout.write("\n")

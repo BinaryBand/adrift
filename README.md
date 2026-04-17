@@ -106,9 +106,9 @@ When `--output-dir` is set, the merge run writes:
 - `downloads/report.json` for the aggregate JSON report.
 - `downloads/index.json` as a directory map from config to generated feed snapshots.
 - `downloads/<slug>/config.json` for the resolved config.
-- `downloads/<slug>/feeds/references.json` for fetched reference-side episodes.
-- `downloads/<slug>/feeds/downloads.json` for fetched download-side episodes.
-- `downloads/<slug>/feeds/combined.json` for merged episodes.
+- `downloads/<slug>/feeds/combined.json`, a single per-podcast JSON file containing the full `MergeResult` payload.
+
+Note: the per-feed `references.json` and `downloads.json` files are no longer written by default; their contents are included in the `MergeResult` stored in `feeds/combined.json`.
 
 ## Configuration
 
