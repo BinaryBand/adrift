@@ -5,13 +5,14 @@
 ```mermaid
 classDiagram
     class SourceFilter {
-        +Regex[] regex
+        +str[] include
+        +str[] exclude
         +RRule[] r_rules
     }
 
     class FeedSource {
         +str url
-        +SourceFilter[] filters
+        +SourceFilter filters
     }
 
     class Podcast {
@@ -19,7 +20,35 @@ classDiagram
         +str path
         +FeedSource[] references
         +FeedSource[] downloads
-        +RRule[] schedule // When we (the client) should download. Spaced to avoid overwhelming YouTube.
+        +RRule[] schedule
+    }
+
+    class RssEpisode {
+        +str id
+        +str title
+        +str author
+        +str content
+        +str description
+        +float duration
+        +DateTime pub_date
+        +str image
+    }
+
+    class EpisodeData {
+        +str id
+        +str title
+        +str description
+        +str[] source
+        +str thumbnail
+        +DateTime upload_date
+    }
+
+    class MergeResult {
+        +Podcast config
+        +RssEpisode[] references
+        +RssEpisode[] downloads
+        +int[][] pairs
+        +EpisodeData[] episodes
     }
 
     class PodcastFeed {
@@ -29,22 +58,16 @@ classDiagram
         +str description
         +str source
         +str thumbnail
-        +DateTime upload_date
         +EpisodeData[] episodes
-    }
-
-    class EpisodeData {
-        +str id
-        +str title
-        +str description
-        +str source
-        +str thumbnail
-        +DateTime upload_date
     }
 
     Podcast --> "0..*" FeedSource : references
     Podcast --> "0..*" FeedSource : downloads
-    FeedSource --> "0..*" SourceFilter : filters
+    FeedSource --> "1" SourceFilter : filters
+    MergeResult --> "1" Podcast : config
+    MergeResult --> "0..*" RssEpisode : references
+    MergeResult --> "0..*" RssEpisode : downloads
+    MergeResult --> "0..*" EpisodeData : episodes
     PodcastFeed --> "0..*" EpisodeData : episodes
 ```
 
@@ -139,23 +162,23 @@ flowchart TD
 
 ### Tuning Parameters
 
-| Parameter | Default | Effect |
-| --- | --- | --- |
-| `θ` (score threshold) | `0.75` | Higher → fewer matches, lower → more aggressive |
-| `w_id` | `0.10` | Weight given to ID similarity |
-| `w_date` | `0.30` | Weight given to date similarity |
-| `w_title` | `0.50` | Weight given to title similarity |
-| `w_desc` | `0.10` | Weight given to description similarity |
+| Parameter | Effect |
+| --- | --- |
+| `θ` (score threshold) | Higher → fewer matches, lower → more aggressive |
+| `w_id` | Weight given to ID similarity |
+| `w_date` | Weight given to date similarity |
+| `w_title` | Weight given to title similarity |
+| `w_desc` | Weight given to description similarity |
 
 ### Stage 1 — Similarity Scoring
 
-For each pair `(e1, e2)` in the cross-product of the two episode lists, compute a weighted similarity score:
+For each pair `(e1, e2)` in the cross-product of the two episode lists, compute a weighted similarity score across up to four signals:
 
 ```text
-Score(e1, e2) =  w_id   · sim_id(e1, e2)
-              +  w_date  · sim_date(e1, e2)
+Score(e1, e2) =  w_id   · sim_id(e1, e2)      [bonus — added after normalization]
+              +  w_date  · sim_date(e1, e2)     [optional — omitted when either date is absent]
               +  w_title · sim_title(e1, e2)
-              +  w_desc  · sim_desc(e1, e2)
+              +  w_desc  · sim_desc(e1, e2)     [optional — omitted when both descriptions are empty]
 
 sim_id(e1, e2)    — 1.0 if IDs are identical; 0.0 otherwise
 sim_date(e1, e2)  — tiered by |date difference|:
@@ -163,14 +186,17 @@ sim_date(e1, e2)  — tiered by |date difference|:
                       ≤ 10 days → 0.70
                       ≤ 35 days → 0.15
                       otherwise → 0.00
-sim_title(e1, e2) — fuzzy title similarity after normalization
-sim_desc(e1, e2)  — fuzzy description similarity after normalization;
-                    0.0 when both descriptions are empty
+sim_title(e1, e2) — normalized title similarity
+sim_desc(e1, e2)  — normalized description similarity
 ```
+
+The optional signals (`w_date`, `w_desc`) are excluded from the denominator when absent, so missing metadata does not penalize pairs — the remaining signals are renormalized over the signals that are present. `w_id` is applied as an additive bonus on top of the renormalized base score rather than as part of the normalized sum, since ID matches are rare across platforms and should reward but not dominate.
+
+A pair with no ID match, no descriptions, and a low title similarity is rejected outright without scoring.
 
 All scored pairs are passed to the greedy matcher.
 
-> **Cross-platform note:** Episodes compared across ID namespaces (e.g. a YouTube source vs an RSS feed) will always have `sim_id = 0.0`, capping the maximum achievable score at `0.60` before date and title are considered. Keeping `w_id` small (default `0.10`) ensures this is a modest same-platform bonus rather than an impassable gate. The practical consequence is that cross-platform matches with a week-tier date offset require `sim_title ≥ 0.91` to exceed `θ` — a high but realistic bar for the same episode across platforms.
+> **Cross-platform note:** Episodes compared across ID namespaces (e.g. a YouTube source vs an RSS feed) will always have `sim_id = 0.0`. Keeping `w_id` small ensures this is a modest same-platform bonus rather than an impassable gate.
 
 ### Stage 2 — Greedy Matching
 
@@ -205,28 +231,3 @@ Resolve each matched pair to a single canonical `EpisodeData` using field-level 
 | `source` | Union of all source URLs in pair |
 
 > **Status:** `merge_episode` is implemented in `src/catalog.py` and covered by tests (`tests/misc/test_align_episodes.py`, `tests/misc/test_catalog.py`). Integration into the Phase 2 RSS rebuild remains pending.
-
-## Episode Download Strategy: yt-dlp vs URL
-
-Episodes download according to the `FeedSource.url` scheme:
-
-- `yt://` sources resolve to YouTube content and are handled by **yt-dlp**.
-- `https://` sources are plain HTTP resources downloaded directly.
-
-```mermaid
-flowchart TD
-    S[FeedSource.url] --> YT{"yt:// scheme?"}
-    YT -- Yes --> YTDLP[yt-dlp downloader]
-    YT -- No --> HTTP[HTTP downloader]
-    YTDLP --> AF[Audio file + metadata]
-    HTTP --> AF
-    AF --> EP[EpisodeData]
-```
-
-### yt:// Sources — yt-dlp
-
-yt-dlp is a feature-rich command-line downloader that handles YouTube's stream selection, format negotiation, and metadata extraction. It requires **FFmpeg** to mux or transcode streams — without it, yt-dlp cannot merge separate audio/video tracks or convert formats.
-
-### https:// Sources — HTTP Download
-
-Plain URL episodes (standard RSS/Atom enclosures, direct MP3/M4A links) are fetched with a simple HTTP client. No format negotiation is needed — the server delivers the file as-is.
