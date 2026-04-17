@@ -151,3 +151,16 @@ def test_youtube_adapter_passes_title_and_options():
         # First arg is URL, second is title
         assert call_args[0][0] == "https://www.youtube.com/@testchannel"
         assert call_args[0][1] == "My Podcast"
+        assert call_args[0][2].detailed is True
+
+
+def test_youtube_adapter_passes_refresh_option():
+    """Verify YouTube adapter forwards refresh into YtFetchOptions."""
+    source = FeedSource(url="https://www.youtube.com/@testchannel")
+    adapter = YouTubeEpisodeSourceAdapter()
+
+    with patch("src.catalog.get_youtube_episodes") as mock_get:
+        mock_get.return_value = []
+        adapter.fetch_episodes(source, {"title": "My Podcast", "refresh": True})
+
+        assert mock_get.call_args[0][2].refresh is True

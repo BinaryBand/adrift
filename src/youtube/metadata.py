@@ -116,14 +116,23 @@ class YtFetchOptions:
     filter: str | None = ""
     detailed: bool = True
     callback: Callback | None = field(default=None)
+    refresh: bool = False
 
 
 def get_youtube_episodes(
-    url: str, author: str, opts: YtFetchOptions = YtFetchOptions()
+    url: str, author: str, opts: YtFetchOptions | None = None
 ) -> list[RssEpisode]:
     """Fetch RSS episodes from a given URL."""
+    if opts is None:
+        opts = YtFetchOptions()
+
     normalized_url = _normalize_youtube_link(url)
-    episodes = ytdlp.get_youtube_videos(normalized_url, author, opts.callback)
+    episodes = ytdlp.get_youtube_videos(
+        normalized_url,
+        author,
+        opts.callback,
+        refresh=opts.refresh,
+    )
     print(f"Fetched {len(episodes)} episodes from {url}")
 
     if opts.filter is not None and opts.filter != "":

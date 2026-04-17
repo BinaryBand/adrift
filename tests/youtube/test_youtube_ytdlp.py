@@ -1,12 +1,13 @@
 """Tests for YouTube yt-dlp module with focus on caching and error handling."""
 
 import unittest
-from datetime import datetime
+from datetime import datetime, timedelta, timezone
 from unittest.mock import MagicMock, patch
 
-from src.models import YtDlpParams
+from src.models import RssEpisode, YtDlpParams
 from src.models.ytdlp import YtDlpImage
 from src.youtube.ytdlp import (
+    YOUTUBE_EPISODE_CACHE_FRESHNESS,
     ChannelInfo,
     VideoInfo,
     _fetch_channel_info_raw,
@@ -16,6 +17,7 @@ from src.youtube.ytdlp import (
     _trim_video_cache_payload,
     get_channel_info,
     get_video_info,
+    get_youtube_videos,
 )
 
 
@@ -471,6 +473,105 @@ class TestGetCachedChannelInfo(unittest.TestCase):
         result = get_channel_info("https://youtube.com/@test")
 
         self.assertIsNone(result)
+
+
+class TestGetYoutubeVideos(unittest.TestCase):
+    """Test episode-list caching and refresh behavior."""
+
+    @patch("src.youtube.ytdlp._fetch_video_batch")
+    @patch("src.youtube.ytdlp._CACHE")
+    def test_returns_fresh_cached_episode_bundle_without_fetching(
+        self, mock_cache, mock_fetch_batch
+    ):
+        episode = RssEpisode(
+            id="vid123",
+            title="Cached Video",
+            author="Test Channel",
+            content="https://youtube.com/watch?v=vid123",
+        )
+        mock_cache.get.return_value = {
+            "fetched_at": datetime.now(timezone.utc).isoformat(),
+            "episodes": {episode.id: episode},
+        }
+
+        result = get_youtube_videos("https://youtube.com/@test/videos", "Test Channel")
+
+        self.assertEqual(result, [episode])
+        mock_fetch_batch.assert_not_called()
+        mock_cache.set.assert_not_called()
+
+    @patch("src.youtube.ytdlp._fetch_video_batch")
+    @patch("src.youtube.ytdlp._CACHE")
+    def test_refresh_bypasses_fresh_episode_bundle(self, mock_cache, mock_fetch_batch):
+        episode = RssEpisode(
+            id="vid123",
+            title="Cached Video",
+            author="Test Channel",
+            content="https://youtube.com/watch?v=vid123",
+        )
+        mock_cache.get.return_value = {
+            "fetched_at": datetime.now(timezone.utc).isoformat(),
+            "episodes": {episode.id: episode},
+        }
+        mock_fetch_batch.side_effect = [[{"id": "vid123", "title": "Cached Video"}]]
+
+        result = get_youtube_videos(
+            "https://youtube.com/@test/videos",
+            "Test Channel",
+            refresh=True,
+        )
+
+        self.assertEqual(result, [episode])
+        mock_fetch_batch.assert_called_once_with(
+            "https://youtube.com/@test/videos",
+            "Test Channel",
+            1,
+            10,
+        )
+        mock_cache.set.assert_called_once()
+
+    @patch("src.youtube.ytdlp._fetch_video_batch")
+    @patch("src.youtube.ytdlp._CACHE")
+    def test_legacy_cached_episode_map_is_treated_as_stale(self, mock_cache, mock_fetch_batch):
+        episode = RssEpisode(
+            id="vid123",
+            title="Cached Video",
+            author="Test Channel",
+            content="https://youtube.com/watch?v=vid123",
+        )
+        mock_cache.get.return_value = {episode.id: episode}
+        mock_fetch_batch.side_effect = [[{"id": "vid123", "title": "Cached Video"}]]
+
+        result = get_youtube_videos("https://youtube.com/@test/videos", "Test Channel")
+
+        self.assertEqual(result, [episode])
+        mock_fetch_batch.assert_called_once()
+        cached_payload = mock_cache.set.call_args.args[1]
+        self.assertEqual(cached_payload["episodes"], {episode.id: episode})
+        self.assertIn("fetched_at", cached_payload)
+
+    @patch("src.youtube.ytdlp._fetch_video_batch")
+    @patch("src.youtube.ytdlp._CACHE")
+    @patch("src.youtube.ytdlp._utcnow")
+    def test_stale_episode_bundle_triggers_refresh(self, mock_utcnow, mock_cache, mock_fetch_batch):
+        fresh_time = datetime(2026, 4, 17, tzinfo=timezone.utc)
+        stale_time = fresh_time - YOUTUBE_EPISODE_CACHE_FRESHNESS - timedelta(seconds=1)
+        episode = RssEpisode(
+            id="vid123",
+            title="Cached Video",
+            author="Test Channel",
+            content="https://youtube.com/watch?v=vid123",
+        )
+        mock_utcnow.return_value = fresh_time
+        mock_cache.get.return_value = {
+            "fetched_at": stale_time.isoformat(),
+            "episodes": {episode.id: episode},
+        }
+        mock_fetch_batch.side_effect = [[{"id": "vid123", "title": "Cached Video"}]]
+
+        get_youtube_videos("https://youtube.com/@test/videos", "Test Channel")
+
+        mock_fetch_batch.assert_called_once()
 
 
 if __name__ == "__main__":

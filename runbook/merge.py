@@ -177,6 +177,12 @@ def main() -> None:
             "report.json/index.json."
         ),
     )
+    parser.add_argument(
+        "--refresh-sources",
+        action="store_true",
+        default=False,
+        help="Bypass fresh source caches and refetch source data.",
+    )
     args = parser.parse_args()
 
     configs = load_podcasts_config(
@@ -187,7 +193,7 @@ def main() -> None:
     output: list[dict[str, object]] = []
     series_entries: list[dict[str, object]] = []
     for config in configs:
-        result = merge_config(config)
+        result = merge_config(config, refresh_sources=args.refresh_sources)
         report = _build_series_report(config.name, args.include_counts, len(result.episodes))
         if args.include_counts:
             report["references_count"] = len(result.references)

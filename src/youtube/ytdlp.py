@@ -7,7 +7,7 @@ Similar to the SponsorBlock module, it uses Pydantic models for type safety.
 """
 
 import random
-from datetime import datetime
+from datetime import datetime, timedelta, timezone
 from typing import Any, Callable, cast
 
 from dateutil import parser
@@ -269,10 +269,43 @@ def _fetch_channel_videos_raw(
 
 
 BATCHES = [10, 100, None]
+YOUTUBE_EPISODE_CACHE_FRESHNESS = timedelta(hours=12)
 
 
-def _load_cached_episode_map(cache_key: str) -> dict[str, RssEpisode]:
-    return _CACHE.get(cache_key) or {}
+def _utcnow() -> datetime:
+    return datetime.now(timezone.utc)
+
+
+def _parse_cached_timestamp(value: Any) -> datetime | None:
+    if not isinstance(value, str):
+        return None
+    try:
+        parsed = datetime.fromisoformat(value)
+    except ValueError:
+        return None
+    if parsed.tzinfo is None:
+        return parsed.replace(tzinfo=timezone.utc)
+    return parsed
+
+
+def _load_cached_episode_bundle(cache_key: str) -> tuple[dict[str, RssEpisode], datetime | None]:
+    cached = _CACHE.get(cache_key)
+    if not isinstance(cached, dict):
+        return {}, None
+
+    raw_episodes = cached.get("episodes")
+    if isinstance(raw_episodes, dict):
+        return cast(dict[str, RssEpisode], raw_episodes), _parse_cached_timestamp(
+            cached.get("fetched_at")
+        )
+
+    return cast(dict[str, RssEpisode], cached), None
+
+
+def _episode_cache_is_fresh(fetched_at: datetime | None) -> bool:
+    if fetched_at is None:
+        return False
+    return _utcnow() - fetched_at <= YOUTUBE_EPISODE_CACHE_FRESHNESS
 
 
 def _fetch_video_batch(
@@ -311,18 +344,40 @@ def _report_video_fetch_progress(
     callback(0, max(batch_size or 1000, episode_count))
 
 
+def _report_cached_video_progress(
+    callback: Callback | None,
+    episode_count: int,
+) -> None:
+    if callback is None:
+        return
+    callback(episode_count, episode_count)
+
+
 def _cache_youtube_videos(cache_key: str, episodes: dict[str, RssEpisode]) -> None:
     expire = random.randint(25, 35) * 24 * 3600
-    _CACHE.set(cache_key, episodes, expire=expire)
+    _CACHE.set(
+        cache_key,
+        {
+            "fetched_at": _utcnow().isoformat(),
+            "episodes": episodes,
+        },
+        expire=expire,
+    )
 
 
 def get_youtube_videos(
     url: str,
     author: str,
     callback: Callback | None = None,
+    refresh: bool = False,
 ) -> list[RssEpisode]:
     cache_key = f"get_youtube_videos:{url}:{author}"
-    stale_episodes = _load_cached_episode_map(cache_key)
+    stale_episodes, fetched_at = _load_cached_episode_bundle(cache_key)
+
+    if stale_episodes and not refresh and _episode_cache_is_fresh(fetched_at):
+        print(f"Using fresh cached YouTube episodes for {author}")
+        _report_cached_video_progress(callback, len(stale_episodes))
+        return list(stale_episodes.values())
 
     for batch_index, batch_size in enumerate(BATCHES, start=1):
         video_entries = _fetch_video_batch(url, author, batch_index, batch_size)

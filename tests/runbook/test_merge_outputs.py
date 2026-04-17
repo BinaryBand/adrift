@@ -77,13 +77,16 @@ def test_write_series_outputs_creates_expected_layout(tmp_path: Path) -> None:
 
 def test_main_writes_bundle_and_stdout(tmp_path: Path, capsys) -> None:
     config = _config()
-    references = [
-        _rss_episode("ref-1", "Reference Episode", "https://example.com/reference-1.mp3")
-    ]
-    downloads = [
-        _rss_episode("dl-1", "Download Episode", "https://youtube.com/watch?v=abc123")
-    ]
+    references = [_rss_episode("ref-1", "Reference Episode", "https://example.com/reference-1.mp3")]
+    downloads = [_rss_episode("dl-1", "Download Episode", "https://youtube.com/watch?v=abc123")]
     merged = [_merged_episode()]
+    result = MergeResult(
+        config=config,
+        references=references,
+        downloads=downloads,
+        pairs=[(0, 0)],
+        episodes=merged,
+    )
 
     argv = [
         "adrift-merge",
@@ -92,13 +95,12 @@ def test_main_writes_bundle_and_stdout(tmp_path: Path, capsys) -> None:
         "--output-dir",
         tmp_path.as_posix(),
         "--include-counts",
+        "--refresh-sources",
     ]
 
     with (
         patch("src.app_common.load_podcasts_config", return_value=[config]),
-        patch("src.catalog.process_feeds", return_value=references),
-        patch("src.catalog.process_sources", return_value=downloads),
-        patch("src.catalog.merge_episode_pairs", return_value=merged),
+        patch("src.catalog.merge_config", return_value=result) as mock_merge_config,
         patch.object(sys, "argv", argv),
     ):
         merge_mod.main()
@@ -108,3 +110,4 @@ def test_main_writes_bundle_and_stdout(tmp_path: Path, capsys) -> None:
     assert stdout_payload[0]["references_count"] == 1
     assert stdout_payload[0]["downloads_count"] == 1
     assert (tmp_path / config.slug / "feeds" / "combined.json").exists()
+    mock_merge_config.assert_called_once_with(config, refresh_sources=True)

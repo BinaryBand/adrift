@@ -21,7 +21,13 @@ class YouTubeEpisodeSourceAdapter(EpisodeSourcePort):
         filter_regex = source.filters.to_regex() if source.filters else None
         callback = options.get("callback")
         detailed = options.get("detailed", True)
-        fetch_opts = YtFetchOptions(filter=filter_regex, detailed=detailed, callback=callback)
+        refresh = options.get("refresh", False)
+        fetch_opts = YtFetchOptions(
+            filter=filter_regex,
+            detailed=detailed,
+            callback=callback,
+            refresh=refresh,
+        )
 
         return get_youtube_episodes(url, title, fetch_opts)
 

@@ -284,10 +284,11 @@ def merge_episode(ref: RssEpisode, dl: RssEpisode) -> EpisodeData:
 def merge_config(
     config: PodcastConfig,
     callback: Callback | None = None,
+    refresh_sources: bool = False,
 ) -> MergeResult:
     """Fetch, align, and merge episodes for a single podcast config."""
-    references = process_feeds(config, callback)
-    downloads = process_sources(config, callback)
+    references = process_feeds(config, callback, refresh_sources=refresh_sources)
+    downloads = process_sources(config, callback, refresh_sources=refresh_sources)
     pairs = align_episodes(references, downloads, config.name)
     episodes = [merge_episode(references[r], downloads[d]) for r, d in pairs]
     return MergeResult(
@@ -319,9 +320,13 @@ def _collect_episodes(
     title: str,
     is_reference: bool,
     callback: Callback | None = None,
+    refresh_sources: bool = False,
 ) -> list[RssEpisode]:
     """Fetch and deduplicate episodes from a list of FeedSource objects."""
-    albums = [_fetch_source_episodes(source, title, is_reference, callback) for source in sources]
+    albums = [
+        _fetch_source_episodes(source, title, is_reference, callback, refresh_sources)
+        for source in sources
+    ]
 
     if not albums:
         return []
@@ -338,6 +343,7 @@ def _fetch_source_episodes(
     title: str,
     is_reference: bool,
     callback: Callback | None = None,
+    refresh_sources: bool = False,
 ) -> list[RssEpisode]:
     from src.adapters import get_episode_source_adapter
 
@@ -351,6 +357,7 @@ def _fetch_source_episodes(
         "title": title,
         "detailed": is_reference,  # is_reference maps to detailed flag for YouTube
         "callback": callback,
+        "refresh": refresh_sources,
     }
 
     # Delegate to adapter
@@ -370,18 +377,35 @@ def _merge_episode_album(
 def process_sources(
     config: PodcastConfig,
     callback: Callback | None = None,
+    refresh_sources: bool = False,
 ) -> list[RssEpisode]:
     """Collect and deduplicate download-side episodes (thin wrapper)."""
-    episodes = _collect_episodes(config.downloads, config.name, False, callback)
+    episodes = _collect_episodes(
+        config.downloads,
+        config.name,
+        False,
+        callback,
+        refresh_sources=refresh_sources,
+    )
     if callback:
         callback(len(episodes), len(episodes))
     return episodes
 
 
-def process_feeds(config: PodcastConfig, callback: Callback | None = None) -> list[RssEpisode]:
+def process_feeds(
+    config: PodcastConfig,
+    callback: Callback | None = None,
+    refresh_sources: bool = False,
+) -> list[RssEpisode]:
     """Collect and deduplicate reference-side episodes (thin wrapper)."""
     title = config.name
-    source_episodes = _collect_episodes(config.references, title, True, callback)
+    source_episodes = _collect_episodes(
+        config.references,
+        title,
+        True,
+        callback,
+        refresh_sources=refresh_sources,
+    )
 
     return source_episodes
 

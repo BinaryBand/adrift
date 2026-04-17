@@ -59,6 +59,21 @@ class TestGetYoutubeVideosCache(unittest.TestCase):
         self.assertEqual(call_args[0][0], normalized_url)
         self.assertEqual(call_args[0][1], "test_author")
 
+    @patch("src.youtube.metadata._normalize_youtube_link")
+    @patch("src.youtube.ytdlp.get_youtube_videos")
+    def test_forwards_refresh_option(self, mock_get_videos, mock_normalize):
+        """Test that refresh is forwarded to the yt-dlp layer."""
+        mock_normalize.return_value = "https://youtube.com/@test/videos"
+        mock_get_videos.return_value = []
+
+        get_youtube_episodes(
+            "https://youtube.com/@test",
+            "test_author",
+            YtFetchOptions(detailed=False, refresh=True),
+        )
+
+        self.assertEqual(mock_get_videos.call_args.kwargs["refresh"], True)
+
 
 class TestGetYoutubeVideosEarlyTermination(unittest.TestCase):
     """Test early termination logic in get_youtube_episodes."""
