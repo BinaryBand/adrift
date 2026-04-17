@@ -3,6 +3,7 @@
 import os
 import unittest
 from datetime import datetime, timezone
+from unittest.mock import patch
 
 os.environ.setdefault("S3_USERNAME", "_test")
 os.environ.setdefault("S3_SECRET_KEY", "_test")
@@ -124,6 +125,23 @@ class TestAlignEpisodes(unittest.TestCase):
         pairs = align_episodes([ref1, ref2], [dl])
         dl_indices = [d for _, d in pairs]
         self.assertEqual(len(dl_indices), len(set(dl_indices)), "Download episode used twice")
+
+    def test_normalized_titles_are_precomputed_once_per_episode(self):
+        refs = [
+            _ep(id="r1", title="Episode One", pub_date=_dt(2024, 1, 1)),
+            _ep(id="r2", title="Episode Two", pub_date=_dt(2024, 1, 2)),
+        ]
+        dls = [
+            _ep(id="d1", title="Episode One", pub_date=_dt(2024, 1, 1)),
+            _ep(id="d2", title="Episode Two", pub_date=_dt(2024, 1, 2)),
+            _ep(id="d3", title="Episode Three", pub_date=_dt(2024, 1, 3)),
+        ]
+
+        with patch("src.catalog._normalized_alignment_title") as mocked_title:
+            mocked_title.side_effect = lambda show, episode: episode.title.lower()
+            align_episodes(refs, dls, "Example Show")
+
+        self.assertEqual(mocked_title.call_count, len(refs) + len(dls))
 
 
 # ---------------------------------------------------------------------------

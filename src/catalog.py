@@ -125,12 +125,11 @@ def _id_similarity(ref: RssEpisode, dl: RssEpisode) -> float:
     return float(bool(ref.id and dl.id and ref.id == dl.id))
 
 
-def _description_similarity(ref: RssEpisode, dl: RssEpisode) -> float:
-    rc = normalize_text(ref.description or "")
-    dc = normalize_text(dl.description or "")
-    if not rc and not dc:
-        return 0.0
-    return _similarity_clean(rc, dc)
+@dataclass(frozen=True)
+class _AlignmentCandidate:
+    episode: RssEpisode
+    title: str
+    description: str
 
 
 def _normalized_alignment_title(show: str, episode: RssEpisode) -> str:
@@ -138,21 +137,41 @@ def _normalized_alignment_title(show: str, episode: RssEpisode) -> str:
     return normalize_text(title)
 
 
-def _has_date_signal(ref: RssEpisode, dl: RssEpisode) -> bool:
-    return ref.pub_date is not None and dl.pub_date is not None
+def _normalized_alignment_description(episode: RssEpisode) -> str:
+    return normalize_text(episode.description or "")
 
 
-def _has_description_signal(ref: RssEpisode, dl: RssEpisode) -> bool:
-    return bool((ref.description or "").strip() and (dl.description or "").strip())
+def _build_alignment_candidates(
+    episodes: list[RssEpisode], show: str
+) -> list[_AlignmentCandidate]:
+    return [
+        _AlignmentCandidate(
+            episode=episode,
+            title=_normalized_alignment_title(show, episode),
+            description=_normalized_alignment_description(episode),
+        )
+        for episode in episodes
+    ]
 
 
-def _weighted_score(ref: RssEpisode, dl: RssEpisode, show: str = "") -> float:
+def _has_date_signal(ref: _AlignmentCandidate, dl: _AlignmentCandidate) -> bool:
+    return ref.episode.pub_date is not None and dl.episode.pub_date is not None
+
+
+def _has_description_signal(ref: _AlignmentCandidate, dl: _AlignmentCandidate) -> bool:
+    return bool(ref.description and dl.description)
+
+
+def _description_similarity(ref: _AlignmentCandidate, dl: _AlignmentCandidate) -> float:
+    if not ref.description and not dl.description:
+        return 0.0
+    return _similarity_clean(ref.description, dl.description)
+
+
+def _weighted_score(ref: _AlignmentCandidate, dl: _AlignmentCandidate) -> float:
     """Metadata-aware similarity score with ID as a small bonus."""
-    s_id = _id_similarity(ref, dl)
-    s_title = _similarity_clean(
-        _normalized_alignment_title(show, ref),
-        _normalized_alignment_title(show, dl),
-    )
+    s_id = _id_similarity(ref.episode, dl.episode)
+    s_title = _similarity_clean(ref.title, dl.title)
     has_date = _has_date_signal(ref, dl)
     has_desc = _has_description_signal(ref, dl)
     if not s_id and not has_desc and s_title < SPARSE_TITLE_MIN:
@@ -171,13 +190,16 @@ def _weighted_score(ref: RssEpisode, dl: RssEpisode, show: str = "") -> float:
 
 
 def _compute_optional_weights(
-    ref: RssEpisode, dl: RssEpisode, has_date: bool, has_desc: bool
+    ref: _AlignmentCandidate,
+    dl: _AlignmentCandidate,
+    has_date: bool,
+    has_desc: bool,
 ) -> tuple[float, float]:
     """Return (weighted_sum, total_weight) for optional metadata contributions."""
     weighted = 0.0
     total = 0.0
     if has_date:
-        weighted += W_DATE * sim_date(ref.pub_date, dl.pub_date)
+        weighted += W_DATE * sim_date(ref.episode.pub_date, dl.episode.pub_date)
         total += W_DATE
     if has_desc:
         weighted += W_DESC * _description_similarity(ref, dl)
@@ -188,10 +210,12 @@ def _compute_optional_weights(
 def _build_alignment_scores(
     references: list[RssEpisode], downloads: list[RssEpisode], show: str = ""
 ) -> dict[tuple[int, int], float]:
+    reference_candidates = _build_alignment_candidates(references, show)
+    download_candidates = _build_alignment_candidates(downloads, show)
     scores: dict[tuple[int, int], float] = {}
-    for r_idx, ref in enumerate(references):
-        for d_idx, dl in enumerate(downloads):
-            scores[(r_idx, d_idx)] = _weighted_score(ref, dl, show)
+    for r_idx, ref in enumerate(reference_candidates):
+        for d_idx, dl in enumerate(download_candidates):
+            scores[(r_idx, d_idx)] = _weighted_score(ref, dl)
     return scores
 
 
@@ -216,13 +240,13 @@ def _append_match_if_unused(
     used_dls.add(d_idx)
 
 
-def align_episodes(
+def align_episodes_impl(
     references: list[RssEpisode], downloads: list[RssEpisode], show: str = ""
 ) -> list[tuple[int, int]]:
-    """Greedy cross-alignment of reference and download episode lists.
+    """Core greedy aligner implementation (internal).
 
-    Returns a list of ``(ref_idx, dl_idx)`` index pairs for matched episodes
-    with score ≥ MATCH_TOLERANCE (θ = 0.75 by default).
+    Kept as a private implementation so catalog can delegate to a pluggable
+    adapter while still providing a stable default behavior.
     """
     scores = _build_alignment_scores(references, downloads, show)
     matches: list[tuple[int, int]] = []
@@ -233,6 +257,25 @@ def align_episodes(
         _append_match_if_unused((r_idx, d_idx), matches, used_refs, used_dls)
 
     return matches
+
+
+def align_episodes(
+    references: list[RssEpisode], downloads: list[RssEpisode], show: str = ""
+) -> list[tuple[int, int]]:
+    """Public alignment entrypoint that delegates to an adapter.
+
+    The default adapter delegates back to `align_episodes_impl` so behavior
+    remains unchanged. Local imports are used to avoid circular imports at
+    module import time.
+    """
+    try:
+        from src.adapters import get_alignment_adapter
+
+        adapter = get_alignment_adapter()
+        return adapter.align_episodes(references, downloads, show)
+    except Exception:
+        # Fallback to the local implementation on any adapter error.
+        return align_episodes_impl(references, downloads, show)
 
 
 def _thumbnail_rank(url: str | None) -> int:

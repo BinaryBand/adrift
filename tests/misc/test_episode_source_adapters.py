@@ -2,7 +2,8 @@
 
 from unittest.mock import patch
 
-from src.adapters import get_episode_source_adapter
+from src.adapters import get_alignment_adapter, get_episode_source_adapter
+from src.adapters.alignment import GreedyAlignmentAdapter
 from src.adapters.episode_source_rss import RssEpisodeSourceAdapter
 from src.adapters.episode_source_youtube import YouTubeEpisodeSourceAdapter
 from src.app_common import FeedSource
@@ -164,3 +165,37 @@ def test_youtube_adapter_passes_refresh_option():
         adapter.fetch_episodes(source, {"title": "My Podcast", "refresh": True})
 
         assert mock_get.call_args[0][2].refresh is True
+
+
+def test_factory_returns_greedy_alignment_adapter():
+    """Verify factory returns the default alignment adapter."""
+    adapter = get_alignment_adapter()
+
+    assert isinstance(adapter, GreedyAlignmentAdapter)
+
+
+def test_greedy_alignment_adapter_delegates_to_catalog_impl():
+    """Verify alignment adapter delegates to the catalog implementation."""
+    references = [
+        RssEpisode(
+            id="ref-1",
+            title="Reference Episode",
+            author="Test Author",
+            content="https://example.com/ref-1.mp3",
+        )
+    ]
+    downloads = [
+        RssEpisode(
+            id="dl-1",
+            title="Download Episode",
+            author="Test Author",
+            content="https://example.com/dl-1.mp3",
+        )
+    ]
+    adapter = GreedyAlignmentAdapter()
+
+    with patch("src.catalog.align_episodes_impl", return_value=[(0, 0)]) as mock_align:
+        result = adapter.align_episodes(references, downloads, "Test Show")
+
+    assert result == [(0, 0)]
+    mock_align.assert_called_once_with(references, downloads, "Test Show")

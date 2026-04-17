@@ -28,3 +28,14 @@ def get_episode_source_adapter(source: FeedSource) -> EpisodeSourcePort:
         from src.adapters.episode_source_rss import RssEpisodeSourceAdapter
 
         return RssEpisodeSourceAdapter()
+
+
+def get_alignment_adapter():
+    """Return the default alignment adapter instance.
+
+    This is a thin factory so callers can obtain a pluggable alignment
+    implementation without importing adapter modules at module import time.
+    """
+    from src.adapters.alignment import GreedyAlignmentAdapter
+
+    return GreedyAlignmentAdapter()
