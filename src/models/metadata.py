@@ -2,7 +2,7 @@ import os
 import sys
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Any, Callable, Sequence, cast
+from typing import Any, Callable, cast
 
 from dotenv import find_dotenv, load_dotenv
 from pydantic import BaseModel, ConfigDict
@@ -68,7 +68,7 @@ def _extract_image_url(value: Any) -> str:
     return ""
 
 
-def _extract_image_from_list(data: "Sequence[YtDlpImage | dict[str, Any]]") -> str:
+def _extract_image_from_list(data: list[Any]) -> str:
     if not data:
         return ""
 

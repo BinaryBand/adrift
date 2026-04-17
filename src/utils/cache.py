@@ -87,18 +87,6 @@ class _SQLiteCacheStore:
         conn.execute("DELETE FROM cache_entries WHERE key = ?", (key,))
         conn.commit()
 
-    def delete_expired(self) -> int:
-        conn = self._connect()
-        cursor = conn.execute(
-            (
-                "DELETE FROM cache_entries "
-                "WHERE expires_at_epoch IS NOT NULL AND expires_at_epoch <= ?"
-            ),
-            (time.time(),),
-        )
-        conn.commit()
-        return int(cursor.rowcount or 0)
-
 
 class S3Cache:
     """Compatibility cache wrapper backed by local SQLite.
@@ -119,9 +107,6 @@ class S3Cache:
 
     def delete(self, key: str) -> None:
         self.sqlite_cache.delete(key)
-
-    def cleanup_expired(self) -> int:
-        return self.sqlite_cache.delete_expired()
 
     def __contains__(self, key: str) -> bool:
         return self.get(key) is not None

@@ -1,11 +1,8 @@
 import functools
-import mimetypes
 import sys
-import xml.etree.ElementTree as ET
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
-from typing import Any, cast
-from xml.dom import minidom
+from typing import cast
 
 import feedparser
 import requests
@@ -15,40 +12,11 @@ from diskcache import Cache
 from feedparser import FeedParserDict
 
 sys.path.insert(0, Path(__file__).parent.parent.parent.as_posix())
-from src.app_common import FeedSource, ensure_feed_source
 from src.models import RssChannel, RssEpisode
 from src.utils.progress import Callback
 from src.utils.regex import LINK_REGEX, re_compile
-from src.utils.text import is_youtube_channel, remove_control_chars
 
 AUDIO_EXTENSIONS = {".mp3", ".m4a", ".aac", ".wav", ".flac", ".ogg", ".mp4", ".opus"}
-
-
-def get_rss_episodes_from_source(
-    source: FeedSource | dict[str, Any],
-    title: str = "",
-    is_reference: bool = False,
-    callback: Callback | None = None,
-) -> list[RssEpisode]:
-    """Convenience wrapper accepting a `FeedSource` model or legacy dict.
-
-    Returns episodes using the same semantics as `get_rss_episodes`.
-    """
-    resolved = ensure_feed_source(source)
-    url = resolved.url
-    filter_regex = resolved.filters.to_regex()
-    r_rules = resolved.filters.r_rules or None
-
-    if is_youtube_channel(url):
-        try:
-            from src.youtube.metadata import YtFetchOptions, get_youtube_episodes
-
-            opts = YtFetchOptions(filter_regex, is_reference, callback)
-            return get_youtube_episodes(url, title, opts)
-        except Exception:
-            return get_rss_episodes(url, filter_regex, r_rules, callback)
-
-    return get_rss_episodes(url, filter_regex, r_rules, callback)
 
 
 @functools.cache
@@ -378,90 +346,3 @@ def _parse_feed_entries(
         if callback:
             callback(idx + 1, total)
     return episodes
-
-
-def podcast_to_rss(channel: RssChannel, episodes: list[RssEpisode]) -> str:
-    rss = _build_rss_root()
-    channel_elem = ET.SubElement(rss, "channel")
-    _append_channel_metadata(channel_elem, channel)
-    for episode in episodes:
-        _append_episode_item(channel_elem, episode)
-    return _serialize_rss(rss)
-
-
-def _build_rss_root() -> ET.Element:
-    rss = ET.Element("rss", version="2.0")
-    rss.set("xmlns:itunes", "http://www.itunes.com/dtds/podcast-1.0.dtd")
-    return rss
-
-
-def _set_text_element(parent: ET.Element, tag: str, value: str | None) -> None:
-    if value:
-        ET.SubElement(parent, tag).text = value
-
-
-def _append_channel_metadata(channel_elem: ET.Element, channel: RssChannel) -> None:
-    _set_text_element(channel_elem, "title", channel.title)
-    _set_text_element(channel_elem, "itunes:author", channel.author)
-    _set_text_element(channel_elem, "url", channel.url)
-    _set_text_element(channel_elem, "description", channel.description)
-    _set_text_element(channel_elem, "itunes:subtitle", channel.subtitle)
-    _append_channel_image(channel_elem, channel)
-
-
-def _append_channel_image(channel_elem: ET.Element, channel: RssChannel) -> None:
-    if not channel.image:
-        return
-    ET.SubElement(channel_elem, "itunes:image", href=channel.image)
-    image_elem = ET.SubElement(channel_elem, "image")
-    ET.SubElement(image_elem, "url").text = channel.image
-    ET.SubElement(image_elem, "title").text = channel.title or ""
-    ET.SubElement(image_elem, "url").text = channel.url or ""
-
-
-def _append_episode_item(channel_elem: ET.Element, episode: RssEpisode) -> None:
-    item = ET.SubElement(channel_elem, "item")
-    _set_text_element(item, "guid", episode.id)
-    _set_text_element(item, "title", _safe_episode_title(episode))
-    _set_text_element(item, "description", episode.description)
-    _set_text_element(item, "itunes:author", episode.author)
-    _append_episode_pub_date(item, episode)
-    _append_episode_duration(item, episode)
-    _append_episode_enclosure(item, episode)
-    _append_episode_image(item, episode)
-
-
-def _safe_episode_title(episode: RssEpisode) -> str | None:
-    if not episode.title:
-        return None
-    return remove_control_chars(episode.title)
-
-
-def _append_episode_pub_date(item: ET.Element, episode: RssEpisode) -> None:
-    if isinstance(episode.pub_date, datetime):
-        ET.SubElement(item, "pubDate").text = episode.pub_date.isoformat()
-
-
-def _append_episode_duration(item: ET.Element, episode: RssEpisode) -> None:
-    if episode.duration is not None:
-        ET.SubElement(item, "itunes:duration").text = str(int(episode.duration))
-
-
-def _append_episode_enclosure(item: ET.Element, episode: RssEpisode) -> None:
-    if not episode.content:
-        return
-    content_type, _ = mimetypes.guess_type(episode.content)
-    enclosure = ET.SubElement(item, "enclosure")
-    enclosure.set("url", episode.content)
-    enclosure.set("type", content_type or "audio/mpeg")
-
-
-def _append_episode_image(item: ET.Element, episode: RssEpisode) -> None:
-    if episode.image is not None and LINK_REGEX.match(episode.image):
-        ET.SubElement(item, "itunes:image", href=episode.image)
-
-
-def _serialize_rss(rss: ET.Element) -> str:
-    rough_string = ET.tostring(rss, "utf-8")
-    re_parsed = minidom.parseString(rough_string)
-    return re_parsed.toprettyxml(indent="\t")

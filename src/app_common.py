@@ -257,20 +257,3 @@ def _expand_include_targets(include: list[str]) -> list[str]:
         else:
             targets.append(target)
     return targets
-
-
-def load_static_config(filename: str) -> dict[str, Any]:
-    """Load a static TOML configuration file from the ``config/`` directory.
-
-    Falls back gracefully and returns an empty dict when the file is
-    missing or malformed.
-    """
-    config_path = Path(__file__).parent.parent / "config" / filename
-    try:
-        with open(config_path, "rb") as f:
-            raw = tomllib.load(f)
-            assert isinstance(raw, dict), "Config file must contain a TOML table"
-            return raw
-    except (FileNotFoundError, tomllib.TOMLDecodeError) as e:
-        print(f"WARNING: Could not load {filename}: {e}")
-        return {}

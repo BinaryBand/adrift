@@ -154,7 +154,7 @@ Prefer early returns over nested conditionals. If a function needs more than 25 
                               `.venv/bin/python runbook/quality/validate_configs.py --problems config/*.toml`
                               `.venv/bin/python runbook/quality/check_static.py src runbook tests typings`
 3. Run tests:                  pytest
-4. Push — optional `.githooks/pre-push` runs local checks if your git hooks path is configured
+4. Push
 5. Open PR — check checklist
 ```
 

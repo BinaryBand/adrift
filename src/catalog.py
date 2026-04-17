@@ -18,7 +18,6 @@ from src.utils.progress import Callback
 from src.utils.text import normalize_text
 from src.web import rss as _rss
 from src.web.rss import (
-    RssChannel,
     RssEpisode,
 )
 from src.youtube import metadata as _yt_meta
@@ -351,45 +350,6 @@ def _merge_episode_album(
     for index, episode in enumerate(album):
         if index not in duplicate_indices:
             merged.append(episode)
-
-
-def process_channel(config: PodcastConfig) -> RssChannel:
-    feed_channel: RssChannel = RssChannel(
-        title=config.name,
-        author="",
-        subtitle="",
-        description="",
-        url="",
-        image="",
-    )
-
-    for fs in config.references:
-        channel_rss = _fetch_channel_data(fs, config.name)
-        _fill_channel_blanks(feed_channel, channel_rss)
-
-    return feed_channel
-
-
-def _fetch_channel_data(source: FeedSource, title: str) -> RssChannel:
-    from src.adapters import get_episode_source_adapter
-
-    # Get appropriate adapter for source type
-    adapter = get_episode_source_adapter(source)
-
-    # Delegate to adapter
-    return adapter.fetch_channel(source)
-
-
-def _fill_channel_blanks(feed_channel: RssChannel, channel_rss: RssChannel) -> None:
-    # Prioritize data from the first feed: only fill if currently empty.
-    for field_name in ("title", "author", "subtitle", "description", "url", "image"):
-        current_value = getattr(feed_channel, field_name)
-        incoming_value = getattr(channel_rss, field_name)
-        setattr(feed_channel, field_name, _prefer_existing(current_value, incoming_value))
-
-
-def _prefer_existing(current: str, incoming: str) -> str:
-    return current or incoming
 
 
 def process_sources(
