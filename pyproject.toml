@@ -13,6 +13,7 @@ packages = [
 adrift-merge = "runbook.merge:main"
 adrift-validate-configs = "runbook.quality.validate_configs:main"
 adrift-build-diagram = "runbook.analysis.build_diagram:main"
+adrift-build-hotspots = "runbook.analysis.build_hotspots:main"
 
 [tool.poetry.dependencies]
 python = "^3.11"

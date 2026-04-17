@@ -137,7 +137,10 @@ def _render_subgraph(layer: str, keys: list[str], node_subgraph: dict) -> list[s
 
 
 def _render_insights(G: nx.DiGraph) -> list[str]:
-    hubs = sorted([(n, d) for n, d in G.in_degree() if d >= 2], key=lambda x: -x[1])
+    hubs = sorted(
+        [(n, d) for n, d in G.in_degree() if d >= 2],
+        key=lambda item: (-item[1], item[0]),
+    )
     lines = ["", "### What this tells us", ""]
     if not hubs:
         lines.append("No significant hubs detected.")
