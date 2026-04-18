@@ -58,6 +58,12 @@ def _clean_financial_audit_title(episode: str) -> str:
 
 
 def _clean_morbid_title(episode: str) -> str:
+    prefix_patterns = [
+        r"(?i)^episode \d{1,3}[:\-]?\s*",
+    ]
+    for pattern in prefix_patterns:
+        episode = re_compile(pattern).sub("", episode)
+
     patterns = [
         r"(?i)\| morbid$",
         r"(?i)\| morbid \| podcast$",

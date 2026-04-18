@@ -46,3 +46,10 @@ def get_mermaid_adapter():
     from src.adapters.mermaid import FileMermaidAdapter
 
     return FileMermaidAdapter()
+
+
+def get_report_adapter():
+    """Return the default report adapter instance."""
+    from src.adapters.report import FileReportAdapter
+
+    return FileReportAdapter()

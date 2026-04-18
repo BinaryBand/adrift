@@ -18,6 +18,29 @@ class SourceTrace(BaseModel):
     has_filters: bool
 
 
+class MatchCandidateTrace(BaseModel):
+    """Scored candidate considered for a reference episode during alignment."""
+
+    download_index: int
+    score: float
+    reason: Literal[
+        "matched",
+        "below_threshold",
+        "download_matched_elsewhere",
+        "reference_matched_elsewhere",
+        "not_selected",
+    ]
+
+
+class ReferenceMatchTrace(BaseModel):
+    """Compact alignment trace for one reference episode."""
+
+    reference_index: int
+    matched_download_index: int | None = None
+    matched_score: float | None = None
+    candidates: list[MatchCandidateTrace] = []
+
+
 class DownloadEpisode(BaseModel):
     """A download-side episode paired with its pre-fetched sponsor segment data."""
 
@@ -40,6 +63,7 @@ class MergeResult(BaseModel):
     references: list[RssEpisode]
     downloads: list[RssEpisode]
     source_traces: list[SourceTrace] = []
+    match_traces: list[ReferenceMatchTrace] = []
     pairs: list[tuple[int, int]]
     episodes: list[EpisodeData]
     download_episodes: list[DownloadEpisode] = []

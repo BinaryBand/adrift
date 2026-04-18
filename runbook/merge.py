@@ -253,13 +253,10 @@ def main() -> None:
                     sys.stderr.write(f"MERMAID generation failed for {config.name}: {exc}\n")
             if not args.skip_report:
                 try:
-                    from src.adapters.report_sections import DEFAULT_SECTIONS
-                    from src.ports.report import compose
+                    from src.adapters import get_report_adapter
 
-                    report_md = compose(result, DEFAULT_SECTIONS)
-                    report_path = output_root / result.config.slug / "feeds" / "report.md"
-                    report_path.parent.mkdir(parents=True, exist_ok=True)
-                    report_path.write_text(report_md, encoding="utf-8")
+                    adapter = get_report_adapter()
+                    adapter.generate_reports(result, output_root)
                 except Exception as exc:  # pragma: no cover - non-fatal optional feature
                     sys.stderr.write(f"REPORT generation failed for {config.name}: {exc}\n")
         if args.output_file:
