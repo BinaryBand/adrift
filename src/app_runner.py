@@ -57,6 +57,16 @@ def _clean_financial_audit_title(episode: str) -> str:
     return _strip_suffix(r"(?i)\| financial audit$", episode)
 
 
+def _clean_morbid_title(episode: str) -> str:
+    patterns = [
+        r"(?i)\| morbid$",
+        r"(?i)\| morbid \| podcast$",
+    ]
+    for pattern in patterns:
+        episode = _strip_suffix(pattern, episode)
+    return episode
+
+
 def _clean_revisionist_history_title(episode: str) -> str:
     return _strip_suffix(r"(?i)\| revisionist history malcolm gladwell$", episode)
 
@@ -79,6 +89,7 @@ _TITLE_CLEANERS = {
     "CreepCast": _clean_creepcast_title,
     "Darknet Diaries": _clean_darknet_diaries_title,
     "Financial Audit": _clean_financial_audit_title,
+    "Morbid": _clean_morbid_title,
     "Revisionist History": _clean_revisionist_history_title,
     "Smosh Reads Reddit Stories": _clean_smosh_reads_reddit_stories_title,
     "Stuff They Don't Want You To Know": _clean_stuff_they_dont_want_you_to_know_title,

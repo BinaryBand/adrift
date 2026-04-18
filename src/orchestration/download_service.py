@@ -10,7 +10,7 @@ from src.files.s3 import exists, upload_file
 from src.models import MediaMetadata, RssChannel, RssEpisode
 from src.models.pipeline import DownloadEpisode, MergeResult
 from src.utils.regex import YOUTUBE_VIDEO_REGEX
-from src.web.rss import download_direct, get_rss_channel, podcast_to_rss
+from src.web.rss import download_direct, podcast_to_rss
 from src.web.sponsorblock import fetch_sponsor_segments
 from src.youtube.downloader import download_video
 
@@ -110,19 +110,24 @@ def update_rss(config: PodcastConfig) -> None:
 
 
 def _build_channel(config: PodcastConfig) -> RssChannel:
+    from src.adapters import get_episode_source_adapter
+
+    channel = RssChannel(
+        title=config.name, author="", subtitle="", url="", description="", image=""
+    )
     for source in config.references:
         try:
-            return get_rss_channel(source.url)
+            adapter = get_episode_source_adapter(source)
+            _fill_channel(channel, adapter.fetch_channel(source))
         except Exception:
             pass
-    return RssChannel(
-        title=config.name,
-        author="",
-        subtitle="",
-        url="",
-        description="",
-        image="",
-    )
+    return channel
+
+
+def _fill_channel(base: RssChannel, incoming: RssChannel) -> None:
+    for field in ("title", "author", "subtitle", "description", "url", "image"):
+        if not getattr(base, field):
+            setattr(base, field, getattr(incoming, field))
 
 
 def _match_to_s3(
