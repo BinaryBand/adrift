@@ -22,9 +22,7 @@ def main() -> None:
     )
     from src.youtube.downloader import BotDetectionError
 
-    parser = argparse.ArgumentParser(
-        description="Download episodes, remove ads, and upload to S3."
-    )
+    parser = argparse.ArgumentParser(description="Download episodes, remove ads, and upload to S3.")
     parser.add_argument("--include", nargs="*", default=DF_TARGETS, help="Config files to include")
     parser.add_argument(
         "--skip-schedule-filter",
@@ -102,9 +100,7 @@ def main() -> None:
             bar.set_postfix_str("done")
 
     except BotDetectionError:
-        sys.stderr.write(
-            f"\nBot detection triggered — cooling down for {args.bot_cooldown}s\n"
-        )
+        sys.stderr.write(f"\nBot detection triggered — cooling down for {args.bot_cooldown}s\n")
         time.sleep(args.bot_cooldown)
         sys.exit(1)
 

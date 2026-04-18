@@ -19,9 +19,7 @@ def re_compile(regex: str) -> re.Pattern[str]:
 
 LINK_REGEX = re_compile(r"https?://\S+")
 
-YOUTUBE_VIDEO_REGEX = re_compile(
-    r"(https?://)?(www\.)?(youtube\.com|youtu\.be)/watch\?v=([\w-]+)"
-)
+YOUTUBE_VIDEO_REGEX = re_compile(r"(https?://)?(www\.)?(youtube\.com|youtu\.be)/watch\?v=([\w-]+)")
 
 YT_CHANNEL = re_compile(r"^https?://(www\.)?youtube\.com/@([A-Za-z0-9_\-]+)(/videos)?$")
 
