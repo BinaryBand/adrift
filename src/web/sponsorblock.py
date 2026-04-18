@@ -4,13 +4,13 @@ SponsorBlock API integration for fetching and removing sponsored segments.
 
 import sys
 from pathlib import Path
-from typing import Any, Literal, cast
+from typing import Any, cast
 
 import requests
-from pydantic import BaseModel, ConfigDict, Field
 
 sys.path.insert(0, Path(__file__).parent.parent.as_posix())
 from src.files.audio import cut_segments
+from src.models.sponsorblock import SponsorSegment
 from src.utils.cache import S3Cache
 from src.utils.crypto import sha256
 from src.utils.progress import Callback
@@ -19,27 +19,6 @@ from src.utils.progress import Callback
 _CACHE = S3Cache(".cache/sponsorblock", "sponsorblock/segments")
 _CACHE_EXPIRY_DAYS = {False: 7, True: 35}  # Days to cache (no segments vs has segments)
 _API_TIMEOUT = 10
-
-# Type aliases
-ActionType = Literal["skip", "mute", "blackout"]
-Category = Literal[
-    "sponsor", "selfpromo", "interaction", "intro", "outro", "preview", "hook", "filler"
-]
-
-
-class SponsorSegment(BaseModel):
-    """https://wiki.sponsor.ajay.app/w/API_Docs#GET_/api/skipSegments"""
-
-    segment: tuple[float, float]
-    uuid: str = Field(alias="UUID")
-    category: Category
-    video_duration: float = Field(alias="videoDuration")
-    action_type: ActionType = Field(alias="actionType")
-    locked: int
-    votes: int
-    description: str = ""
-
-    model_config = ConfigDict(populate_by_name=True)
 
 
 def _fetch_sponsor_segments(video_id: str) -> list[SponsorSegment]:

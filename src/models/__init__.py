@@ -3,20 +3,29 @@
 from .metadata import (
     DEVICE,
     PROJECT,
+    CacheMetadata,
+    MediaMetadata,
     RssChannel,
     RssEpisode,
+    S3Metadata,
     YtDlpParams,
 )
 from .output import EpisodeData, PodcastFeed
-from .pipeline import MergeResult
+from .pipeline import DownloadEpisode, MergeResult
+from .sponsorblock import SponsorSegment
 
 __all__ = [
     "DEVICE",
     "PROJECT",
+    "S3Metadata",
+    "CacheMetadata",
+    "MediaMetadata",
     "YtDlpParams",
     "RssChannel",
     "RssEpisode",
     "EpisodeData",
     "PodcastFeed",
     "MergeResult",
+    "DownloadEpisode",
+    "SponsorSegment",
 ]

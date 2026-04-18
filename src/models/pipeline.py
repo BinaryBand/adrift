@@ -5,6 +5,7 @@ from pydantic import BaseModel
 from src.app_common import PodcastConfig, SourceFilter
 from src.models.metadata import RssEpisode
 from src.models.output import EpisodeData
+from src.models.sponsorblock import SponsorSegment
 
 
 class SourceTrace(BaseModel):
@@ -18,11 +19,22 @@ class SourceTrace(BaseModel):
     has_filters: bool
 
 
+class DownloadEpisode(BaseModel):
+    """A download-side episode paired with its pre-fetched sponsor segment data."""
+
+    episode: RssEpisode
+    sponsor_segments: list[SponsorSegment] = []
+    video_id: str | None = None
+
+
 class MergeResult(BaseModel):
     """Complete pipeline trace for one podcast series.
 
     Captures every stage of the resolution path:
       config → (references, downloads) → pairs → episodes
+
+    `download_episodes` is empty until the download pipeline enriches it with
+    sponsor segments fetched per-episode.
     """
 
     config: PodcastConfig
@@ -31,3 +43,4 @@ class MergeResult(BaseModel):
     source_traces: list[SourceTrace] = []
     pairs: list[tuple[int, int]]
     episodes: list[EpisodeData]
+    download_episodes: list[DownloadEpisode] = []
