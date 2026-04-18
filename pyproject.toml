@@ -27,6 +27,7 @@ unidecode = "*"
 cachetools = "*"
 diskcache = "*"
 yarl = "*"
+python-dateutil = "*"
 
 [tool.poetry.group.dev.dependencies]
 # Type stubs
