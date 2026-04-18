@@ -186,6 +186,12 @@ def main() -> None:
         help="Skip generating Mermaid sankey diagrams (enabled by default).",
     )
     parser.add_argument(
+        "--skip-report",
+        action="store_true",
+        default=False,
+        help="Skip generating the per-podcast markdown report (enabled by default).",
+    )
+    parser.add_argument(
         "--sankey-format",
         choices=["sankey", "flowchart"],
         default="sankey",
@@ -245,6 +251,17 @@ def main() -> None:
                     )
                 except Exception as exc:  # pragma: no cover - non-fatal optional feature
                     sys.stderr.write(f"MERMAID generation failed for {config.name}: {exc}\n")
+            if not args.skip_report:
+                try:
+                    from src.adapters.report_sections import DEFAULT_SECTIONS
+                    from src.ports.report import compose
+
+                    report_md = compose(result, DEFAULT_SECTIONS)
+                    report_path = output_root / result.config.slug / "feeds" / "report.md"
+                    report_path.parent.mkdir(parents=True, exist_ok=True)
+                    report_path.write_text(report_md, encoding="utf-8")
+                except Exception as exc:  # pragma: no cover - non-fatal optional feature
+                    sys.stderr.write(f"REPORT generation failed for {config.name}: {exc}\n")
         if args.output_file:
             _write_report_file(args.output_file, output)
         if args.timings:

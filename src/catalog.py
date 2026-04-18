@@ -19,9 +19,7 @@ from src.models.pipeline import MergeResult, SourceTrace
 from src.utils.progress import Callback
 from src.utils.text import is_youtube_channel, normalize_text
 from src.web import rss as _rss
-from src.web.rss import (
-    RssEpisode,
-)
+from src.web.rss import RssEpisode
 from src.youtube import metadata as _yt_meta
 
 

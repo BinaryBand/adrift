@@ -51,7 +51,7 @@ def _group_counts(result: MergeResult) -> dict[str, int]:
     }
 
 
-def _build_sankey_lines(result: MergeResult) -> list[str]:
+def build_sankey_lines(result: MergeResult) -> list[str]:
     counts = _group_counts(result)
     title = _sanitize_sankey_node(result.config.name, max_len=80)
     lines = ["sankey-beta"]
@@ -214,7 +214,7 @@ def _build_markdown(result: MergeResult, format_name: str) -> str:
         "```mermaid",
     ]
     if format_name == "sankey":
-        lines.extend(_build_sankey_lines(result))
+        lines.extend(build_sankey_lines(result))
     else:
         lines.extend(_build_flowchart_lines(result))
     lines.append("```")
@@ -242,4 +242,4 @@ class FileMermaidAdapter:
         return [out_path]
 
 
-__all__ = ["FileMermaidAdapter"]
+__all__ = ["FileMermaidAdapter", "build_sankey_lines"]
