@@ -113,12 +113,9 @@ def _candidate_rows(result: MergeResult) -> list[list[str]]:
 
 def _greedy_match_section(result: MergeResult) -> str:
     greedy_rows = _greedy_match_rows(result)
-    return (
-        f"# Greedy Matches: {result.config.name}\n\n"
-        + md_table(
-            ["Reference Episode", "Greedy Candidate", "Score", "Outcome"],
-            greedy_rows,
-        )
+    return f"# Greedy Matches: {result.config.name}\n\n" + md_table(
+        ["Reference Episode", "Greedy Candidate", "Score", "Outcome"],
+        greedy_rows,
     )
 
 
@@ -148,9 +145,8 @@ def render_matches(result: MergeResult) -> str:
         return ""
 
     rows = _match_rows(result)
-    return (
-        f"# Matches: {result.config.name}\n\n"
-        + md_table(["Reference Episode", "Status", "Download Match", "Score"], rows)
+    return f"# Matches: {result.config.name}\n\n" + md_table(
+        ["Reference Episode", "Status", "Download Match", "Score"], rows
     )
 
 

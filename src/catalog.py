@@ -590,12 +590,10 @@ def _match_trace_context(
     return _MatchTraceContext(
         scores=_build_alignment_scores(references, downloads, show),
         matched_by_reference={
-            reference_index: download_index
-            for reference_index, download_index in pairs
+            reference_index: download_index for reference_index, download_index in pairs
         },
         matched_by_download={
-            download_index: reference_index
-            for reference_index, download_index in pairs
+            download_index: reference_index for reference_index, download_index in pairs
         },
         pair_set=set(pairs),
     )
