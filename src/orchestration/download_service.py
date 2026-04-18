@@ -1,0 +1,177 @@
+"""Three-stage download pipeline: enrich → download/upload → update RSS."""
+
+import tempfile
+from pathlib import Path
+
+from src.app_common import PodcastConfig
+from src.catalog import match, process_feeds
+from src.files.audio import convert_to_opus, cut_segments, get_duration
+from src.files.s3 import exists, upload_file
+from src.models import MediaMetadata, RssChannel, RssEpisode
+from src.models.pipeline import DownloadEpisode, MergeResult
+from src.utils.regex import YOUTUBE_VIDEO_REGEX
+from src.web.rss import download_direct, get_rss_channel, podcast_to_rss
+from src.web.sponsorblock import fetch_sponsor_segments
+from src.youtube.downloader import download_video
+
+# ---------------------------------------------------------------------------
+# Stage 1 — enrich MergeResult with sponsor segments
+# ---------------------------------------------------------------------------
+
+
+def enrich_with_sponsors(result: MergeResult) -> list[DownloadEpisode]:
+    """Pair each download-side episode with its sponsor segments."""
+    episodes: list[DownloadEpisode] = []
+    for _ref_idx, dl_idx in result.pairs:
+        ep = result.downloads[dl_idx]
+        video_id = _extract_video_id(ep.content)
+        segments = fetch_sponsor_segments(video_id) if video_id else []
+        episodes.append(DownloadEpisode(episode=ep, sponsor_segments=segments, video_id=video_id))
+    result.download_episodes = episodes
+    return episodes
+
+
+def _extract_video_id(content: str) -> str | None:
+    m = YOUTUBE_VIDEO_REGEX.search(content)
+    return m.group(4) if m else None
+
+
+# ---------------------------------------------------------------------------
+# Stage 2 — download, cut ads, convert, upload
+# ---------------------------------------------------------------------------
+
+
+def download_and_upload(ep: DownloadEpisode, config: PodcastConfig) -> bool:
+    """Download one episode, remove ads, convert to Opus, upload to S3.
+
+    Returns True if newly uploaded, False if already present on S3.
+    """
+    bucket, prefix = _s3_prefix(config)
+    key_prefix = f"{prefix}/{_episode_slug(config, ep)}"
+    if exists(bucket, key_prefix):
+        return False
+    with tempfile.TemporaryDirectory() as tmp:
+        return _process_in_tmpdir(ep, bucket, key_prefix, Path(tmp))
+
+
+def _process_in_tmpdir(ep: DownloadEpisode, bucket: str, key_prefix: str, tmp: Path) -> bool:
+    audio = _download_audio(ep, tmp)
+    if audio is None:
+        return False
+    if ep.sponsor_segments:
+        cut_segments(audio, ep.sponsor_segments)
+    opus = convert_to_opus(audio)
+    duration = get_duration(opus)
+    key = f"{key_prefix}.opus"
+    metadata = _build_metadata(ep, duration, sponsors_removed=bool(ep.sponsor_segments))
+    upload_file(bucket, key, opus, metadata)
+    return True
+
+
+def _episode_slug(config: PodcastConfig, ep: DownloadEpisode) -> str:
+    from src.app_runner import normalize_title
+
+    return normalize_title(config.name, ep.episode.title)
+
+
+def _download_audio(ep: DownloadEpisode, dest: Path) -> Path | None:
+    if ep.video_id:
+        return download_video(ep.episode.content, dest)
+    return download_direct(ep.episode.content, dest)
+
+
+def _build_metadata(
+    ep: DownloadEpisode, duration: float | None, *, sponsors_removed: bool
+) -> MediaMetadata:
+    from datetime import datetime, timezone
+
+    pub_date = ep.episode.pub_date or datetime.now(tz=timezone.utc)
+    return MediaMetadata(
+        duration=duration or 0.0,
+        source=ep.episode.content,
+        upload_date=pub_date,
+        sponsors_removed=sponsors_removed,
+    )
+
+
+# ---------------------------------------------------------------------------
+# Stage 3 — regenerate and upload RSS feed
+# ---------------------------------------------------------------------------
+
+
+def update_rss(config: PodcastConfig) -> None:
+    """Rebuild and upload the podcast RSS feed from matched S3 audio files."""
+    bucket, prefix = _s3_prefix(config)
+    channel = _build_channel(config)
+    ref_episodes = process_feeds(config)
+    matched = _match_to_s3(config, ref_episodes, bucket, prefix)
+    rss_xml = podcast_to_rss(channel, matched)
+    _upload_rss(bucket, prefix, rss_xml)
+
+
+def _build_channel(config: PodcastConfig) -> RssChannel:
+    for source in config.references:
+        try:
+            return get_rss_channel(source.url)
+        except Exception:
+            pass
+    return RssChannel(
+        title=config.name,
+        author="",
+        subtitle="",
+        url="",
+        description="",
+        image="",
+    )
+
+
+def _match_to_s3(
+    config: PodcastConfig, episodes: list[RssEpisode], bucket: str, prefix: str
+) -> list[RssEpisode]:
+    from src.app_runner import get_s3_files
+
+    files = get_s3_files(bucket, prefix)
+    if not files:
+        return []
+
+    titles = [ep.title for ep in episodes]
+    pairs = match(files, titles, config.name)
+    return _apply_pairs(files, episodes, pairs)
+
+
+def _apply_pairs(
+    files: list[str], episodes: list[RssEpisode], pairs: list[tuple[int, int]]
+) -> list[RssEpisode]:
+    matched: list[RssEpisode] = []
+    for f_idx, e_idx in pairs:
+        src = episodes[e_idx]
+        ep = RssEpisode(
+            id=src.id,
+            title=src.title,
+            author=src.author,
+            content=files[f_idx],
+            description=src.description,
+            duration=src.duration,
+            pub_date=src.pub_date,
+            image=src.image,
+        )
+        matched.append(ep)
+    return matched
+
+
+def _upload_rss(bucket: str, prefix: str, rss_xml: str) -> None:
+    import tempfile as _tempfile
+
+    with _tempfile.NamedTemporaryFile(suffix=".rss", delete=False) as f:
+        f.write(rss_xml.encode())
+        tmp_path = Path(f.name)
+    try:
+        upload_file(bucket, f"{prefix}/feed.rss", tmp_path)
+    finally:
+        tmp_path.unlink(missing_ok=True)
+
+
+def _s3_prefix(config: PodcastConfig) -> tuple[str, str]:
+    """Parse config.path '/media/podcasts/slug' → ('media', 'podcasts/slug')."""
+    parts = Path(config.path).parts
+    return parts[1], "/".join(parts[2:])

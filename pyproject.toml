@@ -8,6 +8,7 @@ packages = [{ include = "src" }, { include = "runbook" }]
 
 [tool.poetry.scripts]
 adrift-merge = "runbook.merge:main"
+adrift-download = "runbook.download:main"
 adrift-validate-configs = "runbook.quality.validate_configs:main"
 adrift-build-diagram = "runbook.analysis.build_diagram:main"
 adrift-build-hotspots = "runbook.analysis.build_hotspots:main"
@@ -28,6 +29,7 @@ cachetools = "*"
 diskcache = "*"
 yarl = "*"
 python-dateutil = "*"
+boto3 = "*"
 
 [tool.poetry.group.dev.dependencies]
 # Type stubs
@@ -35,6 +37,7 @@ types-tqdm = "*"
 types-cachetools = "*"
 types-yt-dlp = "*"
 types-python-dateutil = "*"
+boto3-stubs = { extras = ["s3"], version = "*" }
 # Linting & formatting
 ruff = "*"
 mypy = "*"

@@ -5,7 +5,6 @@ from pydantic import BaseModel
 from src.app_common import PodcastConfig, SourceFilter
 from src.models.metadata import RssEpisode
 from src.models.output import EpisodeData
-from src.models.sponsorblock import SponsorSegment
 
 
 class SourceTrace(BaseModel):
@@ -23,7 +22,7 @@ class DownloadEpisode(BaseModel):
     """A download-side episode paired with its pre-fetched sponsor segment data."""
 
     episode: RssEpisode
-    sponsor_segments: list[SponsorSegment] = []
+    sponsor_segments: list[tuple[float, float]] = []
     video_id: str | None = None
 
 
