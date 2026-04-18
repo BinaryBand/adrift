@@ -86,9 +86,14 @@ def main() -> None:
                 bar.set_postfix_str("download")
                 budget = max(0, args.max_downloads - downloaded_total)
                 for ep in episodes[:budget]:
-                    newly_uploaded = download_and_upload(ep, config)
-                    if newly_uploaded:
-                        downloaded_total += 1
+                    try:
+                        newly_uploaded = download_and_upload(ep, config)
+                        if newly_uploaded:
+                            downloaded_total += 1
+                    except BotDetectionError:
+                        raise
+                    except Exception as exc:
+                        sys.stderr.write(f"ERROR: {config.name} — {ep.episode.title}: {exc}\n")
 
             if not args.skip_update:
                 bar.set_postfix_str("rss")

@@ -5,7 +5,7 @@ from pathlib import Path
 
 from src.app_common import PodcastConfig
 from src.catalog import match, process_feeds
-from src.files.audio import convert_to_opus, cut_segments, get_duration
+from src.files.audio import convert_to_opus, cut_segments, get_duration, is_audio
 from src.files.s3 import exists, upload_file
 from src.models import MediaMetadata, RssChannel, RssEpisode
 from src.models.pipeline import DownloadEpisode, MergeResult
@@ -130,13 +130,18 @@ def _match_to_s3(
 ) -> list[RssEpisode]:
     from src.app_runner import get_s3_files
 
-    files = get_s3_files(bucket, prefix)
+    files = _audio_files(get_s3_files(bucket, prefix))
     if not files:
         return []
 
+    file_names = [Path(f).stem for f in files]
     titles = [ep.title for ep in episodes]
-    pairs = match(files, titles, config.name)
+    pairs = match(file_names, titles, config.name)
     return _apply_pairs(files, episodes, pairs)
+
+
+def _audio_files(files: list[str]) -> list[str]:
+    return [f for f in files if is_audio(f)]
 
 
 def _apply_pairs(
