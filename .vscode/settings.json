@@ -3,13 +3,20 @@
   "files.exclude": {
     "**/.venv": true,
     "**/__pycache__": true,
-    // "**/.cache": true,
-    // "**/*.cache": true,
+    "**/.cache": true,
+    "**/*.cache": true,
     "**/*_cache": true,
     "**/.claude": true,
     "**/.claude/**": true
   },
   "editor.formatOnSave": true,
+  "editor.codeActionsOnSave": {
+    "source.fixAll.ruff": "explicit",
+    "source.organizeImports.ruff": "explicit"
+  },
+  "[python]": {
+    "editor.defaultFormatter": "charliermarsh.ruff"
+  },
   "emeraldwalk.runonsave": {
     "commands": [
       {

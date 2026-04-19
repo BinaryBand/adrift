@@ -11,33 +11,22 @@ DEFAULT_BOT_COOLDOWN = 300
 
 
 def _run(
-    include: Annotated[
-        list[str],
-        typer.Option(help="Config files to include"),
-    ] = DF_TARGETS,
+    include: Annotated[list[str], typer.Option(help="Config files to include")] = DF_TARGETS,
     skip_schedule_filter: Annotated[
-        bool,
-        typer.Option(help="Include configs even when their schedule does not match today."),
+        bool, typer.Option(help="Include configs even when their schedule does not match today.")
     ] = False,
     skip_download: Annotated[
-        bool,
-        typer.Option(help="Skip download/upload stage (only enrich and update RSS)."),
+        bool, typer.Option(help="Skip download/upload stage (only enrich and update RSS).")
     ] = False,
-    skip_update: Annotated[
-        bool,
-        typer.Option(help="Skip RSS feed update stage."),
-    ] = False,
+    skip_update: Annotated[bool, typer.Option(help="Skip RSS feed update stage.")] = False,
     max_downloads: Annotated[
-        int,
-        typer.Option(help="Maximum number of episodes to download per run."),
+        int, typer.Option(help="Maximum number of episodes to download per run.")
     ] = DEFAULT_MAX_DOWNLOADS,
     bot_cooldown: Annotated[
-        int,
-        typer.Option(help="Seconds to wait before exiting after bot detection."),
+        int, typer.Option(help="Seconds to wait before exiting after bot detection.")
     ] = DEFAULT_BOT_COOLDOWN,
     refresh_sources: Annotated[
-        bool,
-        typer.Option(help="Bypass fresh source caches and refetch source data."),
+        bool, typer.Option(help="Bypass fresh source caches and refetch source data.")
     ] = False,
 ) -> None:
     dotenv.load_dotenv()
