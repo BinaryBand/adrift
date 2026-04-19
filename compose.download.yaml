@@ -1,0 +1,21 @@
+services:
+  adrift-download:
+    build:
+      context: .
+      dockerfile: Dockerfile.download
+    image: adrift-download:latest
+    working_dir: /app
+    env_file:
+      - .env
+    environment:
+      ADRIFT_SECRETS_PROVIDER: ${ADRIFT_SECRETS_PROVIDER:-env}
+      LOCAL_S3_ENDPOINT: ${LOCAL_S3_ENDPOINT:-http://host.docker.internal:9000}
+    extra_hosts:
+      - host.docker.internal:host-gateway
+    volumes:
+      - ./config:/app/config:ro
+      - ./downloads:/app/downloads
+      - ./.cache:/app/.cache
+    command:
+      - --include
+      - config/*.toml

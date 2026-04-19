@@ -110,6 +110,30 @@ When `--output-dir` is set, the merge run writes:
 
 Note: the per-feed `references.json` and `downloads.json` files are no longer written by default; their contents are included in the `MergeResult` stored in `feeds/combined.json`.
 
+## Containerized Download Run
+
+The download pipeline can run in Docker via `compose.download.yaml` and `Dockerfile.download`.
+
+Prerequisites:
+
+- Docker with `docker compose`
+- A populated `.env` file for S3 and other runtime settings
+- Optional: a `cookies.txt` file if you need authenticated YouTube access from inside the container
+
+Build and run:
+
+```bash
+docker compose -f compose.download.yaml build
+docker compose -f compose.download.yaml run --rm adrift-download --skip-download
+```
+
+Notes:
+
+- The container persists `downloads/` and `.cache/` back to the host via bind mounts.
+- `config/` is mounted read-only so local config edits are picked up without rebuilding.
+- `LOCAL_S3_ENDPOINT` defaults to `http://host.docker.internal:9000` so a host-local MinIO/S3-compatible service remains reachable from the container.
+- Browser-cookie discovery from Firefox will not work inside the container unless that browser profile is also mounted. For YouTube auth, prefer mounting a cookie file and setting `YT_COOKIES_FILE=/app/cookies.txt`.
+
 ## Configuration
 
 Podcast series are defined in TOML files under `config/`:
