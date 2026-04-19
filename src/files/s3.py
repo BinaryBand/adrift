@@ -2,7 +2,6 @@
 
 import mimetypes
 import os
-import sys
 import time
 from dataclasses import dataclass
 from functools import wraps
@@ -19,15 +18,11 @@ from mypy_boto3_s3 import S3Client
 from mypy_boto3_s3.type_defs import CopySourceTypeDef
 from pydantic import BaseModel, ConfigDict
 
-sys.path.insert(0, Path(__file__).parent.parent.as_posix())
-from src.adapters.docker_secrets import DockerSecretProvider
-from src.adapters.env_secrets import EnvironmentSecretProvider
+from src.adapters.secrets.docker_secrets import DockerSecretProvider
+from src.adapters.secrets.env_secrets import EnvironmentSecretProvider
 from src.models import CacheMetadata, MediaMetadata, S3Metadata
 from src.ports.secrets import SecretProviderPort, require_secrets
 from src.utils.progress import Callback
-
-sys.path.insert(0, Path(__file__).parent.parent.as_posix())
-sys.path.insert(0, Path(__file__).parent.parent.as_posix())
 
 # Select secret provider based on ADRIFT_SECRETS_PROVIDER env var
 _provider_name = os.getenv("ADRIFT_SECRETS_PROVIDER", "env").lower()

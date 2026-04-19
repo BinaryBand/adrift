@@ -155,8 +155,3 @@ def get_youtube_episodes(
         refresh=fetch_opts.refresh,
     )
     return _post_process_episodes(episodes, url, author, fetch_opts)
-
-
-def get_video_info(id: str) -> ytdlp.VideoInfo | None:
-    """Fetch video info (backward compatibility wrapper)."""
-    return ytdlp.get_video_info(id)

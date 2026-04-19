@@ -1,13 +1,11 @@
 # cspell: words creepcast darknet gladwell smosh
 
-import sys
 from pathlib import Path
 from typing import Any
 from urllib.parse import urljoin
 
 from cachetools import LRUCache, cached
 
-sys.path.insert(0, Path(__file__).parent.parent.as_posix())
 from src.files.s3 import S3_ENDPOINT, get_file_list
 from src.utils.regex import re_compile
 from src.utils.text import create_slug, remove_control_chars

@@ -1,4 +1,4 @@
-from src.adapters.docker_secrets import DockerSecretProvider
+from src.adapters.secrets.docker_secrets import DockerSecretProvider
 
 
 def test_docker_secret_provider_reads_file(tmp_path):

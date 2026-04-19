@@ -2,12 +2,10 @@ import json
 import os
 import shutil
 import subprocess
-import sys
 import tempfile
 from pathlib import Path
 from typing import Any, cast
 
-sys.path.insert(0, Path(__file__).parent.parent.parent.as_posix())
 from src.utils.progress import Callback
 
 Segment = tuple[float, float]

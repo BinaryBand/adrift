@@ -21,11 +21,11 @@ def get_episode_source_adapter(source: FeedSource) -> EpisodeSourcePort:
         raise ValueError("FeedSource URL is required to determine adapter")
 
     if is_youtube_channel(url):
-        from src.adapters.episode_source_youtube import YouTubeEpisodeSourceAdapter
+        from src.adapters.episode_sources.episode_source_youtube import YouTubeEpisodeSourceAdapter
 
         return YouTubeEpisodeSourceAdapter()
     else:
-        from src.adapters.episode_source_rss import RssEpisodeSourceAdapter
+        from src.adapters.episode_sources.episode_source_rss import RssEpisodeSourceAdapter
 
         return RssEpisodeSourceAdapter()
 

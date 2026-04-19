@@ -2,13 +2,11 @@
 SponsorBlock API integration for fetching and removing sponsored segments.
 """
 
-import sys
 from pathlib import Path
 from typing import Any, cast
 
 import requests
 
-sys.path.insert(0, Path(__file__).parent.parent.as_posix())
 from src.files.audio import cut_segments
 from src.models.sponsorblock import SponsorSegment
 from src.utils.cache import S3Cache
