@@ -31,6 +31,7 @@ yarl = "*"
 python-dateutil = "*"
 boto3 = "*"
 rich = "*"
+typer = "*"
 
 [tool.poetry.group.dev.dependencies]
 # Type stubs

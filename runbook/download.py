@@ -1,15 +1,45 @@
-import argparse
 import sys
 import time
+from typing import Annotated
 
 import dotenv
+import typer
 
 DF_TARGETS = ["config/*.toml"]
 DEFAULT_MAX_DOWNLOADS = 10
 DEFAULT_BOT_COOLDOWN = 300
 
 
-def main() -> None:
+def _run(
+    include: Annotated[
+        list[str],
+        typer.Option(help="Config files to include"),
+    ] = DF_TARGETS,
+    skip_schedule_filter: Annotated[
+        bool,
+        typer.Option(help="Include configs even when their schedule does not match today."),
+    ] = False,
+    skip_download: Annotated[
+        bool,
+        typer.Option(help="Skip download/upload stage (only enrich and update RSS)."),
+    ] = False,
+    skip_update: Annotated[
+        bool,
+        typer.Option(help="Skip RSS feed update stage."),
+    ] = False,
+    max_downloads: Annotated[
+        int,
+        typer.Option(help="Maximum number of episodes to download per run."),
+    ] = DEFAULT_MAX_DOWNLOADS,
+    bot_cooldown: Annotated[
+        int,
+        typer.Option(help="Seconds to wait before exiting after bot detection."),
+    ] = DEFAULT_BOT_COOLDOWN,
+    refresh_sources: Annotated[
+        bool,
+        typer.Option(help="Bypass fresh source caches and refetch source data."),
+    ] = False,
+) -> None:
     dotenv.load_dotenv()
 
     from src.app_common import load_podcasts_config
@@ -22,49 +52,9 @@ def main() -> None:
     from src.utils.run_ui import build_merge_callbacks, create_run_ui
     from src.youtube.downloader import BotDetectionError
 
-    parser = argparse.ArgumentParser(description="Download episodes, remove ads, and upload to S3.")
-    parser.add_argument("--include", nargs="*", default=DF_TARGETS, help="Config files to include")
-    parser.add_argument(
-        "--skip-schedule-filter",
-        action="store_true",
-        default=False,
-        help="Include configs even when their schedule does not match today.",
-    )
-    parser.add_argument(
-        "--skip-download",
-        action="store_true",
-        default=False,
-        help="Skip download/upload stage (only enrich and update RSS).",
-    )
-    parser.add_argument(
-        "--skip-update",
-        action="store_true",
-        default=False,
-        help="Skip RSS feed update stage.",
-    )
-    parser.add_argument(
-        "--max-downloads",
-        type=int,
-        default=DEFAULT_MAX_DOWNLOADS,
-        help="Maximum number of episodes to download per run.",
-    )
-    parser.add_argument(
-        "--bot-cooldown",
-        type=int,
-        default=DEFAULT_BOT_COOLDOWN,
-        help="Seconds to wait before exiting after bot detection.",
-    )
-    parser.add_argument(
-        "--refresh-sources",
-        action="store_true",
-        default=False,
-        help="Bypass fresh source caches and refetch source data.",
-    )
-    args = parser.parse_args()
-
     configs = load_podcasts_config(
-        include=args.include,
-        skip_schedule_filter=args.skip_schedule_filter,
+        include=include,
+        skip_schedule_filter=skip_schedule_filter,
     )
 
     downloaded_total = 0
@@ -78,7 +68,7 @@ def main() -> None:
                 ui.set_stage("merge")
                 result = merge_config(
                     config,
-                    refresh_sources=args.refresh_sources,
+                    refresh_sources=refresh_sources,
                     on_stage=on_stage,
                     callback=callback,
                 )
@@ -86,9 +76,9 @@ def main() -> None:
                 ui.set_stage("enrich")
                 episodes = enrich_with_sponsors(result)
 
-                if not args.skip_download:
+                if not skip_download:
                     ui.set_stage("download")
-                    budget = max(0, args.max_downloads - downloaded_total)
+                    budget = max(0, max_downloads - downloaded_total)
                     for ep in episodes[:budget]:
                         try:
                             newly_uploaded = download_and_upload(ep, config)
@@ -99,7 +89,7 @@ def main() -> None:
                         except Exception as exc:
                             ui.emit("error", f"{config.name} — {ep.episode.title}: {exc}")
 
-                if not args.skip_update:
+                if not skip_update:
                     ui.set_stage("rss")
                     update_rss(config)
 
@@ -107,11 +97,15 @@ def main() -> None:
                 ui.advance()
 
     except BotDetectionError:
-        sys.stderr.write(f"\nBot detection triggered — cooling down for {args.bot_cooldown}s\n")
-        time.sleep(args.bot_cooldown)
+        sys.stderr.write(f"\nBot detection triggered — cooling down for {bot_cooldown}s\n")
+        time.sleep(bot_cooldown)
         sys.exit(1)
 
     sys.stderr.write(f"\nDownloaded {downloaded_total} new episode(s).\n")
+
+
+def main() -> None:
+    typer.run(_run)
 
 
 if __name__ == "__main__":
