@@ -216,6 +216,24 @@ def _retry_reason(error: Exception) -> str:
     err_str = str(error)
     if "Sign in to confirm your age" in err_str:
         return "age-restricted; retrying with authentication"
+    if "Premieres in " in err_str:
+        return "premiere not yet available"
+    if "This live event will begin in" in err_str:
+        return "live event not yet started"
+    if "private video" in err_str.lower() or "This video is private" in err_str:
+        return "private video"
+    if "members-only" in err_str.lower() or "channel members" in err_str.lower():
+        return "members-only video"
+    if (
+        "not available in your country" in err_str.lower()
+        or "available in your country" in err_str.lower()
+        or "geo" in err_str.lower() and "block" in err_str.lower()
+    ):
+        return "geo-restricted video"
+    if "This video has been removed" in err_str or "This video is no longer available" in err_str:
+        return "removed video"
+    if "Video unavailable" in err_str:
+        return "video unavailable"
     if "Requested format is not available" in err_str:
         return "requested format unavailable; trying fallback"
     if "This video is only available for" in err_str:

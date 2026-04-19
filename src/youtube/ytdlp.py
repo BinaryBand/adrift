@@ -131,10 +131,39 @@ def _video_info_retry_reason(error: Exception) -> str:
     err_str = str(error)
     if "Sign in to confirm your age" in err_str:
         return "age-restricted; retrying with authentication"
+    if "Premieres in " in err_str:
+        return "premiere not yet available"
+    if "This live event will begin in" in err_str:
+        return "live event not yet started"
+    if "private video" in err_str.lower() or "This video is private" in err_str:
+        return "private video"
+    if "members-only" in err_str.lower() or "channel members" in err_str.lower():
+        return "members-only video"
+    if (
+        "not available in your country" in err_str.lower()
+        or "available in your country" in err_str.lower()
+        or "geo" in err_str.lower() and "block" in err_str.lower()
+    ):
+        return "geo-restricted video"
+    if "This video has been removed" in err_str or "This video is no longer available" in err_str:
+        return "removed video"
+    if "Video unavailable" in err_str:
+        return "video unavailable"
     if "Requested format is not available" in err_str:
         return "requested format unavailable; trying authenticated probe"
     first_line = err_str.splitlines()[0].strip()
     return first_line[:160]
+
+
+def _video_info_attempt_failure_message(
+    video_id: str,
+    attempt_label: str,
+    reason: str,
+    has_more_attempts: bool,
+) -> str:
+    if has_more_attempts:
+        return f"Retrying video info probe for {video_id} after {attempt_label} failed: {reason}"
+    return f"Video info probe failed for {video_id} after {attempt_label}: {reason}"
 
 
 def _fetch_video_info_attempt(
@@ -145,15 +174,21 @@ def _fetch_video_info_attempt(
     build_opts: Callable[[], YtDlpParams],
 ) -> dict[str, Any] | None:
     attempt_label = _video_info_attempt_label(attempt_index, label, attempt_count)
+    has_more_attempts = attempt_index < attempt_count - 1
     print(f"Starting video info probe {attempt_label} for {video_id}")
     try:
         info = _extract_info(_video_info_url(video_id), build_opts())
         print(f"Completed video info probe {attempt_label} for {video_id}")
         return info
     except Exception as e:
+        reason = _video_info_retry_reason(e)
         print(
-            f"Retrying video info probe for {video_id} after {attempt_label} failed: "
-            f"{_video_info_retry_reason(e)}"
+            _video_info_attempt_failure_message(
+                video_id,
+                attempt_label,
+                reason,
+                has_more_attempts,
+            )
         )
         return None
 
