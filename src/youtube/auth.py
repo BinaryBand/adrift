@@ -6,6 +6,20 @@ from typing import Any
 from src.models import YtDlpParams
 
 
+class _QuietYtDlpLogger:
+    def debug(self, msg: str) -> None:
+        return
+
+    def warning(self, msg: str) -> None:
+        return
+
+    def error(self, msg: str) -> None:
+        return
+
+
+_QUIET_YTDLP_LOGGER = _QuietYtDlpLogger()
+
+
 def _node_path() -> str | None:
     return shutil.which("node")
 
@@ -16,6 +30,7 @@ def get_ydl_opts() -> YtDlpParams:
         {
             "quiet": True,
             "no_warnings": True,
+            "logger": _QUIET_YTDLP_LOGGER,
             "extract_flat": False,
             "socket_timeout": 30,
             "sleep_interval": 3,

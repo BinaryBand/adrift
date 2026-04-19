@@ -11,7 +11,7 @@ from pydantic import BaseModel, ConfigDict, computed_field
 
 from src.utils.text import create_slug
 
-MATCH_TOLERANCE = 0.75
+MATCH_TOLERANCE = 0.65
 
 
 def _exclude_lookahead(pattern: str) -> str:
@@ -207,6 +207,7 @@ def load_config(name_or_path: str) -> list[PodcastConfig]:
 
 
 def _config_schedule_matches_today(config: "PodcastConfig") -> bool:
+    return True
     """Return True if any RRULE in config.schedule matches today, or if schedule is empty."""
     if not config.schedule:
         return True

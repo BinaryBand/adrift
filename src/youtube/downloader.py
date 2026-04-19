@@ -67,6 +67,16 @@ class _DownloadAttemptConfig:
     format_selector: str | None = None
 
 
+def _attempt_label(attempt_index: int, attempt: _DownloadAttemptConfig) -> str:
+    mode = "authenticated" if attempt.authenticated else "unauthenticated"
+    details: list[str] = [mode]
+    if attempt.format_selector is not None:
+        details.append(f"format={attempt.format_selector}")
+    if attempt.player_clients is not None:
+        details.append(f"player_clients={','.join(attempt.player_clients)}")
+    return f"attempt {attempt_index + 1}/{len(_DOWNLOAD_ATTEMPTS)} ({', '.join(details)})"
+
+
 def _ytdlp_download(id: str, dir: Path, callback: Callback | None = None) -> Path | None:
     """Download video using yt-dlp.
 
@@ -74,18 +84,34 @@ def _ytdlp_download(id: str, dir: Path, callback: Callback | None = None) -> Pat
     falls back to authenticated for age-restricted content.
     """
     for attempt, raw_attempt in enumerate(_DOWNLOAD_ATTEMPTS):
+        attempt_config = _download_attempt_config(raw_attempt)
+        label = _attempt_label(attempt, attempt_config)
+        print(f"Starting yt-dlp {label} for {id}")
         try:
-            result = _run_download_attempt(id, dir, callback, raw_attempt)
+            result = _run_download_attempt(id, dir, callback, attempt_config)
         except Exception as e:
             if _should_retry_attempt(e, attempt):
+                print(f"Retrying {id} after {label} failed: {_retry_reason(e)}")
                 continue
-            _raise_download_error(id, e)
+            _raise_download_error(id, e, label)
             return None
 
         if result is not None:
+            print(f"Completed yt-dlp {label} for {id}")
             return result
 
     return None
+
+
+def _download_attempt_config(
+    raw_attempt: tuple[bool, list[str] | None, str | None],
+) -> _DownloadAttemptConfig:
+    authenticated, player_clients, format_selector = raw_attempt
+    return _DownloadAttemptConfig(
+        authenticated=authenticated,
+        player_clients=player_clients,
+        format_selector=format_selector,
+    )
 
 
 def _build_download_opts(
@@ -126,14 +152,8 @@ def _run_download_attempt(
     id: str,
     dir: Path,
     callback: Callback | None,
-    raw_attempt: tuple[bool, list[str] | None, str | None],
+    attempt: _DownloadAttemptConfig,
 ) -> Path | None:
-    authenticated, player_clients, format_selector = raw_attempt
-    attempt = _DownloadAttemptConfig(
-        authenticated=authenticated,
-        player_clients=player_clients,
-        format_selector=format_selector,
-    )
     opts = _build_download_opts(id, dir, callback, attempt)
     url = f"https://www.youtube.com/watch?v={id}"
     info_dict = _extract_download_info(url, opts)
@@ -190,6 +210,18 @@ def _is_unavailable_format_error(error: Exception) -> bool:
         or "This video is only available for" in err_str
         or "Sign in" in err_str
     )
+
+
+def _retry_reason(error: Exception) -> str:
+    err_str = str(error)
+    if "Sign in to confirm your age" in err_str:
+        return "age-restricted; retrying with authentication"
+    if "Requested format is not available" in err_str:
+        return "requested format unavailable; trying fallback"
+    if "This video is only available for" in err_str:
+        return "restricted format set; trying fallback"
+    first_line = err_str.splitlines()[0].strip()
+    return first_line[:160]
 
 
 def _log_stub_format(path: Path, size: int, info_dict: dict[str, Any]) -> None:
@@ -261,11 +293,12 @@ def _requested_download_path(info_dict: dict[str, Any]) -> Path | None:
     return Path(downloaded_file)
 
 
-def _raise_download_error(id: str, error: Exception) -> None:
+def _raise_download_error(id: str, error: Exception, attempt_label: str | None = None) -> None:
     error_msg = str(error)
     if _is_bot_detection_error(error_msg) and PROPAGATE_BOT_DETECTION:
         raise BotDetectionError(error_msg)
-    print(f"WARNING: yt-dlp download failed for {id}: {error}")
+    context = f" after {attempt_label}" if attempt_label else ""
+    print(f"WARNING: yt-dlp download failed for {id}{context}: {error}")
     raise error
 
 

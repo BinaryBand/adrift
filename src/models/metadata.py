@@ -66,6 +66,7 @@ class YtDlpParams(BaseModel):
 
     quiet: bool | None = None
     no_warnings: bool | None = None
+    logger: Any | None = None
     extract_flat: bool | None = None
     socket_timeout: int | None = None
     sleep_interval: int | None = None

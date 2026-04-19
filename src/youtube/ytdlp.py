@@ -123,16 +123,38 @@ def _extract_info(url: str, opts: YtDlpParams | dict[str, Any]) -> dict[str, Any
         return cast(dict[str, Any], info) if info else None
 
 
+def _video_info_attempt_label(attempt_index: int, label: str, attempt_count: int) -> str:
+    return f"attempt {attempt_index + 1}/{attempt_count} ({label})"
+
+
+def _video_info_retry_reason(error: Exception) -> str:
+    err_str = str(error)
+    if "Sign in to confirm your age" in err_str:
+        return "age-restricted; retrying with authentication"
+    if "Requested format is not available" in err_str:
+        return "requested format unavailable; trying authenticated probe"
+    first_line = err_str.splitlines()[0].strip()
+    return first_line[:160]
+
+
 def _fetch_video_info_attempt(
     video_id: str,
     label: str,
+    attempt_index: int,
+    attempt_count: int,
     build_opts: Callable[[], YtDlpParams],
 ) -> dict[str, Any] | None:
-    print(f"Fetching video info for {video_id} using {label} yt-dlp")
+    attempt_label = _video_info_attempt_label(attempt_index, label, attempt_count)
+    print(f"Starting video info probe {attempt_label} for {video_id}")
     try:
-        return _extract_info(_video_info_url(video_id), build_opts())
+        info = _extract_info(_video_info_url(video_id), build_opts())
+        print(f"Completed video info probe {attempt_label} for {video_id}")
+        return info
     except Exception as e:
-        print(f"WARNING: {label} attempt failed for {video_id}: {e}")
+        print(
+            f"Retrying video info probe for {video_id} after {attempt_label} failed: "
+            f"{_video_info_retry_reason(e)}"
+        )
         return None
 
 
@@ -194,8 +216,15 @@ def _parse_and_cache_channel(
 
 def _fetch_video_info_raw(video_id: str) -> dict[str, Any] | None:
     """Fetch raw video info using yt-dlp with fallback to authenticated."""
-    for label, build_opts in _video_info_attempts():
-        if info := _fetch_video_info_attempt(video_id, label, build_opts):
+    attempts = _video_info_attempts()
+    for attempt_index, (label, build_opts) in enumerate(attempts):
+        if info := _fetch_video_info_attempt(
+            video_id,
+            label,
+            attempt_index,
+            len(attempts),
+            build_opts,
+        ):
             return info
     return None
 

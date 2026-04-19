@@ -147,7 +147,7 @@ def get_audio_content_hash(file_path: Path, sample_rate: int = 8000) -> str:
     if (cached_hash := cache.get(cache_key)) is not None:
         return cached_hash
 
-    sample_window = 0.75
+    sample_window = 0.65
     num_samples = 5
     duration = _probe_duration(file_path)
     sample_times = _compute_sample_times(duration, num_samples, sample_window)
