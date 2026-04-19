@@ -3,7 +3,6 @@ import sys
 import time
 
 import dotenv
-from tqdm import tqdm
 
 DF_TARGETS = ["config/*.toml"]
 DEFAULT_MAX_DOWNLOADS = 10
@@ -20,6 +19,7 @@ def main() -> None:
         enrich_with_sponsors,
         update_rss,
     )
+    from src.utils.run_ui import build_merge_callbacks, create_run_ui
     from src.youtube.downloader import BotDetectionError
 
     parser = argparse.ArgumentParser(description="Download episodes, remove ads, and upload to S3.")
@@ -67,37 +67,44 @@ def main() -> None:
         skip_schedule_filter=args.skip_schedule_filter,
     )
 
-    bar = tqdm(configs, desc="Downloading", unit="podcast", file=sys.stderr)
     downloaded_total = 0
 
     try:
-        for config in bar:
-            bar.set_description(config.name)
+        with create_run_ui(len(configs), "Downloading") as ui, ui.output_context():
+            on_stage, callback = build_merge_callbacks(ui)
+            for config in configs:
+                ui.set_podcast(config.name)
 
-            bar.set_postfix_str("merge")
-            result = merge_config(config, refresh_sources=args.refresh_sources)
+                ui.set_stage("merge")
+                result = merge_config(
+                    config,
+                    refresh_sources=args.refresh_sources,
+                    on_stage=on_stage,
+                    callback=callback,
+                )
 
-            bar.set_postfix_str("enrich")
-            episodes = enrich_with_sponsors(result)
+                ui.set_stage("enrich")
+                episodes = enrich_with_sponsors(result)
 
-            if not args.skip_download:
-                bar.set_postfix_str("download")
-                budget = max(0, args.max_downloads - downloaded_total)
-                for ep in episodes[:budget]:
-                    try:
-                        newly_uploaded = download_and_upload(ep, config)
-                        if newly_uploaded:
-                            downloaded_total += 1
-                    except BotDetectionError:
-                        raise
-                    except Exception as exc:
-                        sys.stderr.write(f"ERROR: {config.name} — {ep.episode.title}: {exc}\n")
+                if not args.skip_download:
+                    ui.set_stage("download")
+                    budget = max(0, args.max_downloads - downloaded_total)
+                    for ep in episodes[:budget]:
+                        try:
+                            newly_uploaded = download_and_upload(ep, config)
+                            if newly_uploaded:
+                                downloaded_total += 1
+                        except BotDetectionError:
+                            raise
+                        except Exception as exc:
+                            ui.emit("error", f"{config.name} — {ep.episode.title}: {exc}")
 
-            if not args.skip_update:
-                bar.set_postfix_str("rss")
-                update_rss(config)
+                if not args.skip_update:
+                    ui.set_stage("rss")
+                    update_rss(config)
 
-            bar.set_postfix_str("done")
+                ui.set_stage("done")
+                ui.advance()
 
     except BotDetectionError:
         sys.stderr.write(f"\nBot detection triggered — cooling down for {args.bot_cooldown}s\n")

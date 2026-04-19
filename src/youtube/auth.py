@@ -4,6 +4,7 @@ from pathlib import Path
 from typing import Any
 
 from src.models import YtDlpParams
+from src.utils.terminal import emit_info, emit_warning
 
 
 class _QuietYtDlpLogger:
@@ -86,11 +87,11 @@ def _apply_cookiefile(
     try:
         if cookie_path.stat().st_size > 0:
             opts["cookiefile"] = str(cookie_path)
-            print(success_message.format(path=cookie_path))
+            emit_info(success_message.format(path=cookie_path))
             return True
     except FileNotFoundError:
         pass
-    print(invalid_message.format(path=cookie_path))
+    emit_warning(invalid_message.format(path=cookie_path).removeprefix("WARNING: "))
     return False
 
 
@@ -118,17 +119,17 @@ def _apply_repo_cookiefile(opts: YtDlpParams) -> bool:
 def _apply_browser_fallback(opts: YtDlpParams, prefer_native: bool) -> None:
     if prefer_native:
         opts["cookiesfrombrowser"] = ("firefox",)
-        print("Using Firefox browser cookies via yt-dlp browser fallback")
+        emit_info("Using Firefox browser cookies via yt-dlp browser fallback")
         return
 
     cookies_file = _try_export_firefox_cookies()
     if cookies_file is not None:
         opts["cookiefile"] = str(cookies_file)
-        print(f"Using exported Firefox cookies file: {cookies_file}")
+        emit_info(f"Using exported Firefox cookies file: {cookies_file}")
         return
 
     opts["cookiesfrombrowser"] = ("firefox",)
-    print("Export failed; falling back to Firefox cookies via yt-dlp browser fallback")
+    emit_warning("Export failed; falling back to Firefox cookies via yt-dlp browser fallback")
 
 
 def _try_export_firefox_cookies() -> Path | None:
@@ -139,7 +140,7 @@ def _try_export_firefox_cookies() -> Path | None:
     try:
         import browser_cookie3  # type: ignore[import]
     except Exception:
-        print("browser_cookie3 not available; cannot export Firefox cookies")
+        emit_warning("browser_cookie3 not available; cannot export Firefox cookies")
         return None
 
     cookie_jar = _load_firefox_cookie_jar(browser_cookie3)
@@ -157,16 +158,16 @@ def _load_firefox_cookie_jar(browser_cookie3: Any) -> Any | None:
         return browser_cookie3.firefox(domain_name=".youtube.com")
     except TypeError as e:
         if "domain_name" not in str(e):
-            print(f"WARNING: Failed to load Firefox cookies: {e}")
+            emit_warning(f"Failed to load Firefox cookies: {e}")
             return None
         # Older browser_cookie3 versions don't accept domain_name — retry without it
         try:
             return browser_cookie3.firefox()
         except Exception as e2:
-            print(f"WARNING: Failed to load Firefox cookies: {e2}")
+            emit_warning(f"Failed to load Firefox cookies: {e2}")
             return None
     except Exception as e:
-        print(f"WARNING: Failed to load Firefox cookies: {e}")
+        emit_warning(f"Failed to load Firefox cookies: {e}")
         return None
 
 
@@ -179,7 +180,7 @@ def _write_cookie_jar(cookies_path: Path, cookie_jar: Any) -> bool:
                 fh.write(_format_cookie_line(cookie))
         return True
     except Exception as e:
-        print(f"WARNING: Failed to write cookies file: {e}")
+        emit_warning(f"Failed to write cookies file: {e}")
         return False
 
 

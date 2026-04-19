@@ -8,7 +8,9 @@ import yt_dlp
 sys.path.insert(0, Path(__file__).parent.parent.as_posix())
 from src.utils.progress import Callback
 from src.utils.regex import YOUTUBE_VIDEO_REGEX
+from src.utils.terminal import emit_info, emit_warning
 from src.youtube.auth import YtDlpParams, get_auth_ydl_opts, get_ydl_opts
+from src.youtube.error_utils import yt_dlp_retry_reason
 
 
 class BotDetectionError(Exception):
@@ -86,18 +88,18 @@ def _ytdlp_download(id: str, dir: Path, callback: Callback | None = None) -> Pat
     for attempt, raw_attempt in enumerate(_DOWNLOAD_ATTEMPTS):
         attempt_config = _download_attempt_config(raw_attempt)
         label = _attempt_label(attempt, attempt_config)
-        print(f"Starting yt-dlp {label} for {id}")
+        emit_info(f"Starting yt-dlp {label} for {id}")
         try:
             result = _run_download_attempt(id, dir, callback, attempt_config)
         except Exception as e:
             if _should_retry_attempt(e, attempt):
-                print(f"Retrying {id} after {label} failed: {_retry_reason(e)}")
+                emit_info(f"Retrying {id} after {label} failed: {_retry_reason(e)}")
                 continue
             _raise_download_error(id, e, label)
             return None
 
         if result is not None:
-            print(f"Completed yt-dlp {label} for {id}")
+            emit_info(f"Completed yt-dlp {label} for {id}")
             return result
 
     return None
@@ -213,33 +215,7 @@ def _is_unavailable_format_error(error: Exception) -> bool:
 
 
 def _retry_reason(error: Exception) -> str:
-    err_str = str(error)
-    if "Sign in to confirm your age" in err_str:
-        return "age-restricted; retrying with authentication"
-    if "Premieres in " in err_str:
-        return "premiere not yet available"
-    if "This live event will begin in" in err_str:
-        return "live event not yet started"
-    if "private video" in err_str.lower() or "This video is private" in err_str:
-        return "private video"
-    if "members-only" in err_str.lower() or "channel members" in err_str.lower():
-        return "members-only video"
-    if (
-        "not available in your country" in err_str.lower()
-        or "available in your country" in err_str.lower()
-        or "geo" in err_str.lower() and "block" in err_str.lower()
-    ):
-        return "geo-restricted video"
-    if "This video has been removed" in err_str or "This video is no longer available" in err_str:
-        return "removed video"
-    if "Video unavailable" in err_str:
-        return "video unavailable"
-    if "Requested format is not available" in err_str:
-        return "requested format unavailable; trying fallback"
-    if "This video is only available for" in err_str:
-        return "restricted format set; trying fallback"
-    first_line = err_str.splitlines()[0].strip()
-    return first_line[:160]
+    return yt_dlp_retry_reason(error, "requested format unavailable; trying fallback")
 
 
 def _log_stub_format(path: Path, size: int, info_dict: dict[str, Any]) -> None:
@@ -247,8 +223,8 @@ def _log_stub_format(path: Path, size: int, info_dict: dict[str, Any]) -> None:
     fmt = dl.get("format") or info_dict.get("format", "unknown")
     acodec = dl.get("acodec") or info_dict.get("acodec", "?")
     vcodec = dl.get("vcodec") or info_dict.get("vcodec", "?")
-    print(
-        f"WARNING: Downloaded file is too small ({size} bytes), treating as failed: {path}\n"
+    emit_warning(
+        f"Downloaded file is too small ({size} bytes), treating as failed: {path}\n"
         f"  format={fmt!r}  acodec={acodec}  vcodec={vcodec}"
     )
 
@@ -273,7 +249,7 @@ def _evaluate_candidate(candidate: Path, info_dict: dict[str, Any]) -> Path | Li
     if size is None:
         # In unit tests Path.exists() is often patched while stat() is
         # not; assume the candidate is the resolved path in that case.
-        print(f"WARNING: Could not stat {candidate}, assuming present")
+        emit_warning(f"Could not stat {candidate}, assuming present")
         return candidate
     if size < _MIN_AUDIO_BYTES:
         _log_stub_format(candidate, size, info_dict)
@@ -290,7 +266,7 @@ def _find_download_candidate(file_path: Path, info_dict: dict[str, Any]) -> Path
         if res is False:
             return None
         return res
-    print(f"WARNING: Downloaded file not found: {file_path}")
+    emit_warning(f"Downloaded file not found: {file_path}")
     return None
 
 
@@ -316,7 +292,7 @@ def _raise_download_error(id: str, error: Exception, attempt_label: str | None =
     if _is_bot_detection_error(error_msg) and PROPAGATE_BOT_DETECTION:
         raise BotDetectionError(error_msg)
     context = f" after {attempt_label}" if attempt_label else ""
-    print(f"WARNING: yt-dlp download failed for {id}{context}: {error}")
+    emit_warning(f"yt-dlp download failed for {id}{context}: {error}")
     raise error
 
 
@@ -348,7 +324,7 @@ def download_video(url: str, dir: Path, callback: Callback | None = None) -> Pat
 def _validated_video_id(url: str) -> str | None:
     video_id = _extract_video_id(url)
     if not video_id:
-        print(f"WARNING: Could not extract video ID from {url}")
+        emit_warning(f"Could not extract video ID from {url}")
         return None
     return video_id
 
@@ -357,5 +333,5 @@ def _handle_download_failure(url: str, error: Exception) -> None:
     error_msg = str(error)
     if _is_bot_detection_error(error_msg) and PROPAGATE_BOT_DETECTION:
         raise BotDetectionError(error_msg)
-    print(f"WARNING: download failed for {url}: {error}")
+    emit_warning(f"download failed for {url}: {error}")
     return None

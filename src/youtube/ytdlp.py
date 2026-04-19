@@ -7,6 +7,7 @@ Similar to the SponsorBlock module, it uses Pydantic models for type safety.
 """
 
 import random
+from dataclasses import dataclass
 from datetime import datetime, timedelta, timezone
 from typing import Any, Callable, cast
 
@@ -18,7 +19,9 @@ from src.models import RssEpisode, YtDlpParams
 from src.models.ytdlp import YtDlpImage
 from src.utils.cache import S3Cache
 from src.utils.progress import Callback
+from src.utils.terminal import emit_error, emit_info, emit_warning
 from src.youtube.auth import get_auth_ydl_opts, get_ydl_opts
+from src.youtube.error_utils import yt_dlp_retry_reason
 
 # Constants
 _CACHE = S3Cache(".cache/yt-dlp", "yt-dlp")
@@ -109,7 +112,7 @@ def _fetch_channel_info_raw(url: str, fetch_videos: bool = False) -> dict[str, A
             info = ydl.extract_info(url, download=False)
             return cast(dict[str, Any], info) if info else None
     except Exception as e:
-        print(f"ERROR: Failed to fetch channel info from {url}: {e}")
+        emit_error(f"Failed to fetch channel info from {url}: {e}")
         return None
 
 
@@ -127,32 +130,14 @@ def _video_info_attempt_label(attempt_index: int, label: str, attempt_count: int
     return f"attempt {attempt_index + 1}/{attempt_count} ({label})"
 
 
+@dataclass(frozen=True)
+class _VideoInfoAttempt:
+    label: str
+    build_opts: Callable[[], YtDlpParams]
+
+
 def _video_info_retry_reason(error: Exception) -> str:
-    err_str = str(error)
-    if "Sign in to confirm your age" in err_str:
-        return "age-restricted; retrying with authentication"
-    if "Premieres in " in err_str:
-        return "premiere not yet available"
-    if "This live event will begin in" in err_str:
-        return "live event not yet started"
-    if "private video" in err_str.lower() or "This video is private" in err_str:
-        return "private video"
-    if "members-only" in err_str.lower() or "channel members" in err_str.lower():
-        return "members-only video"
-    if (
-        "not available in your country" in err_str.lower()
-        or "available in your country" in err_str.lower()
-        or "geo" in err_str.lower() and "block" in err_str.lower()
-    ):
-        return "geo-restricted video"
-    if "This video has been removed" in err_str or "This video is no longer available" in err_str:
-        return "removed video"
-    if "Video unavailable" in err_str:
-        return "video unavailable"
-    if "Requested format is not available" in err_str:
-        return "requested format unavailable; trying authenticated probe"
-    first_line = err_str.splitlines()[0].strip()
-    return first_line[:160]
+    return yt_dlp_retry_reason(error, "requested format unavailable; trying authenticated probe")
 
 
 def _video_info_attempt_failure_message(
@@ -168,21 +153,20 @@ def _video_info_attempt_failure_message(
 
 def _fetch_video_info_attempt(
     video_id: str,
-    label: str,
+    attempt: _VideoInfoAttempt,
     attempt_index: int,
     attempt_count: int,
-    build_opts: Callable[[], YtDlpParams],
 ) -> dict[str, Any] | None:
-    attempt_label = _video_info_attempt_label(attempt_index, label, attempt_count)
+    attempt_label = _video_info_attempt_label(attempt_index, attempt.label, attempt_count)
     has_more_attempts = attempt_index < attempt_count - 1
-    print(f"Starting video info probe {attempt_label} for {video_id}")
+    emit_info(f"Starting video info probe {attempt_label} for {video_id}")
     try:
-        info = _extract_info(_video_info_url(video_id), build_opts())
-        print(f"Completed video info probe {attempt_label} for {video_id}")
+        info = _extract_info(_video_info_url(video_id), attempt.build_opts())
+        emit_info(f"Completed video info probe {attempt_label} for {video_id}")
         return info
     except Exception as e:
         reason = _video_info_retry_reason(e)
-        print(
+        emit_info(
             _video_info_attempt_failure_message(
                 video_id,
                 attempt_label,
@@ -193,10 +177,10 @@ def _fetch_video_info_attempt(
         return None
 
 
-def _video_info_attempts() -> list[tuple[str, Callable[[], YtDlpParams]]]:
+def _video_info_attempts() -> list[_VideoInfoAttempt]:
     return [
-        ("unauthenticated", get_ydl_opts),
-        (
+        _VideoInfoAttempt("unauthenticated", get_ydl_opts),
+        _VideoInfoAttempt(
             "authenticated",
             lambda: get_auth_ydl_opts(use_browser_fallback=True),
         ),
@@ -214,7 +198,7 @@ def get_channel_info(url: str) -> ChannelInfo | None:
 
     raw_info = _fetch_channel_info_raw(url, fetch_videos=False)
     if raw_info is None:
-        print(f"WARNING: Failed to fetch channel info for {url}")
+        emit_warning(f"Failed to fetch channel info for {url}")
         return None
 
     return _parse_and_cache_channel(raw_info, cache_key, url)
@@ -227,7 +211,7 @@ def _load_cached_channel_info(cache_key: str) -> ChannelInfo | None:
     try:
         return ChannelInfo.model_validate(cached)
     except ValidationError as e:
-        print(f"WARNING: Invalid cached channel info for {cache_key}: {e}")
+        emit_warning(f"Invalid cached channel info for {cache_key}: {e}")
         _CACHE.delete(cache_key)
         return None
 
@@ -238,7 +222,7 @@ def _parse_and_cache_channel(
     try:
         model = ChannelInfo.model_validate(raw_info)
     except ValidationError as e:
-        print(f"WARNING: Failed to parse channel info for {url}: {e}")
+        emit_warning(f"Failed to parse channel info for {url}: {e}")
         return None
 
     # Cache for 25-35 days
@@ -252,13 +236,12 @@ def _parse_and_cache_channel(
 def _fetch_video_info_raw(video_id: str) -> dict[str, Any] | None:
     """Fetch raw video info using yt-dlp with fallback to authenticated."""
     attempts = _video_info_attempts()
-    for attempt_index, (label, build_opts) in enumerate(attempts):
+    for attempt_index, attempt in enumerate(attempts):
         if info := _fetch_video_info_attempt(
             video_id,
-            label,
+            attempt,
             attempt_index,
             len(attempts),
-            build_opts,
         ):
             return info
     return None
@@ -275,7 +258,7 @@ def get_video_info(video_id: str) -> VideoInfo | None:
 
     raw_info = _fetch_video_info_raw(video_id)
     if raw_info is None:
-        print(f"WARNING: Failed to fetch video info for {video_id}")
+        emit_warning(f"Failed to fetch video info for {video_id}")
         return None
 
     return _parse_and_cache_video(raw_info, cache_key, video_id)
@@ -288,7 +271,7 @@ def _load_cached_video_info(cache_key: str) -> VideoInfo | None:
     try:
         return VideoInfo.model_validate(cached)
     except ValidationError as e:
-        print(f"WARNING: Invalid cached video info for {cache_key}: {e}")
+        emit_warning(f"Invalid cached video info for {cache_key}: {e}")
         _CACHE.delete(cache_key)
         return None
 
@@ -299,7 +282,7 @@ def _parse_and_cache_video(
     try:
         model = VideoInfo.model_validate(raw_info)
     except ValidationError as e:
-        print(f"WARNING: Failed to parse video info for {video_id}: {e}")
+        emit_warning(f"Failed to parse video info for {video_id}: {e}")
         return None
     # raw_info should be a dict here; assert to help type-checkers
     assert isinstance(raw_info, dict)
@@ -328,7 +311,7 @@ def _fetch_channel_videos_raw(
 
             return cast(list[dict[str, Any]], channel_info.get("entries", []))
     except Exception as e:
-        print(f"ERROR: Failed to fetch videos from {url}: {e}")
+        emit_error(f"Failed to fetch videos from {url}: {e}")
         return []
 
 
@@ -379,7 +362,7 @@ def _fetch_video_batch(
     batch_index: int,
     batch_size: int | None,
 ) -> list[dict[str, Any]]:
-    print(f"Fetching {author} videos {batch_index} (size={str(batch_size)})...")
+    emit_info(f"Fetching {author} videos {batch_index} (size={str(batch_size)})...")
     return _fetch_channel_videos_raw(url, 1, end=batch_size, reverse=False)
 
 
@@ -393,7 +376,7 @@ def _add_new_public_episodes(
         episode = RssEpisode.from_ytdlp(entry, author)
         if not episode.is_public or episode.id in episodes:
             continue
-        print(f"Found new video: {episode.id}")
+        emit_info(f"Found new video: {episode.id}")
         episodes[episode.id] = episode
         has_new = True
     return has_new
@@ -435,7 +418,7 @@ def _use_cached_youtube_videos(
     author: str,
     callback: Callback | None,
 ) -> list[RssEpisode]:
-    print(f"Using fresh cached YouTube episodes for {author}")
+    emit_info(f"Using fresh cached YouTube episodes for {author}")
     _report_cached_video_progress(callback, len(episodes))
     return list(episodes.values())
 
@@ -482,4 +465,4 @@ def get_youtube_videos(
 
 
 if __name__ == "__main__":
-    print("yt_dlp module is intended to be imported, not executed directly")
+    emit_info("yt_dlp module is intended to be imported, not executed directly")

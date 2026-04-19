@@ -4,6 +4,7 @@ from urllib.parse import urljoin
 from src.models import RssChannel, RssEpisode
 from src.utils.progress import Callback
 from src.utils.regex import YT_CHANNEL, YT_CHANNEL_SHORTHAND, re_compile
+from src.utils.terminal import emit_info, emit_warning
 from src.youtube import ytdlp
 
 
@@ -68,7 +69,7 @@ def _fetch_video_info(video_id: str) -> ytdlp.VideoInfo | None:
     try:
         return ytdlp.get_video_info(video_id)
     except Exception as e:
-        print(f"WARNING: Failed to fetch video info for {video_id}: {e}")
+        emit_warning(f"Failed to fetch video info for {video_id}: {e}")
         return None
 
 
@@ -95,14 +96,14 @@ def _maybe_update_thumbnail(episode: RssEpisode, info: ytdlp.VideoInfo, author: 
 def _filter_episodes(episodes: list[RssEpisode], pattern_str: str) -> list[RssEpisode]:
     pattern = re_compile(pattern_str)
     filtered = [ep for ep in episodes if pattern.search(ep.title)]
-    print(f"Filtered {len(filtered)} episodes using pattern: {pattern_str}")
+    emit_info(f"Filtered {len(filtered)} episodes using pattern: {pattern_str}")
     return filtered
 
 
 def _enrich_episodes(
     episodes: list[RssEpisode], author: str, callback: Callback | None
 ) -> list[RssEpisode]:
-    print("Adding detailed metadata to episodes...")
+    emit_info("Adding detailed metadata to episodes...")
     result: list[RssEpisode] = []
     for i, ep in enumerate(episodes):
         result.append(_add_episode_metadata(ep, author))
@@ -129,7 +130,7 @@ def _post_process_episodes(
     author: str,
     opts: YtFetchOptions,
 ) -> list[RssEpisode]:
-    print(f"Fetched {len(episodes)} episodes from {url}")
+    emit_info(f"Fetched {len(episodes)} episodes from {url}")
 
     if opts.filter:
         episodes = _filter_episodes(episodes, opts.filter)

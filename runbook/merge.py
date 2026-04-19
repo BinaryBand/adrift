@@ -9,7 +9,6 @@ from typing import TYPE_CHECKING, cast
 
 import dotenv
 from pydantic import BaseModel
-from tqdm import tqdm
 
 if TYPE_CHECKING:
     from src.models.pipeline import MergeResult
@@ -129,6 +128,7 @@ def main() -> None:
 
     from src.app_common import load_podcasts_config
     from src.catalog import merge_config
+    from src.utils.run_ui import build_merge_callbacks, create_run_ui
 
     parser = argparse.ArgumentParser(
         description="Fetch source episodes and produce merged alignment output."
@@ -210,61 +210,63 @@ def main() -> None:
 
     output: list[dict[str, object]] = []
     series_entries: list[dict[str, object]] = []
-    bar = tqdm(configs, desc="Matching", unit="podcast", file=sys.stderr)
-    for config in bar:
-        bar.set_description(config.name)
-        timings: dict[str, float] = {}
-        podcast_start = perf_counter()
-        result = merge_config(
-            config,
-            refresh_sources=args.refresh_sources,
-            timings=timings if args.timings else None,
-            on_stage=bar.set_postfix_str,
-        )
-        bar.set_postfix_str("done")
-        report = _build_series_report(config.name, args.include_counts, len(result.episodes))
-        if args.include_counts:
-            report["references_count"] = len(result.references)
-            report["downloads_count"] = len(result.downloads)
-        report["episodes"] = _model_payloads(result.episodes)
-        output.append(report)
+    with create_run_ui(len(configs), "Matching") as ui, ui.output_context():
+        on_stage, callback = build_merge_callbacks(ui)
+        for config in configs:
+            ui.set_podcast(config.name)
+            timings: dict[str, float] = {}
+            podcast_start = perf_counter()
+            result = merge_config(
+                config,
+                refresh_sources=args.refresh_sources,
+                timings=timings if args.timings else None,
+                on_stage=on_stage,
+                callback=callback,
+            )
+            ui.set_stage("done")
+            report = _build_series_report(config.name, args.include_counts, len(result.episodes))
+            if args.include_counts:
+                report["references_count"] = len(result.references)
+                report["downloads_count"] = len(result.downloads)
+            report["episodes"] = _model_payloads(result.episodes)
+            output.append(report)
 
-        write_start = perf_counter()
-        if args.output_dir:
-            output_root = Path(args.output_dir)
-            series_entries.append(_write_series_outputs(output_root, result))
-            _write_output_bundle(args.output_dir, output, series_entries)
-            # Generate Mermaid diagrams by default (can be skipped with --skip-sankey)
-            if not args.skip_sankey:
-                try:
-                    from src.adapters import get_mermaid_adapter
-                    from src.ports.mermaid import MermaidRenderOptions
+            write_start = perf_counter()
+            if args.output_dir:
+                output_root = Path(args.output_dir)
+                series_entries.append(_write_series_outputs(output_root, result))
+                _write_output_bundle(args.output_dir, output, series_entries)
+                if not args.skip_sankey:
+                    try:
+                        from src.adapters import get_mermaid_adapter
+                        from src.ports.mermaid import MermaidRenderOptions
 
-                    adapter = get_mermaid_adapter()
-                    adapter.generate_diagrams(
-                        result,
-                        output_root,
-                        MermaidRenderOptions(
-                            format=args.sankey_format,
-                            overwrite=True,
-                        ),
-                    )
-                except Exception as exc:  # pragma: no cover - non-fatal optional feature
-                    sys.stderr.write(f"MERMAID generation failed for {config.name}: {exc}\n")
-            if not args.skip_report:
-                try:
-                    from src.adapters import get_report_adapter
+                        adapter = get_mermaid_adapter()
+                        adapter.generate_diagrams(
+                            result,
+                            output_root,
+                            MermaidRenderOptions(
+                                format=args.sankey_format,
+                                overwrite=True,
+                            ),
+                        )
+                    except Exception as exc:  # pragma: no cover - non-fatal optional feature
+                        ui.emit("warning", f"MERMAID generation failed for {config.name}: {exc}")
+                if not args.skip_report:
+                    try:
+                        from src.adapters import get_report_adapter
 
-                    adapter = get_report_adapter()
-                    adapter.generate_reports(result, output_root)
-                except Exception as exc:  # pragma: no cover - non-fatal optional feature
-                    sys.stderr.write(f"REPORT generation failed for {config.name}: {exc}\n")
-        if args.output_file:
-            _write_report_file(args.output_file, output)
-        if args.timings:
-            timings["write_outputs"] = perf_counter() - write_start
-            timings["podcast_total"] = perf_counter() - podcast_start
-            _emit_timings(config.name, timings)
+                        adapter = get_report_adapter()
+                        adapter.generate_reports(result, output_root)
+                    except Exception as exc:  # pragma: no cover - non-fatal optional feature
+                        ui.emit("warning", f"REPORT generation failed for {config.name}: {exc}")
+            if args.output_file:
+                _write_report_file(args.output_file, output)
+            if args.timings:
+                timings["write_outputs"] = perf_counter() - write_start
+                timings["podcast_total"] = perf_counter() - podcast_start
+                _emit_timings(config.name, timings)
+            ui.advance()
 
     json.dump(output, sys.stdout, indent=2 if args.pretty else None)
     sys.stdout.write("\n")
