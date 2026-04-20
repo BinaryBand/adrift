@@ -1,21 +1,28 @@
 from collections.abc import Mapping, Sequence
-from typing import Protocol
+from typing import Protocol, runtime_checkable
 
 
+@runtime_checkable
 class SecretProviderPort(Protocol):
     """Port for reading string secrets/config values by key."""
 
     def get(self, key: str, default: str = "") -> str: ...
 
 
-class SecretStorePort(Protocol):
-    """Port for listing and persisting managed secret values."""
+@runtime_checkable
+class ReadOnlySecretStorePort(Protocol):
+    """Port for listing managed secret values without mutation support."""
 
     def get(self, key: str, default: str = "") -> str: ...
 
     def has(self, key: str) -> bool: ...
 
     def items(self) -> Mapping[str, str]: ...
+
+
+@runtime_checkable
+class SecretStorePort(ReadOnlySecretStorePort, Protocol):
+    """Port for listing and persisting managed secret values."""
 
     def set(self, key: str, value: str) -> None: ...
 

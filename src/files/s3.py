@@ -46,7 +46,7 @@ def set_secret_provider(provider: SecretProviderPort) -> None:
 
 def reset_secret_provider() -> None:
     """Restore default environment-backed secret provider."""
-    set_secret_provider(get_secret_provider_adapter("env"))
+    set_secret_provider(get_secret_provider_adapter("env", enable_prompt_fallback=False))
 
 
 def _require_s3_env() -> tuple[str, str, str, str]:

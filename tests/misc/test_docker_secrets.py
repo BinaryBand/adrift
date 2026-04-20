@@ -1,4 +1,6 @@
+from src.adapters import get_secret_store_adapter
 from src.adapters.secrets.docker_secrets import DockerSecretProvider
+from src.ports.secrets import SecretStorePort
 
 
 def test_docker_secret_provider_reads_file(tmp_path):
@@ -25,3 +27,17 @@ def test_docker_secret_provider_fallback_env(monkeypatch, tmp_path):
     monkeypatch.setenv(secret_name, secret_value)
     provider = DockerSecretProvider(secrets_dir=str(secrets_dir))
     assert provider.get(secret_name) == secret_value
+
+
+def test_docker_secret_store_is_read_only(monkeypatch, tmp_path) -> None:
+    secret_name = "S3_REGION"
+    secret_value = "us-east-1"
+    monkeypatch.setenv(secret_name, secret_value)
+    monkeypatch.setenv("ADRIFT_SECRETS_PROVIDER", "docker")
+
+    store = get_secret_store_adapter()
+
+    assert store.get(secret_name) == secret_value
+    assert store.has(secret_name) is True
+    assert store.items()[secret_name] == secret_value
+    assert isinstance(store, SecretStorePort) is False

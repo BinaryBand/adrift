@@ -2,7 +2,12 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
-from src.ports.secrets import SecretProviderPort, SecretStorePort, require_secrets
+from src.ports.secrets import (
+    ReadOnlySecretStorePort,
+    SecretProviderPort,
+    SecretStorePort,
+    require_secrets,
+)
 
 MANAGED_S3_KEYS = (
     "S3_USERNAME",
@@ -62,30 +67,62 @@ MANAGED_S3_FIELDS = (
 )
 
 
-def collect_secret_states(
-    store: SecretStorePort,
+def describe_managed_secret(key: str) -> ManagedSecretField | None:
+    return next((field for field in MANAGED_S3_FIELDS if field.key == key), None)
+
+
+def is_writable_secret_store(store: ReadOnlySecretStorePort | SecretStorePort) -> bool:
+    return isinstance(store, SecretStorePort)
+
+
+def _state_source_and_value(
+    key: str,
+    store: ReadOnlySecretStorePort | SecretStorePort,
     provider: SecretProviderPort,
+    provider_name: str,
+) -> tuple[str, str]:
+    if provider_name == "env" and store.has(key):
+        return ".env", store.get(key, "")
+
+    value = provider.get(key, "")
+    if not value:
+        return "missing", ""
+    if provider_name == "env":
+        return "environment", value
+    return f"{provider_name}/env", value
+
+
+def _require_writable_store(store: ReadOnlySecretStorePort | SecretStorePort) -> SecretStorePort:
+    if isinstance(store, SecretStorePort):
+        return store
+    raise RuntimeError("Selected secret backend is read-only and cannot be edited")
+
+
+def collect_secret_states(
+    store: ReadOnlySecretStorePort | SecretStorePort,
+    provider: SecretProviderPort,
+    *,
+    provider_name: str = "env",
 ) -> list[ManagedSecretState]:
     states: list[ManagedSecretState] = []
     for field in MANAGED_S3_FIELDS:
-        if store.has(field.key):
-            source = ".env"
-            value = store.get(field.key, "")
-        else:
-            value = provider.get(field.key, "")
-            source = "environment" if value else "missing"
+        source, value = _state_source_and_value(field.key, store, provider, provider_name)
         states.append(ManagedSecretState(field=field, value=value, source=source))
     return states
 
 
-def set_secret_value(store: SecretStorePort, key: str, value: str) -> None:
-    store.set(key, value)
-    store.save()
+def set_secret_value(
+    store: ReadOnlySecretStorePort | SecretStorePort, key: str, value: str
+) -> None:
+    writable_store = _require_writable_store(store)
+    writable_store.set(key, value)
+    writable_store.save()
 
 
-def delete_secret_value(store: SecretStorePort, key: str) -> None:
-    store.delete(key)
-    store.save()
+def delete_secret_value(store: ReadOnlySecretStorePort | SecretStorePort, key: str) -> None:
+    writable_store = _require_writable_store(store)
+    writable_store.delete(key)
+    writable_store.save()
 
 
 def validate_required_secret_values(provider: SecretProviderPort) -> dict[str, str]:

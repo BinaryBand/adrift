@@ -130,7 +130,9 @@ Notes:
 - Values written through the TUI are persisted to `.env`.
 - The table masks sensitive values such as `S3_SECRET_KEY`.
 - Validation can check either that required keys are present or that the configured S3 endpoint is reachable.
-- Runtime secret-provider selection still uses `ADRIFT_SECRETS_PROVIDER`; only the env-backed provider is writable through the TUI today.
+- Runtime secret-provider selection still uses `ADRIFT_SECRETS_PROVIDER`.
+- The env-backed provider is writable through the TUI; non-env backends such as `docker` are inspect-only in the runbook today.
+- Set `ADRIFT_SECRETS_PROMPT_FALLBACK=1` to let runtime reads prompt interactively for missing managed S3 keys instead of failing immediately. Leave it unset for automation and non-interactive runs.
 
 ## Containerized Download Run
 

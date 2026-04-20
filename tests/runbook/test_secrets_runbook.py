@@ -58,3 +58,26 @@ def test_runbook_validation_uses_secret_service(tmp_path: Path) -> None:
 
     assert mock_validate_required.called is True
     assert mock_validate_connection.called is True
+
+
+def test_runbook_read_only_provider_only_offers_validate_and_quit(
+    tmp_path: Path, monkeypatch, capsys
+) -> None:
+    env_file = tmp_path / ".env"
+    monkeypatch.setenv("S3_REGION", "us-east-1")
+    monkeypatch.setenv("S3_USERNAME", "alice")
+    monkeypatch.setenv("S3_SECRET_KEY", "secret-123")
+    monkeypatch.setenv("S3_ENDPOINT", "https://s3.example.com")
+
+    responses = iter(["validate", "quit"])
+
+    def _ask(*args, **kwargs):
+        del args, kwargs
+        return next(responses)
+
+    with patch("runbook.secrets.Prompt.ask", side_effect=_ask):
+        secrets_mod._run(provider="docker", env_file=env_file.as_posix(), probe=False)
+
+    output = capsys.readouterr().out
+    assert "inspect-only" in output
+    assert "Required S3 secrets are present" in output

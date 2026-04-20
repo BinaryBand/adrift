@@ -1,9 +1,11 @@
 """Adapter implementations for various ports."""
 
 import os
+from collections.abc import Callable
 
 from src.app_common import FeedSource
 from src.ports.episode_source import EpisodeSourcePort
+from src.ports.secrets import ReadOnlySecretStorePort, SecretProviderPort, SecretStorePort
 from src.utils.text import is_youtube_channel
 
 
@@ -57,9 +59,18 @@ def get_report_adapter():
     return FileReportAdapter()
 
 
-def get_secret_provider_adapter(provider_name: str | None = None):
-    """Return the configured secret provider adapter instance."""
-    selected = (provider_name or os.getenv("ADRIFT_SECRETS_PROVIDER", "env")).lower()
+def _resolve_secret_provider_name(provider_name: str | None = None) -> str:
+    return (provider_name or os.getenv("ADRIFT_SECRETS_PROVIDER", "env")).lower()
+
+
+def _is_prompt_fallback_enabled(enable_prompt_fallback: bool | None) -> bool:
+    if enable_prompt_fallback is not None:
+        return enable_prompt_fallback
+    raw_value = os.getenv("ADRIFT_SECRETS_PROMPT_FALLBACK", "").strip().lower()
+    return raw_value in {"1", "true", "yes", "on"}
+
+
+def _get_base_secret_provider(selected: str):
     if selected == "docker":
         from src.adapters.secrets.docker_secrets import DockerSecretProvider
 
@@ -73,12 +84,38 @@ def get_secret_provider_adapter(provider_name: str | None = None):
     raise ValueError(f"Unsupported secret provider: {selected}")
 
 
-def get_secret_store_adapter(provider_name: str | None = None, *, env_file: str = ".env"):
-    """Return a writable secret store for the selected provider."""
-    selected = (provider_name or os.getenv("ADRIFT_SECRETS_PROVIDER", "env")).lower()
+def get_secret_provider_adapter(
+    provider_name: str | None = None,
+    *,
+    enable_prompt_fallback: bool | None = None,
+    prompt_callback: Callable[[str, str, bool], str] | None = None,
+) -> SecretProviderPort:
+    """Return the configured secret provider adapter instance."""
+    selected = _resolve_secret_provider_name(provider_name)
+    provider = _get_base_secret_provider(selected)
+    if not _is_prompt_fallback_enabled(enable_prompt_fallback):
+        return provider
+
+    from src.adapters.secrets.prompt_fallback import PromptFallbackProvider
+
+    if prompt_callback is None:
+        return PromptFallbackProvider(provider)
+    return PromptFallbackProvider(provider, prompt_callback=prompt_callback)
+
+
+def get_secret_store_adapter(
+    provider_name: str | None = None,
+    *,
+    env_file: str = ".env",
+) -> ReadOnlySecretStorePort | SecretStorePort:
+    """Return a store-like adapter for the selected provider."""
+    selected = _resolve_secret_provider_name(provider_name)
     if selected == "env":
         from src.adapters.secrets.env_secrets import EnvironmentSecretStore
 
         return EnvironmentSecretStore(env_file=env_file)
 
-    raise ValueError(f"Secret store is not writable for provider: {selected}")
+    from src.adapters.secrets.read_only_store import ReadOnlySecretStore
+    from src.orchestration.secret_service import MANAGED_S3_KEYS
+
+    return ReadOnlySecretStore(_get_base_secret_provider(selected), known_keys=MANAGED_S3_KEYS)
