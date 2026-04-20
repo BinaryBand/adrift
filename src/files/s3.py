@@ -29,8 +29,6 @@ _secret_provider: SecretProviderPort = get_secret_provider_adapter()
 
 S3_ENDPOINT = _secret_provider.get("S3_ENDPOINT", "")
 
-_LOCAL_S3_ENDPOINT = _secret_provider.get("LOCAL_S3_ENDPOINT", "http://localhost:9000")
-
 _s3_client_lock = Lock()
 _s3_client: S3Client | None = None
 _effective_endpoint: str | None = None
@@ -62,6 +60,14 @@ def _require_s3_env() -> tuple[str, str, str, str]:
     )
 
 
+def _configured_local_s3_endpoint(
+    provider: SecretProviderPort | None = None,
+) -> str | None:
+    active_provider = provider or _secret_provider
+    endpoint = active_provider.get("LOCAL_S3_ENDPOINT", "").strip()
+    return endpoint or None
+
+
 def validate_s3_provider(
     provider: SecretProviderPort | None = None,
     *,
@@ -71,7 +77,7 @@ def validate_s3_provider(
     values = require_secrets(active_provider, _REQUIRED_S3_KEYS)
     if not check_endpoint:
         return
-    local_endpoint = active_provider.get("LOCAL_S3_ENDPOINT", _LOCAL_S3_ENDPOINT)
+    local_endpoint = _configured_local_s3_endpoint(active_provider)
     if local_endpoint and _is_endpoint_reachable_with_provider(local_endpoint, active_provider):
         return
     endpoint = values["S3_ENDPOINT"]
@@ -261,8 +267,8 @@ def _get_effective_s3_endpoint() -> str:
 
     _, _, endpoint, _ = _require_s3_env()
 
-    # Prefer local endpoint if it's reachable.
-    local_endpoint = _secret_provider.get("LOCAL_S3_ENDPOINT", _LOCAL_S3_ENDPOINT)
+    # Prefer an explicitly configured local override when it's reachable.
+    local_endpoint = _configured_local_s3_endpoint()
     if local_endpoint and _is_endpoint_reachable(local_endpoint):
         _effective_endpoint = local_endpoint
     else:
@@ -304,7 +310,7 @@ def _build_s3_client() -> S3Client:
             "s3",
             aws_access_key_id=username,
             aws_secret_access_key=secret_key,
-            # Use local shortcut endpoint when available; keep S3_ENDPOINT as public.
+            # Use an explicit local override when configured; otherwise use S3_ENDPOINT.
             endpoint_url=_get_effective_s3_endpoint(),
             config=cfg,
             region_name=region,
