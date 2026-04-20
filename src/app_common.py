@@ -94,27 +94,21 @@ class FeedSource(BaseModel):
     url: str
     filters: SourceFilter = SourceFilter()
 
-
 class PodcastConfig(BaseModel):
     """Configuration for a single podcast series."""
 
-    model_config = ConfigDict(extra="ignore")
+    model_config = ConfigDict(extra="forbid")
 
     name: str
+    path: str
     references: list[FeedSource] = []
     downloads: list[FeedSource] = []
+    schedule: list[str] = []
 
     @computed_field(return_type=str)
+    @property
     def slug(self) -> str:
         return create_slug(self.name)
-
-    @computed_field(return_type=str)
-    def path(self) -> str:
-        return f"/media/podcasts/{self.slug}"
-
-    # iCalendar RRULE strings that control when downloads run, e.g.
-    # ["FREQ=WEEKLY;BYDAY=WE,FR"]. Empty list = always include.
-    schedule: list[str] = []
 
 
 def ensure_source_filter(filters: SourceFilter | dict[str, Any] | None) -> SourceFilter:
@@ -150,6 +144,9 @@ def ensure_podcast_config(podcast: PodcastConfig | dict[str, Any]) -> PodcastCon
     payload = dict(podcast)
     payload["references"] = _ensure_sources_list(payload.get("references"))
     payload["downloads"] = _ensure_sources_list(payload.get("downloads"))
+    # If path is missing, synthesize it for backward compatibility
+    if "path" not in payload:
+        payload["path"] = f"/media/podcasts/{create_slug(payload['name'])}"
     return PodcastConfig.model_validate(payload)
 
 

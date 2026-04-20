@@ -14,6 +14,7 @@ from src.models.pipeline import MergeResult
 def _config() -> PodcastConfig:
     return PodcastConfig(
         name="Example Show",
+        path="/tmp/example-show",
         references=[FeedSource(url="https://example.com/reference.rss")],
         downloads=[FeedSource(url="yt://@example-show")],
     )
@@ -121,11 +122,13 @@ def test_main_writes_bundle_and_stdout(tmp_path: Path, capsys) -> None:
 def test_main_updates_output_file_after_each_podcast(tmp_path: Path, capsys) -> None:
     first = PodcastConfig(
         name="First Show",
+        path="/tmp/first-show",
         references=[FeedSource(url="https://example.com/first-reference.rss")],
         downloads=[FeedSource(url="yt://@first-show")],
     )
     second = PodcastConfig(
         name="Second Show",
+        path="/tmp/second-show",
         references=[FeedSource(url="https://example.com/second-reference.rss")],
         downloads=[FeedSource(url="yt://@second-show")],
     )

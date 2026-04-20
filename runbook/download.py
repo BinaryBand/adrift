@@ -83,7 +83,7 @@ def _run(
     dotenv.load_dotenv()
 
     from src.app_common import load_podcasts_config
-    from src.catalog import merge_config
+    from src.catalog import MergeConfigOptions, merge_config
     from src.orchestration.download_service import (
         build_download_queue,
         download_and_upload,
@@ -109,9 +109,11 @@ def _run(
                 ui.set_stage("merge")
                 result = merge_config(
                     config,
-                    refresh_sources=refresh_sources,
-                    on_stage=on_stage,
-                    callback=callback,
+                    MergeConfigOptions(
+                        refresh_sources=refresh_sources,
+                        on_stage=on_stage,
+                        callback=callback,
+                    ),
                 )
 
                 ui.set_stage("enrich")

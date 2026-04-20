@@ -10,8 +10,7 @@ class YouTubeEpisodeSourceAdapter(EpisodeSourcePort):
 
     def fetch_episodes(self, source: FeedSource, options: dict[str, Any]) -> list[RssEpisode]:
         """Fetch episodes from a YouTube channel."""
-        from src.catalog import get_youtube_episodes
-        from src.youtube.metadata import YtFetchOptions
+        from src.youtube.metadata import YtFetchOptions, get_youtube_episodes
 
         url = source.url
         if not url:

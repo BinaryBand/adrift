@@ -3,7 +3,7 @@ from collections.abc import Callable
 from dataclasses import dataclass
 from datetime import datetime
 from time import perf_counter
-from typing import Any, cast
+from typing import Any, TypedDict, Unpack
 
 from rapidfuzz import fuzz
 
@@ -23,9 +23,7 @@ from src.models.pipeline import (
 )
 from src.utils.progress import Callback
 from src.utils.text import is_youtube_channel, normalize_text
-from src.web import rss as _rss
 from src.web.rss import RssEpisode
-from src.youtube import metadata as _yt_meta
 
 
 def _similarity_clean(ac: str, bc: str) -> float:
@@ -55,34 +53,35 @@ def match(
     callback: Callback | None = None,
 ) -> list[tuple[int, int]]:
     files_clean, episodes_clean = _prepare_match_inputs(files, episodes, title)
-    scores = _score_match_pairs(files_clean, episodes_clean, callback)
-    matches = _select_unique_matches(scores)
-    return _filter_tolerated_matches(matches, scores)
+    return _score_match_pairs(files_clean, episodes_clean, callback)
 
 
 def _prepare_match_inputs(
-    files: list[str], episodes: list[str], title: str
+    files: list[str],
+    episodes: list[str],
+    title: str,
 ) -> tuple[list[str], list[str]]:
-    files_clean = [normalize_text(f) for f in files]
-    episodes_norm = [normalize_title(title, e) for e in episodes]
-    episodes_clean = [normalize_text(e) for e in episodes_norm]
-    return files_clean, episodes_clean
+    return (
+        [normalize_text(normalize_title(title, item)) for item in files],
+        [normalize_text(normalize_title(title, item)) for item in episodes],
+    )
 
 
 def _score_match_pairs(
     files_clean: list[str],
     episodes_clean: list[str],
     callback: Callback | None = None,
-) -> dict[tuple[int, int], float]:
+) -> list[tuple[int, int]]:
     scores: dict[tuple[int, int], float] = {}
+    total = len(files_clean)
     for f_idx, file_name in enumerate(files_clean):
         for e_idx, episode_name in enumerate(episodes_clean):
             scores[(f_idx, e_idx)] = _similarity_clean(file_name, episode_name)
-
         if callback:
-            callback(f_idx + 1, len(files_clean))
+            callback(f_idx + 1, total)
 
-    return scores
+    matches = _select_unique_matches(scores)
+    return _filter_tolerated_matches(matches, scores)
 
 
 def _select_unique_matches(
@@ -156,6 +155,13 @@ class MergeConfigOptions:
     refresh_sources: bool = False
     timings: dict[str, float] | None = None
     on_stage: Callable[[str], None] | None = None
+
+
+class MergeConfigOptionOverrides(TypedDict, total=False):
+    callback: Callback | None
+    refresh_sources: bool
+    timings: dict[str, float] | None
+    on_stage: Callable[[str], None] | None
 
 
 @dataclass(frozen=True)
@@ -666,30 +672,6 @@ def _collect_merge_parts(
     return pairs, match_traces, episodes
 
 
-def _coerce_merge_config_options(
-    options: MergeConfigOptions | None,
-    legacy_kwargs: dict[str, Any],
-) -> MergeConfigOptions:
-    if options is not None and not legacy_kwargs:
-        return options
-    if options is not None:
-        return MergeConfigOptions(
-            callback=legacy_kwargs.get("callback", options.callback),
-            refresh_sources=legacy_kwargs.get(
-                "refresh_sources",
-                options.refresh_sources,
-            ),
-            timings=legacy_kwargs.get("timings", options.timings),
-            on_stage=legacy_kwargs.get("on_stage", options.on_stage),
-        )
-    return MergeConfigOptions(
-        callback=legacy_kwargs.get("callback"),
-        refresh_sources=legacy_kwargs.get("refresh_sources", False),
-        timings=legacy_kwargs.get("timings"),
-        on_stage=legacy_kwargs.get("on_stage"),
-    )
-
-
 def _collect_merge_result_parts(
     config: PodcastConfig,
     options: MergeConfigOptions,
@@ -714,15 +696,14 @@ def _collect_merge_result_parts(
 def merge_config(
     config: PodcastConfig,
     options: MergeConfigOptions | None = None,
-    **legacy_kwargs: Any,
+    **option_overrides: Unpack[MergeConfigOptionOverrides],
 ) -> MergeResult:
     """Fetch, align, and merge episodes for a single podcast config."""
-    merged_options = _coerce_merge_config_options(options, legacy_kwargs)
+    if options is None:
+        options = MergeConfigOptions(**option_overrides)
     total_start = perf_counter()
-
-    merge_result = _build_merge_result(config, merged_options)
-    _maybe_record_timing(merged_options.timings, "merge_config_total", total_start)
-
+    merge_result = _build_merge_result(config, options)
+    _maybe_record_timing(options.timings, "merge_config_total", total_start)
     return merge_result
 
 
@@ -768,38 +749,12 @@ class EpisodeFetchContext:
     refresh_sources: bool = False
 
 
-def _legacy_fetch_arg(legacy_args: tuple[object, ...], index: int) -> object | None:
-    return legacy_args[index] if len(legacy_args) > index else None
-
-
-def _coerce_legacy_callback(value: object | None) -> Callback | None:
-    if value is None or callable(value):
-        return cast(Callback | None, value)
-    return None
-
-
-def _coerce_episode_fetch_context(
-    context_or_title: EpisodeFetchContext | str,
-    legacy_args: tuple[object, ...],
-) -> EpisodeFetchContext:
-    if isinstance(context_or_title, EpisodeFetchContext):
-        return context_or_title
-
-    return EpisodeFetchContext(
-        title=context_or_title,
-        is_reference=bool(_legacy_fetch_arg(legacy_args, 0)),
-        callback=_coerce_legacy_callback(_legacy_fetch_arg(legacy_args, 1)),
-        refresh_sources=bool(_legacy_fetch_arg(legacy_args, 2)),
-    )
-
-
 def _collect_episodes(
     sources: list[FeedSource],
-    context_or_title: EpisodeFetchContext | str,
-    *legacy_args: object,
+    context: EpisodeFetchContext,
 ) -> list[RssEpisode]:
     """Fetch and deduplicate episodes from a list of FeedSource objects."""
-    merged, _traces = _collect_episodes_with_traces(sources, context_or_title, *legacy_args)
+    merged, _traces = _collect_episodes_with_traces(sources, context)
     return merged
 
 
@@ -829,11 +784,9 @@ def _build_source_trace(
 
 def _collect_episodes_with_traces(
     sources: list[FeedSource],
-    context_or_title: EpisodeFetchContext | str,
-    *legacy_args: object,
+    context: EpisodeFetchContext,
 ) -> tuple[list[RssEpisode], list[SourceTrace]]:
     """Fetch, trace, and deduplicate episodes from a list of FeedSource objects."""
-    context = _coerce_episode_fetch_context(context_or_title, legacy_args)
     albums: list[list[RssEpisode]] = []
     traces: list[SourceTrace] = []
     for source in sources:
@@ -921,8 +874,3 @@ def process_feeds(
     )
 
     return source_episodes
-
-
-# Compatibility aliases: tests may patch these names on the `src.catalog` module.
-get_rss_episodes = _rss.get_rss_episodes
-get_youtube_episodes = _yt_meta.get_youtube_episodes

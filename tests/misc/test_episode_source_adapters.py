@@ -26,7 +26,7 @@ def test_rss_adapter_fetches_episodes():
         )
     ]
 
-    with patch("src.catalog.get_rss_episodes", return_value=mock_episodes):
+    with patch("src.web.rss.get_rss_episodes", return_value=mock_episodes):
         result = adapter.fetch_episodes(source, {})
 
     assert result == mock_episodes
@@ -69,7 +69,7 @@ def test_youtube_adapter_fetches_episodes():
         )
     ]
 
-    with patch("src.catalog.get_youtube_episodes", return_value=mock_episodes):
+    with patch("src.youtube.metadata.get_youtube_episodes", return_value=mock_episodes):
         result = adapter.fetch_episodes(source, {"title": "Test Channel"})
 
     assert result == mock_episodes
@@ -127,7 +127,7 @@ def test_rss_adapter_passes_filters_to_rss_episodes():
     source = FeedSource(url="https://example.com/feed.xml", filters={"include": ["test"]})
     adapter = RssEpisodeSourceAdapter()
 
-    with patch("src.catalog.get_rss_episodes") as mock_get:
+    with patch("src.web.rss.get_rss_episodes") as mock_get:
         mock_get.return_value = []
         adapter.fetch_episodes(source, {})
 
@@ -143,7 +143,7 @@ def test_youtube_adapter_passes_title_and_options():
     source = FeedSource(url="https://www.youtube.com/@testchannel")
     adapter = YouTubeEpisodeSourceAdapter()
 
-    with patch("src.catalog.get_youtube_episodes") as mock_get:
+    with patch("src.youtube.metadata.get_youtube_episodes") as mock_get:
         mock_get.return_value = []
         adapter.fetch_episodes(source, {"title": "My Podcast", "detailed": True})
 
@@ -160,7 +160,7 @@ def test_youtube_adapter_passes_refresh_option():
     source = FeedSource(url="https://www.youtube.com/@testchannel")
     adapter = YouTubeEpisodeSourceAdapter()
 
-    with patch("src.catalog.get_youtube_episodes") as mock_get:
+    with patch("src.youtube.metadata.get_youtube_episodes") as mock_get:
         mock_get.return_value = []
         adapter.fetch_episodes(source, {"title": "My Podcast", "refresh": True})
 

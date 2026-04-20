@@ -10,7 +10,7 @@ class RssEpisodeSourceAdapter(EpisodeSourcePort):
 
     def fetch_episodes(self, source: FeedSource, options: dict[str, Any]) -> list[RssEpisode]:
         """Fetch episodes from an RSS feed."""
-        from src.catalog import get_rss_episodes
+        from src.web.rss import get_rss_episodes
 
         url = source.url
         if not url:

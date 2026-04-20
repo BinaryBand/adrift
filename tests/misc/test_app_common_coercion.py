@@ -41,7 +41,7 @@ def test_ensure_podcast_config_from_dict() -> None:
 
 
 def test_parse_podcasts_raw_mixed_entries() -> None:
-    model = PodcastConfig(name="ModelEntry")
+    model = PodcastConfig(name="ModelEntry", path="/tmp/model-entry")
     parsed = parse_podcasts_raw([model, {"name": "DictEntry"}])
     assert [item.name for item in parsed] == ["ModelEntry", "DictEntry"]
 

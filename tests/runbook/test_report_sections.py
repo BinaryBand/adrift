@@ -21,6 +21,7 @@ def _episode(identifier: str, title: str, day: int) -> RssEpisode:
 def _config() -> PodcastConfig:
     return PodcastConfig(
         name="Debug Show",
+        path="/tmp/debug-show",
         references=[FeedSource(url="https://example.com/reference.rss")],
         downloads=[FeedSource(url="https://www.youtube.com/@debug-show")],
     )

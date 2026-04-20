@@ -10,6 +10,7 @@ from src.models.pipeline import MatchCandidateTrace, MergeResult, ReferenceMatch
 def _config() -> PodcastConfig:
     return PodcastConfig(
         name="Example Show",
+        path="/tmp/example-show",
         references=[FeedSource(url="https://example.com/reference.rss")],
         downloads=[FeedSource(url="https://www.youtube.com/@example")],
     )

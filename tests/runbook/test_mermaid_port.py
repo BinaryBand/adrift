@@ -12,6 +12,7 @@ from src.ports.mermaid import MermaidRenderOptions
 def _config() -> PodcastConfig:
     return PodcastConfig(
         name="Example Show",
+        path="/tmp/example-show",
         references=[FeedSource(url="https://example.com/reference.rss")],
         downloads=[FeedSource(url="https://www.youtube.com/@example")],
     )
@@ -124,6 +125,7 @@ def test_mermaid_overwrite_respected(tmp_path: Path) -> None:
 def test_mermaid_includes_filter_stage_when_source_traces_exist(tmp_path: Path) -> None:
     config = PodcastConfig(
         name="Filtered Show",
+        path="/tmp/filtered-show",
         references=[
             FeedSource(
                 url="https://example.com/reference.rss",

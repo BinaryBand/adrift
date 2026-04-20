@@ -21,6 +21,7 @@ os.environ.setdefault("S3_REGION", "us-east-1")
 
 from src.app_common import FeedSource, PodcastConfig, SourceFilter
 from src.catalog import (
+    EpisodeFetchContext,
     _collect_episodes,
     align_episodes,
     merge_config,
@@ -82,50 +83,52 @@ def _config(
 
 
 class TestCollectEpisodes(unittest.TestCase):
-    @patch("src.catalog.get_rss_episodes")
+    @patch("src.web.rss.get_rss_episodes")
     def test_single_source_returns_all(self, mock_rss):
         eps = [_ep("1", "Ep 1"), _ep("2", "Ep 2"), _ep("3", "Ep 3")]
         mock_rss.return_value = eps
-        result = _collect_episodes([_rss_source()], "Test Show", True)
+        context = EpisodeFetchContext(title="Test Show", is_reference=True)
+        result = _collect_episodes([_rss_source()], context)
         self.assertEqual(len(result), 3)
 
-    @patch("src.catalog.get_rss_episodes")
+    @patch("src.web.rss.get_rss_episodes")
     def test_two_sources_deduplicates_overlap(self, mock_rss):
         ep1 = _ep("1", "Episode One", pub_date=_dt(2024, 2, 6))
         ep2 = _ep("2", "Episode Two", pub_date=_dt(2024, 2, 13))
         ep3 = _ep("3", "Episode Three", pub_date=_dt(2024, 2, 20))
         ep2_dup = _ep("2b", "Episode Two", pub_date=_dt(2024, 2, 13))  # same episode, second source
         mock_rss.side_effect = [[ep1, ep2], [ep2_dup, ep3]]
+        context = EpisodeFetchContext(title="Test Show", is_reference=True)
         result = _collect_episodes(
             [
                 _rss_source("https://a.com/feed.rss"),
                 _rss_source("https://b.com/feed.rss"),
             ],
-            "Test Show",
-            True,
+            context,
         )
         titles = [ep.title for ep in result]
         self.assertEqual(len(result), 3)
         self.assertEqual(titles.count("Episode Two"), 1)
 
-    @patch("src.catalog.get_rss_episodes")
+    @patch("src.web.rss.get_rss_episodes")
     def test_two_sources_no_overlap(self, mock_rss):
         mock_rss.side_effect = [
             [_ep("1", "Episode One", pub_date=_dt(2024, 2, 6))],
             [_ep("2", "Episode Two", pub_date=_dt(2024, 2, 13))],
         ]
+        context = EpisodeFetchContext(title="Test Show", is_reference=True)
         result = _collect_episodes(
             [
                 _rss_source("https://a.com/feed.rss"),
                 _rss_source("https://b.com/feed.rss"),
             ],
-            "Test Show",
-            True,
+            context,
         )
         self.assertEqual(len(result), 2)
 
     def test_empty_sources_returns_empty(self):
-        result = _collect_episodes([], "Test Show", True)
+        context = EpisodeFetchContext(title="Test Show", is_reference=True)
+        result = _collect_episodes([], context)
         self.assertEqual(result, [])
 
 
@@ -135,14 +138,14 @@ class TestCollectEpisodes(unittest.TestCase):
 
 
 class TestProcessFeeds(unittest.TestCase):
-    @patch("src.catalog.get_rss_episodes")
+    @patch("src.web.rss.get_rss_episodes")
     def test_rss_source_no_filter_returns_all(self, mock_rss):
         eps = [_ep(str(i), f"Ep {i}") for i in range(5)]
         mock_rss.return_value = eps
         result = process_feeds(_config(references=[_rss_source()]))
         self.assertEqual(len(result), 5)
 
-    @patch("src.catalog.get_rss_episodes")
+    @patch("src.web.rss.get_rss_episodes")
     def test_r_rules_forwarded_to_get_rss_episodes(self, mock_rss):
         """process_feeds must pass r_rules from config through to get_rss_episodes."""
         mock_rss.return_value = []
@@ -152,15 +155,15 @@ class TestProcessFeeds(unittest.TestCase):
         # get_rss_episodes(url, filter_regex, r_rules, callback)
         self.assertEqual(mock_rss.call_args[0][2], rules)
 
-    @patch("src.catalog.get_youtube_episodes")
+    @patch("src.youtube.metadata.get_youtube_episodes")
     def test_youtube_source_returns_all(self, mock_yt):
         eps = [_ep("yt1", "YT Ep 1"), _ep("yt2", "YT Ep 2"), _ep("yt3", "YT Ep 3")]
         mock_yt.return_value = eps
         result = process_feeds(_config(references=[_yt_source()]))
         self.assertEqual(len(result), 3)
 
-    @patch("src.catalog.get_rss_episodes")
-    @patch("src.catalog.get_youtube_episodes")
+    @patch("src.web.rss.get_rss_episodes")
+    @patch("src.youtube.metadata.get_youtube_episodes")
     def test_multiple_sources_merged(self, mock_yt, mock_rss):
         mock_rss.return_value = [_ep("r1", "RSS Ep 1"), _ep("r2", "RSS Ep 2")]
         mock_yt.return_value = [_ep("yt1", "YT Ep 3")]
@@ -178,7 +181,7 @@ class TestProcessFeeds(unittest.TestCase):
 
 
 class TestProcessSources(unittest.TestCase):
-    @patch("src.catalog.get_youtube_episodes")
+    @patch("src.youtube.metadata.get_youtube_episodes")
     def test_returns_youtube_episodes(self, mock_yt):
         mock_yt.return_value = [_ep("yt1", "YT Ep A"), _ep("yt2", "YT Ep B")]
         result = process_sources(_config(downloads=[_yt_source()]))
@@ -195,8 +198,8 @@ class TestProcessSources(unittest.TestCase):
 
 
 class TestFullPipeline(unittest.TestCase):
-    @patch("src.catalog.get_rss_episodes")
-    @patch("src.catalog.get_youtube_episodes")
+    @patch("src.web.rss.get_rss_episodes")
+    @patch("src.youtube.metadata.get_youtube_episodes")
     def test_only_matched_downloads_survive(self, mock_yt, mock_rss):
         ep1 = _ep("r1", "The Show: Episode 101", pub_date=_dt(2024, 2, 6))
         ep2 = _ep("r2", "The Show: Episode 102", pub_date=_dt(2024, 2, 13))
@@ -221,8 +224,8 @@ class TestFullPipeline(unittest.TestCase):
         self.assertIn("The Show: Episode 102", survived_titles)
         self.assertNotIn("Science Quarterly: Quantum Tunneling", survived_titles)
 
-    @patch("src.catalog.get_rss_episodes")
-    @patch("src.catalog.get_youtube_episodes")
+    @patch("src.web.rss.get_rss_episodes")
+    @patch("src.youtube.metadata.get_youtube_episodes")
     def test_merge_config_records_source_traces(self, mock_yt, mock_rss):
         mock_rss.return_value = [_ep("r1", "RSS Episode", pub_date=_dt(2024, 2, 6))]
         mock_yt.return_value = [_ep("d1", "YT Episode", pub_date=_dt(2024, 2, 6))]
@@ -237,7 +240,8 @@ class TestFullPipeline(unittest.TestCase):
             downloads=[_yt_source()],
         )
 
-        result = merge_config(config)
+        from src.catalog import MergeConfigOptions
+        result = merge_config(config, MergeConfigOptions())
 
         self.assertEqual(len(result.source_traces), 2)
         reference_trace = next(trace for trace in result.source_traces if trace.role == "reference")
@@ -248,8 +252,8 @@ class TestFullPipeline(unittest.TestCase):
         self.assertFalse(download_trace.has_filters)
         self.assertEqual(download_trace.source_type, "youtube")
 
-    @patch("src.catalog.get_rss_episodes")
-    @patch("src.catalog.get_youtube_episodes")
+    @patch("src.web.rss.get_rss_episodes")
+    @patch("src.youtube.metadata.get_youtube_episodes")
     def test_daily_show_scenario(self, mock_yt, mock_rss):
         """Regression: only episodes matching a reference should survive.
 
@@ -302,7 +306,7 @@ class TestFullPipeline(unittest.TestCase):
                 ep.pub_date, _dt(2024, 1, 1), f"Old episode slipped through: {ep.title}"
             )
 
-    @patch("src.catalog.get_youtube_episodes")
+    @patch("src.youtube.metadata.get_youtube_episodes")
     def test_no_references_keeps_all_downloads(self, mock_yt):
         """When references is empty, the fallback in download.py keeps all downloads."""
         mock_yt.return_value = [_ep("a", "Ep A"), _ep("b", "Ep B")]
@@ -319,8 +323,8 @@ class TestFullPipeline(unittest.TestCase):
 
         self.assertEqual(len(survived), 2)
 
-    @patch("src.catalog.get_rss_episodes")
-    @patch("src.catalog.get_youtube_episodes")
+    @patch("src.web.rss.get_rss_episodes")
+    @patch("src.youtube.metadata.get_youtube_episodes")
     def test_unmatched_reference_is_dropped(self, mock_yt, mock_rss):
         """A reference with no matching download produces no output episode."""
         mock_rss.return_value = [
@@ -339,8 +343,8 @@ class TestFullPipeline(unittest.TestCase):
 
         self.assertEqual(pairs, [])
 
-    @patch("src.catalog.get_rss_episodes")
-    @patch("src.catalog.get_youtube_episodes")
+    @patch("src.web.rss.get_rss_episodes")
+    @patch("src.youtube.metadata.get_youtube_episodes")
     def test_unmatched_download_is_dropped(self, mock_yt, mock_rss):
         """A download with no reference counterpart must not survive alignment."""
         matched_ref = _ep("ref1", "The Show: Episode 5", pub_date=_dt(2024, 3, 5))
