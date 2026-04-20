@@ -241,6 +241,7 @@ class TestFullPipeline(unittest.TestCase):
         )
 
         from src.catalog import MergeConfigOptions
+
         result = merge_config(config, MergeConfigOptions())
 
         self.assertEqual(len(result.source_traces), 2)

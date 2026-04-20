@@ -94,6 +94,7 @@ class FeedSource(BaseModel):
     url: str
     filters: SourceFilter = SourceFilter()
 
+
 class PodcastConfig(BaseModel):
     """Configuration for a single podcast series."""
 
