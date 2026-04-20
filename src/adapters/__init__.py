@@ -1,5 +1,7 @@
 """Adapter implementations for various ports."""
 
+import os
+
 from src.app_common import FeedSource
 from src.ports.episode_source import EpisodeSourcePort
 from src.utils.text import is_youtube_channel
@@ -53,3 +55,30 @@ def get_report_adapter():
     from src.adapters.report import FileReportAdapter
 
     return FileReportAdapter()
+
+
+def get_secret_provider_adapter(provider_name: str | None = None):
+    """Return the configured secret provider adapter instance."""
+    selected = (provider_name or os.getenv("ADRIFT_SECRETS_PROVIDER", "env")).lower()
+    if selected == "docker":
+        from src.adapters.secrets.docker_secrets import DockerSecretProvider
+
+        return DockerSecretProvider()
+
+    if selected == "env":
+        from src.adapters.secrets.env_secrets import EnvironmentSecretProvider
+
+        return EnvironmentSecretProvider()
+
+    raise ValueError(f"Unsupported secret provider: {selected}")
+
+
+def get_secret_store_adapter(provider_name: str | None = None, *, env_file: str = ".env"):
+    """Return a writable secret store for the selected provider."""
+    selected = (provider_name or os.getenv("ADRIFT_SECRETS_PROVIDER", "env")).lower()
+    if selected == "env":
+        from src.adapters.secrets.env_secrets import EnvironmentSecretStore
+
+        return EnvironmentSecretStore(env_file=env_file)
+
+    raise ValueError(f"Secret store is not writable for provider: {selected}")

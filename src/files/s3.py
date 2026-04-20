@@ -18,18 +18,14 @@ from mypy_boto3_s3 import S3Client
 from mypy_boto3_s3.type_defs import CopySourceTypeDef
 from pydantic import BaseModel, ConfigDict
 
-from src.adapters.secrets.docker_secrets import DockerSecretProvider
-from src.adapters.secrets.env_secrets import EnvironmentSecretProvider
+from src.adapters import get_secret_provider_adapter
 from src.models import CacheMetadata, MediaMetadata, S3Metadata
 from src.ports.secrets import SecretProviderPort, require_secrets
 from src.utils.progress import Callback
 
-# Select secret provider based on ADRIFT_SECRETS_PROVIDER env var
-_provider_name = os.getenv("ADRIFT_SECRETS_PROVIDER", "env").lower()
-if _provider_name == "docker":
-    _secret_provider: SecretProviderPort = DockerSecretProvider()
-else:
-    _secret_provider: SecretProviderPort = EnvironmentSecretProvider()
+_REQUIRED_S3_KEYS = ("S3_USERNAME", "S3_SECRET_KEY", "S3_ENDPOINT", "S3_REGION")
+
+_secret_provider: SecretProviderPort = get_secret_provider_adapter()
 
 S3_ENDPOINT = _secret_provider.get("S3_ENDPOINT", "")
 
@@ -50,13 +46,13 @@ def set_secret_provider(provider: SecretProviderPort) -> None:
 
 def reset_secret_provider() -> None:
     """Restore default environment-backed secret provider."""
-    set_secret_provider(EnvironmentSecretProvider())
+    set_secret_provider(get_secret_provider_adapter("env"))
 
 
 def _require_s3_env() -> tuple[str, str, str, str]:
     values = require_secrets(
         _secret_provider,
-        ["S3_USERNAME", "S3_SECRET_KEY", "S3_ENDPOINT", "S3_REGION"],
+        _REQUIRED_S3_KEYS,
     )
     return (
         values["S3_USERNAME"],
@@ -64,6 +60,24 @@ def _require_s3_env() -> tuple[str, str, str, str]:
         values["S3_ENDPOINT"],
         values["S3_REGION"],
     )
+
+
+def validate_s3_provider(
+    provider: SecretProviderPort | None = None,
+    *,
+    check_endpoint: bool,
+) -> None:
+    active_provider = provider or _secret_provider
+    values = require_secrets(active_provider, _REQUIRED_S3_KEYS)
+    if not check_endpoint:
+        return
+    local_endpoint = active_provider.get("LOCAL_S3_ENDPOINT", _LOCAL_S3_ENDPOINT)
+    if local_endpoint and _is_endpoint_reachable_with_provider(local_endpoint, active_provider):
+        return
+    endpoint = values["S3_ENDPOINT"]
+    if _is_endpoint_reachable_with_provider(endpoint, active_provider):
+        return
+    raise RuntimeError(f"Unable to reach configured S3 endpoint: {endpoint}")
 
 
 def _s3_cache() -> Cache:
@@ -148,6 +162,14 @@ def _make_boto_config(
 
 
 def _is_endpoint_reachable(url: str, timeout: float = 2.0) -> bool:
+    return _is_endpoint_reachable_with_provider(url, _secret_provider, timeout=timeout)
+
+
+def _is_endpoint_reachable_with_provider(
+    url: str,
+    provider: SecretProviderPort,
+    timeout: float = 2.0,
+) -> bool:
     """Return True if an actual S3 API call succeeds against the endpoint.
 
     A plain HTTP GET (or TCP probe) is not sufficient — a reverse proxy may
@@ -156,18 +178,18 @@ def _is_endpoint_reachable(url: str, timeout: float = 2.0) -> bool:
     list_buckets() so the check exercises the same code-path as normal usage.
     """
     try:
-        username, secret_key, _, region = _require_s3_env()
+        values = require_secrets(provider, _REQUIRED_S3_KEYS)
         cfg = _make_boto_config(connect_timeout=timeout, read_timeout=timeout, max_attempts=1)
         boto3_factory: Callable[..., Any] = boto3.client  # pyright: ignore[reportUnknownVariableType]
         client = cast(  # pyright: ignore[reportUnknownVariableType]
             S3Client,
             boto3_factory(
                 "s3",
-                aws_access_key_id=username,
-                aws_secret_access_key=secret_key,
+                aws_access_key_id=values["S3_USERNAME"],
+                aws_secret_access_key=values["S3_SECRET_KEY"],
                 endpoint_url=url,
                 config=cfg,
-                region_name=region,
+                region_name=values["S3_REGION"],
             ),
         )
         client.list_buckets()

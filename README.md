@@ -110,6 +110,28 @@ When `--output-dir` is set, the merge run writes:
 
 Note: the per-feed `references.json` and `downloads.json` files are no longer written by default; their contents are included in the `MergeResult` stored in `feeds/combined.json`.
 
+## Secret Management
+
+Use the secret-management TUI to inspect and update the required S3 settings stored in `.env`.
+
+```bash
+poetry run adrift-secrets
+```
+
+The first version manages these keys:
+
+- `S3_USERNAME`
+- `S3_SECRET_KEY`
+- `S3_ENDPOINT`
+- `S3_REGION`
+
+Notes:
+
+- Values written through the TUI are persisted to `.env`.
+- The table masks sensitive values such as `S3_SECRET_KEY`.
+- Validation can check either that required keys are present or that the configured S3 endpoint is reachable.
+- Runtime secret-provider selection still uses `ADRIFT_SECRETS_PROVIDER`; only the env-backed provider is writable through the TUI today.
+
 ## Containerized Download Run
 
 The download pipeline can run in Docker via `compose.download.yaml` and `Dockerfile.download`.

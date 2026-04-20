@@ -9,6 +9,7 @@ packages = [{ include = "src" }, { include = "runbook" }]
 [tool.poetry.scripts]
 adrift-merge = "runbook.merge:main"
 adrift-download = "runbook.download:main"
+adrift-secrets = "runbook.secrets:main"
 adrift-validate-configs = "runbook.quality.validate_configs:main"
 adrift-build-diagram = "runbook.analysis.build_diagram:main"
 adrift-build-hotspots = "runbook.analysis.build_hotspots:main"
