@@ -4,12 +4,13 @@ import tempfile
 from collections.abc import Callable
 from dataclasses import dataclass
 from datetime import datetime, timezone
+from functools import lru_cache
 from pathlib import Path
 
 from src.app_common import PodcastConfig
 from src.catalog import match, process_feeds
 from src.files.audio import convert_to_opus, cut_segments, get_duration, is_audio
-from src.files.s3 import exists, upload_file
+from src.files.s3 import exists, get_file_list, get_metadata, upload_file
 from src.models import MediaMetadata, RssChannel, RssEpisode
 from src.models.pipeline import DownloadEpisode, MergeResult
 from src.utils.progress import Callback
@@ -69,7 +70,40 @@ def build_download_queue(
 def _episode_exists_on_s3(ep: DownloadEpisode, config: PodcastConfig) -> bool:
     bucket, prefix = _s3_prefix(config)
     key_prefix = f"{prefix}/{_episode_slug(config, ep)}"
-    return exists(bucket, key_prefix) is not None
+    if exists(bucket, key_prefix) is not None:
+        return True
+    return _existing_media_sources(bucket, prefix).matches(ep)
+
+
+@dataclass(frozen=True)
+class _ExistingMediaSources:
+    source_urls: frozenset[str]
+    youtube_video_ids: frozenset[str]
+
+    def matches(self, ep: DownloadEpisode) -> bool:
+        if ep.episode.content in self.source_urls:
+            return True
+        return ep.video_id is not None and ep.video_id in self.youtube_video_ids
+
+
+@lru_cache(maxsize=128)
+def _existing_media_sources(bucket: str, prefix: str) -> _ExistingMediaSources:
+    source_urls: set[str] = set()
+    youtube_video_ids: set[str] = set()
+
+    for name in get_file_list(bucket, prefix, False):
+        metadata = get_metadata(bucket, _prefixed_s3_key(prefix, name))
+        if metadata is None:
+            continue
+        source_urls.add(metadata.source)
+        if video_id := _extract_video_id(metadata.source):
+            youtube_video_ids.add(video_id)
+
+    return _ExistingMediaSources(frozenset(source_urls), frozenset(youtube_video_ids))
+
+
+def _prefixed_s3_key(prefix: str, name: str) -> str:
+    return f"{prefix}/{name}" if prefix else name
 
 
 def _download_queue_sort_key(item: DownloadQueueItem) -> tuple[bool, float, str]:

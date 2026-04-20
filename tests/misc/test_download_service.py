@@ -1,9 +1,10 @@
 from datetime import datetime, timezone
 
 from src.app_common import PodcastConfig
+from src.models import MediaMetadata
 from src.models.metadata import RssEpisode
 from src.models.pipeline import DownloadEpisode
-from src.orchestration.download_service import build_download_queue
+from src.orchestration.download_service import _episode_exists_on_s3, build_download_queue
 
 
 def _episode(title: str, pub_date: datetime | None = None) -> DownloadEpisode:
@@ -69,3 +70,78 @@ def test_build_download_queue_preserves_unknown_dates_after_dated_missing(monkey
         "Dated Missing",
         "Undated Missing",
     ]
+
+
+def test_episode_exists_on_s3_matches_existing_youtube_video_id(monkeypatch) -> None:
+    episode = DownloadEpisode(
+        episode=RssEpisode(
+            id="new-title",
+            title="New YouTube Title",
+            author="CreepCast",
+            content="https://youtube.com/watch?v=stable-video-id",
+            pub_date=datetime(2026, 4, 20, tzinfo=timezone.utc),
+        ),
+        sponsor_segments=[],
+        video_id="stable-video-id",
+    )
+    config = _config()
+
+    monkeypatch.setattr("src.orchestration.download_service.exists", lambda bucket, key: None)
+    monkeypatch.setattr(
+        "src.orchestration.download_service.get_file_list",
+        lambda bucket, prefix, without_extensions=False: ["old-title.opus"],
+    )
+    monkeypatch.setattr(
+        "src.orchestration.download_service.get_metadata",
+        lambda bucket, key: MediaMetadata(
+            duration=1.0,
+            source="https://youtube.com/watch?v=stable-video-id",
+            upload_date=datetime(2026, 4, 19, tzinfo=timezone.utc),
+            sponsors_removed=False,
+        ),
+    )
+    from src.orchestration import download_service
+
+    download_service._existing_media_sources.cache_clear()
+
+    assert _episode_exists_on_s3(episode, config) is True
+
+
+def test_episode_exists_on_s3_matches_existing_direct_source_url(monkeypatch) -> None:
+    episode = DownloadEpisode(
+        episode=RssEpisode(
+            id="direct-id",
+            title="Renamed Direct Source",
+            author="Test Show",
+            content="https://cdn.example.com/audio/episode.mp3",
+            pub_date=datetime(2026, 4, 20, tzinfo=timezone.utc),
+        ),
+        sponsor_segments=[],
+        video_id=None,
+    )
+    config = PodcastConfig(
+        name="Test Show",
+        path="/media/podcasts/test-show",
+        references=[],
+        downloads=[],
+    )
+
+    monkeypatch.setattr("src.orchestration.download_service.exists", lambda bucket, key: None)
+    monkeypatch.setattr(
+        "src.orchestration.download_service.get_file_list",
+        lambda bucket, prefix, without_extensions=False: ["old-direct-title.opus"],
+    )
+    monkeypatch.setattr(
+        "src.orchestration.download_service.get_metadata",
+        lambda bucket, key: MediaMetadata(
+            duration=1.0,
+            source="https://cdn.example.com/audio/episode.mp3",
+            upload_date=datetime(2026, 4, 19, tzinfo=timezone.utc),
+            sponsors_removed=False,
+        ),
+    )
+    from src.orchestration import download_service
+
+    download_service._existing_media_sources.cache_clear()
+
+    assert _episode_exists_on_s3(episode, config) is True
