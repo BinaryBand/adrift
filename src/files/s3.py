@@ -7,16 +7,21 @@ from dataclasses import dataclass
 from functools import wraps
 from pathlib import Path
 from threading import Lock
-from typing import Any, Callable, ParamSpec, TypeVar, cast
+from typing import TYPE_CHECKING, Any, Callable, ParamSpec, TypeVar, cast
 from urllib.parse import urljoin
 
 import boto3
 from boto3.s3.transfer import TransferConfig
 from botocore.client import Config
 from diskcache import Cache
-from mypy_boto3_s3 import S3Client
-from mypy_boto3_s3.type_defs import CopySourceTypeDef
 from pydantic import BaseModel, ConfigDict
+
+if TYPE_CHECKING:
+    from mypy_boto3_s3 import S3Client
+    from mypy_boto3_s3.type_defs import CopySourceTypeDef
+else:
+    S3Client = Any
+    CopySourceTypeDef = dict[str, Any]
 
 from src.adapters import get_secret_provider_adapter
 from src.models import CacheMetadata, MediaMetadata, S3Metadata

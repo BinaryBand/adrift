@@ -147,8 +147,17 @@ Prerequisites:
 Build and run:
 
 ```bash
-docker compose -f compose.download.yaml build
-docker compose -f compose.download.yaml run --rm adrift-download --skip-download
+make build
+make download ARGS="--skip-download"
+```
+
+You can pass any `runbook/download.py` CLI flags through `ARGS`, for example `make download ARGS="--include config/youtube.toml --max-downloads 3"`.
+
+The Makefile is the main Docker entrypoint:
+
+```bash
+make help
+make merge ARGS="--include config/podcasts.toml --pretty"
 ```
 
 Notes:
