@@ -8,7 +8,7 @@ import typer
 
 from src.app_common import PodcastConfig
 from src.models.pipeline import DownloadEpisode
-from src.orchestration.download_service import DownloadQueueItem
+from src.orchestration.download_service import DownloadProgressHooks, DownloadQueueItem
 
 DF_TARGETS = ["config/*.toml"]
 DEFAULT_MAX_DOWNLOADS = 10
@@ -17,6 +17,12 @@ DEFAULT_BOT_COOLDOWN = 300
 
 class _DownloadUiPort(Protocol):
     def emit(self, level: Any, message: str) -> None: ...
+
+    def set_operation(self, operation: str) -> None: ...
+
+    def clear_operation(self) -> None: ...
+
+    def operation_callback(self, current: int, total: int | None) -> None: ...
 
 
 def _download_episodes(
@@ -27,7 +33,9 @@ def _download_episodes(
     max_downloads: int,
     ui: _DownloadUiPort,
     build_download_queue: Callable[[list[DownloadEpisode], PodcastConfig], list[DownloadQueueItem]],
-    download_and_upload: Callable[[DownloadEpisode, PodcastConfig], bool],
+    download_and_upload: Callable[
+        [DownloadEpisode, PodcastConfig, DownloadProgressHooks | None], bool
+    ],
     bot_detection_error: type[BaseException],
 ) -> int:
     additional_downloads = 0
@@ -37,12 +45,18 @@ def _download_episodes(
         if queue_item.exists_on_s3:
             continue
         try:
-            newly_uploaded = download_and_upload(queue_item.episode, config)
+            progress_hooks = DownloadProgressHooks(
+                on_operation=ui.set_operation,
+                on_progress=ui.operation_callback,
+                on_complete=ui.clear_operation,
+            )
+            newly_uploaded = download_and_upload(queue_item.episode, config, progress_hooks)
             if newly_uploaded:
                 additional_downloads += 1
         except bot_detection_error:
             raise
         except Exception as exc:
+            ui.clear_operation()
             ui.emit("error", f"{config.name} — {queue_item.episode.episode.title}: {exc}")
     return additional_downloads
 

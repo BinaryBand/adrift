@@ -1,6 +1,7 @@
 """Three-stage download pipeline: enrich → download/upload → update RSS."""
 
 import tempfile
+from collections.abc import Callable
 from dataclasses import dataclass
 from datetime import datetime, timezone
 from pathlib import Path
@@ -11,6 +12,7 @@ from src.files.audio import convert_to_opus, cut_segments, get_duration, is_audi
 from src.files.s3 import exists, upload_file
 from src.models import MediaMetadata, RssChannel, RssEpisode
 from src.models.pipeline import DownloadEpisode, MergeResult
+from src.utils.progress import Callback
 from src.utils.regex import YOUTUBE_VIDEO_REGEX
 from src.web.rss import download_direct, podcast_to_rss
 from src.web.sponsorblock import fetch_sponsor_segments
@@ -42,6 +44,13 @@ def _extract_video_id(content: str) -> str | None:
 class DownloadQueueItem:
     episode: DownloadEpisode
     exists_on_s3: bool
+
+
+@dataclass(frozen=True)
+class DownloadProgressHooks:
+    on_operation: Callable[[str], None] | None = None
+    on_progress: Callback | None = None
+    on_complete: Callable[[], None] | None = None
 
 
 def build_download_queue(
@@ -85,7 +94,11 @@ def _episode_sort_timestamp(pub_date: datetime | None) -> float:
 # ---------------------------------------------------------------------------
 
 
-def download_and_upload(ep: DownloadEpisode, config: PodcastConfig) -> bool:
+def download_and_upload(
+    ep: DownloadEpisode,
+    config: PodcastConfig,
+    progress_hooks: DownloadProgressHooks | None = None,
+) -> bool:
     """Download one episode, remove ads, convert to Opus, upload to S3.
 
     Returns True if newly uploaded, False if already present on S3.
@@ -95,21 +108,49 @@ def download_and_upload(ep: DownloadEpisode, config: PodcastConfig) -> bool:
     if exists(bucket, key_prefix):
         return False
     with tempfile.TemporaryDirectory() as tmp:
-        return _process_in_tmpdir(ep, bucket, key_prefix, Path(tmp))
+        return _process_in_tmpdir(ep, config, Path(tmp), progress_hooks)
 
 
-def _process_in_tmpdir(ep: DownloadEpisode, bucket: str, key_prefix: str, tmp: Path) -> bool:
-    audio = _download_audio(ep, tmp)
+def _process_in_tmpdir(
+    ep: DownloadEpisode,
+    config: PodcastConfig,
+    tmp: Path,
+    progress_hooks: DownloadProgressHooks | None,
+) -> bool:
+    bucket, prefix = _s3_prefix(config)
+    key_prefix = f"{prefix}/{_episode_slug(config, ep)}"
+    _start_operation(progress_hooks, f"download audio: {ep.episode.title}")
+    audio = _download_audio(ep, tmp, _operation_progress(progress_hooks))
     if audio is None:
+        _complete_operation(progress_hooks)
         return False
     if ep.sponsor_segments:
-        cut_segments(audio, ep.sponsor_segments)
-    opus = convert_to_opus(audio)
+        _start_operation(progress_hooks, f"cut sponsors: {ep.episode.title}")
+        cut_segments(audio, ep.sponsor_segments, callback=_operation_progress(progress_hooks))
+    _start_operation(progress_hooks, f"convert opus: {ep.episode.title}")
+    opus = convert_to_opus(audio, callback=_operation_progress(progress_hooks))
+    _complete_operation(progress_hooks)
     duration = get_duration(opus)
     key = f"{key_prefix}.opus"
     metadata = _build_metadata(ep, duration, sponsors_removed=bool(ep.sponsor_segments))
     upload_file(bucket, key, opus, metadata)
     return True
+
+
+def _start_operation(progress_hooks: DownloadProgressHooks | None, label: str) -> None:
+    if progress_hooks is not None and progress_hooks.on_operation is not None:
+        progress_hooks.on_operation(label)
+
+
+def _complete_operation(progress_hooks: DownloadProgressHooks | None) -> None:
+    if progress_hooks is not None and progress_hooks.on_complete is not None:
+        progress_hooks.on_complete()
+
+
+def _operation_progress(progress_hooks: DownloadProgressHooks | None) -> Callback | None:
+    if progress_hooks is None:
+        return None
+    return progress_hooks.on_progress
 
 
 def _episode_slug(config: PodcastConfig, ep: DownloadEpisode) -> str:
@@ -118,9 +159,11 @@ def _episode_slug(config: PodcastConfig, ep: DownloadEpisode) -> str:
     return normalize_title(config.name, ep.episode.title)
 
 
-def _download_audio(ep: DownloadEpisode, dest: Path) -> Path | None:
+def _download_audio(
+    ep: DownloadEpisode, dest: Path, callback: Callback | None = None
+) -> Path | None:
     if ep.video_id:
-        return download_video(ep.episode.content, dest)
+        return download_video(ep.episode.content, dest, callback=callback)
     return download_direct(ep.episode.content, dest)
 
 

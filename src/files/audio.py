@@ -4,7 +4,7 @@ import shutil
 import subprocess
 import tempfile
 from pathlib import Path
-from typing import Any, cast
+from typing import Any, TypedDict, Unpack, cast
 
 from src.utils.progress import Callback
 
@@ -15,6 +15,32 @@ MIN_LENGTH = 0.1  # seconds
 _FFMPEG_BASE = ["ffmpeg", "-hide_banner", "-loglevel", "error"]
 
 AUDIO_EXTENSIONS = {".mp3", ".m4a", ".aac", ".wav", ".flac", ".ogg", ".mp4", ".opus"}
+
+
+class OpusConversionKwargs(TypedDict, total=False):
+    target_bitrate_kbps: int | None
+    force_bitrate: bool
+    application: str
+
+
+class _OpusConversionSettings:
+    def __init__(
+        self,
+        target_bitrate_kbps: int | None = None,
+        force_bitrate: bool = False,
+        application: str = "audio",
+    ) -> None:
+        self.target_bitrate_kbps = target_bitrate_kbps
+        self.force_bitrate = force_bitrate
+        self.application = application
+
+
+def _build_opus_settings(kwargs: OpusConversionKwargs) -> _OpusConversionSettings:
+    return _OpusConversionSettings(
+        target_bitrate_kbps=kwargs.get("target_bitrate_kbps"),
+        force_bitrate=kwargs.get("force_bitrate", False),
+        application=kwargs.get("application", "audio"),
+    )
 
 
 def _duration_weights(part_count: int) -> tuple[int, ...] | None:
@@ -286,7 +312,7 @@ def run_ffprobe_json(check_file: Path) -> dict[str, Any]:
     return data
 
 
-def _run_ffmpeg_convert(cmd: list[str], file: Path, output: Path, ffprobe_out: str) -> None:
+def _run_ffmpeg_convert(cmd: list[str], file: Path, ffprobe_out: str) -> None:
     """Run ffmpeg conversion command and raise a RuntimeError with stderr on failure."""
     try:
         subprocess.run(cmd, check=True, capture_output=True)
@@ -299,6 +325,66 @@ def _run_ffmpeg_convert(cmd: list[str], file: Path, output: Path, ffprobe_out: s
             f"Error output: {stderr}\n"
             f"ffprobe: {ffprobe_out if ffprobe_out else 'no ffprobe output'}"
         ) from e
+
+
+def _run_ffmpeg_convert_with_progress(
+    cmd: list[str],
+    file: Path,
+    ffprobe_out: str,
+    callback: Callback,
+) -> None:
+    progress_cmd = _FFMPEG_BASE + ["-progress", "pipe:1", "-nostats", *cmd[len(_FFMPEG_BASE) :]]
+    total_duration = _parse_ffprobe_duration(ffprobe_out)
+    total_seconds = max(int(total_duration), 1)
+    return_code, stderr = _run_ffmpeg_progress_process(progress_cmd, total_seconds, callback)
+
+    callback(total_seconds, total_seconds)
+    if return_code != 0:
+        raise RuntimeError(
+            f"ffmpeg failed to convert {file} to opus\n"
+            f"Command: {' '.join(progress_cmd)}\n"
+            f"Exit code: {return_code}\n"
+            f"Error output: {stderr or 'No error'}\n"
+            f"ffprobe: {ffprobe_out if ffprobe_out else 'no ffprobe output'}"
+        )
+
+
+def _run_ffmpeg_progress_process(
+    progress_cmd: list[str],
+    total_seconds: int,
+    callback: Callback,
+) -> tuple[int, str]:
+
+    with subprocess.Popen(
+        progress_cmd,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+        text=True,
+        encoding="utf-8",
+        errors="ignore",
+    ) as process:
+        assert process.stdout is not None, "ffmpeg progress stream not available"
+        for raw_line in process.stdout:
+            _maybe_report_ffmpeg_progress(raw_line, total_seconds, callback)
+
+        stderr = process.stderr.read() if process.stderr is not None else ""
+        return_code = process.wait()
+    return return_code, stderr
+
+
+def _maybe_report_ffmpeg_progress(
+    raw_line: str,
+    total_seconds: int,
+    callback: Callback,
+) -> None:
+    if not raw_line.startswith("out_time_us="):
+        return
+    try:
+        current_microseconds = int(raw_line.split("=", 1)[1].strip())
+    except ValueError:
+        return
+    current_seconds = max(current_microseconds // 1_000_000, 0)
+    callback(min(current_seconds, total_seconds), total_seconds)
 
 
 def _build_opus_copy_cmd(src: Path, dest: Path) -> list[str]:
@@ -430,9 +516,7 @@ def _log_space_change(src: Path, dest: Path) -> None:
 
 def _prepare_opus_conversion(
     file: Path,
-    target_bitrate_kbps: int | None,
-    force_bitrate: bool,
-    application: str,
+    settings: _OpusConversionSettings,
 ) -> tuple[Path, list[str], str]:
     output = file.with_suffix(".opus")
     ffprobe_out = _ensure_audio_stream(file)
@@ -442,25 +526,30 @@ def _prepare_opus_conversion(
     if audio_stream.get("codec_name") == "opus":
         return output, _build_opus_copy_cmd(file, output), ffprobe_out
     src_kbps = _extract_stream_bitrate_kbps(ffprobe_out)
-    final_bitrate = _decide_final_bitrate(src_kbps, target_bitrate_kbps, force_bitrate)
-    cmd = _build_opus_cmd(file, output, final_bitrate, application)
+    final_bitrate = _decide_final_bitrate(
+        src_kbps,
+        settings.target_bitrate_kbps,
+        settings.force_bitrate,
+    )
+    cmd = _build_opus_cmd(file, output, final_bitrate, settings.application)
     return output, cmd, ffprobe_out
 
 
 def convert_to_opus(
     file: Path,
-    target_bitrate_kbps: int | None = None,
-    force_bitrate: bool = False,
-    application: str = "audio",
+    callback: Callback | None = None,
+    **kwargs: Unpack[OpusConversionKwargs],
 ) -> Path:
     """Convert `file` to Opus."""
     if file.suffix.lower() == ".opus":
         return file
 
-    output, cmd, ffprobe_out = _prepare_opus_conversion(
-        file, target_bitrate_kbps, force_bitrate, application
-    )
-    _run_ffmpeg_convert(cmd, file, output, ffprobe_out)
+    settings = _build_opus_settings(kwargs)
+    output, cmd, ffprobe_out = _prepare_opus_conversion(file, settings)
+    if callback is None:
+        _run_ffmpeg_convert(cmd, file, ffprobe_out)
+    else:
+        _run_ffmpeg_convert_with_progress(cmd, file, ffprobe_out, callback)
 
     _log_space_change(file, output)
 

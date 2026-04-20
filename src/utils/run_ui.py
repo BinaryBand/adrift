@@ -10,11 +10,20 @@ from tqdm import tqdm
 from src.utils.progress import Callback
 from src.utils.terminal import Level, using_terminal_emitter
 
+_PROGRESS_META_WIDTH = 38
+
 
 def _render_stage_description(name: str, stage: str | None) -> str:
     if not stage:
         return name
     return f"{name} [{stage}]"
+
+
+def _fit_progress_description(description: str, console_width: int) -> str:
+    max_width = max(console_width - _PROGRESS_META_WIDTH, 24)
+    if len(description) <= max_width:
+        return description
+    return f"{description[: max_width - 3].rstrip()}..."
 
 
 class BaseRunUI(AbstractContextManager["BaseRunUI"]):
@@ -23,12 +32,16 @@ class BaseRunUI(AbstractContextManager["BaseRunUI"]):
         self.label = label
         self.current_name = label
         self.current_stage: str | None = None
+        self.current_operation: str | None = None
 
     def stage_callback(self, stage: str) -> None:
         self.set_stage(stage)
 
     def progress_callback(self, current: int, total: int | None) -> None:
         self.update_progress(current, total)
+
+    def operation_callback(self, current: int, total: int | None) -> None:
+        self.update_operation_progress(current, total)
 
     def output_context(self):
         return using_terminal_emitter(self.emit)
@@ -40,7 +53,16 @@ class BaseRunUI(AbstractContextManager["BaseRunUI"]):
     def set_stage(self, stage: str) -> None:
         self.current_stage = stage
 
+    def set_operation(self, operation: str) -> None:
+        self.current_operation = operation
+
+    def clear_operation(self) -> None:
+        self.current_operation = None
+
     def update_progress(self, current: int, total: int | None) -> None:
+        del current, total
+
+    def update_operation_progress(self, current: int, total: int | None) -> None:
         del current, total
 
     def advance(self) -> None:
@@ -72,6 +94,14 @@ class TqdmRunUI(BaseRunUI):
         super().set_stage(stage)
         self._bar.set_postfix_str(stage)
 
+    def set_operation(self, operation: str) -> None:
+        super().set_operation(operation)
+        self._bar.set_postfix_str(f"{self.current_stage or ''} {operation}".strip())
+
+    def clear_operation(self) -> None:
+        super().clear_operation()
+        self._bar.set_postfix_str(self.current_stage or "")
+
     def emit(self, level: Level, message: str) -> None:
         prefix = {
             "info": "",
@@ -92,8 +122,12 @@ class RichRunUI(BaseRunUI):
         super().__init__(total, label)
         self._progress = _build_rich_progress()
         self._progress.start()
-        self._overall_task = self._progress.add_task(f"[cyan]{label}", total=total)
-        self._detail_task = self._progress.add_task("[magenta]Idle", total=None, visible=False)
+        self._overall_task = self._progress.add_task(self._fit(label), total=total)
+        self._detail_task = self._progress.add_task("Idle", total=None, visible=False)
+        self._operation_task = self._progress.add_task("Idle", total=None, visible=False)
+
+    def _fit(self, description: str) -> str:
+        return _fit_progress_description(description, self._progress.console.width)
 
     def set_podcast(self, name: str) -> None:
         super().set_podcast(name)
@@ -102,25 +136,57 @@ class RichRunUI(BaseRunUI):
             visible=True,
             total=None,
             completed=0,
-            description=f"[bold magenta]{name}",
+            description=self._fit(name),
         )
+        self._progress.update(self._operation_task, visible=False, total=None, completed=0)
 
     def set_stage(self, stage: str) -> None:
         super().set_stage(stage)
         self._progress.update(
             self._detail_task,
-            description=f"[bold magenta]{self.current_name}[/] [dim]{stage}[/]",
+            description=self._fit(f"{self.current_name} {stage}"),
         )
 
     def update_progress(self, current: int, total: int | None) -> None:
         description = _render_stage_description(self.current_name, self.current_stage)
         self._progress.update(
             self._detail_task,
-            description=f"[bold magenta]{description}",
+            description=self._fit(description),
             total=total,
             completed=current,
             visible=True,
         )
+
+    def set_operation(self, operation: str) -> None:
+        super().set_operation(operation)
+        self._progress.update(
+            self._operation_task,
+            description=self._operation_description(),
+            total=None,
+            completed=0,
+            visible=True,
+        )
+
+    def clear_operation(self) -> None:
+        super().clear_operation()
+        self._progress.update(self._operation_task, visible=False, total=None, completed=0)
+
+    def update_operation_progress(self, current: int, total: int | None) -> None:
+        self._progress.update(
+            self._operation_task,
+            description=self._operation_description(),
+            total=total,
+            completed=current,
+            visible=True,
+        )
+
+    def _operation_description(self) -> str:
+        description = self.current_name
+        if self.current_stage:
+            description = f"{description} {self.current_stage}"
+        if self.current_operation:
+            description = f"{description} {self.current_operation}"
+        return self._fit(description)
 
     def emit(self, level: Level, message: str) -> None:
         style = {
@@ -164,10 +230,11 @@ def _build_rich_progress():
         TextColumn,
         TimeElapsedColumn,
     )
+    from rich.table import Column
 
     return Progress(
         SpinnerColumn(style="cyan"),
-        TextColumn("[bold]{task.description}"),
+        TextColumn("{task.description}", table_column=Column(ratio=3, min_width=24)),
         BarColumn(bar_width=None),
         TaskProgressColumn(),
         MofNCompleteColumn(),

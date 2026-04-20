@@ -499,6 +499,59 @@ def _refresh_youtube_videos(
     return list(episodes.values())
 
 
+@dataclass(frozen=True)
+class _EpisodeBundleState:
+    cache_key: str
+    episodes: dict[str, RssEpisode]
+    fetched_at: datetime | None
+    head_checked_at: datetime | None
+
+
+@dataclass(frozen=True)
+class _EpisodeFetchRequest:
+    url: str
+    author: str
+    callback: Callback | None
+    refresh: bool
+
+
+def _load_episode_bundle_state(cache_key: str) -> _EpisodeBundleState:
+    stale_episodes, fetched_at, head_checked_at = _load_cached_episode_bundle(cache_key)
+    return _EpisodeBundleState(cache_key, stale_episodes, fetched_at, head_checked_at)
+
+
+def _cache_recent_probe_result(state: _EpisodeBundleState) -> None:
+    _cache_youtube_videos(
+        state.cache_key,
+        state.episodes,
+        fetched_at=state.fetched_at,
+        head_checked_at=_utcnow(),
+    )
+
+
+def _probe_recent_or_refresh_youtube_videos(
+    state: _EpisodeBundleState,
+    request: _EpisodeFetchRequest,
+) -> list[RssEpisode]:
+    if _should_probe_recent_youtube_videos(
+        state.episodes,
+        state.fetched_at,
+        state.head_checked_at,
+        request.refresh,
+    ):
+        episodes = _refresh_recent_youtube_videos(
+            request.url, request.author, request.callback, state.episodes
+        )
+        _cache_recent_probe_result(state)
+        return episodes
+
+    episodes = _refresh_youtube_videos(
+        request.url, request.author, request.callback, state.episodes
+    )
+    _cache_youtube_videos(state.cache_key, state.episodes)
+    return episodes
+
+
 def get_youtube_videos(
     url: str,
     author: str,
@@ -506,29 +559,17 @@ def get_youtube_videos(
     refresh: bool = False,
 ) -> list[RssEpisode]:
     cache_key = f"get_youtube_videos:{url}:{author}"
-    stale_episodes, fetched_at, head_checked_at = _load_cached_episode_bundle(cache_key)
+    state = _load_episode_bundle_state(cache_key)
 
-    if _should_use_cached_youtube_videos(stale_episodes, fetched_at, head_checked_at, refresh):
-        return _use_cached_youtube_videos(stale_episodes, author, callback)
-
-    if _should_probe_recent_youtube_videos(
-        stale_episodes,
-        fetched_at,
-        head_checked_at,
+    if _should_use_cached_youtube_videos(
+        state.episodes,
+        state.fetched_at,
+        state.head_checked_at,
         refresh,
     ):
-        episodes = _refresh_recent_youtube_videos(url, author, callback, stale_episodes)
-        _cache_youtube_videos(
-            cache_key,
-            stale_episodes,
-            fetched_at=fetched_at,
-            head_checked_at=_utcnow(),
-        )
-        return episodes
-
-    episodes = _refresh_youtube_videos(url, author, callback, stale_episodes)
-    _cache_youtube_videos(cache_key, stale_episodes)
-    return episodes
+        return _use_cached_youtube_videos(state.episodes, author, callback)
+    request = _EpisodeFetchRequest(url, author, callback, refresh)
+    return _probe_recent_or_refresh_youtube_videos(state, request)
 
 
 if __name__ == "__main__":
