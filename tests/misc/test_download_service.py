@@ -4,7 +4,12 @@ from src.app_common import PodcastConfig
 from src.models import MediaMetadata
 from src.models.metadata import RssEpisode
 from src.models.pipeline import DownloadEpisode
-from src.orchestration.download_service import _episode_exists_on_s3, build_download_queue
+from src.orchestration.download_service import (
+    DownloadProgressHooks,
+    _episode_exists_on_s3,
+    _process_in_tmpdir,
+    build_download_queue,
+)
 
 
 def _episode(title: str, pub_date: datetime | None = None) -> DownloadEpisode:
@@ -145,3 +150,64 @@ def test_episode_exists_on_s3_matches_existing_direct_source_url(monkeypatch) ->
     download_service._existing_media_sources.cache_clear()
 
     assert _episode_exists_on_s3(episode, config) is True
+
+
+def test_process_in_tmpdir_reports_upload_progress(monkeypatch, tmp_path) -> None:
+    episode = _episode("Upload Progress")
+    config = _config()
+    audio_path = tmp_path / "audio.m4a"
+    opus_path = tmp_path / "audio.opus"
+    audio_path.write_bytes(b"audio")
+    opus_path.write_bytes(b"opus")
+
+    operations: list[str] = []
+    updates: list[tuple[int, int | None]] = []
+
+    monkeypatch.setattr(
+        "src.orchestration.download_service._s3_prefix",
+        lambda config: ("bucket", "podcasts/creepcast"),
+    )
+    monkeypatch.setattr(
+        "src.orchestration.download_service._download_audio",
+        lambda ep, dest, callback=None: audio_path,
+    )
+    monkeypatch.setattr(
+        "src.orchestration.download_service.convert_to_opus",
+        lambda audio, callback=None: opus_path,
+    )
+    monkeypatch.setattr("src.orchestration.download_service.get_duration", lambda path: 42.0)
+
+    captured: dict[str, object] = {}
+
+    def _upload_file(bucket, key, file_path, options):
+        captured["bucket"] = bucket
+        captured["key"] = key
+        captured["file_path"] = file_path
+        captured["options"] = options
+        assert options is not None
+        assert options.callback is not None
+        options.callback(3, 10)
+
+    monkeypatch.setattr("src.orchestration.download_service.upload_file", _upload_file)
+
+    hooks = DownloadProgressHooks(
+        on_operation=operations.append,
+        on_progress=lambda current, total: updates.append((current, total)),
+        on_complete=lambda: operations.append("<cleared>"),
+    )
+
+    uploaded = _process_in_tmpdir(episode, config, tmp_path, hooks)
+
+    assert uploaded is True
+    assert operations == [
+        "download audio: Upload Progress",
+        "convert opus: Upload Progress",
+        "upload opus: Upload Progress",
+        "<cleared>",
+    ]
+    assert updates == [(3, 10)]
+    options = captured["options"]
+    assert isinstance(options, object)
+    assert captured["bucket"] == "bucket"
+    assert captured["key"] == "podcasts/creepcast/upload-progress.opus"
+    assert captured["file_path"] == opus_path

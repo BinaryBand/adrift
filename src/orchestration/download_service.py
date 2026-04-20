@@ -10,7 +10,7 @@ from pathlib import Path
 from src.app_common import PodcastConfig
 from src.catalog import match, process_feeds
 from src.files.audio import convert_to_opus, cut_segments, get_duration, is_audio
-from src.files.s3 import exists, get_file_list, get_metadata, upload_file
+from src.files.s3 import UploadOptions, exists, get_file_list, get_metadata, upload_file
 from src.models import MediaMetadata, RssChannel, RssEpisode
 from src.models.pipeline import DownloadEpisode, MergeResult
 from src.utils.progress import Callback
@@ -52,6 +52,14 @@ class DownloadProgressHooks:
     on_operation: Callable[[str], None] | None = None
     on_progress: Callback | None = None
     on_complete: Callable[[], None] | None = None
+
+
+@dataclass(frozen=True)
+class _UploadRequest:
+    bucket: str
+    key: str
+    opus: Path
+    metadata: MediaMetadata
 
 
 def build_download_queue(
@@ -153,22 +161,66 @@ def _process_in_tmpdir(
 ) -> bool:
     bucket, prefix = _s3_prefix(config)
     key_prefix = f"{prefix}/{_episode_slug(config, ep)}"
-    _start_operation(progress_hooks, f"download audio: {ep.episode.title}")
-    audio = _download_audio(ep, tmp, _operation_progress(progress_hooks))
+    audio = _download_episode_audio(ep, tmp, progress_hooks)
     if audio is None:
         _complete_operation(progress_hooks)
         return False
+    opus = _prepare_upload_audio(ep, audio, progress_hooks)
+    duration = get_duration(opus)
+    metadata = _build_metadata(ep, duration, sponsors_removed=bool(ep.sponsor_segments))
+    upload_request = _build_upload_request(bucket, key_prefix, opus, metadata)
+    _upload_episode_audio(ep, upload_request, progress_hooks)
+    _complete_operation(progress_hooks)
+    return True
+
+
+def _download_episode_audio(
+    ep: DownloadEpisode,
+    tmp: Path,
+    progress_hooks: DownloadProgressHooks | None,
+) -> Path | None:
+    _start_operation(progress_hooks, f"download audio: {ep.episode.title}")
+    return _download_audio(ep, tmp, _operation_progress(progress_hooks))
+
+
+def _prepare_upload_audio(
+    ep: DownloadEpisode,
+    audio: Path,
+    progress_hooks: DownloadProgressHooks | None,
+) -> Path:
     if ep.sponsor_segments:
         _start_operation(progress_hooks, f"cut sponsors: {ep.episode.title}")
         cut_segments(audio, ep.sponsor_segments, callback=_operation_progress(progress_hooks))
     _start_operation(progress_hooks, f"convert opus: {ep.episode.title}")
-    opus = convert_to_opus(audio, callback=_operation_progress(progress_hooks))
-    _complete_operation(progress_hooks)
-    duration = get_duration(opus)
-    key = f"{key_prefix}.opus"
-    metadata = _build_metadata(ep, duration, sponsors_removed=bool(ep.sponsor_segments))
-    upload_file(bucket, key, opus, metadata)
-    return True
+    return convert_to_opus(audio, callback=_operation_progress(progress_hooks))
+
+
+def _build_upload_request(
+    bucket: str,
+    key_prefix: str,
+    opus: Path,
+    metadata: MediaMetadata,
+) -> _UploadRequest:
+    return _UploadRequest(
+        bucket=bucket,
+        key=f"{key_prefix}.opus",
+        opus=opus,
+        metadata=metadata,
+    )
+
+
+def _upload_episode_audio(
+    ep: DownloadEpisode,
+    request: _UploadRequest,
+    progress_hooks: DownloadProgressHooks | None,
+) -> None:
+    _start_operation(progress_hooks, f"upload opus: {ep.episode.title}")
+    upload_file(
+        request.bucket,
+        request.key,
+        request.opus,
+        UploadOptions(metadata=request.metadata, callback=_operation_progress(progress_hooks)),
+    )
 
 
 def _start_operation(progress_hooks: DownloadProgressHooks | None, label: str) -> None:

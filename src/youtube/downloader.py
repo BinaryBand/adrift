@@ -177,16 +177,67 @@ def _make_progress_hook(callback: Callback | None = None):
         return None
 
     def progress_hook(download: dict[str, Any]) -> None:
-        if download.get("status") != "downloading":
-            return
         try:
-            progress = download.get("downloaded_bytes", 0)
-            total = download.get("total_bytes") or download.get("total_bytes_estimate")
-            callback(progress, total)
+            progress = _extract_progress_update(download)
+            if progress is None:
+                return
+            callback(*progress)
         except Exception:
             pass
 
     return progress_hook
+
+
+def _extract_progress_update(download: dict[str, Any]) -> tuple[int, int | None] | None:
+    status = download.get("status")
+    if status == "finished":
+        return _finished_progress_update(download)
+    if status != "downloading":
+        return None
+
+    byte_progress = _byte_progress_update(download)
+    if byte_progress is not None:
+        return byte_progress
+    return _fragment_progress_update(download)
+
+
+def _byte_progress_update(download: dict[str, Any]) -> tuple[int, int | None] | None:
+    current = _coerce_int(download.get("downloaded_bytes"))
+    total = _coerce_int(download.get("total_bytes")) or _coerce_int(
+        download.get("total_bytes_estimate")
+    )
+    if current is None:
+        return None
+    return current, total
+
+
+def _fragment_progress_update(download: dict[str, Any]) -> tuple[int, int | None] | None:
+    fragment_index = _coerce_int(download.get("fragment_index"))
+    fragment_count = _coerce_int(download.get("fragment_count"))
+    if fragment_index is None:
+        return None
+    return fragment_index, fragment_count
+
+
+def _finished_progress_update(download: dict[str, Any]) -> tuple[int, int] | None:
+    total = _coerce_int(download.get("total_bytes"))
+    if total is None:
+        total = _coerce_int(download.get("downloaded_bytes"))
+    if total is None:
+        total = _coerce_int(download.get("total_bytes_estimate"))
+    if total is None:
+        return None
+    return total, total
+
+
+def _coerce_int(value: Any) -> int | None:
+    if isinstance(value, bool):
+        return None
+    if isinstance(value, int):
+        return value
+    if isinstance(value, float):
+        return int(value)
+    return None
 
 
 def _ydl_opts_dict(opts: YtDlpParams | dict[str, Any]) -> dict[str, Any]:
