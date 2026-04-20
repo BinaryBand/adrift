@@ -317,6 +317,7 @@ def _fetch_channel_videos_raw(
 
 BATCHES = [10, 100, None]
 YOUTUBE_EPISODE_CACHE_FRESHNESS = timedelta(hours=12)
+YOUTUBE_RECENT_EPISODE_CHECK_FRESHNESS = timedelta(hours=1)
 
 
 def _utcnow() -> datetime:
@@ -335,25 +336,35 @@ def _parse_cached_timestamp(value: Any) -> datetime | None:
     return parsed
 
 
-def _load_cached_episode_bundle(cache_key: str) -> tuple[dict[str, RssEpisode], datetime | None]:
+def _load_cached_episode_bundle(
+    cache_key: str,
+) -> tuple[dict[str, RssEpisode], datetime | None, datetime | None]:
     cached = _CACHE.get(cache_key)
     if not isinstance(cached, dict):
-        return {}, None
+        return {}, None, None
 
     cached_payload = cast(dict[str, object], cached)
     raw_episodes = cached_payload.get("episodes")
     if isinstance(raw_episodes, dict):
-        return cast(dict[str, RssEpisode], raw_episodes), _parse_cached_timestamp(
-            cached_payload.get("fetched_at")
+        return (
+            cast(dict[str, RssEpisode], raw_episodes),
+            _parse_cached_timestamp(cached_payload.get("fetched_at")),
+            _parse_cached_timestamp(cached_payload.get("head_checked_at")),
         )
 
-    return cast(dict[str, RssEpisode], cached_payload), None
+    return cast(dict[str, RssEpisode], cached_payload), None, None
 
 
 def _episode_cache_is_fresh(fetched_at: datetime | None) -> bool:
     if fetched_at is None:
         return False
     return _utcnow() - fetched_at <= YOUTUBE_EPISODE_CACHE_FRESHNESS
+
+
+def _recent_episode_check_is_fresh(checked_at: datetime | None) -> bool:
+    if checked_at is None:
+        return False
+    return _utcnow() - checked_at <= YOUTUBE_RECENT_EPISODE_CHECK_FRESHNESS
 
 
 def _fetch_video_batch(
@@ -401,12 +412,21 @@ def _report_cached_video_progress(
     callback(episode_count, episode_count)
 
 
-def _cache_youtube_videos(cache_key: str, episodes: dict[str, RssEpisode]) -> None:
+def _cache_youtube_videos(
+    cache_key: str,
+    episodes: dict[str, RssEpisode],
+    *,
+    fetched_at: datetime | None = None,
+    head_checked_at: datetime | None = None,
+) -> None:
     expire = random.randint(25, 35) * 24 * 3600
+    effective_fetched_at = fetched_at or _utcnow()
+    effective_head_checked_at = head_checked_at or effective_fetched_at
     _CACHE.set(
         cache_key,
         {
-            "fetched_at": _utcnow().isoformat(),
+            "fetched_at": effective_fetched_at.isoformat(),
+            "head_checked_at": effective_head_checked_at.isoformat(),
             "episodes": episodes,
         },
         expire=expire,
@@ -426,9 +446,41 @@ def _use_cached_youtube_videos(
 def _should_use_cached_youtube_videos(
     episodes: dict[str, RssEpisode],
     fetched_at: datetime | None,
+    head_checked_at: datetime | None,
     refresh: bool,
 ) -> bool:
-    return bool(episodes) and not refresh and _episode_cache_is_fresh(fetched_at)
+    return (
+        bool(episodes)
+        and not refresh
+        and _episode_cache_is_fresh(fetched_at)
+        and _recent_episode_check_is_fresh(head_checked_at)
+    )
+
+
+def _refresh_recent_youtube_videos(
+    url: str,
+    author: str,
+    callback: Callback | None,
+    episodes: dict[str, RssEpisode],
+) -> list[RssEpisode]:
+    video_entries = _fetch_video_batch(url, author, 1, BATCHES[0])
+    _add_new_public_episodes(video_entries, author, episodes)
+    _report_video_fetch_progress(callback, BATCHES[0], len(episodes))
+    return list(episodes.values())
+
+
+def _should_probe_recent_youtube_videos(
+    episodes: dict[str, RssEpisode],
+    fetched_at: datetime | None,
+    head_checked_at: datetime | None,
+    refresh: bool,
+) -> bool:
+    return (
+        bool(episodes)
+        and not refresh
+        and _episode_cache_is_fresh(fetched_at)
+        and not _recent_episode_check_is_fresh(head_checked_at)
+    )
 
 
 def _refresh_youtube_videos(
@@ -454,10 +506,25 @@ def get_youtube_videos(
     refresh: bool = False,
 ) -> list[RssEpisode]:
     cache_key = f"get_youtube_videos:{url}:{author}"
-    stale_episodes, fetched_at = _load_cached_episode_bundle(cache_key)
+    stale_episodes, fetched_at, head_checked_at = _load_cached_episode_bundle(cache_key)
 
-    if _should_use_cached_youtube_videos(stale_episodes, fetched_at, refresh):
+    if _should_use_cached_youtube_videos(stale_episodes, fetched_at, head_checked_at, refresh):
         return _use_cached_youtube_videos(stale_episodes, author, callback)
+
+    if _should_probe_recent_youtube_videos(
+        stale_episodes,
+        fetched_at,
+        head_checked_at,
+        refresh,
+    ):
+        episodes = _refresh_recent_youtube_videos(url, author, callback, stale_episodes)
+        _cache_youtube_videos(
+            cache_key,
+            stale_episodes,
+            fetched_at=fetched_at,
+            head_checked_at=_utcnow(),
+        )
+        return episodes
 
     episodes = _refresh_youtube_videos(url, author, callback, stale_episodes)
     _cache_youtube_videos(cache_key, stale_episodes)

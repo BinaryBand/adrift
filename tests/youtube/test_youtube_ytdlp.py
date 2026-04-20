@@ -8,6 +8,7 @@ from src.models import RssEpisode, YtDlpParams
 from src.models.ytdlp import YtDlpImage
 from src.youtube.ytdlp import (
     YOUTUBE_EPISODE_CACHE_FRESHNESS,
+    YOUTUBE_RECENT_EPISODE_CHECK_FRESHNESS,
     ChannelInfo,
     VideoInfo,
     _fetch_channel_info_raw,
@@ -491,6 +492,7 @@ class TestGetYoutubeVideos(unittest.TestCase):
         )
         mock_cache.get.return_value = {
             "fetched_at": datetime.now(timezone.utc).isoformat(),
+            "head_checked_at": datetime.now(timezone.utc).isoformat(),
             "episodes": {episode.id: episode},
         }
 
@@ -511,6 +513,7 @@ class TestGetYoutubeVideos(unittest.TestCase):
         )
         mock_cache.get.return_value = {
             "fetched_at": datetime.now(timezone.utc).isoformat(),
+            "head_checked_at": datetime.now(timezone.utc).isoformat(),
             "episodes": {episode.id: episode},
         }
         mock_fetch_batch.side_effect = [[{"id": "vid123", "title": "Cached Video"}]]
@@ -549,6 +552,7 @@ class TestGetYoutubeVideos(unittest.TestCase):
         cached_payload = mock_cache.set.call_args.args[1]
         self.assertEqual(cached_payload["episodes"], {episode.id: episode})
         self.assertIn("fetched_at", cached_payload)
+        self.assertIn("head_checked_at", cached_payload)
 
     @patch("src.youtube.ytdlp._fetch_video_batch")
     @patch("src.youtube.ytdlp._CACHE")
@@ -565,6 +569,7 @@ class TestGetYoutubeVideos(unittest.TestCase):
         mock_utcnow.return_value = fresh_time
         mock_cache.get.return_value = {
             "fetched_at": stale_time.isoformat(),
+            "head_checked_at": stale_time.isoformat(),
             "episodes": {episode.id: episode},
         }
         mock_fetch_batch.side_effect = [[{"id": "vid123", "title": "Cached Video"}]]
@@ -572,6 +577,67 @@ class TestGetYoutubeVideos(unittest.TestCase):
         get_youtube_videos("https://youtube.com/@test/videos", "Test Channel")
 
         mock_fetch_batch.assert_called_once()
+
+    @patch("src.youtube.ytdlp._fetch_video_batch")
+    @patch("src.youtube.ytdlp._CACHE")
+    @patch("src.youtube.ytdlp._utcnow")
+    def test_recent_probe_refreshes_first_batch_without_full_refresh(
+        self, mock_utcnow, mock_cache, mock_fetch_batch
+    ):
+        now = datetime(2026, 4, 20, tzinfo=timezone.utc)
+        fetched_at = now - timedelta(hours=2)
+        head_checked_at = now - YOUTUBE_RECENT_EPISODE_CHECK_FRESHNESS - timedelta(seconds=1)
+        episode = RssEpisode(
+            id="vid123",
+            title="Cached Video",
+            author="Test Channel",
+            content="https://youtube.com/watch?v=vid123",
+        )
+        mock_utcnow.return_value = now
+        mock_cache.get.return_value = {
+            "fetched_at": fetched_at.isoformat(),
+            "head_checked_at": head_checked_at.isoformat(),
+            "episodes": {episode.id: episode},
+        }
+        mock_fetch_batch.return_value = [{"id": "vid999", "title": "Brand New Video"}]
+
+        result = get_youtube_videos("https://youtube.com/@test/videos", "Test Channel")
+
+        self.assertEqual({item.id for item in result}, {"vid123", "vid999"})
+        mock_fetch_batch.assert_called_once_with(
+            "https://youtube.com/@test/videos",
+            "Test Channel",
+            1,
+            10,
+        )
+        cached_payload = mock_cache.set.call_args.args[1]
+        self.assertEqual(cached_payload["fetched_at"], fetched_at.isoformat())
+        self.assertEqual(cached_payload["head_checked_at"], now.isoformat())
+
+    @patch("src.youtube.ytdlp._fetch_video_batch")
+    @patch("src.youtube.ytdlp._CACHE")
+    @patch("src.youtube.ytdlp._utcnow")
+    def test_recent_probe_is_skipped_when_head_check_is_fresh(
+        self, mock_utcnow, mock_cache, mock_fetch_batch
+    ):
+        now = datetime(2026, 4, 20, tzinfo=timezone.utc)
+        episode = RssEpisode(
+            id="vid123",
+            title="Cached Video",
+            author="Test Channel",
+            content="https://youtube.com/watch?v=vid123",
+        )
+        mock_utcnow.return_value = now
+        mock_cache.get.return_value = {
+            "fetched_at": (now - timedelta(hours=2)).isoformat(),
+            "head_checked_at": now.isoformat(),
+            "episodes": {episode.id: episode},
+        }
+
+        result = get_youtube_videos("https://youtube.com/@test/videos", "Test Channel")
+
+        self.assertEqual(result, [episode])
+        mock_fetch_batch.assert_not_called()
 
 
 if __name__ == "__main__":

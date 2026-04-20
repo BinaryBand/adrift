@@ -1,13 +1,50 @@
 import sys
 import time
-from typing import Annotated
+from collections.abc import Callable
+from typing import Annotated, Any, Protocol
 
 import dotenv
 import typer
 
+from src.app_common import PodcastConfig
+from src.models.pipeline import DownloadEpisode
+from src.orchestration.download_service import DownloadQueueItem
+
 DF_TARGETS = ["config/*.toml"]
 DEFAULT_MAX_DOWNLOADS = 10
 DEFAULT_BOT_COOLDOWN = 300
+
+
+class _DownloadUiPort(Protocol):
+    def emit(self, level: Any, message: str) -> None: ...
+
+
+def _download_episodes(
+    episodes: list[DownloadEpisode],
+    config: PodcastConfig,
+    *,
+    downloaded_total: int,
+    max_downloads: int,
+    ui: _DownloadUiPort,
+    build_download_queue: Callable[[list[DownloadEpisode], PodcastConfig], list[DownloadQueueItem]],
+    download_and_upload: Callable[[DownloadEpisode, PodcastConfig], bool],
+    bot_detection_error: type[BaseException],
+) -> int:
+    additional_downloads = 0
+    for queue_item in build_download_queue(episodes, config):
+        if downloaded_total + additional_downloads >= max_downloads:
+            break
+        if queue_item.exists_on_s3:
+            continue
+        try:
+            newly_uploaded = download_and_upload(queue_item.episode, config)
+            if newly_uploaded:
+                additional_downloads += 1
+        except bot_detection_error:
+            raise
+        except Exception as exc:
+            ui.emit("error", f"{config.name} — {queue_item.episode.episode.title}: {exc}")
+    return additional_downloads
 
 
 def _run(
@@ -34,6 +71,7 @@ def _run(
     from src.app_common import load_podcasts_config
     from src.catalog import merge_config
     from src.orchestration.download_service import (
+        build_download_queue,
         download_and_upload,
         enrich_with_sponsors,
         update_rss,
@@ -67,16 +105,16 @@ def _run(
 
                 if not skip_download:
                     ui.set_stage("download")
-                    budget = max(0, max_downloads - downloaded_total)
-                    for ep in episodes[:budget]:
-                        try:
-                            newly_uploaded = download_and_upload(ep, config)
-                            if newly_uploaded:
-                                downloaded_total += 1
-                        except BotDetectionError:
-                            raise
-                        except Exception as exc:
-                            ui.emit("error", f"{config.name} — {ep.episode.title}: {exc}")
+                    downloaded_total += _download_episodes(
+                        episodes,
+                        config,
+                        downloaded_total=downloaded_total,
+                        max_downloads=max_downloads,
+                        ui=ui,
+                        build_download_queue=build_download_queue,
+                        download_and_upload=download_and_upload,
+                        bot_detection_error=BotDetectionError,
+                    )
 
                 if not skip_update:
                     ui.set_stage("rss")

@@ -1,6 +1,8 @@
 """Three-stage download pipeline: enrich → download/upload → update RSS."""
 
 import tempfile
+from dataclasses import dataclass
+from datetime import datetime, timezone
 from pathlib import Path
 
 from src.app_common import PodcastConfig
@@ -34,6 +36,48 @@ def enrich_with_sponsors(result: MergeResult) -> list[DownloadEpisode]:
 def _extract_video_id(content: str) -> str | None:
     m = YOUTUBE_VIDEO_REGEX.search(content)
     return m.group(4) if m else None
+
+
+@dataclass(frozen=True)
+class DownloadQueueItem:
+    episode: DownloadEpisode
+    exists_on_s3: bool
+
+
+def build_download_queue(
+    episodes: list[DownloadEpisode], config: PodcastConfig
+) -> list[DownloadQueueItem]:
+    queue = [
+        DownloadQueueItem(
+            episode=episode,
+            exists_on_s3=_episode_exists_on_s3(episode, config),
+        )
+        for episode in episodes
+    ]
+    return sorted(queue, key=_download_queue_sort_key)
+
+
+def _episode_exists_on_s3(ep: DownloadEpisode, config: PodcastConfig) -> bool:
+    bucket, prefix = _s3_prefix(config)
+    key_prefix = f"{prefix}/{_episode_slug(config, ep)}"
+    return exists(bucket, key_prefix) is not None
+
+
+def _download_queue_sort_key(item: DownloadQueueItem) -> tuple[bool, float, str]:
+    episode = item.episode.episode
+    return (
+        item.exists_on_s3,
+        -_episode_sort_timestamp(episode.pub_date),
+        episode.title,
+    )
+
+
+def _episode_sort_timestamp(pub_date: datetime | None) -> float:
+    if pub_date is None:
+        return datetime.min.replace(tzinfo=timezone.utc).timestamp()
+    if pub_date.tzinfo is None:
+        pub_date = pub_date.replace(tzinfo=timezone.utc)
+    return pub_date.timestamp()
 
 
 # ---------------------------------------------------------------------------
