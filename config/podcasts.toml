@@ -1,18 +1,3 @@
-
-# YouTube-first podcast series.
-#
-# Schedule (RRULE)
-# ----------------
-#   schedule = ["FREQ=WEEKLY;BYDAY=<days>"]
-#   BYDAY values: MO TU WE TH FR SA SU  (comma-separated for multiple days)
-#   Omit BYDAY to use a deterministic per-show day based on the title hash.
-#
-# Filter rules (under [podcasts.references.filters] or [podcasts.downloads.filters])
-# ------------------------------------------------------------------------------------
-#   include   - Title must match at least one pattern (re.search, case-insensitive).
-#   exclude   - Title must NOT match any pattern.
-#   r_rules - Only include episodes published on these days of the week.
-# 
 # cspell:disable
 
 
