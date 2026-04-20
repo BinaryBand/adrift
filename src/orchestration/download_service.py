@@ -77,29 +77,37 @@ def build_download_queue(
 
 def _episode_exists_on_s3(ep: DownloadEpisode, config: PodcastConfig) -> bool:
     bucket, prefix = _s3_prefix(config)
-    key_prefix = f"{prefix}/{_episode_slug(config, ep)}"
+    cleaned_slug = _episode_slug(config, ep)
+    key_prefix = f"{prefix}/{cleaned_slug}"
     if exists(bucket, key_prefix) is not None:
         return True
-    return _existing_media_sources(bucket, prefix).matches(ep)
+    return _existing_media_sources(bucket, prefix, config.name).matches(ep, cleaned_slug)
 
 
 @dataclass(frozen=True)
 class _ExistingMediaSources:
+    cleaned_slugs: frozenset[str]
     source_urls: frozenset[str]
     youtube_video_ids: frozenset[str]
 
-    def matches(self, ep: DownloadEpisode) -> bool:
+    def matches(self, ep: DownloadEpisode, cleaned_slug: str) -> bool:
+        if cleaned_slug in self.cleaned_slugs:
+            return True
         if ep.episode.content in self.source_urls:
             return True
         return ep.video_id is not None and ep.video_id in self.youtube_video_ids
 
 
 @lru_cache(maxsize=128)
-def _existing_media_sources(bucket: str, prefix: str) -> _ExistingMediaSources:
+def _existing_media_sources(bucket: str, prefix: str, show: str) -> _ExistingMediaSources:
+    from src.app_runner import normalize_title
+
+    cleaned_slugs: set[str] = set()
     source_urls: set[str] = set()
     youtube_video_ids: set[str] = set()
 
     for name in get_file_list(bucket, prefix, False):
+        cleaned_slugs.add(normalize_title(show, Path(name).stem))
         metadata = get_metadata(bucket, _prefixed_s3_key(prefix, name))
         if metadata is None:
             continue
@@ -107,7 +115,11 @@ def _existing_media_sources(bucket: str, prefix: str) -> _ExistingMediaSources:
         if video_id := _extract_video_id(metadata.source):
             youtube_video_ids.add(video_id)
 
-    return _ExistingMediaSources(frozenset(source_urls), frozenset(youtube_video_ids))
+    return _ExistingMediaSources(
+        frozenset(cleaned_slugs),
+        frozenset(source_urls),
+        frozenset(youtube_video_ids),
+    )
 
 
 def _prefixed_s3_key(prefix: str, name: str) -> str:

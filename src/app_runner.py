@@ -41,11 +41,7 @@ def _clean_coffee_break_swedish_title(episode: str) -> str:
 
 
 def _clean_creepcast_title(episode: str) -> str:
-    patterns = [
-        r"(?i)\| creep cast$",
-        r"(?i)\| creepcast$",
-        r"(?i)\| creep tv$",
-    ]
+    patterns = [r"(?i)\| creep cast$", r"(?i)\| creepcast$", r"(?i)\| creep tv$"]
     for pattern in patterns:
         episode = _strip_suffix(pattern, episode)
     return episode
@@ -62,10 +58,7 @@ def _clean_morbid_title(episode: str) -> str:
     for pattern in prefix_patterns:
         episode = re_compile(pattern).sub("", episode)
 
-    patterns = [
-        r"(?i)\| morbid$",
-        r"(?i)\| morbid \| podcast$",
-    ]
+    patterns = [r"(?i)\| morbid$", r"(?i)\| morbid \| podcast$"]
     for pattern in patterns:
         episode = _strip_suffix(pattern, episode)
     return episode
@@ -101,6 +94,18 @@ _TITLE_CLEANERS = {
     "Swindled": _clean_swindled_title,
 }
 
+_TITLE_SLUG_SUFFIXES = {
+    "Behind the Bastards": ["Behind the Bastards"],
+    "Coffee Break Swedish": ["Coffee Break Swedish Podcast"],
+    "CreepCast": ["Creep Cast", "CreepCast", "Creep TV"],
+    "Financial Audit": ["Financial Audit"],
+    "Morbid": ["Morbid", "Morbid Podcast"],
+    "Revisionist History": ["Revisionist History Malcolm Gladwell"],
+    "Smosh Reads Reddit Stories": ["Smosh Reading Reddit Stories"],
+    "Stuff They Don't Want You To Know": ["Stuff They Don't Want You To Know"],
+    "Stuff You Should Know": ["Stuff You Should Know"],
+}
+
 
 def _apply_title_cleaner(show: str, episode: str) -> str:
     cleaner = _TITLE_CLEANERS.get(show)
@@ -109,11 +114,19 @@ def _apply_title_cleaner(show: str, episode: str) -> str:
     return cleaner(episode)
 
 
+def _strip_slug_suffixes(show: str, slug: str) -> str:
+    for suffix in _TITLE_SLUG_SUFFIXES.get(show, []):
+        suffix_slug = create_slug(suffix).strip("-")
+        if slug.endswith(f"-{suffix_slug}"):
+            slug = slug[: -len(suffix_slug) - 1]
+    return slug.strip("-")
+
+
 @cached(_TITLE_CACHE)
 def normalize_title(show: str, episode: str) -> str:
     episode = remove_control_chars(episode)
     episode = _apply_title_cleaner(show, episode)
-    return create_slug(episode).strip("-")
+    return _strip_slug_suffixes(show, create_slug(episode).strip("-"))
 
 
 def get_s3_files(bucket: str, prefix: str) -> list[str]:

@@ -152,6 +152,38 @@ def test_episode_exists_on_s3_matches_existing_direct_source_url(monkeypatch) ->
     assert _episode_exists_on_s3(episode, config) is True
 
 
+def test_episode_exists_on_s3_matches_cleaned_existing_filename(monkeypatch) -> None:
+    episode = DownloadEpisode(
+        episode=RssEpisode(
+            id="morbid-title",
+            title="Ann & Billy Woodward",
+            author="Morbid",
+            content="https://youtube.com/watch?v=woodward-video",
+            pub_date=datetime(2026, 4, 20, tzinfo=timezone.utc),
+        ),
+        sponsor_segments=[],
+        video_id="woodward-video",
+    )
+    config = PodcastConfig(
+        name="Morbid",
+        path="/media/podcasts/morbid",
+        references=[],
+        downloads=[],
+    )
+
+    monkeypatch.setattr("src.orchestration.download_service.exists", lambda bucket, key: None)
+    monkeypatch.setattr(
+        "src.orchestration.download_service.get_file_list",
+        lambda bucket, prefix, without_extensions=False: ["ann-billy-woodward-morbid-podcast.opus"],
+    )
+    monkeypatch.setattr("src.orchestration.download_service.get_metadata", lambda bucket, key: None)
+    from src.orchestration import download_service
+
+    download_service._existing_media_sources.cache_clear()
+
+    assert _episode_exists_on_s3(episode, config) is True
+
+
 def test_process_in_tmpdir_reports_upload_progress(monkeypatch, tmp_path) -> None:
     episode = _episode("Upload Progress")
     config = _config()
