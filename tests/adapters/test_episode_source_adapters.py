@@ -7,6 +7,7 @@ from src.adapters.alignment import GreedyAlignmentAdapter
 from src.adapters.episode_sources.episode_source_rss import RssEpisodeSourceAdapter
 from src.adapters.episode_sources.episode_source_youtube import YouTubeEpisodeSourceAdapter
 from src.models import FeedSource, RssChannel, RssEpisode
+from src.ports import EpisodeSourceFetchContext
 
 
 def test_rss_adapter_fetches_episodes():
@@ -26,7 +27,7 @@ def test_rss_adapter_fetches_episodes():
     ]
 
     with patch("src.web.rss.get_rss_episodes", return_value=mock_episodes):
-        result = adapter.fetch_episodes(source, {})
+        result = adapter.fetch_episodes(source)
 
     assert result == mock_episodes
     assert len(result) == 1
@@ -69,7 +70,7 @@ def test_youtube_adapter_fetches_episodes():
     ]
 
     with patch("src.youtube.metadata.get_youtube_episodes", return_value=mock_episodes):
-        result = adapter.fetch_episodes(source, {"title": "Test Channel"})
+        result = adapter.fetch_episodes(source, EpisodeSourceFetchContext(title="Test Channel"))
 
     assert result == mock_episodes
     assert len(result) == 1
@@ -128,7 +129,7 @@ def test_rss_adapter_passes_filters_to_rss_episodes():
 
     with patch("src.web.rss.get_rss_episodes") as mock_get:
         mock_get.return_value = []
-        adapter.fetch_episodes(source, {})
+        adapter.fetch_episodes(source)
 
         # Verify the call was made with extracted filters
         assert mock_get.called
@@ -144,7 +145,10 @@ def test_youtube_adapter_passes_title_and_options():
 
     with patch("src.youtube.metadata.get_youtube_episodes") as mock_get:
         mock_get.return_value = []
-        adapter.fetch_episodes(source, {"title": "My Podcast", "detailed": True})
+        adapter.fetch_episodes(
+            source,
+            EpisodeSourceFetchContext(title="My Podcast", detailed=True),
+        )
 
         assert mock_get.called
         call_args = mock_get.call_args
@@ -161,7 +165,10 @@ def test_youtube_adapter_passes_refresh_option():
 
     with patch("src.youtube.metadata.get_youtube_episodes") as mock_get:
         mock_get.return_value = []
-        adapter.fetch_episodes(source, {"title": "My Podcast", "refresh": True})
+        adapter.fetch_episodes(
+            source,
+            EpisodeSourceFetchContext(title="My Podcast", refresh=True),
+        )
 
         assert mock_get.call_args[0][2].refresh is True
 

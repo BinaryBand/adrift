@@ -1,17 +1,31 @@
-from typing import Any, Protocol
+from dataclasses import dataclass
+from typing import Protocol
 
 from src.models import FeedSource, RssChannel, RssEpisode
+from src.utils.progress import Callback
+
+
+@dataclass(frozen=True)
+class EpisodeSourceFetchContext:
+    title: str = ""
+    detailed: bool = True
+    callback: Callback | None = None
+    refresh: bool = False
 
 
 class EpisodeSourcePort(Protocol):
     """Port for fetching episodes from various sources (RSS, YouTube, etc.)."""
 
-    def fetch_episodes(self, source: FeedSource, options: dict[str, Any]) -> list[RssEpisode]:
+    def fetch_episodes(
+        self,
+        source: FeedSource,
+        context: EpisodeSourceFetchContext | None = None,
+    ) -> list[RssEpisode]:
         """Fetch episodes from a given source.
 
         Args:
             source: FeedSource configuration with URL and optional filters
-            options: Dict with fetch options (e.g., callback, regex pattern, rrules)
+            context: Typed fetch context for title, callback, detail level, and refresh mode
 
         Returns:
             List of RssEpisode objects

@@ -1,33 +1,32 @@
-from typing import Any
-
 from src.models import FeedSource, RssChannel, RssEpisode
-from src.ports import EpisodeSourcePort
+from src.ports import EpisodeSourceFetchContext, EpisodeSourcePort
 
 
 class YouTubeEpisodeSourceAdapter(EpisodeSourcePort):
     """Adapter for fetching episodes from YouTube channels."""
 
-    def fetch_episodes(self, source: FeedSource, options: dict[str, Any]) -> list[RssEpisode]:
+    def fetch_episodes(
+        self,
+        source: FeedSource,
+        context: EpisodeSourceFetchContext | None = None,
+    ) -> list[RssEpisode]:
         """Fetch episodes from a YouTube channel."""
         from src.youtube.metadata import YtFetchOptions, get_youtube_episodes
 
+        resolved_context = context or EpisodeSourceFetchContext()
         url = source.url
         if not url:
             raise ValueError("FeedSource URL is required for YouTube episode fetching")
 
-        title = options.get("title", "")
         filter_regex = source.filters.to_regex() if source.filters else None
-        callback = options.get("callback")
-        detailed = options.get("detailed", True)
-        refresh = options.get("refresh", False)
         fetch_opts = YtFetchOptions(
             filter=filter_regex,
-            detailed=detailed,
-            callback=callback,
-            refresh=refresh,
+            detailed=resolved_context.detailed,
+            callback=resolved_context.callback,
+            refresh=resolved_context.refresh,
         )
 
-        return get_youtube_episodes(url, title, fetch_opts)
+        return get_youtube_episodes(url, resolved_context.title, fetch_opts)
 
     def fetch_channel(self, source: FeedSource) -> RssChannel:
         """Fetch channel metadata from a YouTube channel."""

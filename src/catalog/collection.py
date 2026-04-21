@@ -75,12 +75,13 @@ def _fetch_source_episodes(
     source: FeedSource | dict[str, Any],
     context: EpisodeFetchContext,
 ) -> list[RssEpisode]:
-    from src.adapters import FetchSourceEpisodesOptions, fetch_source_episodes
+    from src.adapters import fetch_source_episodes
+    from src.ports import EpisodeSourceFetchContext
 
     resolved = ensure_feed_source(source)
     return fetch_source_episodes(
         resolved,
-        FetchSourceEpisodesOptions(
+        EpisodeSourceFetchContext(
             title=context.title,
             detailed=context.is_reference,
             callback=context.callback,

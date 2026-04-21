@@ -1,7 +1,7 @@
 """Package wrapper for port definitions."""
 
 from .alignment import AlignmentPort
-from .episode_source import EpisodeSourcePort
+from .episode_source import EpisodeSourceFetchContext, EpisodeSourcePort
 from .mermaid import MermaidPort, MermaidRenderOptions
 from .secrets import (
     ReadOnlySecretStorePort,
@@ -12,6 +12,7 @@ from .secrets import (
 
 __all__ = [
     "AlignmentPort",
+    "EpisodeSourceFetchContext",
     "EpisodeSourcePort",
     "MermaidPort",
     "MermaidRenderOptions",
