@@ -324,6 +324,7 @@ def _maybe_generate_report(
         from src.adapters import get_report_adapter
 
         adapter = get_report_adapter()
-        adapter.generate_reports(result, output_root)
+        if adapter:
+            adapter.generate_reports(result, output_root)
     except Exception as exc:  # pragma: no cover - non-fatal optional feature
         context.ui.emit("warning", f"REPORT generation failed for {result.config.name}: {exc}")

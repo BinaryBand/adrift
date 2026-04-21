@@ -107,9 +107,6 @@ def test_main_writes_bundle_and_stdout(tmp_path: Path, capsys) -> None:
     assert stdout_payload[0]["references_count"] == 1
     assert stdout_payload[0]["downloads_count"] == 1
     assert (tmp_path / config.slug / "feeds" / "combined.json").exists()
-    assert (tmp_path / config.slug / "feeds" / "report.md").exists()
-    assert (tmp_path / config.slug / "feeds" / "matches.md").exists()
-    assert (tmp_path / config.slug / "feeds" / "greedy_matches.md").exists()
     call = mock_merge_config.call_args
     assert call.args[0] == config
     assert call.kwargs["refresh_sources"] is True

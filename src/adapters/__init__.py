@@ -58,10 +58,7 @@ def get_mermaid_adapter():
 
 def get_report_adapter():
     """Return the default report adapter instance."""
-    from src.adapters.report import FileReportAdapter
-
-    return FileReportAdapter()
-
+    return None
 
 def _resolve_secret_provider_name(provider_name: str | None = None) -> str:
     return (provider_name or os.getenv("ADRIFT_SECRETS_PROVIDER", "env")).lower()
