@@ -66,6 +66,15 @@ def test_complexity_checks():
     assert rc == 0, f"Complexity checks reported {rc} diagnostics"
 
 
+def test_import_boundary_checks():
+    mod = _load_module(
+        Path(__file__).parents[2] / "runbook" / "quality" / "check_import_boundaries.py",
+        "check_import_boundaries",
+    )
+    diags = mod.check_paths(["src", "runbook", "tests"])
+    assert not diags, f"Import boundary checks reported {len(diags)} diagnostics"
+
+
 def test_pyright_checks():
     mod = _load_module(
         Path(__file__).parents[2] / "runbook" / "quality" / "check_static.py",

@@ -33,6 +33,9 @@ jobs:
       - name: Complexity check (lizard)
         run: poetry run python -m runbook.quality.check_complexity src --ccn 8 --length 25 --params 4 --strict
 
+      - name: Import boundary check
+        run: poetry run python -m runbook.quality.check_import_boundaries src runbook tests --strict
+
       - name: Dead code check (vulture)
         run: poetry run python -m runbook.quality.check_dead_code src
 

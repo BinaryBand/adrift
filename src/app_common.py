@@ -64,8 +64,6 @@ def _next_occurrence_in_window(schedule: str, day_start: datetime) -> datetime |
     return rule.after(day_start - timedelta(microseconds=1), inc=True)
 
 
-
-
 def _load_config(name_or_path: str) -> list[PodcastConfig]:
     """Load podcast configurations from a TOML file.
 
