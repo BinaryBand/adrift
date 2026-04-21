@@ -183,7 +183,7 @@
         "-m",
         "pytest",
         "tests",
-        "--ignore=tests/misc/test_filter_rules.py"
+        "--ignore=tests/models/test_filter_rules.py"
       ],
       "group": "test",
       "presentation": {
