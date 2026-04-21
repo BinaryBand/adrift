@@ -12,6 +12,7 @@ from .metadata import (
 )
 from .output import EpisodeData, PodcastFeed
 from .pipeline import DownloadEpisode, MergeResult
+from .podcast_config import FeedSource, PodcastConfig, SourceFilter
 from .sponsorblock import SponsorSegment
 
 __all__ = [
@@ -23,6 +24,9 @@ __all__ = [
     "YtDlpParams",
     "RssChannel",
     "RssEpisode",
+    "SourceFilter",
+    "FeedSource",
+    "PodcastConfig",
     "EpisodeData",
     "PodcastFeed",
     "MergeResult",

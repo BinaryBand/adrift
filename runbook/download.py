@@ -6,8 +6,8 @@ from typing import Annotated, Any, Protocol
 import dotenv
 import typer
 
-from src.app_common import PodcastConfig
 from src.models.pipeline import DownloadEpisode
+from src.models.podcast_config import PodcastConfig
 from src.orchestration.download_service import DownloadProgressHooks, DownloadQueueItem
 
 DF_TARGETS = ["config/*.toml"]
@@ -71,7 +71,7 @@ def _run(
     ] = False,
     skip_update: Annotated[bool, typer.Option(help="Skip RSS feed update stage.")] = False,
     max_downloads: Annotated[
-        int, typer.Option(help="Maximum number of episodes to download per run.")
+        int, typer.Option(help="Max number of episodes to download per run.")
     ] = DEFAULT_MAX_DOWNLOADS,
     bot_cooldown: Annotated[
         int, typer.Option(help="Seconds to wait before exiting after bot detection.")

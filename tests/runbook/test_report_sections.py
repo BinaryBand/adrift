@@ -1,10 +1,10 @@
 from datetime import datetime, timezone
 
 from src.adapters.report_sections.match_debug import render_greedy_matches, render_matches
-from src.app_common import FeedSource, PodcastConfig
 from src.catalog import _build_match_traces
 from src.models.metadata import RssEpisode
 from src.models.pipeline import MergeResult
+from src.models.podcast_config import FeedSource, PodcastConfig
 
 
 def _episode(identifier: str, title: str, day: int) -> RssEpisode:

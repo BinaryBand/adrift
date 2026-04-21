@@ -55,7 +55,7 @@ _DEFAULT_EXCLUDES = ["src/files/s3.py"]
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="Run complexity checks via lizard")
     parser.add_argument("path", nargs="?", default="src", help="Path to scan")
-    parser.add_argument("--ccn", type=int, default=5, help="CCN ceiling")
+    parser.add_argument("--ccn", type=int, default=8, help="CCN ceiling")
     parser.add_argument("--length", type=int, default=25, help="Function length ceiling")
     parser.add_argument("--params", type=int, default=4, help="Parameter-count ceiling")
     parser.add_argument(

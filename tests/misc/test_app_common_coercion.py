@@ -1,6 +1,6 @@
 import pytest
 
-from src.app_common import (
+from src.models.podcast_config import (
     FeedSource,
     PodcastConfig,
     SourceFilter,

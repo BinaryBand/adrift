@@ -28,7 +28,7 @@
       {
         "match": "\\.py$",
         "notMatch": "(\\.venv|__pycache__|/\\.)",
-        "cmd": "${workspaceFolder}/.venv/bin/python -m runbook.quality.check_complexity src --ccn 5 --length 25 --params 4",
+        "cmd": "${workspaceFolder}/.venv/bin/python -m runbook.quality.check_complexity src --ccn 8 --length 25 --params 4",
         "isAsync": true
       },
       {

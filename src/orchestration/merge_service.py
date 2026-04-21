@@ -12,9 +12,9 @@ from typing import TYPE_CHECKING, cast
 from pydantic import BaseModel
 
 from src import catalog
+from src.models.podcast_config import PodcastConfig
 
 if TYPE_CHECKING:
-    from src.app_common import PodcastConfig
     from src.models.pipeline import MergeResult
     from src.utils.run_ui import BaseRunUI
 

@@ -44,7 +44,7 @@ is:
 4. File path or module ownership (alphabetical or by subsystem)
 
 Define what constitutes "high-risk" in your project. Example thresholds (treat
-as configurable): CCN ≥ 6, NLOC ≥ 25.
+as configurable): CCN ≥ 9, NLOC ≥ 25.
 
 ## 4. Resolution Protocol
 

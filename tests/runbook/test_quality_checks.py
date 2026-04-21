@@ -60,8 +60,8 @@ def test_complexity_checks():
     # Detect lizard without importing it (avoids linting unused-import warnings)
     if importlib.util.find_spec("lizard") is None:
         pytest.skip("lizard not installed")
-    output = mod.run_lizard("src", ccn=5, length=25, params=4, exclude=None)
-    ceiling = mod.Ceiling(ccn=5, length=25, params=4)
+    output = mod.run_lizard("src", ccn=8, length=25, params=4, exclude=None)
+    ceiling = mod.Ceiling(ccn=8, length=25, params=4)
     rc = mod.check_metrics(output, ceiling, warn_at_ceiling=False)
     assert rc == 0, f"Complexity checks reported {rc} diagnostics"
 

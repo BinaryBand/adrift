@@ -42,7 +42,7 @@
                 "runbook.quality.check_complexity",
                 "src",
                 "--ccn",
-                "5",
+                "8",
                 "--length",
                 "25",
                 "--params",

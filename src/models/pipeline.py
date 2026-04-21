@@ -2,9 +2,9 @@ from typing import Literal
 
 from pydantic import BaseModel
 
-from src.app_common import PodcastConfig, SourceFilter
 from src.models.metadata import RssEpisode
 from src.models.output import EpisodeData
+from src.models.podcast_config import PodcastConfig, SourceFilter
 
 
 class SourceTrace(BaseModel):

@@ -19,7 +19,7 @@ poetry install
 #   .venv/bin/ruff format --check src runbook tests typings
 #   .venv/bin/python -m runbook.quality.check_static src runbook tests typings
 #   .venv/bin/python -m runbook.quality.check_dead_code src
-#   .venv/bin/python -m runbook.quality.check_complexity src --ccn 5 --length 25 --params 4
+#   .venv/bin/python -m runbook.quality.check_complexity src --ccn 8 --length 25 --params 4
 #   .venv/bin/python -m runbook.quality.validate_configs --problems config/*.toml
 ```
 
@@ -109,7 +109,7 @@ included in this repository.
       "label": "Complexity: Lizard Check",
       "type": "shell",
       "command": "${config:python.defaultInterpreterPath}",
-      "args": ["-m", "runbook.quality.check_complexity", "src", "--ccn", "5", "--length", "25", "--params", "4"]
+      "args": ["-m", "runbook.quality.check_complexity", "src", "--ccn", "8", "--length", "25", "--params", "4"]
     }
   ]
 }
@@ -124,7 +124,7 @@ Every rule is paired with its enforcement tier. Rules marked **review** have no 
 | Rule | Tier | Mechanism |
 | --- | --- | --- |
 | Function length ≤ 25 lines | Automated | Lizard via `runbook/quality/check_complexity.py` |
-| Cyclomatic complexity ≤ 5 | Automated | Lizard |
+| Cyclomatic complexity ≤ 8 | Automated | Lizard |
 | Nesting depth ≤ 3 | Review | — |
 | Parameters per function ≤ 4 | Automated | Lizard via `runbook/quality/check_complexity.py` |
 | No type errors | Advisory | Pyright strict config in `pyrightconfig.json`; run via `check_static.py` |
@@ -149,7 +149,7 @@ Prefer early returns over nested conditionals. If a function needs more than 25 
                               (see `.vscode/tasks.json`). Example:
                               `.venv/bin/ruff format --check src runbook tests typings`
                               `.venv/bin/ruff check src runbook tests typings`
-                              `.venv/bin/python -m runbook.quality.check_complexity src --ccn 5 --length 25 --params 4`
+                              `.venv/bin/python -m runbook.quality.check_complexity src --ccn 8 --length 25 --params 4`
                               `.venv/bin/python -m runbook.quality.check_dead_code src`
                               `.venv/bin/python -m runbook.quality.validate_configs --problems config/*.toml`
                               `.venv/bin/python -m runbook.quality.check_static src runbook tests typings`

@@ -1,8 +1,10 @@
 import re
+import tempfile
 import unittest
 from pathlib import Path
 
-from src.app_common import PodcastConfig, SourceFilter
+from src.app_common import _expand_include_targets
+from src.models.podcast_config import PodcastConfig, SourceFilter
 from src.utils.regex import (
     LINK_REGEX,
     YOUTUBE_PLAYLIST_SHORTHAND_REGEX,
@@ -98,6 +100,21 @@ class AuditConfigs(unittest.TestCase):
                         ),
                         f"{podcast.name}: invalid r_rules entry {rule!r}",
                     )
+
+
+class ExpandIncludeTargets(unittest.TestCase):
+    def test_glob_pattern_includes_hidden_toml_files(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            config_dir = Path(temp_dir) / "config"
+            config_dir.mkdir()
+            visible = config_dir / "podcasts.toml"
+            hidden = config_dir / ".podcasts.toml"
+            visible.write_text("", encoding="utf-8")
+            hidden.write_text("", encoding="utf-8")
+
+            expanded = _expand_include_targets([f"{config_dir}/*.toml"])
+
+            self.assertEqual(expanded, [visible.as_posix(), hidden.as_posix()])
 
 
 if __name__ == "__main__":

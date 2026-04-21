@@ -99,7 +99,7 @@ def validate_file(path: Path, problems: bool = False) -> int:
     entry_spans = _podcast_entry_spans(lines)
     from pydantic import ValidationError
 
-    from src.app_common import PodcastConfig  # type: ignore
+    from src.models.podcast_config import PodcastConfig
 
     exit_code = 0
     podcast_entries = cast(list[object], podcasts)

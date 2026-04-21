@@ -3,7 +3,7 @@
 import os
 from collections.abc import Callable
 
-from src.app_common import FeedSource
+from src.models.podcast_config import FeedSource
 from src.ports.episode_source import EpisodeSourcePort
 from src.ports.secrets import ReadOnlySecretStorePort, SecretProviderPort, SecretStorePort
 from src.utils.text import is_youtube_channel

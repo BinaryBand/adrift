@@ -5,10 +5,10 @@ from pathlib import Path
 from unittest.mock import patch
 
 from runbook import merge as merge_mod
-from src.app_common import FeedSource, PodcastConfig
 from src.models.metadata import RssEpisode
 from src.models.output import EpisodeData
 from src.models.pipeline import MergeResult
+from src.models.podcast_config import FeedSource, PodcastConfig
 
 
 def _config() -> PodcastConfig:

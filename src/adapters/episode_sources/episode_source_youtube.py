@@ -1,7 +1,7 @@
 from typing import Any
 
-from src.app_common import FeedSource
 from src.models.metadata import RssChannel, RssEpisode
+from src.models.podcast_config import FeedSource
 from src.ports.episode_source import EpisodeSourcePort
 
 

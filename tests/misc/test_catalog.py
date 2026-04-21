@@ -19,7 +19,6 @@ os.environ.setdefault("S3_SECRET_KEY", "_test")
 os.environ.setdefault("S3_ENDPOINT", "http://localhost")
 os.environ.setdefault("S3_REGION", "us-east-1")
 
-from src.app_common import FeedSource, PodcastConfig, SourceFilter
 from src.catalog import (
     EpisodeFetchContext,
     _collect_episodes,
@@ -29,6 +28,7 @@ from src.catalog import (
     process_sources,
 )
 from src.models.metadata import RssEpisode
+from src.models.podcast_config import FeedSource, PodcastConfig, SourceFilter
 
 
 def _dt(year: int, month: int, day: int) -> datetime:

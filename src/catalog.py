@@ -7,12 +7,7 @@ from typing import Any, TypedDict, Unpack
 
 from rapidfuzz import fuzz
 
-from src.app_common import (
-    MATCH_TOLERANCE,
-    FeedSource,
-    PodcastConfig,
-    ensure_feed_source,
-)
+from src.app_common import MATCH_TOLERANCE
 from src.app_runner import normalize_title
 from src.models.output import EpisodeData
 from src.models.pipeline import (
@@ -21,6 +16,7 @@ from src.models.pipeline import (
     ReferenceMatchTrace,
     SourceTrace,
 )
+from src.models.podcast_config import FeedSource, PodcastConfig, ensure_feed_source
 from src.utils.progress import Callback
 from src.utils.text import is_youtube_channel, normalize_text
 from src.web.rss import RssEpisode
