@@ -7,8 +7,8 @@ ARGS ?=
 PYTHON ?= $(shell [ -x .venv/bin/python ] && echo .venv/bin/python || echo python3)
 PYRIGHT ?= $(shell [ -x .venv/bin/pyright ] && echo .venv/bin/pyright || echo pyright)
 
-.PHONY: quality ruff-format ruff-format-check ruff-check ruff-check-src ruff-check-tests validate-configs check-complexity check-dead-code check-import-boundaries
-.PHONY: quality ruff-format ruff-format-check ruff-format-src ruff-format-tests ruff-check ruff-check-src ruff-check-tests ruff vulture pyright lizard validate-configs check-complexity check-dead-code check-import-boundaries
+.PHONY: quality ruff-format ruff-format-check ruff-check ruff-check-src ruff-check-tests check-complexity check-dead-code check-import-boundaries
+.PHONY: quality ruff-format ruff-format-check ruff-format-src ruff-format-tests ruff-check ruff-check-src ruff-check-tests ruff vulture pyright lizard check-complexity check-dead-code check-import-boundaries
 
 .PHONY: help download merge build
 

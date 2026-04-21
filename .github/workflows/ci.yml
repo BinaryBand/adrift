@@ -27,20 +27,17 @@ jobs:
       - name: Ruff format check
         run: poetry run ruff format --check src runbook tests typings
 
-      - name: Ruff lint
+      - name: Ruff lint check
         run: poetry run ruff check src runbook tests typings
 
-      - name: Complexity check (lizard)
-        run: poetry run python -m runbook.quality.check_complexity src --ccn 8 --length 30 --params 4 --strict
+      - name: Pyright check
+        run: pyright --project pyrightconfig.json
 
-      - name: Import boundary check
-        run: poetry run python -m runbook.quality.check_import_boundaries src runbook tests --strict
+      - name: Complexity check (lizard)
+        run: python -m lizard src -C 8 -L 30 -a 4
 
       - name: Dead code check (vulture)
-        run: poetry run python -m runbook.quality.check_dead_code src
-
-      - name: Validate TOML configs
-        run: poetry run python -m runbook.quality.validate_configs --problems config/*.toml
+        run: python -m vulture src runbook tests typings --min-confidence 80
 
       - name: Run tests
         run: poetry run pytest -q

@@ -16,7 +16,6 @@ from zoneinfo import ZoneInfo
 import feedparser
 import requests
 import tomllib
-from dateutil import parser as date_parser
 from yt_dlp import YoutubeDL
 
 try:
@@ -147,52 +146,20 @@ def _include_lookahead(patterns: list[str]) -> str | None:
     return f"(?=.*(?:{'|'.join(patterns)}))" if patterns else None
 
 
-def _string_list(values: Any) -> list[str]:
-    if not isinstance(values, list):
-        return []
-    return [value for value in values if isinstance(value, str)]
-
-
-def _has_filter_patterns(include: list[str], exclude: list[str]) -> bool:
-    return bool(include or exclude)
-
-
-def _filter_parts(include: list[str], exclude: list[str]) -> list[str]:
-    parts: list[str] = ["(?i)^"]
-    parts.extend(_exclude_lookahead(pattern) for pattern in exclude)
-    include_part = _include_lookahead(include)
-    if include_part:
-        parts.append(include_part)
-    parts.append(".*$")
-    return parts
-
-
 def _filters_to_regex(filters: Any) -> str | None:
-    # Accept either legacy dicts or structured SourceFilter objects.
-    if hasattr(filters, "to_regex"):
-        try:
-            return filters.to_regex()
-        except Exception:
-            return None
-    if not isinstance(filters, dict):
+    try:
+        return filters.to_regex()
+    except Exception:
         return None
-    include = _string_list(filters.get("include"))
-    exclude = _string_list(filters.get("exclude"))
-    if not _has_filter_patterns(include, exclude):
-        return None
-    return "".join(_filter_parts(include, exclude))
 
 
 def _build_target(name: str, idx: int, source: Any) -> Target | None:
-    # Coerce legacy dicts into `FeedSource` models and extract filter regex.
     try:
         fs = ensure_feed_source(source)
     except Exception:
         return None
 
     url = fs.url
-    if not isinstance(url, str):
-        return None
     kind = "youtube" if _is_youtube_target(url) else "feed"
     return Target(
         source=url,
@@ -202,15 +169,6 @@ def _build_target(name: str, idx: int, source: Any) -> Target | None:
     )
 
 
-def _podcast_downloads(podcast: Any) -> list[Any]:
-    # Normalize to a `PodcastConfig` model, then return its configured downloads.
-    try:
-        pc = ensure_podcast_config(podcast)
-    except Exception:
-        return []
-    return list(pc.downloads or [])
-
-
 def _targets_from_podcast(podcast: Any) -> list[Target]:
     try:
         pc = ensure_podcast_config(podcast)
@@ -218,7 +176,7 @@ def _targets_from_podcast(podcast: Any) -> list[Target]:
         return []
     name = pc.name or "Unknown"
     targets: list[Target] = []
-    for idx, source in enumerate(_podcast_downloads(pc), start=1):
+    for idx, source in enumerate(pc.downloads, start=1):
         if target := _build_target(name, idx, source):
             targets.append(target)
     return targets
@@ -228,20 +186,12 @@ def _load_download_targets() -> list[Target]:
     with open(CONFIG_PATH, "rb") as f:
         data = tomllib.load(f)
 
-    targets: list[Target] = []
     raw = data.get("podcasts", [])
     if not isinstance(raw, list):
-        return targets
+        return []
 
-    # Parse into typed `PodcastConfig` models for a safer surface.
-    try:
-        podcasts = parse_podcasts_raw(raw)
-    except Exception:
-        # Fallback to legacy dict processing if validation fails.
-        for podcast in raw:
-            targets.extend(_targets_from_podcast(podcast))
-        return targets
-
+    targets: list[Target] = []
+    podcasts = parse_podcasts_raw(raw)
     for podcast in podcasts:
         targets.extend(_targets_from_podcast(podcast))
     return targets
@@ -274,7 +224,7 @@ def _resolve_channel_id(channel_url: str) -> str:
     }
     with YoutubeDL(cast(Any, opts)) as ydl:
         info = ydl.extract_info(channel_url, download=False) or {}
-    channel_id = info.get("channel_id") or info.get("id")
+    channel_id = info.get("channel_id")
     if isinstance(channel_id, str) and channel_id.startswith("UC"):
         return channel_id
     raise ValueError(f"Could not resolve channel_id from {channel_url}")
@@ -296,18 +246,6 @@ def _fetch_feed(feed_url: str) -> feedparser.FeedParserDict:
     return feedparser.parse(response.text)
 
 
-def _parse_datetime_value(raw: Any) -> datetime | None:
-    if not raw:
-        return None
-    try:
-        dt = date_parser.parse(str(raw))
-    except Exception:
-        return None
-    if dt.tzinfo is None:
-        dt = dt.replace(tzinfo=timezone.utc)
-    return dt.astimezone(timezone.utc)
-
-
 def _parse_datetime_tuple(raw: Any) -> datetime | None:
     if not isinstance(raw, tuple) or len(raw) < 6:
         return None
@@ -317,39 +255,12 @@ def _parse_datetime_tuple(raw: Any) -> datetime | None:
         return None
 
 
-def _entry_field(entry: feedparser.FeedParserDict, name: str) -> Any:
-    return getattr(entry, name, None) or entry.get(name)
-
-
-def _first_named_datetime(
-    entry: feedparser.FeedParserDict, names: tuple[str, ...]
-) -> datetime | None:
-    for name in names:
-        if dt := _parse_datetime_value(_entry_field(entry, name)):
-            return dt
-    return None
-
-
-def _first_named_datetime_tuple(
-    entry: feedparser.FeedParserDict, names: tuple[str, ...]
-) -> datetime | None:
-    for name in names:
-        if dt := _parse_datetime_tuple(_entry_field(entry, name)):
-            return dt
-    return None
-
-
 def _parse_entry_datetime(entry: feedparser.FeedParserDict) -> datetime | None:
-    dt = _first_named_datetime(entry, ("published", "updated", "pubDate"))
-    if dt is not None:
-        return dt
-    return _first_named_datetime_tuple(
-        entry, ("published_parsed", "updated_parsed", "pubDate_parsed")
-    )
+    return _parse_datetime_tuple(entry.get("published_parsed"))
 
 
 def _entry_raw_id(entry: feedparser.FeedParserDict) -> str:
-    return str(_entry_field(entry, "id") or "")
+    return str(entry.get("id") or "")
 
 
 def _video_id_from_raw_id(raw_id: str) -> str:
@@ -357,9 +268,6 @@ def _video_id_from_raw_id(raw_id: str) -> str:
 
 
 def _entry_video_id(entry: feedparser.FeedParserDict) -> str:
-    yid = _entry_field(entry, "yt_videoid")
-    if isinstance(yid, str) and yid:
-        return yid
     return _video_id_from_raw_id(_entry_raw_id(entry))
 
 
@@ -369,7 +277,7 @@ def _sample_from_entry(entry: feedparser.FeedParserDict) -> Sample | None:
         return None
     return Sample(
         video_id=_entry_video_id(entry),
-        title=str(getattr(entry, "title", "") or entry.get("title", "")),
+        title=str(entry.get("title") or ""),
         published_utc=dt,
     )
 

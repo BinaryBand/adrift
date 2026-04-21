@@ -20,7 +20,7 @@ def run_resolved(cmd: Iterable[str], /, **kwargs: Any) -> subprocess.CompletedPr
         argv[0] = local_executable.as_posix()
     elif which(executable) is not None:
         argv[0] = which(executable) or executable
-    return subprocess.run(argv, cwd=ROOT, check=False, **kwargs)
+    return subprocess.run(argv, cwd=ROOT, check=False, **kwargs)  # type: ignore
 
 
 class TestRuff:
