@@ -1,6 +1,6 @@
 from src.adapters import get_secret_store_adapter
 from src.adapters.secrets.docker_secrets import DockerSecretProvider
-from src.ports.secrets import SecretStorePort
+from src.ports import SecretStorePort
 
 
 def test_docker_secret_provider_reads_file(tmp_path):

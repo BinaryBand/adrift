@@ -17,7 +17,7 @@ from src.orchestration.secret_service import (
     validate_required_secret_values,
     validate_s3_connection,
 )
-from src.ports.secrets import SecretStorePort
+from src.ports import SecretStorePort
 
 READ_ONLY_ACTION_CHOICES = ["validate", "quit"]
 WRITABLE_ACTION_CHOICES = ["edit", "delete", "validate", "quit"]

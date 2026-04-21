@@ -8,7 +8,7 @@ from typing import TYPE_CHECKING
 import dotenv
 
 if TYPE_CHECKING:
-    from src.models.pipeline import MergeResult
+    from src.models import MergeResult
 
 from src.orchestration.merge_service import (
     MergeRunOptions,

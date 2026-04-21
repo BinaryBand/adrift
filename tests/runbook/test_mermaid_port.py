@@ -3,7 +3,7 @@ from pathlib import Path
 
 from src.adapters.mermaid import FileMermaidAdapter
 from src.models import EpisodeData, FeedSource, MergeResult, PodcastConfig, RssEpisode, SourceTrace
-from src.ports.mermaid import MermaidRenderOptions
+from src.ports import MermaidRenderOptions
 
 
 def _config() -> PodcastConfig:

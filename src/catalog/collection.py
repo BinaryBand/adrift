@@ -1,8 +1,7 @@
 from dataclasses import dataclass
 from typing import Any
 
-from src.models import FeedSource, PodcastConfig, RssEpisode, SourceTrace
-from src.models.podcast_config import ensure_feed_source
+from src.models import FeedSource, PodcastConfig, RssEpisode, SourceTrace, ensure_feed_source
 from src.utils.progress import Callback
 from src.utils.text import is_youtube_channel
 

@@ -18,7 +18,15 @@ from .pipeline import (
     ReferenceMatchTrace,
     SourceTrace,
 )
-from .podcast_config import FeedSource, PodcastConfig, SourceFilter
+from .podcast_config import (
+    FeedSource,
+    PodcastConfig,
+    SourceFilter,
+    ensure_feed_source,
+    ensure_podcast_config,
+    ensure_source_filter,
+    parse_podcasts_raw,
+)
 from .sponsorblock import SponsorSegment
 from .ytdlp import YtDlpImage, YtDlpVideo
 
@@ -44,4 +52,8 @@ __all__ = [
     "SponsorSegment",
     "YtDlpImage",
     "YtDlpVideo",
+    "ensure_feed_source",
+    "ensure_podcast_config",
+    "ensure_source_filter",
+    "parse_podcasts_raw",
 ]
