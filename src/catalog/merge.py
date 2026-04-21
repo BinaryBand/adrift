@@ -2,7 +2,7 @@
 from collections.abc import Callable
 from dataclasses import dataclass
 from time import perf_counter
-from typing import Any, TypedDict, Unpack
+from typing import TypedDict, TypeVar, Unpack, cast
 
 from src.models import (
     EpisodeData,
@@ -33,6 +33,9 @@ class MergeConfigOptionOverrides(TypedDict, total=False):
     on_stage: Callable[[str], None] | None
 
 
+_T = TypeVar("_T")
+
+
 def _maybe_record_timing(
     timings: dict[str, float] | None,
     key: str,
@@ -42,7 +45,7 @@ def _maybe_record_timing(
         timings[key] = perf_counter() - started_at
 
 
-def _timed_stage(key: str, fn: Any, options: MergeConfigOptions) -> Any:
+def _timed_stage(key: str, fn: Callable[[], _T], options: MergeConfigOptions) -> _T:
     if options.on_stage:
         options.on_stage(key)
     started_at = perf_counter()
@@ -116,6 +119,28 @@ def _collect_feed_sets(
     return references, downloads, [*reference_traces, *download_traces]
 
 
+def _merge_config_artifacts(
+    config: PodcastConfig,
+    references: list[RssEpisode],
+    downloads: list[RssEpisode],
+    options: MergeConfigOptions,
+) -> tuple[list[tuple[int, int]], list[SourceTrace], list[EpisodeData]]:
+    pairs = _timed_stage(
+        "align_episodes",
+        lambda: align_episodes(references, downloads, config.name),
+        options,
+    )
+    match_traces = cast(
+        list[SourceTrace], _build_match_traces(references, downloads, pairs, config.name)
+    )
+    episodes = _timed_stage(
+        "merge_episodes",
+        lambda: _merge_episode_list(references, downloads, pairs),
+        options,
+    )
+    return pairs, match_traces, episodes
+
+
 def merge_config(
     config: PodcastConfig,
     options: MergeConfigOptions | None = None,
@@ -127,19 +152,14 @@ def merge_config(
     total_start = perf_counter()
 
     references, downloads, source_traces = _collect_feed_sets(config, options)
-    pairs = _timed_stage(
-        "align_episodes",
-        lambda: align_episodes(references, downloads, config.name),
+    pairs, match_traces, episodes = _merge_config_artifacts(
+        config,
+        references,
+        downloads,
         options,
     )
-    match_traces = _build_match_traces(references, downloads, pairs, config.name)
-    episodes = _timed_stage(
-        "merge_episodes",
-        lambda: _merge_episode_list(references, downloads, pairs),
-        options,
-    )
-
-    merge_result = MergeResult(
+    _maybe_record_timing(options.timings, "merge_config_total", total_start)
+    return MergeResult(
         config=config,
         references=references,
         downloads=downloads,
@@ -148,8 +168,6 @@ def merge_config(
         pairs=pairs,
         episodes=episodes,
     )
-    _maybe_record_timing(options.timings, "merge_config_total", total_start)
-    return merge_result
 
 
 __all__ = ["MergeConfigOptions", "MergeConfigOptionOverrides", "merge_config"]

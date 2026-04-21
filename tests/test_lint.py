@@ -69,6 +69,19 @@ class TestPyright:
         assert result.returncode == 0, result.stdout + result.stderr
 
 
+class TestLizard:
+    """Track the current Lizard complexity gate."""
+
+    def test_lizard(self):
+        """Fail once the repo is expected to satisfy the configured Lizard thresholds."""
+        result = run_resolved(
+            ["python", "-m", "lizard", "src", "-C", "8", "-L", "30", "-a", "4"],
+            capture_output=True,
+            text=True,
+        )
+        assert result.returncode == 0, result.stdout + result.stderr
+
+
 # class TestSemgrep:
 #     """Ensure the codebase passes the current Semgrep architecture gate."""
 

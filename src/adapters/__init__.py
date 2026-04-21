@@ -2,6 +2,7 @@
 
 import os
 from collections.abc import Callable
+from dataclasses import dataclass
 
 from src.models import FeedSource, RssChannel, RssEpisode
 from src.ports import (
@@ -12,6 +13,14 @@ from src.ports import (
 )
 from src.utils.progress import Callback
 from src.utils.text import is_youtube_channel
+
+
+@dataclass(frozen=True)
+class FetchSourceEpisodesOptions:
+    title: str = ""
+    detailed: bool = True
+    callback: Callback | None = None
+    refresh: bool = False
 
 
 def _require_source_url(source: FeedSource) -> str:
@@ -27,34 +36,30 @@ def _is_youtube_source(source: FeedSource) -> bool:
 
 def fetch_source_episodes(
     source: FeedSource,
-    *,
-    title: str = "",
-    detailed: bool = True,
-    callback: Callback | None = None,
-    refresh: bool = False,
+    options: FetchSourceEpisodesOptions | None = None,
 ) -> list[RssEpisode]:
     """Fetch episodes directly from the concrete source type."""
+    resolved_options = options or FetchSourceEpisodesOptions()
     url = _require_source_url(source)
+    filter_regex = source.filters.to_regex() if source.filters else None
     if _is_youtube_source(source):
         from src.youtube.metadata import YtFetchOptions, get_youtube_episodes
 
-        filter_regex = source.filters.to_regex() if source.filters else None
         return get_youtube_episodes(
             url,
-            title,
+            resolved_options.title,
             YtFetchOptions(
                 filter=filter_regex,
-                detailed=detailed,
-                callback=callback,
-                refresh=refresh,
+                detailed=resolved_options.detailed,
+                callback=resolved_options.callback,
+                refresh=resolved_options.refresh,
             ),
         )
 
     from src.web.rss import get_rss_episodes
 
-    filter_regex = source.filters.to_regex() if source.filters else None
     r_rules = source.filters.r_rules if source.filters else None
-    return get_rss_episodes(url, filter_regex, r_rules, callback)
+    return get_rss_episodes(url, filter_regex, r_rules, resolved_options.callback)
 
 
 def fetch_source_channel(source: FeedSource) -> RssChannel:

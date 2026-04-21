@@ -189,24 +189,31 @@ def _is_endpoint_reachable_with_provider(
     list_buckets() so the check exercises the same code-path as normal usage.
     """
     try:
-        values = require_secrets(provider, _REQUIRED_S3_KEYS)
-        cfg = _make_boto_config(connect_timeout=timeout, read_timeout=timeout, max_attempts=1)
-        boto3_factory: Callable[..., Any] = boto3.client  # pyright: ignore[reportUnknownVariableType]
-        client = cast(  # pyright: ignore[reportUnknownVariableType]
-            S3Client,
-            boto3_factory(
-                "s3",
-                aws_access_key_id=values["S3_USERNAME"],
-                aws_secret_access_key=values["S3_SECRET_KEY"],
-                endpoint_url=url,
-                config=cfg,
-                region_name=values["S3_REGION"],
-            ),
-        )
-        client.list_buckets()
-        return True
+        _build_s3_probe_client(url, provider, timeout).list_buckets()
     except Exception:
         return False
+    return True
+
+
+def _build_s3_probe_client(
+    url: str,
+    provider: SecretProviderPort,
+    timeout: float,
+) -> S3Client:
+    values = require_secrets(provider, _REQUIRED_S3_KEYS)
+    cfg = _make_boto_config(connect_timeout=timeout, read_timeout=timeout, max_attempts=1)
+    boto3_factory: Callable[..., Any] = boto3.client  # pyright: ignore[reportUnknownVariableType]
+    return cast(  # pyright: ignore[reportUnknownVariableType]
+        S3Client,
+        boto3_factory(
+            "s3",
+            aws_access_key_id=values["S3_USERNAME"],
+            aws_secret_access_key=values["S3_SECRET_KEY"],
+            endpoint_url=url,
+            config=cfg,
+            region_name=values["S3_REGION"],
+        ),
+    )
 
 
 @dataclass
@@ -524,24 +531,30 @@ def copy_file(bucket: str, source_key: str, dest_key: str) -> str | None:
         MetadataDirective="COPY",
         ACL="public-read",
     )
+    _sync_copy_cache(client, bucket, source_key, dest_key)
+    return _public_s3_url(bucket, dest_key)
 
+
+def _sync_copy_cache(client: S3Client, bucket: str, source_key: str, dest_key: str) -> None:
     src_cache_key = f"s3_metadata:{bucket}:{source_key}"
     dst_cache_key = f"s3_metadata:{bucket}:{dest_key}"
     metadata = _s3_cache().get(src_cache_key)
+    if metadata is None:
+        metadata = _fetch_head_metadata(client, bucket, dest_key)
     if metadata is not None:
         _s3_cache().set(dst_cache_key, metadata)
-    else:
-        try:
-            head_response = client.head_object(Bucket=bucket, Key=dest_key)
-            metadata = head_response.get("Metadata", {})
-            _s3_cache().set(dst_cache_key, metadata)
-        except Exception:
-            # best-effort: ignore cache update failures
-            pass
 
-    return urljoin(
-        _secret_provider.get("S3_ENDPOINT", S3_ENDPOINT), Path(bucket, dest_key).as_posix()
-    )
+
+def _fetch_head_metadata(client: S3Client, bucket: str, key: str) -> dict[str, str] | None:
+    try:
+        head_response = client.head_object(Bucket=bucket, Key=key)
+    except Exception:
+        return None
+    return head_response.get("Metadata", {})
+
+
+def _public_s3_url(bucket: str, key: str) -> str:
+    return urljoin(_secret_provider.get("S3_ENDPOINT", S3_ENDPOINT), Path(bucket, key).as_posix())
 
 
 def get_metadata(bucket: str, key: str) -> MediaMetadata | None:
