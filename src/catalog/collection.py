@@ -75,17 +75,16 @@ def _fetch_source_episodes(
     source: FeedSource | dict[str, Any],
     context: EpisodeFetchContext,
 ) -> list[RssEpisode]:
-    from src.adapters import get_episode_source_adapter
+    from src.adapters import fetch_source_episodes
 
     resolved = ensure_feed_source(source)
-    adapter = get_episode_source_adapter(resolved)
-    options = {
-        "title": context.title,
-        "detailed": context.is_reference,
-        "callback": context.callback,
-        "refresh": context.refresh_sources,
-    }
-    return adapter.fetch_episodes(resolved, options)
+    return fetch_source_episodes(
+        resolved,
+        title=context.title,
+        detailed=context.is_reference,
+        callback=context.callback,
+        refresh=context.refresh_sources,
+    )
 
 
 def _merge_episode_album(

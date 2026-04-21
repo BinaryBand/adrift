@@ -8,7 +8,6 @@ from src.models import (
     EpisodeData,
     MergeResult,
     PodcastConfig,
-    ReferenceMatchTrace,
     RssEpisode,
     SourceTrace,
 )
@@ -92,14 +91,6 @@ def _collect_download_episodes_with_traces(
     )
 
 
-def _align_config_episodes(
-    config_name: str,
-    references: list[RssEpisode],
-    downloads: list[RssEpisode],
-) -> list[tuple[int, int]]:
-    return align_episodes(references, downloads, config_name)
-
-
 def _collect_feed_sets(
     config: PodcastConfig,
     options: MergeConfigOptions,
@@ -125,66 +116,6 @@ def _collect_feed_sets(
     return references, downloads, [*reference_traces, *download_traces]
 
 
-def _collect_merge_parts(
-    config_name: str,
-    references: list[RssEpisode],
-    downloads: list[RssEpisode],
-    options: MergeConfigOptions,
-) -> tuple[list[tuple[int, int]], list[ReferenceMatchTrace], list[EpisodeData]]:
-    pairs = _timed_stage(
-        "align_episodes",
-        lambda: _align_config_episodes(config_name, references, downloads),
-        options,
-    )
-    match_traces = _build_match_traces(references, downloads, pairs, config_name)
-    episodes = _timed_stage(
-        "merge_episodes",
-        lambda: _merge_episode_list(references, downloads, pairs),
-        options,
-    )
-    return pairs, match_traces, episodes
-
-
-def _collect_merge_result_parts(
-    config: PodcastConfig,
-    options: MergeConfigOptions,
-) -> tuple[
-    list[RssEpisode],
-    list[RssEpisode],
-    list[SourceTrace],
-    list[tuple[int, int]],
-    list[ReferenceMatchTrace],
-    list[EpisodeData],
-]:
-    references, downloads, source_traces = _collect_feed_sets(config, options)
-    pairs, match_traces, episodes = _collect_merge_parts(
-        config.name,
-        references,
-        downloads,
-        options,
-    )
-    return references, downloads, source_traces, pairs, match_traces, episodes
-
-
-def _build_merge_result(
-    config: PodcastConfig,
-    options: MergeConfigOptions,
-) -> MergeResult:
-    references, downloads, source_traces, pairs, match_traces, episodes = (
-        _collect_merge_result_parts(config, options)
-    )
-
-    return MergeResult(
-        config=config,
-        references=references,
-        downloads=downloads,
-        source_traces=source_traces,
-        match_traces=match_traces,
-        pairs=pairs,
-        episodes=episodes,
-    )
-
-
 def merge_config(
     config: PodcastConfig,
     options: MergeConfigOptions | None = None,
@@ -194,7 +125,29 @@ def merge_config(
     if options is None:
         options = MergeConfigOptions(**option_overrides)
     total_start = perf_counter()
-    merge_result = _build_merge_result(config, options)
+
+    references, downloads, source_traces = _collect_feed_sets(config, options)
+    pairs = _timed_stage(
+        "align_episodes",
+        lambda: align_episodes(references, downloads, config.name),
+        options,
+    )
+    match_traces = _build_match_traces(references, downloads, pairs, config.name)
+    episodes = _timed_stage(
+        "merge_episodes",
+        lambda: _merge_episode_list(references, downloads, pairs),
+        options,
+    )
+
+    merge_result = MergeResult(
+        config=config,
+        references=references,
+        downloads=downloads,
+        source_traces=source_traces,
+        match_traces=match_traces,
+        pairs=pairs,
+        episodes=episodes,
+    )
     _maybe_record_timing(options.timings, "merge_config_total", total_start)
     return merge_result
 

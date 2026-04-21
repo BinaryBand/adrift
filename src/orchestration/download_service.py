@@ -304,15 +304,14 @@ def update_rss(config: PodcastConfig) -> None:
 
 
 def _build_channel(config: PodcastConfig) -> RssChannel:
-    from src.adapters import get_episode_source_adapter
+    from src.adapters import fetch_source_channel
 
     channel = RssChannel(
         title=config.name, author="", subtitle="", url="", description="", image=""
     )
     for source in config.references:
         try:
-            adapter = get_episode_source_adapter(source)
-            _fill_channel(channel, adapter.fetch_channel(source))
+            _fill_channel(channel, fetch_source_channel(source))
         except Exception:
             pass
     return channel

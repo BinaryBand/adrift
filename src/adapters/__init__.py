@@ -3,14 +3,72 @@
 import os
 from collections.abc import Callable
 
-from src.models import FeedSource
+from src.models import FeedSource, RssChannel, RssEpisode
 from src.ports import (
     EpisodeSourcePort,
     ReadOnlySecretStorePort,
     SecretProviderPort,
     SecretStorePort,
 )
+from src.utils.progress import Callback
 from src.utils.text import is_youtube_channel
+
+
+def _require_source_url(source: FeedSource) -> str:
+    url = source.url
+    if not url:
+        raise ValueError("FeedSource URL is required")
+    return url
+
+
+def _is_youtube_source(source: FeedSource) -> bool:
+    return is_youtube_channel(_require_source_url(source))
+
+
+def fetch_source_episodes(
+    source: FeedSource,
+    *,
+    title: str = "",
+    detailed: bool = True,
+    callback: Callback | None = None,
+    refresh: bool = False,
+) -> list[RssEpisode]:
+    """Fetch episodes directly from the concrete source type."""
+    url = _require_source_url(source)
+    if _is_youtube_source(source):
+        from src.youtube.metadata import YtFetchOptions, get_youtube_episodes
+
+        filter_regex = source.filters.to_regex() if source.filters else None
+        return get_youtube_episodes(
+            url,
+            title,
+            YtFetchOptions(
+                filter=filter_regex,
+                detailed=detailed,
+                callback=callback,
+                refresh=refresh,
+            ),
+        )
+
+    from src.web.rss import get_rss_episodes
+
+    filter_regex = source.filters.to_regex() if source.filters else None
+    r_rules = source.filters.r_rules if source.filters else None
+    return get_rss_episodes(url, filter_regex, r_rules, callback)
+
+
+def fetch_source_channel(source: FeedSource) -> RssChannel:
+    """Fetch channel metadata directly from the concrete source type."""
+    url = _require_source_url(source)
+    if _is_youtube_source(source):
+        from src.youtube.metadata import get_youtube_channel
+
+        title = source.filters.to_regex() if source.filters else ""
+        return get_youtube_channel(url, title or "")
+
+    from src.web.rss import get_rss_channel
+
+    return get_rss_channel(url)
 
 
 def get_episode_source_adapter(source: FeedSource) -> EpisodeSourcePort:
@@ -24,18 +82,15 @@ def get_episode_source_adapter(source: FeedSource) -> EpisodeSourcePort:
     Returns:
         EpisodeSourcePort adapter instance
     """
-    url = source.url
-    if not url:
-        raise ValueError("FeedSource URL is required to determine adapter")
-
-    if is_youtube_channel(url):
+    _require_source_url(source)
+    if _is_youtube_source(source):
         from src.adapters.episode_sources.episode_source_youtube import YouTubeEpisodeSourceAdapter
 
         return YouTubeEpisodeSourceAdapter()
-    else:
-        from src.adapters.episode_sources.episode_source_rss import RssEpisodeSourceAdapter
 
-        return RssEpisodeSourceAdapter()
+    from src.adapters.episode_sources.episode_source_rss import RssEpisodeSourceAdapter
+
+    return RssEpisodeSourceAdapter()
 
 
 def get_alignment_adapter():
@@ -59,6 +114,7 @@ def get_mermaid_adapter():
 def get_report_adapter():
     """Return the default report adapter instance."""
     return None
+
 
 def _resolve_secret_provider_name(provider_name: str | None = None) -> str:
     return (provider_name or os.getenv("ADRIFT_SECRETS_PROVIDER", "env")).lower()
