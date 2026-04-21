@@ -1,0 +1,129 @@
+# cspell: words creepcast darknet gladwell smosh
+
+from typing import Any
+
+from cachetools import LRUCache, cached
+
+from src.utils.regex import re_compile
+from src.utils.text import create_slug, remove_control_chars
+
+_TITLE_CACHE: LRUCache[Any, Any] = LRUCache(2048)
+
+
+def _strip_suffix(pattern: str, episode: str) -> str:
+    return re_compile(pattern).sub("", episode)
+
+
+def _clean_darknet_diaries_title(filename: str) -> str:
+    slug_name = create_slug(filename)
+    match = re_compile(r"ep\-*(\d{1,3}[\-a-z0-9]+)$").search(slug_name)
+    groups = list(match.groups() if match else [])
+    groups = sorted(groups, key=len)
+    return groups[-1].strip("-") if groups else slug_name
+
+
+def _clean_swindled_title(filename: str) -> str:
+    cleaned_filename = re_compile(r"(?i)\s*\|\s*Audio Podcast$").sub("", filename)
+    cleaned_filename = re_compile(r"(?i)\s*\|\s*Documentary$").sub("", cleaned_filename)
+    title = re_compile(r"\(([^/\)]+)/[^)]*\)").sub(r"(\1)", cleaned_filename)
+    return title.strip()
+
+
+def _clean_behind_the_bastards_title(episode: str) -> str:
+    return _strip_suffix(r"(?i)\| behind the bastards$", episode)
+
+
+def _clean_coffee_break_swedish_title(episode: str) -> str:
+    return _strip_suffix(r"(?i)\| coffee break swedish podcast$", episode)
+
+
+def _clean_creepcast_title(episode: str) -> str:
+    patterns = [r"(?i)\| creep cast$", r"(?i)\| creepcast$", r"(?i)\| creep tv$"]
+    for pattern in patterns:
+        episode = _strip_suffix(pattern, episode)
+    return episode
+
+
+def _clean_financial_audit_title(episode: str) -> str:
+    return _strip_suffix(r"(?i)\| financial audit$", episode)
+
+
+def _clean_morbid_title(episode: str) -> str:
+    prefix_patterns = [
+        r"(?i)^episode \d{1,3}[:\-]?\s*",
+    ]
+    for pattern in prefix_patterns:
+        episode = re_compile(pattern).sub("", episode)
+
+    patterns = [r"(?i)\| morbid$", r"(?i)\| morbid \| podcast$"]
+    for pattern in patterns:
+        episode = _strip_suffix(pattern, episode)
+    return episode
+
+
+def _clean_revisionist_history_title(episode: str) -> str:
+    return _strip_suffix(r"(?i)\| revisionist history malcolm gladwell$", episode)
+
+
+def _clean_smosh_reads_reddit_stories_title(episode: str) -> str:
+    return _strip_suffix(r"(?i)\| smosh reading reddit stories$", episode)
+
+
+def _clean_stuff_they_dont_want_you_to_know_title(episode: str) -> str:
+    return _strip_suffix(r"(?i)\| stuff they don't want you to know$", episode)
+
+
+def _clean_stuff_you_should_know_title(episode: str) -> str:
+    return _strip_suffix(r"(?i)\| stuff you should know$", episode)
+
+
+_TITLE_CLEANERS = {
+    "Behind the Bastards": _clean_behind_the_bastards_title,
+    "Coffee Break Swedish": _clean_coffee_break_swedish_title,
+    "CreepCast": _clean_creepcast_title,
+    "Darknet Diaries": _clean_darknet_diaries_title,
+    "Financial Audit": _clean_financial_audit_title,
+    "Morbid": _clean_morbid_title,
+    "Revisionist History": _clean_revisionist_history_title,
+    "Smosh Reads Reddit Stories": _clean_smosh_reads_reddit_stories_title,
+    "Stuff They Don't Want You To Know": _clean_stuff_they_dont_want_you_to_know_title,
+    "Stuff You Should Know": _clean_stuff_you_should_know_title,
+    "Swindled": _clean_swindled_title,
+}
+
+_TITLE_SLUG_SUFFIXES = {
+    "Behind the Bastards": ["Behind the Bastards"],
+    "Coffee Break Swedish": ["Coffee Break Swedish Podcast"],
+    "CreepCast": ["Creep Cast", "CreepCast", "Creep TV"],
+    "Financial Audit": ["Financial Audit"],
+    "Morbid": ["Morbid", "Morbid Podcast"],
+    "Revisionist History": ["Revisionist History Malcolm Gladwell"],
+    "Smosh Reads Reddit Stories": ["Smosh Reading Reddit Stories"],
+    "Stuff They Don't Want You To Know": ["Stuff They Don't Want You To Know"],
+    "Stuff You Should Know": ["Stuff You Should Know"],
+}
+
+
+def _apply_title_cleaner(show: str, episode: str) -> str:
+    cleaner = _TITLE_CLEANERS.get(show)
+    if cleaner is None:
+        return episode
+    return cleaner(episode)
+
+
+def _strip_slug_suffixes(show: str, slug: str) -> str:
+    for suffix in _TITLE_SLUG_SUFFIXES.get(show, []):
+        suffix_slug = create_slug(suffix).strip("-")
+        if slug.endswith(f"-{suffix_slug}"):
+            slug = slug[: -len(suffix_slug) - 1]
+    return slug.strip("-")
+
+
+@cached(_TITLE_CACHE)
+def normalize_title(show: str, episode: str) -> str:
+    episode = remove_control_chars(episode)
+    episode = _apply_title_cleaner(show, episode)
+    return _strip_slug_suffixes(show, create_slug(episode).strip("-"))
+
+
+__all__ = ["normalize_title"]

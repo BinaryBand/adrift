@@ -1,8 +1,8 @@
-"""Tests for normalize_title() in src/app_runner.py."""
+"""Tests for normalize_title() in src.utils.title_normalization."""
 
 import unittest
 
-from src.app_runner import normalize_title
+from src.utils.title_normalization import normalize_title
 
 
 class TestNormalizeTitleUnknownShow(unittest.TestCase):

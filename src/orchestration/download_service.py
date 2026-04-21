@@ -9,7 +9,14 @@ from pathlib import Path
 
 from src.catalog import match, process_feeds
 from src.files.audio import convert_to_opus, cut_segments, get_duration, is_audio
-from src.files.s3 import UploadOptions, exists, get_file_list, get_metadata, upload_file
+from src.files.s3 import (
+    UploadOptions,
+    exists,
+    get_file_list,
+    get_metadata,
+    get_s3_files,
+    upload_file,
+)
 from src.models import (
     DownloadEpisode,
     MediaMetadata,
@@ -20,6 +27,7 @@ from src.models import (
 )
 from src.utils.progress import Callback
 from src.utils.regex import YOUTUBE_VIDEO_REGEX
+from src.utils.title_normalization import normalize_title
 from src.web.rss import download_direct, podcast_to_rss
 from src.web.sponsorblock import fetch_sponsor_segments
 from src.youtube.downloader import download_video
@@ -105,8 +113,6 @@ class _ExistingMediaSources:
 
 @lru_cache(maxsize=128)
 def _existing_media_sources(bucket: str, prefix: str, show: str) -> _ExistingMediaSources:
-    from src.app_runner import normalize_title
-
     cleaned_slugs: set[str] = set()
     source_urls: set[str] = set()
     youtube_video_ids: set[str] = set()
@@ -257,8 +263,6 @@ def _operation_progress(progress_hooks: DownloadProgressHooks | None) -> Callbac
 
 
 def _episode_slug(config: PodcastConfig, ep: DownloadEpisode) -> str:
-    from src.app_runner import normalize_title
-
     return normalize_title(config.name, ep.episode.title)
 
 
@@ -323,8 +327,6 @@ def _fill_channel(base: RssChannel, incoming: RssChannel) -> None:
 def _match_to_s3(
     config: PodcastConfig, episodes: list[RssEpisode], bucket: str, prefix: str
 ) -> list[RssEpisode]:
-    from src.app_runner import get_s3_files
-
     files = _audio_files(get_s3_files(bucket, prefix))
     if not files:
         return []

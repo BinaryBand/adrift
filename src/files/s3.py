@@ -650,6 +650,19 @@ def get_file_list(bucket: str, prefix: str, without_extensions: bool = False) ->
     return file_list
 
 
+def get_s3_files(bucket: str, prefix: str) -> list[str]:
+    file_list = get_file_list(bucket, prefix)
+    root_path = Path(bucket) / prefix
+
+    files: list[str] = []
+    for file_key in file_list:
+        filename = Path(file_key).name
+        location = urljoin(S3_ENDPOINT, (root_path / filename).as_posix())
+        files.append(location)
+
+    return files
+
+
 def exists(bucket: str, prefix: str, extension_agnostic: bool = True) -> str | None:
     prefix = prefix.lstrip(".").rstrip("/")
     key: Path = Path(prefix)
