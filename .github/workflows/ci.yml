@@ -31,13 +31,13 @@ jobs:
         run: poetry run ruff check src runbook tests typings
 
       - name: Pyright check
-        run: pyright --project pyrightconfig.json
+        run: poetry run pyright --project pyrightconfig.json
 
       - name: Complexity check (lizard)
-        run: python -m lizard src -C 8 -L 30 -a 4
+        run: poetry run lizard src -C 8 -L 30 -a 4
 
       - name: Dead code check (vulture)
-        run: python -m vulture src runbook tests typings --min-confidence 80
+        run: poetry run vulture src runbook tests typings --min-confidence 80
 
       - name: Run tests
         run: poetry run pytest -q
