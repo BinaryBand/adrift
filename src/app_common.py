@@ -9,17 +9,19 @@ from typing import Any, cast
 import tomllib
 from dateutil.rrule import rrulestr
 
-from src.models.podcast_config import (
+from src.models import (
     FeedSource,
     PodcastConfig,
     SourceFilter,
+)
+from src.models.podcast_config import (
     ensure_feed_source,
     ensure_podcast_config,
     ensure_source_filter,
     parse_podcasts_raw,
 )
 
-MATCH_TOLERANCE = 0.65
+MATCH_TOLERANCE = 0.75
 
 __all__ = [
     "MATCH_TOLERANCE",

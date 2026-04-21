@@ -4,7 +4,7 @@ import unittest
 from pathlib import Path
 
 from src.app_common import _expand_include_targets
-from src.models.podcast_config import PodcastConfig, SourceFilter
+from src.models import PodcastConfig, SourceFilter
 from src.utils.regex import (
     LINK_REGEX,
     YOUTUBE_PLAYLIST_SHORTHAND_REGEX,

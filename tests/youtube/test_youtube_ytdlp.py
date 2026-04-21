@@ -4,8 +4,7 @@ import unittest
 from datetime import datetime, timedelta, timezone
 from unittest.mock import MagicMock, patch
 
-from src.models import RssEpisode, YtDlpParams
-from src.models.ytdlp import YtDlpImage
+from src.models import RssEpisode, YtDlpImage, YtDlpParams
 from src.youtube.ytdlp import (
     YOUTUBE_EPISODE_CACHE_FRESHNESS,
     YOUTUBE_RECENT_EPISODE_CHECK_FRESHNESS,

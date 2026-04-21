@@ -1,5 +1,5 @@
 from src.adapters.mermaid import build_sankey_lines
-from src.models.pipeline import MergeResult
+from src.models import MergeResult
 
 from ._helpers import mermaid_block
 

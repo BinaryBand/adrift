@@ -10,9 +10,14 @@ from pathlib import Path
 from src.catalog import match, process_feeds
 from src.files.audio import convert_to_opus, cut_segments, get_duration, is_audio
 from src.files.s3 import UploadOptions, exists, get_file_list, get_metadata, upload_file
-from src.models import MediaMetadata, RssChannel, RssEpisode
-from src.models.pipeline import DownloadEpisode, MergeResult
-from src.models.podcast_config import PodcastConfig
+from src.models import (
+    DownloadEpisode,
+    MediaMetadata,
+    MergeResult,
+    PodcastConfig,
+    RssChannel,
+    RssEpisode,
+)
 from src.utils.progress import Callback
 from src.utils.regex import YOUTUBE_VIDEO_REGEX
 from src.web.rss import download_direct, podcast_to_rss

@@ -2,10 +2,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 
 from src.adapters.mermaid import FileMermaidAdapter
-from src.models.metadata import RssEpisode
-from src.models.output import EpisodeData
-from src.models.pipeline import MergeResult, SourceTrace
-from src.models.podcast_config import FeedSource, PodcastConfig
+from src.models import EpisodeData, FeedSource, MergeResult, PodcastConfig, RssEpisode, SourceTrace
 from src.ports.mermaid import MermaidRenderOptions
 
 

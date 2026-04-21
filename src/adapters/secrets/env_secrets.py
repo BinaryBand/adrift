@@ -3,7 +3,7 @@ from pathlib import Path
 
 from dotenv import find_dotenv, load_dotenv
 
-from src.ports.secrets import SecretProviderPort, SecretStorePort
+from src.ports import SecretProviderPort, SecretStorePort
 
 
 class EnvironmentSecretProvider(SecretProviderPort):

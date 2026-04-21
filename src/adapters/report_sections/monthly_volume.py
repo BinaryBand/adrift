@@ -1,8 +1,7 @@
 from collections import Counter
 from datetime import datetime, timezone
 
-from src.models.output import EpisodeData
-from src.models.pipeline import MergeResult
+from src.models import EpisodeData, MergeResult
 
 from ._helpers import mermaid_block
 

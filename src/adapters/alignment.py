@@ -1,6 +1,6 @@
 from typing import Any
 
-from src.ports.alignment import AlignmentPort
+from src.ports import AlignmentPort
 
 
 class GreedyAlignmentAdapter(AlignmentPort):

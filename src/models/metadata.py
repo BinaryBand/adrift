@@ -154,7 +154,7 @@ try:
 except Exception:
     # When executed as a script the package-relative import may fail;
     # fall back to absolute import using the `src` package on sys.path.
-    from src.models.ytdlp import YtDlpImage, YtDlpVideo
+    from src.models import YtDlpImage, YtDlpVideo
 
 
 def _parse_ytdlp_pub_date(data: YtDlpVideo | dict[str, Any]) -> datetime | None:

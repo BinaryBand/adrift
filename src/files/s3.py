@@ -25,7 +25,7 @@ else:
 
 from src.adapters import get_secret_provider_adapter
 from src.models import CacheMetadata, MediaMetadata, S3Metadata
-from src.ports.secrets import SecretProviderPort, require_secrets
+from src.ports import SecretProviderPort, require_secrets
 from src.utils.progress import Callback
 
 _REQUIRED_S3_KEYS = ("S3_USERNAME", "S3_SECRET_KEY", "S3_ENDPOINT", "S3_REGION")

@@ -3,7 +3,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Protocol
 
-from src.models.pipeline import MergeResult
+from src.models import MergeResult
 
 ReportSection = Callable[[MergeResult], str]
 

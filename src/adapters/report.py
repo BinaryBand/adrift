@@ -1,8 +1,8 @@
 from pathlib import Path
 
 from src.adapters.report_sections import DEFAULT_DOCUMENTS
-from src.models.pipeline import MergeResult
-from src.ports.report import ReportDocument, ReportRenderOptions, compose
+from src.models import MergeResult
+from src.ports import ReportDocument, ReportRenderOptions, compose
 
 
 def _coerce_render_options(options: ReportRenderOptions | None) -> ReportRenderOptions:

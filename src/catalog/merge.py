@@ -4,10 +4,14 @@ from dataclasses import dataclass
 from time import perf_counter
 from typing import Any, TypedDict, Unpack
 
-from src.models.metadata import RssEpisode
-from src.models.output import EpisodeData
-from src.models.pipeline import MergeResult, ReferenceMatchTrace, SourceTrace
-from src.models.podcast_config import PodcastConfig
+from src.models import (
+    EpisodeData,
+    MergeResult,
+    PodcastConfig,
+    ReferenceMatchTrace,
+    RssEpisode,
+    SourceTrace,
+)
 from src.utils.progress import Callback
 
 from .alignment import align_episodes, merge_episode

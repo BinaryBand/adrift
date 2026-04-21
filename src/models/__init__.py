@@ -11,9 +11,16 @@ from .metadata import (
     YtDlpParams,
 )
 from .output import EpisodeData, PodcastFeed
-from .pipeline import DownloadEpisode, MergeResult
+from .pipeline import (
+    DownloadEpisode,
+    MatchCandidateTrace,
+    MergeResult,
+    ReferenceMatchTrace,
+    SourceTrace,
+)
 from .podcast_config import FeedSource, PodcastConfig, SourceFilter
 from .sponsorblock import SponsorSegment
+from .ytdlp import YtDlpImage, YtDlpVideo
 
 __all__ = [
     "DEVICE",
@@ -29,7 +36,12 @@ __all__ = [
     "PodcastConfig",
     "EpisodeData",
     "PodcastFeed",
+    "MatchCandidateTrace",
+    "ReferenceMatchTrace",
+    "SourceTrace",
     "MergeResult",
     "DownloadEpisode",
     "SponsorSegment",
+    "YtDlpImage",
+    "YtDlpVideo",
 ]

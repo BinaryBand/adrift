@@ -11,7 +11,7 @@ os.environ.setdefault("S3_ENDPOINT", "http://localhost")
 os.environ.setdefault("S3_REGION", "us-east-1")
 
 from src.catalog import _best_thumbnail, align_episodes, merge_episode, sim_date
-from src.models.metadata import RssEpisode
+from src.models import RssEpisode
 
 
 def _dt(year: int, month: int, day: int) -> datetime:

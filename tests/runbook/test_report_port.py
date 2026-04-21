@@ -2,9 +2,14 @@ from datetime import datetime, timezone
 from pathlib import Path
 
 from src.adapters.report import FileReportAdapter
-from src.models.metadata import RssEpisode
-from src.models.pipeline import MatchCandidateTrace, MergeResult, ReferenceMatchTrace
-from src.models.podcast_config import FeedSource, PodcastConfig
+from src.models import (
+    FeedSource,
+    MatchCandidateTrace,
+    MergeResult,
+    PodcastConfig,
+    ReferenceMatchTrace,
+    RssEpisode,
+)
 
 
 def _config() -> PodcastConfig:

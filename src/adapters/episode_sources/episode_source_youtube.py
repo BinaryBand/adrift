@@ -1,8 +1,7 @@
 from typing import Any
 
-from src.models.metadata import RssChannel, RssEpisode
-from src.models.podcast_config import FeedSource
-from src.ports.episode_source import EpisodeSourcePort
+from src.models import FeedSource, RssChannel, RssEpisode
+from src.ports import EpisodeSourcePort
 
 
 class YouTubeEpisodeSourceAdapter(EpisodeSourcePort):

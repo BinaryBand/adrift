@@ -12,10 +12,10 @@ from typing import TYPE_CHECKING, cast
 from pydantic import BaseModel
 
 from src import catalog
-from src.models.podcast_config import PodcastConfig
+from src.models import PodcastConfig
 
 if TYPE_CHECKING:
-    from src.models.pipeline import MergeResult
+    from src.models import MergeResult
     from src.utils.run_ui import BaseRunUI
 
 
@@ -298,7 +298,7 @@ def _maybe_generate_mermaid(
         return
     try:
         from src.adapters import get_mermaid_adapter
-        from src.ports.mermaid import MermaidRenderOptions
+        from src.ports import MermaidRenderOptions
 
         adapter = get_mermaid_adapter()
         adapter.generate_diagrams(

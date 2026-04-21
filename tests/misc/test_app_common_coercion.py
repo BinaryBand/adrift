@@ -1,9 +1,7 @@
 import pytest
 
+from src.models import FeedSource, PodcastConfig, SourceFilter
 from src.models.podcast_config import (
-    FeedSource,
-    PodcastConfig,
-    SourceFilter,
     ensure_feed_source,
     ensure_podcast_config,
     ensure_source_filter,

@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
-from src.ports.secrets import (
+from src.ports import (
     ReadOnlySecretStorePort,
     SecretProviderPort,
     SecretStorePort,

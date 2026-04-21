@@ -6,8 +6,7 @@ from typing import Annotated, Any, Protocol
 import dotenv
 import typer
 
-from src.models.pipeline import DownloadEpisode
-from src.models.podcast_config import PodcastConfig
+from src.models import DownloadEpisode, PodcastConfig
 from src.orchestration.download_service import DownloadProgressHooks, DownloadQueueItem
 
 DF_TARGETS = ["config/*.toml"]

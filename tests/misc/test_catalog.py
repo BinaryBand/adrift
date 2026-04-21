@@ -27,8 +27,7 @@ from src.catalog import (
     process_feeds,
     process_sources,
 )
-from src.models.metadata import RssEpisode
-from src.models.podcast_config import FeedSource, PodcastConfig, SourceFilter
+from src.models import FeedSource, PodcastConfig, RssEpisode, SourceFilter
 
 
 def _dt(year: int, month: int, day: int) -> datetime:

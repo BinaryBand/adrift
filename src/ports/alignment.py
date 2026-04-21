@@ -1,6 +1,6 @@
 from typing import Protocol
 
-from src.models.metadata import RssEpisode
+from src.models import RssEpisode
 
 
 class AlignmentPort(Protocol):

@@ -8,7 +8,7 @@ from typing import Any, cast
 import requests
 
 from src.files.audio import cut_segments
-from src.models.sponsorblock import SponsorSegment
+from src.models import SponsorSegment
 from src.utils.cache import S3Cache
 from src.utils.crypto import sha256
 from src.utils.progress import Callback

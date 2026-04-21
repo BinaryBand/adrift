@@ -1,6 +1,6 @@
 import os
 
-from src.ports.secrets import SecretProviderPort
+from src.ports import SecretProviderPort
 
 
 class DockerSecretProvider(SecretProviderPort):

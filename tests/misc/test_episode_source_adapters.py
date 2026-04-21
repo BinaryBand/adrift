@@ -6,8 +6,7 @@ from src.adapters import get_alignment_adapter, get_episode_source_adapter
 from src.adapters.alignment import GreedyAlignmentAdapter
 from src.adapters.episode_sources.episode_source_rss import RssEpisodeSourceAdapter
 from src.adapters.episode_sources.episode_source_youtube import YouTubeEpisodeSourceAdapter
-from src.models.metadata import RssChannel, RssEpisode
-from src.models.podcast_config import FeedSource
+from src.models import FeedSource, RssChannel, RssEpisode
 
 
 def test_rss_adapter_fetches_episodes():

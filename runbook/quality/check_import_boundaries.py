@@ -33,6 +33,13 @@ class ImportBoundaryRule:
     message: str
 
 
+@dataclass(frozen=True)
+class ImportPrefixRule:
+    banned_prefix: str
+    allowed_parents: tuple[str, ...]
+    message: str
+
+
 RULES = (
     ImportBoundaryRule(
         banned_module="src.web.rss",
@@ -41,6 +48,19 @@ RULES = (
         message=(
             "Import domain RSS models from src.models or src.models.metadata, not from src.web.rss."
         ),
+    ),
+)
+
+PREFIX_RULES = (
+    ImportPrefixRule(
+        banned_prefix="src.models.",
+        allowed_parents=("src.models",),
+        message="Import models from src.models, not submodules under src.models.",
+    ),
+    ImportPrefixRule(
+        banned_prefix="src.ports.",
+        allowed_parents=("src.ports",),
+        message="Import ports from src.ports, not submodules under src.ports.",
     ),
 )
 
@@ -73,6 +93,7 @@ def _check_import_from(node: ast.ImportFrom, file_path: Path) -> list[Diagnostic
         return []
 
     diagnostics: list[Diagnostic] = []
+    rel_path = file_path.relative_to(_ROOT).as_posix()
     for rule in RULES:
         if node.module != rule.banned_module:
             continue
@@ -83,10 +104,27 @@ def _check_import_from(node: ast.ImportFrom, file_path: Path) -> list[Diagnostic
         preferred = " or ".join(rule.preferred_modules)
         diagnostics.append(
             Diagnostic(
-                path=file_path.relative_to(_ROOT).as_posix(),
+                path=rel_path,
                 line=node.lineno,
                 severity="error",
                 message=f"{rule.message} Offending import: {names}. Preferred: {preferred}.",
+            )
+        )
+
+    module_name = node.module
+    for rule in PREFIX_RULES:
+        if not module_name.startswith(rule.banned_prefix):
+            continue
+        if any(
+            rel_path.startswith(parent.replace(".", "/") + "/") for parent in rule.allowed_parents
+        ):
+            continue
+        diagnostics.append(
+            Diagnostic(
+                path=rel_path,
+                line=node.lineno,
+                severity="error",
+                message=f"{rule.message} Offending import: {module_name}.",
             )
         )
     return diagnostics

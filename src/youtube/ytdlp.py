@@ -15,8 +15,7 @@ from dateutil import parser
 from pydantic import BaseModel, ValidationError, field_validator
 from yt_dlp import YoutubeDL
 
-from src.models import RssEpisode, YtDlpParams
-from src.models.ytdlp import YtDlpImage
+from src.models import RssEpisode, YtDlpImage, YtDlpParams
 from src.utils.cache import S3Cache
 from src.utils.progress import Callback
 from src.utils.terminal import emit_error, emit_info, emit_warning

@@ -2,8 +2,7 @@
 from dataclasses import dataclass
 
 from src.app_common import MATCH_TOLERANCE
-from src.models.metadata import RssEpisode
-from src.models.pipeline import MatchCandidateTrace, ReferenceMatchTrace
+from src.models import MatchCandidateTrace, ReferenceMatchTrace, RssEpisode
 
 from .alignment import _build_alignment_scores
 

@@ -5,7 +5,7 @@ from collections.abc import Callable
 from rich.prompt import Prompt
 
 from src.orchestration.secret_service import describe_managed_secret
-from src.ports.secrets import SecretProviderPort
+from src.ports import SecretProviderPort
 
 PromptCallback = Callable[[str, str, bool], str]
 

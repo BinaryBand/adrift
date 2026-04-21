@@ -7,8 +7,7 @@ from rapidfuzz import fuzz
 
 from src.app_common import MATCH_TOLERANCE
 from src.app_runner import normalize_title
-from src.models.metadata import RssEpisode
-from src.models.output import EpisodeData
+from src.models import EpisodeData, RssEpisode
 from src.utils.progress import Callback
 from src.utils.text import normalize_text
 

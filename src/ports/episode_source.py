@@ -1,7 +1,6 @@
 from typing import Any, Protocol
 
-from src.models.metadata import RssChannel, RssEpisode
-from src.models.podcast_config import FeedSource
+from src.models import FeedSource, RssChannel, RssEpisode
 
 
 class EpisodeSourcePort(Protocol):

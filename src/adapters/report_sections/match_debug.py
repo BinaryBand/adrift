@@ -1,5 +1,5 @@
 from src.app_common import MATCH_TOLERANCE
-from src.models.pipeline import MatchCandidateTrace, MergeResult, ReferenceMatchTrace
+from src.models import MatchCandidateTrace, MergeResult, ReferenceMatchTrace
 
 from ._helpers import md_table
 

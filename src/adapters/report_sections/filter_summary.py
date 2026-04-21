@@ -1,4 +1,4 @@
-from src.models.pipeline import MergeResult, SourceTrace
+from src.models import MergeResult, SourceTrace
 
 from ._helpers import md_table
 

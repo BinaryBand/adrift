@@ -1,7 +1,7 @@
 from pathlib import Path
 
-from src.models.pipeline import MergeResult
-from src.ports.mermaid import MermaidRenderOptions
+from src.models import MergeResult
+from src.ports import MermaidRenderOptions
 
 
 def _sanitize_label(s: str | None, max_len: int = 60) -> str:

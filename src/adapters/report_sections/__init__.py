@@ -1,4 +1,4 @@
-from src.ports.report import ReportDocument, ReportSection
+from src.ports import ReportDocument, ReportSection
 
 from .duration_histogram import render_duration_histogram
 from .filter_summary import render_filter_summary
