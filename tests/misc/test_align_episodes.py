@@ -137,7 +137,7 @@ class TestAlignEpisodes(unittest.TestCase):
             _ep(id="d3", title="Episode Three", pub_date=_dt(2024, 1, 3)),
         ]
 
-        with patch("src.catalog._normalized_alignment_title") as mocked_title:
+        with patch("src.catalog.alignment._normalized_alignment_title") as mocked_title:
             mocked_title.side_effect = lambda show, episode: episode.title.lower()
             align_episodes(refs, dls, "Example Show")
 

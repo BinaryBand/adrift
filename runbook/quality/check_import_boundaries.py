@@ -39,8 +39,7 @@ RULES = (
         banned_names=("RssEpisode", "RssChannel"),
         preferred_modules=("src.models", "src.models.metadata"),
         message=(
-            "Import domain RSS models from src.models or src.models.metadata, "
-            "not from src.web.rss."
+            "Import domain RSS models from src.models or src.models.metadata, not from src.web.rss."
         ),
     ),
 )
