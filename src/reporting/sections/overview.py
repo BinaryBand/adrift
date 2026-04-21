@@ -11,7 +11,7 @@ def render_overview(result: MergeResult) -> str:
     rows = [
         ["References", str(ref_count), str(matched), pct(matched, ref_count)],
         ["Downloads", str(dl_count), str(matched), pct(matched, dl_count)],
-        ["Merged output", str(merged), "—", "—"],
+        ["Merged output", str(merged), "", ""],
     ]
     table = md_table(["Role", "Total", "Matched", "Match Rate"], rows)
     return f"# {result.config.name}\n\n{table}"

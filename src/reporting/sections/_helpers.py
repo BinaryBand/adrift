@@ -11,4 +11,4 @@ def md_table(headers: list[str], rows: list[list[str]]) -> str:
 
 
 def pct(n: int, d: int) -> str:
-    return "—" if d == 0 else f"{100 * n / d:.1f}%"
+    return "" if d == 0 else f"{100 * n / d:.1f}%"

@@ -2,7 +2,7 @@ from src.models import MergeResult
 
 from ._helpers import mermaid_block
 
-_BUCKETS: list[tuple[str, float, float]] = [
+_BUCKETS = [
     ("<10m", 0, 600),
     ("10-30m", 600, 1800),
     ("30-60m", 1800, 3600),

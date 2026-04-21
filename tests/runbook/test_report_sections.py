@@ -1,8 +1,8 @@
 from datetime import datetime, timezone
 
-from src.adapters.report_sections.match_debug import render_greedy_matches, render_matches
 from src.catalog import _build_match_traces
 from src.models import FeedSource, MergeResult, PodcastConfig, RssEpisode
+from src.reporting.sections.match_debug import render_greedy_matches, render_matches
 
 
 def _episode(identifier: str, title: str, day: int) -> RssEpisode:

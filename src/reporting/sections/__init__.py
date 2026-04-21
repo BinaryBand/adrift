@@ -18,7 +18,6 @@ DEFAULT_REPORT_SECTIONS: list[ReportSection] = [
 ]
 
 MATCH_SECTIONS: list[ReportSection] = [render_matches]
-
 GREEDY_MATCH_SECTIONS: list[ReportSection] = [render_greedy_matches]
 
 DEFAULT_DOCUMENTS: tuple[ReportDocument, ...] = (
