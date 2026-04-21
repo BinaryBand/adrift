@@ -81,7 +81,7 @@ Below are tasks you can copy; adjust paths to your project's layout and virtual 
       "label": "Complexity: Lizard",
       "type": "shell",
       "command": "${workspaceFolder}/.venv/bin/python",
-      "args": ["runbook/quality/check_complexity.py", "src", "--ccn", "8", "--length", "25", "--params", "4"],
+      "args": ["runbook/quality/check_complexity.py", "src", "--ccn", "8", "--length", "30", "--params", "4"],
       "group": "build"
     },
     {

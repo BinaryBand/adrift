@@ -4,8 +4,8 @@
     {
       "label": "Ruff: Check",
       "type": "shell",
-      "command": "${config:python.defaultInterpreterPath}",
-      "args": ["-m", "ruff", "check", "src", "runbook", "tests", "typings"],
+      "command": "make",
+      "args": ["ruff-check"],
       "group": "build",
       "presentation": {
         "echo": true,
@@ -19,17 +19,8 @@
     {
       "label": "Ruff: Format Check",
       "type": "shell",
-      "command": "${config:python.defaultInterpreterPath}",
-      "args": [
-        "-m",
-        "ruff",
-        "format",
-        "--check",
-        "src",
-        "runbook",
-        "tests",
-        "typings"
-      ],
+      "command": "make",
+      "args": ["ruff-format-check"],
       "group": "build",
       "presentation": {
         "echo": true,
@@ -43,18 +34,8 @@
     {
       "label": "Complexity: Lizard Check",
       "type": "shell",
-      "command": "${config:python.defaultInterpreterPath}",
-      "args": [
-        "-m",
-        "runbook.quality.check_complexity",
-        "src",
-        "--ccn",
-        "8",
-        "--length",
-        "25",
-        "--params",
-        "4"
-      ],
+      "command": "make",
+      "args": ["check-complexity"],
       "group": "build",
       "presentation": {
         "echo": false,
@@ -82,15 +63,8 @@
     {
       "label": "Import Boundaries: Check",
       "type": "shell",
-      "command": "${config:python.defaultInterpreterPath}",
-      "args": [
-        "-m",
-        "runbook.quality.check_import_boundaries",
-        "src",
-        "runbook",
-        "tests",
-        "--strict"
-      ],
+      "command": "make",
+      "args": ["check-import-boundaries"],
       "group": "build",
       "presentation": {
         "echo": true,
@@ -116,8 +90,8 @@
     {
       "label": "Dead Code: Vulture Check",
       "type": "shell",
-      "command": "${config:python.defaultInterpreterPath}",
-      "args": ["-m", "runbook.quality.check_dead_code", "src"],
+      "command": "make",
+      "args": ["check-dead-code"],
       "group": "build",
       "presentation": {
         "echo": true,
@@ -143,8 +117,8 @@
     {
       "label": "Dead Code: Vulture Watch",
       "type": "shell",
-      "command": "${config:python.defaultInterpreterPath}",
-      "args": ["-m", "runbook.quality.check_dead_code", "src", "--watch"],
+      "command": "make",
+      "args": ["check-dead-code"],
       "group": "build",
       "isBackground": true,
       "presentation": {
@@ -198,13 +172,8 @@
     {
       "label": "Validate TOML",
       "type": "shell",
-      "command": "${config:python.defaultInterpreterPath}",
-      "args": [
-        "-m",
-        "runbook.quality.validate_configs",
-        "--problems",
-        "${file}"
-      ],
+      "command": "make",
+      "args": ["validate-configs"],
       "group": "build",
       "presentation": {
         "echo": true,
@@ -229,13 +198,8 @@
     {
       "label": "Validate TOML Watch",
       "type": "shell",
-      "command": "${config:python.defaultInterpreterPath}",
-      "args": [
-        "-m",
-        "runbook.quality.validate_configs",
-        "--problems",
-        "--watch"
-      ],
+      "command": "make",
+      "args": ["validate-configs"],
       "group": "build",
       "isBackground": true,
       "presentation": {

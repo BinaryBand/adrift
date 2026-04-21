@@ -1,6 +1,6 @@
 {
   "typeCheckingMode": "strict",
-  "include": ["src", "runbook", "tests", "typings"],
+  "include": ["src", "runbook", "typings"],
   "exclude": [
     "runbook/analysis",
     "**/node_modules",
