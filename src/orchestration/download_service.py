@@ -81,14 +81,14 @@ def build_download_queue(
     queue = [
         DownloadQueueItem(
             episode=episode,
-            exists_on_s3=_episode_exists_on_s3(episode, config),
+            exists_on_s3=episode_exists_on_s3(episode, config),
         )
         for episode in episodes
     ]
     return sorted(queue, key=_download_queue_sort_key)
 
 
-def _episode_exists_on_s3(ep: DownloadEpisode, config: PodcastConfig) -> bool:
+def episode_exists_on_s3(ep: DownloadEpisode, config: PodcastConfig) -> bool:
     bucket, prefix = _s3_prefix(config)
     cleaned_slug = _episode_slug(config, ep)
     key_prefix = f"{prefix}/{cleaned_slug}"
@@ -173,10 +173,10 @@ def download_and_upload(
     if exists(bucket, key_prefix):
         return False
     with tempfile.TemporaryDirectory() as tmp:
-        return _process_in_tmpdir(ep, config, Path(tmp), progress_hooks)
+        return process_in_tmpdir(ep, config, Path(tmp), progress_hooks)
 
 
-def _process_in_tmpdir(
+def process_in_tmpdir(
     ep: DownloadEpisode,
     config: PodcastConfig,
     tmp: Path,

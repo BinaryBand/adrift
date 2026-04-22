@@ -1,11 +1,12 @@
 from datetime import datetime, timezone
+from types import SimpleNamespace
 
 from src.models import DownloadEpisode, MediaMetadata, PodcastConfig, RssEpisode
 from src.orchestration.download_service import (
     DownloadProgressHooks,
-    _episode_exists_on_s3,
-    _process_in_tmpdir,
     build_download_queue,
+    episode_exists_on_s3,
+    process_in_tmpdir,
 )
 
 
@@ -44,7 +45,7 @@ def test_build_download_queue_prioritizes_missing_then_newest(monkeypatch) -> No
         return ep.episode.title in existing_titles
 
     monkeypatch.setattr(
-        "src.orchestration.download_service._episode_exists_on_s3",
+        "src.orchestration.download_service.episode_exists_on_s3",
         _exists_on_s3,
     )
 
@@ -62,7 +63,7 @@ def test_build_download_queue_preserves_unknown_dates_after_dated_missing(monkey
     undated_missing = _episode("Undated Missing")
 
     monkeypatch.setattr(
-        "src.orchestration.download_service._episode_exists_on_s3",
+        "src.orchestration.download_service.episode_exists_on_s3",
         lambda ep, config: False,
     )
 
@@ -88,25 +89,21 @@ def test_episode_exists_on_s3_matches_existing_youtube_video_id(monkeypatch) -> 
     )
     config = _config()
 
-    monkeypatch.setattr("src.orchestration.download_service.exists", lambda bucket, key: None)
-    monkeypatch.setattr(
-        "src.orchestration.download_service.get_file_list",
-        lambda bucket, prefix, without_extensions=False: ["old-title.opus"],
+    fake = SimpleNamespace()
+    fake.exists = lambda bucket, key, extension_agnostic=True: None
+    fake.get_file_list = lambda bucket, prefix, without_extensions=False: ["old-title.opus"]
+    fake.get_metadata = lambda bucket, key: MediaMetadata(
+        duration=1.0,
+        source="https://youtube.com/watch?v=stable-video-id",
+        upload_date=datetime(2026, 4, 19, tzinfo=timezone.utc),
+        sponsors_removed=False,
     )
-    monkeypatch.setattr(
-        "src.orchestration.download_service.get_metadata",
-        lambda bucket, key: MediaMetadata(
-            duration=1.0,
-            source="https://youtube.com/watch?v=stable-video-id",
-            upload_date=datetime(2026, 4, 19, tzinfo=timezone.utc),
-            sponsors_removed=False,
-        ),
-    )
+    monkeypatch.setattr("src.files.s3._default_s3_service", fake)
     from src.orchestration import download_service
 
     download_service._existing_media_sources.cache_clear()
 
-    assert _episode_exists_on_s3(episode, config) is True
+    assert episode_exists_on_s3(episode, config) is True
 
 
 def test_episode_exists_on_s3_matches_existing_direct_source_url(monkeypatch) -> None:
@@ -128,25 +125,21 @@ def test_episode_exists_on_s3_matches_existing_direct_source_url(monkeypatch) ->
         downloads=[],
     )
 
-    monkeypatch.setattr("src.orchestration.download_service.exists", lambda bucket, key: None)
-    monkeypatch.setattr(
-        "src.orchestration.download_service.get_file_list",
-        lambda bucket, prefix, without_extensions=False: ["old-direct-title.opus"],
+    fake = SimpleNamespace()
+    fake.exists = lambda bucket, key, extension_agnostic=True: None
+    fake.get_file_list = lambda bucket, prefix, without_extensions=False: ["old-direct-title.opus"]
+    fake.get_metadata = lambda bucket, key: MediaMetadata(
+        duration=1.0,
+        source="https://cdn.example.com/audio/episode.mp3",
+        upload_date=datetime(2026, 4, 19, tzinfo=timezone.utc),
+        sponsors_removed=False,
     )
-    monkeypatch.setattr(
-        "src.orchestration.download_service.get_metadata",
-        lambda bucket, key: MediaMetadata(
-            duration=1.0,
-            source="https://cdn.example.com/audio/episode.mp3",
-            upload_date=datetime(2026, 4, 19, tzinfo=timezone.utc),
-            sponsors_removed=False,
-        ),
-    )
+    monkeypatch.setattr("src.files.s3._default_s3_service", fake)
     from src.orchestration import download_service
 
     download_service._existing_media_sources.cache_clear()
 
-    assert _episode_exists_on_s3(episode, config) is True
+    assert episode_exists_on_s3(episode, config) is True
 
 
 def test_episode_exists_on_s3_matches_cleaned_existing_filename(monkeypatch) -> None:
@@ -168,17 +161,18 @@ def test_episode_exists_on_s3_matches_cleaned_existing_filename(monkeypatch) -> 
         downloads=[],
     )
 
-    monkeypatch.setattr("src.orchestration.download_service.exists", lambda bucket, key: None)
-    monkeypatch.setattr(
-        "src.orchestration.download_service.get_file_list",
-        lambda bucket, prefix, without_extensions=False: ["ann-billy-woodward-morbid-podcast.opus"],
-    )
-    monkeypatch.setattr("src.orchestration.download_service.get_metadata", lambda bucket, key: None)
+    fake = SimpleNamespace()
+    fake.exists = lambda bucket, key, extension_agnostic=True: None
+    fake.get_file_list = lambda bucket, prefix, without_extensions=False: [
+        "ann-billy-woodward-morbid-podcast.opus"
+    ]
+    fake.get_metadata = lambda bucket, key: None
+    monkeypatch.setattr("src.files.s3._default_s3_service", fake)
     from src.orchestration import download_service
 
     download_service._existing_media_sources.cache_clear()
 
-    assert _episode_exists_on_s3(episode, config) is True
+    assert episode_exists_on_s3(episode, config) is True
 
 
 def test_process_in_tmpdir_reports_upload_progress(monkeypatch, tmp_path) -> None:
@@ -217,7 +211,11 @@ def test_process_in_tmpdir_reports_upload_progress(monkeypatch, tmp_path) -> Non
         assert options.callback is not None
         options.callback(3, 10)
 
-    monkeypatch.setattr("src.orchestration.download_service.upload_file", _upload_file)
+    fake = SimpleNamespace()
+    fake.upload_file = lambda bucket_key, file_path, options: _upload_file(
+        bucket_key[0], bucket_key[1], file_path, options
+    )
+    monkeypatch.setattr("src.files.s3._default_s3_service", fake)
 
     hooks = DownloadProgressHooks(
         on_operation=operations.append,
@@ -225,7 +223,7 @@ def test_process_in_tmpdir_reports_upload_progress(monkeypatch, tmp_path) -> Non
         on_complete=lambda: operations.append("<cleared>"),
     )
 
-    uploaded = _process_in_tmpdir(episode, config, tmp_path, hooks)
+    uploaded = process_in_tmpdir(episode, config, tmp_path, hooks)
 
     assert uploaded is True
     assert operations == [

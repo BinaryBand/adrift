@@ -1,4 +1,6 @@
-# pyright: reportUnknownVariableType=false, reportUnknownMemberType=false, reportUnknownArgumentType=false
+# pyright: reportUnknownVariableType=false, reportUnknownMemberType=false, reportUnknownArgumentType=false, reportUnusedFunction=false
+
+from __future__ import annotations
 
 import logging
 import mimetypes
@@ -8,7 +10,7 @@ from dataclasses import dataclass
 from functools import wraps
 from pathlib import Path
 from threading import Lock
-from typing import TYPE_CHECKING, Any, Callable, ParamSpec, TypeVar, cast
+from typing import TYPE_CHECKING, Any, Callable, Iterator, ParamSpec, TypeVar, cast
 from urllib.parse import urljoin
 
 import boto3
@@ -118,6 +120,288 @@ class S3Service:
     def get_effective_endpoint(self) -> str:
         """Public accessor for the effective endpoint used by this service."""
         return self._get_effective_endpoint()
+
+    # -- Probe / client helpers ------------------------------------------------
+    def build_probe_client(self, url: str, timeout: float) -> S3Client:
+        values = require_secrets(self.secret_provider, _REQUIRED_S3_KEYS)
+        cfg = _make_boto_config(connect_timeout=timeout, read_timeout=timeout, max_attempts=1)
+        boto3_factory: Callable[..., Any] = boto3.client  # pyright: ignore[reportUnknownVariableType]
+        return cast(
+            S3Client,
+            boto3_factory(
+                "s3",
+                aws_access_key_id=values["S3_USERNAME"],
+                aws_secret_access_key=values["S3_SECRET_KEY"],
+                endpoint_url=url,
+                config=cfg,
+                region_name=values["S3_REGION"],
+            ),
+        )
+
+    def is_endpoint_reachable(self, url: str, timeout: float = 2.0) -> bool:
+        try:
+            self.build_probe_client(url, timeout).list_buckets()
+        except Exception:
+            return False
+        return True
+
+    # -- Cache helpers ---------------------------------------------------------
+    def invalidate_file_map_cache(self, bucket: str, key: str) -> None:
+        parent_dir = Path(key).parent.as_posix()
+        if parent_dir == ".":
+            parent_dir = ""
+        if parent_dir and not parent_dir.endswith("/"):
+            parent_dir += "/"
+        for ext_agnostic in (True, False):
+            cache_key = f"s3_file_map:{bucket}:{parent_dir}:{ext_agnostic}"
+            self.cache.delete(cache_key)
+
+    def sync_upload_cache(
+        self, bucket: str, key: str, metadata_dict: dict[str, str] | None
+    ) -> None:
+        cache_key = f"s3_metadata:{bucket}:{key}"
+        if metadata_dict is not None:
+            self.cache.set(cache_key, metadata_dict)
+        else:
+            self.cache.delete(cache_key)
+        self.invalidate_file_map_cache(bucket, key)
+
+    def sync_copy_cache(self, bucket: str, source_key: str, dest_key: str) -> None:
+        src_cache_key = f"s3_metadata:{bucket}:{source_key}"
+        dst_cache_key = f"s3_metadata:{bucket}:{dest_key}"
+        metadata = self.cache.get(src_cache_key)
+        if metadata is None:
+            client = self.get_client()
+            metadata = self.fetch_head_metadata(client, bucket, dest_key)
+        if metadata is not None:
+            self.cache.set(dst_cache_key, metadata)
+
+    def fetch_head_metadata(self, client: S3Client, bucket: str, key: str) -> dict[str, str] | None:
+        try:
+            head_response = client.head_object(Bucket=bucket, Key=key)
+        except Exception:
+            return None
+        return head_response.get("Metadata", {})
+
+    def public_s3_url(self, bucket: str, key: str) -> str:
+        return urljoin(
+            self.secret_provider.get("S3_ENDPOINT", S3_ENDPOINT), Path(bucket, key).as_posix()
+        )
+
+    # -- Listing / map helpers -------------------------------------------------
+    def build_file_map_from_iterator(
+        self, bucket: str, prefix: str, without_extensions: bool
+    ) -> dict[str, str]:
+        file_list: dict[str, str] = {}
+        for obj in self.iterate_s3_objects(bucket, prefix):
+            key = obj.get("Key", "")
+            file_name = Path(key).name
+
+            if without_extensions:
+                file_name = Path(file_name).with_suffix("").as_posix()
+
+            etag = obj.get("ETag", "").strip('"')[:32]
+            file_list[file_name] = etag
+
+        return file_list
+
+    def get_file_map(
+        self, bucket: str, prefix: str, without_extensions: bool = True
+    ) -> dict[str, str]:
+        prefix = prefix.lstrip(".")
+        if prefix and not prefix.endswith("/"):
+            prefix += "/"
+
+        cache_key = f"s3_file_map:{bucket}:{prefix}:{without_extensions}"
+        cached_map = self.cache.get(cache_key)
+        if cached_map is not None:
+            return cached_map
+
+        file_list = self.build_file_map_from_iterator(bucket, prefix, without_extensions)
+        self.cache.set(cache_key, file_list, expire=300)
+        return file_list
+
+    def iterate_s3_objects(self, bucket: str, prefix: str) -> Iterator[Any]:
+        s3: S3Client = self.get_client()
+        paginator = s3.get_paginator("list_objects_v2")
+        page_iterator = paginator.paginate(Bucket=bucket, Prefix=prefix, Delimiter="/")
+
+        for page in page_iterator:
+            for obj in page.get("Contents", {}):
+                yield obj
+
+    def _remove_file_extensions(self, file_names: list[str]) -> list[str]:
+        return [Path(f).with_suffix("").as_posix() for f in file_names]
+
+    def get_file_list(
+        self, bucket: str, prefix: str, without_extensions: bool = False
+    ) -> list[str]:
+        prefix = prefix.lstrip(".").rstrip("/")
+        file_map = self.get_file_map(bucket, prefix, False)
+
+        file_list = list(file_map.keys())
+        if without_extensions:
+            file_list = self._remove_file_extensions(file_list)
+
+        return file_list
+
+    def get_s3_files(self, bucket: str, prefix: str) -> list[str]:
+        file_list = self.get_file_list(bucket, prefix)
+        root_path = Path(bucket) / prefix
+
+        files: list[str] = []
+        for file_key in file_list:
+            filename = Path(file_key).name
+            location = urljoin(self.get_effective_endpoint(), (root_path / filename).as_posix())
+            files.append(location)
+
+        return files
+
+    def exists(self, bucket: str, prefix: str, extension_agnostic: bool = True) -> str | None:
+        prefix = prefix.lstrip(".").rstrip("/")
+        key: Path = Path(prefix)
+
+        parent_dir = key.parent.as_posix()
+        if parent_dir == ".":
+            parent_dir = ""
+
+        identifier = key.stem if extension_agnostic else key.name
+        file_list: list[str] = self.get_file_list(bucket, parent_dir, False)
+
+        for f in file_list:
+            if _identifier_matches(f, identifier, extension_agnostic):
+                return f
+
+        return None
+
+    # -- Metadata / object operations -----------------------------------------
+    def get_metadata(self, bucket: str, key: str) -> MediaMetadata | None:
+        key = Path(key).as_posix()
+        cache_key = f"s3_metadata:{bucket}:{key}"
+        metadata = self.cache.get(cache_key)
+
+        if metadata is None and self.exists(bucket, key) is not None:
+            try:
+                client: S3Client = self.get_client()
+                head_response = client.head_object(Bucket=bucket, Key=key)
+                metadata = head_response.get("Metadata", {})
+                self.cache.set(cache_key, metadata)
+            except Exception:
+                pass
+
+        try:
+            return MediaMetadata.model_validate(metadata)
+        except Exception:
+            return None
+
+    def set_metadata(self, bucket: str, key: str, metadata: MediaMetadata) -> None:
+        key = Path(key).as_posix()
+        metadata_dict = metadata.to_dict()
+
+        client: S3Client = self.get_client()
+        client.copy_object(
+            Bucket=bucket,
+            Key=key,
+            CopySource={"Bucket": bucket, "Key": key},
+            Metadata=metadata_dict,
+            MetadataDirective="REPLACE",
+            ACL="public-read",
+        )
+
+        cache_key = f"s3_metadata:{bucket}:{key}"
+        self.cache.set(cache_key, metadata_dict)
+
+    def delete_file(self, bucket: str, key: str) -> None:
+        client: S3Client = self.get_client()
+        client.delete_object(Bucket=bucket, Key=key)
+
+        cache_key = f"s3_metadata:{bucket}:{key}"
+        self.cache.delete(cache_key)
+        self.invalidate_file_map_cache(bucket, key)
+
+    def rename_file(self, bucket: str, old_key: str, new_key: str) -> None:
+        if old_key == new_key:
+            return
+
+        client: S3Client = self.get_client()
+
+        copy_source: CopySourceTypeDef = {"Bucket": bucket, "Key": old_key}
+        client.copy_object(
+            Bucket=bucket, Key=new_key, CopySource=copy_source, MetadataDirective="COPY"
+        )
+        client.delete_object(Bucket=bucket, Key=old_key)
+
+        old_cache_key = f"s3_metadata:{bucket}:{old_key}"
+        new_cache_key = f"s3_metadata:{bucket}:{new_key}"
+        self.cache.set(new_cache_key, self.cache.get(old_cache_key))
+        self.cache.delete(old_cache_key)
+        self.invalidate_file_map_cache(bucket, old_key)
+        self.invalidate_file_map_cache(bucket, new_key)
+
+    def copy_file(self, bucket: str, source_key: str, dest_key: str) -> str | None:
+        client: S3Client = self.get_client()
+        copy_source: CopySourceTypeDef = {"Bucket": bucket, "Key": source_key}
+        client.copy_object(
+            Bucket=bucket,
+            Key=dest_key,
+            CopySource=copy_source,
+            MetadataDirective="COPY",
+            ACL="public-read",
+        )
+        self.sync_copy_cache(bucket, source_key, dest_key)
+        return self.public_s3_url(bucket, dest_key)
+
+    def do_s3_upload(self, spec: _UploadSpec) -> None:
+        transfer_config = TransferConfig(
+            max_concurrency=4,
+            multipart_threshold=8 * 1024 * 1024,
+            multipart_chunksize=8 * 1024 * 1024,
+            use_threads=True,
+        )
+        self.get_client().upload_file(
+            Filename=spec.file_path,
+            Bucket=spec.bucket,
+            Key=spec.key,
+            ExtraArgs=spec.extra_args,
+            Config=transfer_config,
+            Callback=spec.boto_callback,
+        )
+
+    def upload_file(
+        self,
+        bucket_key: tuple[str, str],
+        file_path: Path,
+        options: UploadOptions | MediaMetadata | dict[str, Any] | None = None,
+    ) -> str | None:
+        bucket, key = bucket_key
+        spec, metadata_dict = _prepare_upload_spec(bucket, key, file_path, options)
+        self.do_s3_upload(spec)
+        self.sync_upload_cache(bucket, key, metadata_dict)
+        return urljoin(
+            self.secret_provider.get("S3_ENDPOINT", S3_ENDPOINT), Path(bucket, key).as_posix()
+        )
+
+    def upload_cache_file(
+        self,
+        bucket_key: tuple[str, str],
+        file_path: Path,
+        metadata: CacheMetadata | None = None,
+    ) -> str | None:
+        bucket, key = bucket_key
+        spec, metadata_dict = _prepare_upload_spec(bucket, key, file_path, metadata)
+        self.do_s3_upload(spec)
+        self.sync_upload_cache(bucket, key, metadata_dict)
+        return urljoin(
+            self.secret_provider.get("S3_ENDPOINT", S3_ENDPOINT), Path(bucket, key).as_posix()
+        )
+
+    def download_file(self, bucket: str, key: str, download_path: Path) -> None:
+        client = self.get_client()
+        response = client.get_object(Bucket=bucket, Key=key)
+
+        with open(download_path, "wb") as f:
+            for chunk in response["Body"].iter_chunks():
+                f.write(chunk)
 
 
 # Global default service registration --------------------------------------
@@ -354,24 +638,12 @@ def _invalidate_file_map_cache(bucket: str, key: str) -> None:
     to `exists()` / `get_file_list()` re-lists the directory from S3 rather
     than returning a stale cached result.
     """
-    parent_dir = Path(key).parent.as_posix()
-    if parent_dir == ".":
-        parent_dir = ""
-    if parent_dir and not parent_dir.endswith("/"):
-        parent_dir += "/"
-    for ext_agnostic in (True, False):
-        cache_key = f"s3_file_map:{bucket}:{parent_dir}:{ext_agnostic}"
-        _s3_cache().delete(cache_key)
+    return get_s3_service().invalidate_file_map_cache(bucket, key)
 
 
 def _sync_upload_cache(bucket: str, key: str, metadata_dict: dict[str, str] | None) -> None:
     """Update the local S3 metadata cache after an upload."""
-    cache_key = f"s3_metadata:{bucket}:{key}"
-    if metadata_dict is not None:
-        _s3_cache().set(cache_key, metadata_dict)
-    else:
-        _s3_cache().delete(cache_key)
-    _invalidate_file_map_cache(bucket, key)
+    return get_s3_service().sync_upload_cache(bucket, key, metadata_dict)
 
 
 def get_effective_s3_endpoint() -> str:
@@ -528,10 +800,7 @@ def upload_file(
       - a `MediaMetadata` instance (metadata only)
       - an `UploadOptions` dict with optional keys `metadata` and `callback`
     """
-    spec, metadata_dict = _prepare_upload_spec(bucket, key, file_path, options)
-    _do_s3_upload(spec)
-    _sync_upload_cache(bucket, key, metadata_dict)
-    return urljoin(_secret_provider.get("S3_ENDPOINT", S3_ENDPOINT), Path(bucket, key).as_posix())
+    return get_s3_service().upload_file((bucket, key), file_path, options)
 
 
 @retry(attempts=3, backoff_base=2)
@@ -541,38 +810,16 @@ def upload_cache_file(
     file_path: Path,
     metadata: CacheMetadata | None = None,
 ) -> str | None:
-    spec, metadata_dict = _prepare_upload_spec(bucket, key, file_path, metadata)
-    _do_s3_upload(spec)
-    _sync_upload_cache(bucket, key, metadata_dict)
-    return urljoin(_secret_provider.get("S3_ENDPOINT", S3_ENDPOINT), Path(bucket, key).as_posix())
+    return get_s3_service().upload_cache_file((bucket, key), file_path, metadata)
 
 
 @retry(attempts=3, backoff_base=2)
 def delete_file(bucket: str, key: str) -> None:
-    client: S3Client = get_s3_client()
-    client.delete_object(Bucket=bucket, Key=key)
-
-    cache_key = f"s3_metadata:{bucket}:{key}"
-    _s3_cache().delete(cache_key)
-    _invalidate_file_map_cache(bucket, key)
+    return get_s3_service().delete_file(bucket, key)
 
 
 def rename_file(bucket: str, old_key: str, new_key: str) -> None:
-    if old_key == new_key:
-        return
-
-    client: S3Client = get_s3_client()
-
-    copy_source: CopySourceTypeDef = {"Bucket": bucket, "Key": old_key}
-    client.copy_object(Bucket=bucket, Key=new_key, CopySource=copy_source, MetadataDirective="COPY")
-    client.delete_object(Bucket=bucket, Key=old_key)
-
-    old_cache_key = f"s3_metadata:{bucket}:{old_key}"
-    new_cache_key = f"s3_metadata:{bucket}:{new_key}"
-    _s3_cache().set(new_cache_key, _s3_cache().get(old_cache_key))
-    _s3_cache().delete(old_cache_key)
-    _invalidate_file_map_cache(bucket, old_key)
-    _invalidate_file_map_cache(bucket, new_key)
+    return get_s3_service().rename_file(bucket, old_key, new_key)
 
 
 @retry(attempts=3, backoff_base=2)
@@ -581,77 +828,27 @@ def copy_file(bucket: str, source_key: str, dest_key: str) -> str | None:
 
     Updates the local S3 metadata cache to reflect the copied object when possible.
     """
-    client: S3Client = get_s3_client()
-    copy_source: CopySourceTypeDef = {"Bucket": bucket, "Key": source_key}
-    client.copy_object(
-        Bucket=bucket,
-        Key=dest_key,
-        CopySource=copy_source,
-        MetadataDirective="COPY",
-        ACL="public-read",
-    )
-    _sync_copy_cache(client, bucket, source_key, dest_key)
-    return _public_s3_url(bucket, dest_key)
+    return get_s3_service().copy_file(bucket, source_key, dest_key)
 
 
-def _sync_copy_cache(client: S3Client, bucket: str, source_key: str, dest_key: str) -> None:
-    src_cache_key = f"s3_metadata:{bucket}:{source_key}"
-    dst_cache_key = f"s3_metadata:{bucket}:{dest_key}"
-    metadata = _s3_cache().get(src_cache_key)
-    if metadata is None:
-        metadata = _fetch_head_metadata(client, bucket, dest_key)
-    if metadata is not None:
-        _s3_cache().set(dst_cache_key, metadata)
+def _sync_copy_cache(bucket: str, source_key: str, dest_key: str) -> None:
+    return get_s3_service().sync_copy_cache(bucket, source_key, dest_key)
 
 
 def _fetch_head_metadata(client: S3Client, bucket: str, key: str) -> dict[str, str] | None:
-    try:
-        head_response = client.head_object(Bucket=bucket, Key=key)
-    except Exception:
-        return None
-    return head_response.get("Metadata", {})
+    return get_s3_service().fetch_head_metadata(client, bucket, key)
 
 
 def _public_s3_url(bucket: str, key: str) -> str:
-    return urljoin(_secret_provider.get("S3_ENDPOINT", S3_ENDPOINT), Path(bucket, key).as_posix())
+    return get_s3_service().public_s3_url(bucket, key)
 
 
 def get_metadata(bucket: str, key: str) -> MediaMetadata | None:
-    key = Path(key).as_posix()
-    cache_key = f"s3_metadata:{bucket}:{key}"
-    metadata = _s3_cache().get(cache_key)
-
-    if metadata is None and exists(bucket, key) is not None:
-        try:
-            client: S3Client = get_s3_client()
-            head_response = client.head_object(Bucket=bucket, Key=key)
-            metadata = head_response.get("Metadata", {})
-            _s3_cache().set(cache_key, metadata)
-        except Exception:
-            pass
-
-    try:
-        return MediaMetadata.model_validate(metadata)
-    except Exception:
-        return None
+    return get_s3_service().get_metadata(bucket, key)
 
 
 def set_metadata(bucket: str, key: str, metadata: MediaMetadata) -> None:
-    key = Path(key).as_posix()
-    metadata_dict = metadata.to_dict()
-
-    client: S3Client = get_s3_client()
-    client.copy_object(
-        Bucket=bucket,
-        Key=key,
-        CopySource={"Bucket": bucket, "Key": key},
-        Metadata=metadata_dict,
-        MetadataDirective="REPLACE",
-        ACL="public-read",
-    )
-
-    cache_key = f"s3_metadata:{bucket}:{key}"
-    _s3_cache().set(cache_key, metadata_dict)
+    return get_s3_service().set_metadata(bucket, key, metadata)
 
 
 def _build_file_map_from_iterator(
@@ -662,18 +859,7 @@ def _build_file_map_from_iterator(
     Extracted so pagination and mapping logic can be tested or swapped
     independently of the cache handling in `_get_file_map()`.
     """
-    file_list: dict[str, str] = {}
-    for obj in _iterate_s3_objects(bucket, prefix):
-        key = obj.get("Key", "")
-        file_name = Path(key).name
-
-        if without_extensions:
-            file_name = Path(file_name).with_suffix("").as_posix()
-
-        etag = obj.get("ETag", "").strip('"')[:32]
-        file_list[file_name] = etag
-
-    return file_list
+    return get_s3_service().build_file_map_from_iterator(bucket, prefix, without_extensions)
 
 
 def _get_file_map(bucket: str, prefix: str, without_extensions: bool = True) -> dict[str, str]:
@@ -682,29 +868,16 @@ def _get_file_map(bucket: str, prefix: str, without_extensions: bool = True) -> 
     if prefix and not prefix.endswith("/"):
         prefix += "/"
 
-    cache_key = f"s3_file_map:{bucket}:{prefix}:{without_extensions}"
-    cached_map = _s3_cache().get(cache_key)
-    if cached_map is not None:
-        return cached_map
-
-    file_list = _build_file_map_from_iterator(bucket, prefix, without_extensions)
-    _s3_cache().set(cache_key, file_list, expire=300)
-    return file_list
+    return get_s3_service().get_file_map(bucket, prefix, without_extensions)
 
 
-def _iterate_s3_objects(bucket: str, prefix: str):
+def _iterate_s3_objects(bucket: str, prefix: str) -> Iterator[Any]:
     """Yield object dicts for all objects under `bucket/prefix`.
 
     Extracted from `_get_file_map()` so pagination can be tested or swapped
     independently of the mapping/ETag logic.
     """
-    s3: S3Client = get_s3_client()
-    paginator = s3.get_paginator("list_objects_v2")
-    page_iterator = paginator.paginate(Bucket=bucket, Prefix=prefix, Delimiter="/")
-
-    for page in page_iterator:
-        for obj in page.get("Contents", {}):
-            yield obj
+    yield from get_s3_service().iterate_s3_objects(bucket, prefix)
 
 
 def _remove_file_extensions(file_names: list[str]) -> list[str]:
@@ -712,27 +885,11 @@ def _remove_file_extensions(file_names: list[str]) -> list[str]:
 
 
 def get_file_list(bucket: str, prefix: str, without_extensions: bool = False) -> list[str]:
-    prefix = prefix.lstrip(".").rstrip("/")
-    file_map = _get_file_map(bucket, prefix, False)
-
-    file_list = list(file_map.keys())
-    if without_extensions:
-        file_list = _remove_file_extensions(file_list)
-
-    return file_list
+    return get_s3_service().get_file_list(bucket, prefix, without_extensions)
 
 
 def get_s3_files(bucket: str, prefix: str) -> list[str]:
-    file_list = get_file_list(bucket, prefix)
-    root_path = Path(bucket) / prefix
-
-    files: list[str] = []
-    for file_key in file_list:
-        filename = Path(file_key).name
-        location = urljoin(S3_ENDPOINT, (root_path / filename).as_posix())
-        files.append(location)
-
-    return files
+    return get_s3_service().get_s3_files(bucket, prefix)
 
 
 def exists(bucket: str, prefix: str, extension_agnostic: bool = True) -> str | None:
@@ -744,14 +901,7 @@ def exists(bucket: str, prefix: str, extension_agnostic: bool = True) -> str | N
     if parent_dir == ".":
         parent_dir = ""
 
-    identifier = key.stem if extension_agnostic else key.name
-    file_list: list[str] = get_file_list(bucket, parent_dir, False)
-
-    for f in file_list:
-        if _identifier_matches(f, identifier, extension_agnostic):
-            return f
-
-    return None
+    return get_s3_service().exists(bucket, prefix, extension_agnostic)
 
 
 def _identifier_matches(name: str, identifier: str, extension_agnostic: bool) -> bool:
