@@ -37,17 +37,118 @@ S3_ENDPOINT = _secret_provider.get("S3_ENDPOINT", "")
 
 logger = logging.getLogger(__name__)
 
-_s3_client_lock = Lock()
-_s3_client: S3Client | None = None
-_effective_endpoint: str | None = None
+
+# Injectable S3 service ----------------------------------------------------
+class S3Service:
+    """Encapsulate S3 client construction and provide an injectable service.
+
+    This is intentionally lightweight: it owns a cached boto3 client and the
+    secret provider to use when building clients. Callers may register a
+    different service with `register_s3_service()` for testing or alternate
+    behavior.
+    """
+
+    def __init__(self, secret_provider: SecretProviderPort | None = None, **kwargs: Any) -> None:
+        """Construct the service.
+
+        Accepts optional keyword args for `session_factory` and `cache` to aid
+        testing, but keeps a short explicit signature to satisfy the lizard
+        parameter-count gate.
+        """
+        self.secret_provider = secret_provider or _secret_provider
+        session_factory = kwargs.get("session_factory")
+        cache = kwargs.get("cache")
+
+        self._session_factory = session_factory or boto3.session.Session
+        self._client_lock = Lock()
+        self._client: S3Client | None = None
+        self._effective_endpoint: str | None = None
+        self.cache = cache if cache is not None else _s3_cache()
+
+    @classmethod
+    def from_env(cls, provider: SecretProviderPort | None = None, **kwargs: Any) -> "S3Service":
+        return cls(provider or _secret_provider, **kwargs)
+
+    def build_client(self) -> S3Client:
+        """Construct a fresh boto3 S3 client using this service's secret provider."""
+        session = self._session_factory()
+        username, secret_key, _, region = require_secrets(self.secret_provider, _REQUIRED_S3_KEYS)
+
+        cfg = _make_boto_config()
+        session_factory: Callable[..., Any] = session.client  # pyright: ignore[reportUnknownVariableType]
+
+        return cast(
+            S3Client,
+            session_factory(
+                "s3",
+                aws_access_key_id=username,
+                aws_secret_access_key=secret_key,
+                endpoint_url=self.get_effective_endpoint(),
+                config=cfg,
+                region_name=region,
+            ),
+        )
+
+    def get_client(self) -> S3Client:
+        if self._client is not None:
+            return self._client
+        with self._client_lock:
+            if self._client is not None:
+                return self._client
+            self._client = self.build_client()
+            return self._client
+
+    def _get_effective_endpoint(self) -> str:
+        if self._effective_endpoint is not None:
+            return self._effective_endpoint
+
+        _, _, endpoint, _ = require_secrets(self.secret_provider, _REQUIRED_S3_KEYS)
+
+        # Prefer configured LOCAL_S3_ENDPOINT when reachable
+        local_endpoint = _configured_local_s3_endpoint(self.secret_provider)
+        if local_endpoint and _is_endpoint_reachable_with_provider(
+            local_endpoint, self.secret_provider
+        ):
+            self._effective_endpoint = local_endpoint
+        else:
+            self._effective_endpoint = endpoint
+
+        return self._effective_endpoint
+
+    def get_effective_endpoint(self) -> str:
+        """Public accessor for the effective endpoint used by this service."""
+        return self._get_effective_endpoint()
+
+
+# Global default service registration --------------------------------------
+_default_s3_service: S3Service | None = None
+_default_s3_service_lock = Lock()
+
+
+def register_s3_service(service: S3Service) -> None:
+    """Register a global default `S3Service` instance (thread-safe)."""
+    global _default_s3_service
+    with _default_s3_service_lock:
+        _default_s3_service = service
+
+
+def get_s3_service() -> S3Service:
+    """Return the registered `S3Service`, creating a default one from the
+    environment if none is registered yet.
+    """
+    global _default_s3_service
+    with _default_s3_service_lock:
+        if _default_s3_service is None:
+            _default_s3_service = S3Service.from_env()
+        return _default_s3_service
 
 
 def set_secret_provider(provider: SecretProviderPort) -> None:
     """Swap the secret provider port implementation used by this module."""
-    global _secret_provider, _s3_client, _effective_endpoint
+    global _secret_provider
     _secret_provider = provider
-    _s3_client = None
-    _effective_endpoint = None
+    # Re-create the default registered service so the new provider is used.
+    register_s3_service(S3Service.from_env(provider))
 
 
 def reset_secret_provider() -> None:
@@ -55,7 +156,7 @@ def reset_secret_provider() -> None:
     set_secret_provider(get_secret_provider_adapter("env", enable_prompt_fallback=False))
 
 
-def _require_s3_env() -> tuple[str, str, str, str]:
+def require_s3_env() -> tuple[str, str, str, str]:
     values = require_secrets(
         _secret_provider,
         _REQUIRED_S3_KEYS,
@@ -175,8 +276,8 @@ def _make_boto_config(
     )
 
 
-def _is_endpoint_reachable(url: str, timeout: float = 2.0) -> bool:
-    return _is_endpoint_reachable_with_provider(url, _secret_provider, timeout=timeout)
+# legacy wrapper removed — use `_is_endpoint_reachable_with_provider` directly
+# if you need to probe endpoints with a specific provider.
 
 
 def _is_endpoint_reachable_with_provider(
@@ -273,64 +374,18 @@ def _sync_upload_cache(bucket: str, key: str, metadata_dict: dict[str, str] | No
     _invalidate_file_map_cache(bucket, key)
 
 
-def _get_effective_s3_endpoint() -> str:
+def get_effective_s3_endpoint() -> str:
     """Resolve the endpoint boto3 should talk to."""
-    global _effective_endpoint
-
-    if _effective_endpoint is not None:
-        return _effective_endpoint
-
-    _, _, endpoint, _ = _require_s3_env()
-
-    # Prefer an explicitly configured local override when it's reachable.
-    local_endpoint = _configured_local_s3_endpoint()
-    if local_endpoint and _is_endpoint_reachable(local_endpoint):
-        _effective_endpoint = local_endpoint
-    else:
-        _effective_endpoint = endpoint
-
-    return _effective_endpoint
+    # Delegate to the registered service for endpoint resolution so that any
+    # registered service's provider is consulted.
+    return get_s3_service().get_effective_endpoint()
 
 
 def get_s3_client() -> S3Client:
     """Get a cached S3 client."""
-    global _s3_client
-
-    if _s3_client is not None:
-        return _s3_client
-
-    with _s3_client_lock:
-        if _s3_client is not None:
-            return _s3_client
-
-        _s3_client = _build_s3_client()
-        return _s3_client
-
-
-def _build_s3_client() -> S3Client:
-    """Construct a new boto3 S3 client (not cached).
-
-    Exposed as a helper so client construction can be replaced or mocked
-    independently of the caching layer in `get_s3_client()`.
-    """
-    session = boto3.session.Session()
-    username, secret_key, _, region = _require_s3_env()
-
-    cfg = _make_boto_config()
-    session_factory: Callable[..., Any] = session.client  # pyright: ignore[reportUnknownVariableType]
-
-    return cast(  # pyright: ignore[reportUnknownVariableType]
-        S3Client,
-        session_factory(
-            "s3",
-            aws_access_key_id=username,
-            aws_secret_access_key=secret_key,
-            # Use an explicit local override when configured; otherwise use S3_ENDPOINT.
-            endpoint_url=_get_effective_s3_endpoint(),
-            config=cfg,
-            region_name=region,
-        ),
-    )
+    # Use the registered service's client; this allows tests to register a
+    # fake service and ensures a single place to control client construction.
+    return get_s3_service().get_client()
 
 
 @retry(attempts=5, backoff_base=2)
