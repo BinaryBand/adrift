@@ -1,20 +1,21 @@
-# Thin re-export shim for download worker helpers
+"""Thin re-export shim for download worker helpers."""
 
-from src.orchestration.download_service import (
+from src.orchestration.download_process import (
     DownloadProgressHooks,
     _build_metadata,
-    _build_upload_request,
     _complete_operation,
-    _download_audio,
     _download_episode_audio,
     _episode_slug,
     _operation_progress,
     _prepare_upload_audio,
     _start_operation,
-    _upload_episode_audio,
-    _UploadRequest,
     download_and_upload,
     process_in_tmpdir,
+)
+from src.orchestration.download_upload import (
+    _build_upload_request,
+    _upload_episode_audio,
+    _UploadRequest,
 )
 
 __all__ = [
@@ -29,7 +30,6 @@ __all__ = [
     "_start_operation",
     "_complete_operation",
     "_operation_progress",
-    "_download_audio",
     "_build_metadata",
     "_episode_slug",
 ]

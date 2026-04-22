@@ -50,7 +50,7 @@ def test_build_download_queue_prioritizes_missing_then_newest(
         return ep.episode.title in existing_titles
 
     monkeypatch.setattr(
-        "src.orchestration.download_service.episode_exists_on_s3",
+        "src.orchestration.download_process.episode_exists_on_s3",
         _exists_on_s3,
     )
 
@@ -73,7 +73,7 @@ def test_build_download_queue_preserves_unknown_dates_after_dated_missing(
         return False
 
     monkeypatch.setattr(
-        "src.orchestration.download_service.episode_exists_on_s3",
+        "src.orchestration.download_process.episode_exists_on_s3",
         _always_missing,
     )
 
@@ -221,14 +221,14 @@ def test_process_in_tmpdir_reports_upload_progress(
         _s3_prefix_fn,
     )
     monkeypatch.setattr(
-        "src.orchestration.download_service._download_audio",
+        "src.orchestration.download_process._download_audio",
         _download_audio_fn,
     )
     monkeypatch.setattr(
-        "src.orchestration.download_service.convert_to_opus",
+        "src.orchestration.download_process.convert_to_opus",
         _convert_to_opus_fn,
     )
-    monkeypatch.setattr("src.orchestration.download_service.get_duration", _get_duration_fn)
+    monkeypatch.setattr("src.orchestration.download_process.get_duration", _get_duration_fn)
 
     captured: dict[str, object] = {}
 
