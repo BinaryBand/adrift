@@ -1,9 +1,13 @@
+from pathlib import Path
+
+import pytest
+
 from src.adapters import get_secret_store_adapter
 from src.adapters.secrets.docker_secrets import DockerSecretProvider
 from src.ports import SecretStorePort
 
 
-def test_docker_secret_provider_reads_file(tmp_path):
+def test_docker_secret_provider_reads_file(tmp_path: Path):
     # Create a fake secret file
     secret_name = "MY_SECRET"
     secret_value = "supersecret"
@@ -18,7 +22,7 @@ def test_docker_secret_provider_reads_file(tmp_path):
     assert provider.get("MISSING", default="fallback") == "fallback"
 
 
-def test_docker_secret_provider_fallback_env(monkeypatch, tmp_path):
+def test_docker_secret_provider_fallback_env(monkeypatch: pytest.MonkeyPatch, tmp_path: Path):
     secret_name = "ENV_SECRET"
     secret_value = "envvalue"
     secrets_dir = tmp_path / "secrets"
@@ -29,7 +33,7 @@ def test_docker_secret_provider_fallback_env(monkeypatch, tmp_path):
     assert provider.get(secret_name) == secret_value
 
 
-def test_docker_secret_store_is_read_only(monkeypatch, tmp_path) -> None:
+def test_docker_secret_store_is_read_only(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
     secret_name = "S3_REGION"
     secret_value = "us-east-1"
     monkeypatch.setenv(secret_name, secret_value)

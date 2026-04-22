@@ -1,10 +1,12 @@
 from pathlib import Path
 from unittest.mock import patch
 
+import pytest
+
 from runbook import secrets as secrets_mod
 
 
-def test_runbook_edits_and_deletes_secrets(tmp_path: Path, monkeypatch) -> None:
+def test_runbook_edits_and_deletes_secrets(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     env_file = tmp_path / ".env"
     responses = iter(
         [
@@ -61,7 +63,7 @@ def test_runbook_validation_uses_secret_service(tmp_path: Path) -> None:
 
 
 def test_runbook_read_only_provider_only_offers_validate_and_quit(
-    tmp_path: Path, monkeypatch, capsys
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture
 ) -> None:
     env_file = tmp_path / ".env"
     monkeypatch.setenv("S3_REGION", "us-east-1")

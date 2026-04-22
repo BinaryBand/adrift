@@ -1,5 +1,7 @@
 from pathlib import Path
 
+import pytest
+
 from src.adapters.secrets.env_secrets import EnvironmentSecretStore
 
 
@@ -23,7 +25,9 @@ def test_environment_secret_store_persists_and_deletes_keys(tmp_path: Path) -> N
     assert env_file.read_text() == 'S3_USERNAME="alice"\n'
 
 
-def test_environment_secret_store_falls_back_to_process_env(monkeypatch, tmp_path: Path) -> None:
+def test_environment_secret_store_falls_back_to_process_env(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
     monkeypatch.setenv("S3_REGION", "us-east-1")
     store = EnvironmentSecretStore(env_file=(tmp_path / ".env").as_posix())
 

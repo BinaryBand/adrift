@@ -1,0 +1,10 @@
+{
+  "typeCheckingMode": "basic",
+  "include": ["tests"],
+  "reportMissingParameterType": false,
+  "reportUnknownParameterType": false,
+  "reportUnknownMemberType": false,
+  "reportUnknownArgumentType": false,
+  "reportUnknownLambdaType": false,
+  "reportPrivateUsage": false
+}

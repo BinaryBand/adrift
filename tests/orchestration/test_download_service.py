@@ -1,5 +1,8 @@
 from datetime import datetime, timezone
+from pathlib import Path
 from types import SimpleNamespace
+
+import pytest
 
 from src.models import DownloadEpisode, MediaMetadata, PodcastConfig, RssEpisode
 from src.orchestration.download_service import (
@@ -33,7 +36,9 @@ def _config() -> PodcastConfig:
     )
 
 
-def test_build_download_queue_prioritizes_missing_then_newest(monkeypatch) -> None:
+def test_build_download_queue_prioritizes_missing_then_newest(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
     newest_missing = _episode("Newest Missing", datetime(2026, 4, 20, tzinfo=timezone.utc))
     older_missing = _episode("Older Missing", datetime(2026, 4, 10, tzinfo=timezone.utc))
     newest_existing = _episode("Newest Existing", datetime(2026, 4, 21, tzinfo=timezone.utc))
@@ -58,7 +63,9 @@ def test_build_download_queue_prioritizes_missing_then_newest(monkeypatch) -> No
     ]
 
 
-def test_build_download_queue_preserves_unknown_dates_after_dated_missing(monkeypatch) -> None:
+def test_build_download_queue_preserves_unknown_dates_after_dated_missing(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
     dated_missing = _episode("Dated Missing", datetime(2026, 4, 20, tzinfo=timezone.utc))
     undated_missing = _episode("Undated Missing")
 
@@ -75,7 +82,9 @@ def test_build_download_queue_preserves_unknown_dates_after_dated_missing(monkey
     ]
 
 
-def test_episode_exists_on_s3_matches_existing_youtube_video_id(monkeypatch) -> None:
+def test_episode_exists_on_s3_matches_existing_youtube_video_id(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
     episode = DownloadEpisode(
         episode=RssEpisode(
             id="new-title",
@@ -106,7 +115,9 @@ def test_episode_exists_on_s3_matches_existing_youtube_video_id(monkeypatch) -> 
     assert episode_exists_on_s3(episode, config) is True
 
 
-def test_episode_exists_on_s3_matches_existing_direct_source_url(monkeypatch) -> None:
+def test_episode_exists_on_s3_matches_existing_direct_source_url(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
     episode = DownloadEpisode(
         episode=RssEpisode(
             id="direct-id",
@@ -142,7 +153,9 @@ def test_episode_exists_on_s3_matches_existing_direct_source_url(monkeypatch) ->
     assert episode_exists_on_s3(episode, config) is True
 
 
-def test_episode_exists_on_s3_matches_cleaned_existing_filename(monkeypatch) -> None:
+def test_episode_exists_on_s3_matches_cleaned_existing_filename(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
     episode = DownloadEpisode(
         episode=RssEpisode(
             id="morbid-title",
@@ -175,7 +188,9 @@ def test_episode_exists_on_s3_matches_cleaned_existing_filename(monkeypatch) -> 
     assert episode_exists_on_s3(episode, config) is True
 
 
-def test_process_in_tmpdir_reports_upload_progress(monkeypatch, tmp_path) -> None:
+def test_process_in_tmpdir_reports_upload_progress(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
     episode = _episode("Upload Progress")
     config = _config()
     audio_path = tmp_path / "audio.m4a"
