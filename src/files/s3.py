@@ -74,7 +74,7 @@ class S3Service:
     def build_client(self) -> S3Client:
         """Construct a fresh boto3 S3 client using this service's secret provider."""
         session = self._session_factory()
-        username, secret_key, _, region = require_secrets(self.secret_provider, _REQUIRED_S3_KEYS)
+        values = require_secrets(self.secret_provider, _REQUIRED_S3_KEYS)
 
         cfg = _make_boto_config()
         session_factory: Callable[..., Any] = session.client  # pyright: ignore[reportUnknownVariableType]
@@ -83,11 +83,11 @@ class S3Service:
             S3Client,
             session_factory(
                 "s3",
-                aws_access_key_id=username,
-                aws_secret_access_key=secret_key,
+                aws_access_key_id=values["S3_USERNAME"],
+                aws_secret_access_key=values["S3_SECRET_KEY"],
                 endpoint_url=self.get_effective_endpoint(),
                 config=cfg,
-                region_name=region,
+                region_name=values["S3_REGION"],
             ),
         )
 
@@ -104,7 +104,8 @@ class S3Service:
         if self._effective_endpoint is not None:
             return self._effective_endpoint
 
-        _, _, endpoint, _ = require_secrets(self.secret_provider, _REQUIRED_S3_KEYS)
+        values = require_secrets(self.secret_provider, _REQUIRED_S3_KEYS)
+        endpoint = values["S3_ENDPOINT"]
 
         # Prefer configured LOCAL_S3_ENDPOINT when reachable
         local_endpoint = _configured_local_s3_endpoint(self.secret_provider)

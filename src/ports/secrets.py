@@ -34,7 +34,15 @@ class SecretStorePort(ReadOnlySecretStorePort, Protocol):
 def require_secrets(provider: SecretProviderPort, keys: Sequence[str]) -> dict[str, str]:
     """Return required secret values or raise when any are missing."""
     values = {key: provider.get(key, "") for key in keys}
-    missing = [key for key, value in values.items() if not value]
+    missing = [key for key, value in values.items() if _is_missing_or_placeholder(key, value)]
     if missing:
         raise RuntimeError(f"Missing required S3 environment variables: {', '.join(missing)}")
     return values
+
+
+def _is_missing_or_placeholder(key: str, value: str) -> bool:
+    stripped = value.strip()
+    if not stripped:
+        return True
+    # Catch unresolved templates such as S3_REGION, $S3_REGION, or ${S3_REGION}.
+    return stripped in {key, f"${key}", f"${{{key}}}"}
