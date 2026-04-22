@@ -82,17 +82,17 @@ class TestLizard:
         assert result.returncode == 0, result.stdout + result.stderr
 
 
-# class TestSemgrep:
-#     """Ensure the codebase passes the current Semgrep architecture gate."""
+class TestSemgrep:
+    """Ensure the codebase passes the current Semgrep architecture gate."""
 
-#     def test_semgrep(self):
-#         """Fail if Semgrep reports any architecture or process violations."""
-#         result = run_resolved(
-#             ["poetry", "run", "semgrep", "scan", "--config", ".semgrep.yml", "--error"],
-#             capture_output=True,
-#             text=True,
-#         )
-#         assert result.returncode == 0, result.stdout + result.stderr
+    def test_semgrep(self):
+        """Fail if Semgrep reports any architecture or process violations."""
+        result = run_resolved(
+            ["poetry", "run", "semgrep", "scan", "--config", ".semgrep.yml", "--error"],
+            capture_output=True,
+            text=True,
+        )
+        assert result.returncode == 0, result.stdout + result.stderr
 
 
 class TestVulture:

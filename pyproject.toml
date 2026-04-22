@@ -14,7 +14,7 @@ adrift-build-diagram = "runbook.analysis.build_diagram:main"
 adrift-build-hotspots = "runbook.analysis.build_hotspots:main"
 
 [tool.poetry.dependencies]
-python = "^3.11"
+python = ">=3.12"
 attrs = "~=26.1.0"
 pydantic = "~=2.12.5"
 feedparser = "~=6.0.12"
@@ -31,7 +31,7 @@ yarl = "~=1.23.0"
 python-dateutil = "~=2.9.0.post0"
 boto3 = "~=1.42.91"
 rich = "~=15.0.0"
-typer = "~=0.24.1"
+typer = "^0.24.1"
 
 [tool.poetry.group.dev.dependencies]
 # Type stubs
@@ -51,6 +51,7 @@ lizard = "~=1.21.3"
 vulture = "~=2.16"
 grimp = "~=3.14"
 networkx = "~=3.6"
+semgrep = "<1.160.0"
 
 [tool.pytest.ini_options]
 addopts = "-m 'not slow'"

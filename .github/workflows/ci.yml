@@ -39,5 +39,8 @@ jobs:
       - name: Dead code check (vulture)
         run: poetry run vulture src runbook tests typings --min-confidence 80
 
+      - name: Run Semgrep
+        run: poetry run semgrep --config .semgrep.yml
+
       - name: Run tests
         run: poetry run pytest -q

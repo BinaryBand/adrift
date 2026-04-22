@@ -1,7 +1,6 @@
 {
   "python.defaultInterpreterPath": "/home/owen/Documents/Dev/adrift/.venv/bin/python",
   "files.exclude": {
-    "**/.venv": true,
     "**/__pycache__": true,
     "**/.cache": true,
     "**/*.cache": true,
@@ -16,33 +15,6 @@
   },
   "[python]": {
     "editor.defaultFormatter": "charliermarsh.ruff"
-  },
-  "emeraldwalk.runonsave": {
-    "commands": [
-      {
-        "match": "\\.py$",
-        "notMatch": "(\\.venv|__pycache__|/\\.)",
-        "cmd": "${workspaceFolder}/.venv/bin/python -m runbook.quality.check_static --problems src runbook tests typings",
-        "isAsync": true
-      },
-      {
-        "match": "\\.py$",
-        "notMatch": "(\\.venv|__pycache__|/\\.)",
-        "cmd": "${workspaceFolder}/.venv/bin/python -m runbook.quality.check_complexity src --ccn 8 --length 30 --params 4",
-        "isAsync": true
-      },
-      {
-        "match": "\\.py$",
-        "notMatch": "(\\.venv|__pycache__|/\\.)",
-        "cmd": "${workspaceFolder}/.venv/bin/python -m runbook.quality.check_dead_code src",
-        "isAsync": true
-      },
-      {
-        "match": "config/.*\\.toml$",
-        "cmd": "${workspaceFolder}/.venv/bin/python -m runbook.quality.validate_configs --problems ${file}",
-        "isAsync": true
-      }
-    ]
   },
   "cSpell.words": [
     "BYDAY",

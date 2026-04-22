@@ -1,0 +1,16 @@
+rules:
+  - id: python.eval-exec
+    languages: [python]
+    message: "Avoid using eval/exec; prefer safer alternatives"
+    severity: ERROR
+    patterns:
+      - pattern: eval($EXPR)
+      - pattern: exec($EXPR)
+
+  - id: python.subprocess-shell
+    languages: [python]
+    message: "Avoid passing shell=True to subprocess calls"
+    severity: WARNING
+    patterns:
+      - pattern: subprocess.run($ARGS, shell=True)
+      - pattern: subprocess.Popen($ARGS, shell=True)
