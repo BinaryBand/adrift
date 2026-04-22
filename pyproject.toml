@@ -52,6 +52,7 @@ vulture = "~=2.16"
 grimp = "~=3.14"
 networkx = "~=3.6"
 semgrep = "<1.160.0"
+setuptools = ">=75.0"
 
 [tool.pytest.ini_options]
 addopts = "-m 'not slow'"
