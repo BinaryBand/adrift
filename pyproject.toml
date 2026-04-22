@@ -73,7 +73,8 @@ line-length = 100
 select = ["E", "F", "I"]
 
 [tool.ty.environment]
-python = ".venv"
+# `python` intentionally omitted so `ty` auto-detects the project's Python
+# environment (activated venv or environment specified by the caller).
 python-version = "3.12"
 extra-paths = []
 root = ["."]
