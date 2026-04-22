@@ -74,14 +74,16 @@ def _run_ffprobe(file: Path) -> str:
         errors="ignore",
         check=True,
     )
-    assert res.stdout is not None, "ffprobe returned no output"
+    if not res.stdout:
+        raise ValueError("ffprobe returned no output")
     return res.stdout
 
 
 def _parse_ffprobe_duration(stdout: str) -> float:
     data = json.loads(stdout)
     duration = data.get("format", {}).get("duration")
-    assert duration is not None, "No duration in ffprobe output"
+    if duration is None:
+        raise ValueError("No duration in ffprobe output")
     return float(duration)
 
 
@@ -131,7 +133,8 @@ def parse_duration(duration_str: str | None) -> float | None:
 
 
 def get_duration(file: Path) -> float | None:
-    assert os.path.exists(file), f"File not found: {file}"
+    if not os.path.exists(file):
+        raise FileNotFoundError(f"File not found: {file}")
 
     try:
         return _parse_ffprobe_duration(_run_ffprobe(file))
@@ -152,7 +155,8 @@ def invert_segments(file: Path, segments: list[Segment]) -> list[Segment]:
         prev_end = seg[1]
 
     total_len = get_duration(file)
-    assert total_len is not None, f"Could not get duration for {file}"
+    if total_len is None:
+        raise ValueError(f"Could not get duration for {file}")
 
     content_segments.append((prev_end, total_len))
     return content_segments
@@ -366,7 +370,8 @@ def _run_ffmpeg_progress_process(
         encoding="utf-8",
         errors="ignore",
     ) as process:
-        assert process.stdout is not None, "ffmpeg progress stream not available"
+        if process.stdout is None:
+            raise RuntimeError("ffmpeg progress stream not available")
         for raw_line in process.stdout:
             _maybe_report_ffmpeg_progress(raw_line, total_seconds, callback)
 

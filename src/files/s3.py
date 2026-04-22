@@ -367,7 +367,8 @@ def _prepare_upload_spec(
     Extracted to keep `upload_file` short and focused on orchestration.
     """
     _file_path = file_path if isinstance(file_path, str) else file_path.as_posix()
-    assert os.path.exists(_file_path), f"Local file not found: {file_path}"
+    if not os.path.exists(_file_path):
+        raise FileNotFoundError(f"Local file not found: {_file_path}")
 
     metadata, callback = _extract_upload_options(options)
     metadata_dict = metadata.to_dict() if metadata is not None else None

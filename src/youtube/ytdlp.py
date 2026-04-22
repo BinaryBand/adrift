@@ -226,8 +226,7 @@ def _parse_and_cache_channel(
 
     # Cache for 25-35 days
     expire_days = random.randint(25, 35)
-    # raw_info should be a dict here; assert to help type-checkers
-    assert isinstance(raw_info, dict)
+    # raw_info is typed as `dict[str, Any]` in the signature; no runtime check needed
     _CACHE.set(cache_key, _trim_channel_cache_payload(raw_info), expire=expire_days * 24 * 3600)
     return model
 
@@ -283,8 +282,7 @@ def _parse_and_cache_video(
     except ValidationError as e:
         emit_warning(f"Failed to parse video info for {video_id}: {e}")
         return None
-    # raw_info should be a dict here; assert to help type-checkers
-    assert isinstance(raw_info, dict)
+    # raw_info is typed as `dict[str, Any]` in the signature; no runtime check needed
     _CACHE.set(cache_key, _trim_video_cache_payload(raw_info))
     return model
 

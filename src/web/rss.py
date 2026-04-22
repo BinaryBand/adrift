@@ -197,7 +197,8 @@ def parse_rss_entry(entry: FeedParserDict) -> RssEpisode:
     id, title, author, description = _entry_basic_fields(entry)
 
     content = _extract_content_url(entry)
-    assert content is not None, "No valid audio content URL found"
+    if content is None:
+        raise ValueError("No valid audio content URL found")
 
     pub_date = _parse_entry_pub_date(entry)
 
@@ -284,7 +285,8 @@ def get_rss_episodes(
     callback: Callback | None = None,
 ) -> list[RssEpisode]:
     """Parse RSS feed and extract episode information for a podcast."""
-    assert LINK_REGEX.match(url), "Invalid RSS feed url or file path"
+    if not LINK_REGEX.match(url):
+        raise ValueError("Invalid RSS feed url or file path")
     r_rules = r_rules or []
     r_rules_key = ",".join(sorted(r_rules))
     cache_key = f"feed:{url}:{filter}:{r_rules_key}"

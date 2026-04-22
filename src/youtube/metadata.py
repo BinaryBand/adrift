@@ -13,7 +13,8 @@ def _normalize_youtube_link(url: str) -> str:
 
     href_match = YT_CHANNEL.match(url)
     yt_match = YT_CHANNEL_SHORTHAND.match(url)
-    assert href_match or yt_match, "Invalid YouTube channel URL"
+    if not (href_match or yt_match):
+        raise ValueError("Invalid YouTube channel URL")
 
     if href_match:
         if href_match.group(3) is None:
