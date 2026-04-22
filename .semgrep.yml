@@ -22,3 +22,12 @@ rules:
     patterns:
       - pattern: print(...)
       - pattern: print()
+  - id: python.assert-in-production
+    languages: [python]
+    message: "Avoid using bare 'assert' for runtime checks; use explicit exceptions (ValueError, FileNotFoundError, etc.) instead because assertions can be disabled."
+    severity: ERROR
+    patterns:
+      - pattern: assert $X
+    paths-ignore:
+      - "tests/**"
+      - '**/tests/**'
