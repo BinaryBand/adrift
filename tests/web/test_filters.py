@@ -28,7 +28,9 @@ class TestFeedFilter(unittest.TestCase):
     @patch("src.web.rss._rss_cache")
     @patch("src.web.rss.requests.get")
     @patch("src.web.rss.feedparser.parse")
-    def test_filter_includes_matching_episodes(self, mock_parse, mock_get, mock_cache_fn):
+    def test_filter_includes_matching_episodes(
+        self, mock_parse: Mock, mock_get: Mock, mock_cache_fn: Mock
+    ):
         """Test that episodes matching the filter regex are included."""
         mock_cache = mock_cache_fn.return_value
         mock_cache.get.return_value = None
@@ -55,7 +57,9 @@ class TestFeedFilter(unittest.TestCase):
     @patch("src.web.rss._rss_cache")
     @patch("src.web.rss.requests.get")
     @patch("src.web.rss.feedparser.parse")
-    def test_filter_excludes_non_matching_episodes(self, mock_parse, mock_get, mock_cache_fn):
+    def test_filter_excludes_non_matching_episodes(
+        self, mock_parse: Mock, mock_get: Mock, mock_cache_fn: Mock
+    ):
         """Test that episodes not matching the filter regex are excluded."""
         mock_cache = mock_cache_fn.return_value
         mock_cache.get.return_value = None
@@ -82,7 +86,7 @@ class TestFeedFilter(unittest.TestCase):
     @patch("src.web.rss._rss_cache")
     @patch("src.web.rss.requests.get")
     @patch("src.web.rss.feedparser.parse")
-    def test_filter_case_insensitive(self, mock_parse, mock_get, mock_cache_fn):
+    def test_filter_case_insensitive(self, mock_parse: Mock, mock_get: Mock, mock_cache_fn: Mock):
         """Test that filter can be case-insensitive with (?i) flag."""
         mock_cache = mock_cache_fn.return_value
         mock_cache.get.return_value = None
@@ -108,7 +112,9 @@ class TestFeedFilter(unittest.TestCase):
     @patch("src.web.rss._rss_cache")
     @patch("src.web.rss.requests.get")
     @patch("src.web.rss.feedparser.parse")
-    def test_filter_empty_string_returns_all(self, mock_parse, mock_get, mock_cache_fn):
+    def test_filter_empty_string_returns_all(
+        self, mock_parse: Mock, mock_get: Mock, mock_cache_fn: Mock
+    ):
         """Test that empty filter string returns all episodes."""
         mock_cache = mock_cache_fn.return_value
         mock_cache.get.return_value = None
@@ -130,7 +136,7 @@ class TestFeedFilter(unittest.TestCase):
     @patch("src.web.rss._rss_cache")
     @patch("src.web.rss.requests.get")
     @patch("src.web.rss.feedparser.parse")
-    def test_filter_none_returns_all(self, mock_parse, mock_get, mock_cache_fn):
+    def test_filter_none_returns_all(self, mock_parse: Mock, mock_get: Mock, mock_cache_fn: Mock):
         """Test that None filter returns all episodes."""
         mock_cache = mock_cache_fn.return_value
         mock_cache.get.return_value = None
@@ -156,7 +162,7 @@ class TestDayOfWeekFilter(unittest.TestCase):
     @patch("src.web.rss._rss_cache")
     @patch("src.web.rss.requests.get")
     @patch("src.web.rss.feedparser.parse")
-    def test_filters_weekdays_only(self, mock_parse, mock_get, mock_cache_fn):
+    def test_filters_weekdays_only(self, mock_parse: Mock, mock_get: Mock, mock_cache_fn: Mock):
         """Test filtering for weekdays only (Mon-Fri)."""
         mock_cache = mock_cache_fn.return_value
         mock_cache.get.return_value = None
@@ -193,7 +199,7 @@ class TestDayOfWeekFilter(unittest.TestCase):
     @patch("src.web.rss._rss_cache")
     @patch("src.web.rss.requests.get")
     @patch("src.web.rss.feedparser.parse")
-    def test_filters_weekend_only(self, mock_parse, mock_get, mock_cache_fn):
+    def test_filters_weekend_only(self, mock_parse: Mock, mock_get: Mock, mock_cache_fn: Mock):
         """Test filtering for weekend only (Sat-Sun)."""
         mock_cache = mock_cache_fn.return_value
         mock_cache.get.return_value = None
@@ -222,7 +228,7 @@ class TestDayOfWeekFilter(unittest.TestCase):
     @patch("src.web.rss._rss_cache")
     @patch("src.web.rss.requests.get")
     @patch("src.web.rss.feedparser.parse")
-    def test_filters_single_day(self, mock_parse, mock_get, mock_cache_fn):
+    def test_filters_single_day(self, mock_parse: Mock, mock_get: Mock, mock_cache_fn: Mock):
         """Test filtering for a single specific day."""
         mock_cache = mock_cache_fn.return_value
         mock_cache.get.return_value = None
@@ -248,7 +254,9 @@ class TestDayOfWeekFilter(unittest.TestCase):
     @patch("src.web.rss._rss_cache")
     @patch("src.web.rss.requests.get")
     @patch("src.web.rss.feedparser.parse")
-    def test_empty_day_filter_returns_all(self, mock_parse, mock_get, mock_cache_fn):
+    def test_empty_day_filter_returns_all(
+        self, mock_parse: Mock, mock_get: Mock, mock_cache_fn: Mock
+    ):
         """Test that empty feed_day_of_week_filter returns all episodes."""
         mock_cache = mock_cache_fn.return_value
         mock_cache.get.return_value = None
@@ -270,7 +278,9 @@ class TestDayOfWeekFilter(unittest.TestCase):
     @patch("src.web.rss._rss_cache")
     @patch("src.web.rss.requests.get")
     @patch("src.web.rss.feedparser.parse")
-    def test_none_day_filter_returns_all(self, mock_parse, mock_get, mock_cache_fn):
+    def test_none_day_filter_returns_all(
+        self, mock_parse: Mock, mock_get: Mock, mock_cache_fn: Mock
+    ):
         """Test that None r_rules returns all episodes."""
         mock_cache = mock_cache_fn.return_value
         mock_cache.get.return_value = None
@@ -292,7 +302,7 @@ class TestDayOfWeekFilter(unittest.TestCase):
     @patch("src.web.rss._rss_cache")
     @patch("src.web.rss.requests.get")
     @patch("src.web.rss.feedparser.parse")
-    def test_handles_missing_pub_date(self, mock_parse, mock_get, mock_cache_fn):
+    def test_handles_missing_pub_date(self, mock_parse: Mock, mock_get: Mock, mock_cache_fn: Mock):
         """Test that episodes with missing pub_date are excluded when using day filter."""
         mock_cache = mock_cache_fn.return_value
         mock_cache.get.return_value = None
@@ -316,7 +326,7 @@ class TestDayOfWeekFilter(unittest.TestCase):
     @patch("src.web.rss._rss_cache")
     @patch("src.web.rss.requests.get")
     @patch("src.web.rss.feedparser.parse")
-    def test_handles_invalid_pub_date(self, mock_parse, mock_get, mock_cache_fn):
+    def test_handles_invalid_pub_date(self, mock_parse: Mock, mock_get: Mock, mock_cache_fn: Mock):
         """Test that episodes with invalid pub_date format are excluded when using r_rules."""
         mock_cache = mock_cache_fn.return_value
         mock_cache.get.return_value = None
@@ -344,7 +354,7 @@ class TestCombinedFilters(unittest.TestCase):
     @patch("src.web.rss._rss_cache")
     @patch("src.web.rss.requests.get")
     @patch("src.web.rss.feedparser.parse")
-    def test_both_filters_applied(self, mock_parse, mock_get, mock_cache_fn):
+    def test_both_filters_applied(self, mock_parse: Mock, mock_get: Mock, mock_cache_fn: Mock):
         """Test that both feed_filter and r_rules are applied together."""
         mock_cache = mock_cache_fn.return_value
         mock_cache.get.return_value = None
@@ -386,7 +396,9 @@ class TestCombinedFilters(unittest.TestCase):
     @patch("src.web.rss._rss_cache")
     @patch("src.web.rss.requests.get")
     @patch("src.web.rss.feedparser.parse")
-    def test_complex_regex_with_day_filter(self, mock_parse, mock_get, mock_cache_fn):
+    def test_complex_regex_with_day_filter(
+        self, mock_parse: Mock, mock_get: Mock, mock_cache_fn: Mock
+    ):
         """Test complex regex exclusion filter combined with day filter."""
         mock_cache = mock_cache_fn.return_value
         mock_cache.get.return_value = None
@@ -444,7 +456,9 @@ class TestCacheKeyGeneration(unittest.TestCase):
     @patch("src.web.rss._rss_cache")
     @patch("src.web.rss.requests.get")
     @patch("src.web.rss.feedparser.parse")
-    def test_cache_key_includes_day_filter(self, mock_parse, mock_get, mock_cache_fn):
+    def test_cache_key_includes_day_filter(
+        self, mock_parse: Mock, mock_get: Mock, mock_cache_fn: Mock
+    ):
         """Test that cache key includes r_rules to prevent wrong cached results."""
         mock_cache = mock_cache_fn.return_value
         mock_cache.get.return_value = None
@@ -477,7 +491,9 @@ class TestCacheKeyGeneration(unittest.TestCase):
     @patch("src.web.rss._rss_cache")
     @patch("src.web.rss.requests.get")
     @patch("src.web.rss.feedparser.parse")
-    def test_cache_key_converts_list_to_tuple(self, mock_parse, mock_get, mock_cache_fn):
+    def test_cache_key_converts_list_to_tuple(
+        self, mock_parse: Mock, mock_get: Mock, mock_cache_fn: Mock
+    ):
         """Test that r_rules list is serialized into a hashable cache key."""
         mock_cache = mock_cache_fn.return_value
         mock_cache.get.return_value = None

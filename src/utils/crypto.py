@@ -18,7 +18,7 @@ def get_hash(payload: str) -> str:
     cache = _crypto_cache()
 
     cache_key = f"hash:pl={payload}"
-    if (cached := cache.get(cache_key)) is not None:
+    if (cached := cache.get(cache_key)) is not None and isinstance(cached, str):
         return cached
 
     hash_md5 = hashlib.md5()
@@ -34,7 +34,7 @@ def get_file_hash(file_path: Path) -> str:
     modified_date = os.path.getmtime(file_path)
 
     cache_key = f"md5:cs={file_path.absolute().as_posix()},mod={modified_date}"
-    if (cached_md5 := cache.get(cache_key)) is not None:
+    if (cached_md5 := cache.get(cache_key)) is not None and isinstance(cached_md5, str):
         return cached_md5
 
     hash_md5 = hashlib.md5()
@@ -144,7 +144,7 @@ def get_audio_content_hash(file_path: Path, sample_rate: int = 8000) -> str:
     cache_key = (
         f"audio_hash:file={file_path.absolute().as_posix()},mod={modified_date},sr={sample_rate}"
     )
-    if (cached_hash := cache.get(cache_key)) is not None:
+    if (cached_hash := cache.get(cache_key)) is not None and isinstance(cached_hash, str):
         return cached_hash
 
     sample_window = 0.65

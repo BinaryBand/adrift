@@ -45,7 +45,7 @@ def test_build_download_queue_prioritizes_missing_then_newest(
 
     existing_titles = {"Newest Existing"}
 
-    def _exists_on_s3(ep, config):
+    def _exists_on_s3(ep: DownloadEpisode, config: PodcastConfig) -> bool:
         del config
         return ep.episode.title in existing_titles
 
@@ -69,9 +69,12 @@ def test_build_download_queue_preserves_unknown_dates_after_dated_missing(
     dated_missing = _episode("Dated Missing", datetime(2026, 4, 20, tzinfo=timezone.utc))
     undated_missing = _episode("Undated Missing")
 
+    def _always_missing(ep: DownloadEpisode, config: PodcastConfig) -> bool:
+        return False
+
     monkeypatch.setattr(
         "src.orchestration.download_service.episode_exists_on_s3",
-        lambda ep, config: False,
+        _always_missing,
     )
 
     queue = build_download_queue([undated_missing, dated_missing], _config())
@@ -201,30 +204,43 @@ def test_process_in_tmpdir_reports_upload_progress(
     operations: list[str] = []
     updates: list[tuple[int, int | None]] = []
 
+    def _s3_prefix_fn(cfg: PodcastConfig) -> tuple[str, str]:
+        return ("bucket", "podcasts/creepcast")
+
+    def _download_audio_fn(ep: DownloadEpisode, dest: Path, callback: object | None = None) -> Path:
+        return audio_path
+
+    def _convert_to_opus_fn(audio: Path, callback: object | None = None) -> Path:
+        return opus_path
+
+    def _get_duration_fn(path: Path) -> float:
+        return 42.0
+
     monkeypatch.setattr(
         "src.orchestration.download_service._s3_prefix",
-        lambda config: ("bucket", "podcasts/creepcast"),
+        _s3_prefix_fn,
     )
     monkeypatch.setattr(
         "src.orchestration.download_service._download_audio",
-        lambda ep, dest, callback=None: audio_path,
+        _download_audio_fn,
     )
     monkeypatch.setattr(
         "src.orchestration.download_service.convert_to_opus",
-        lambda audio, callback=None: opus_path,
+        _convert_to_opus_fn,
     )
-    monkeypatch.setattr("src.orchestration.download_service.get_duration", lambda path: 42.0)
+    monkeypatch.setattr("src.orchestration.download_service.get_duration", _get_duration_fn)
 
     captured: dict[str, object] = {}
 
-    def _upload_file(bucket, key, file_path, options):
+    def _upload_file(bucket: str, key: str, file_path: Path, options: object | None) -> None:
         captured["bucket"] = bucket
         captured["key"] = key
         captured["file_path"] = file_path
         captured["options"] = options
         assert options is not None
-        assert options.callback is not None
-        options.callback(3, 10)
+        assert getattr(options, "callback") is not None
+        # mypy/pyright can't infer the callable shape here; call dynamically
+        options.callback(3, 10)  # type: ignore[union-attr]
 
     fake = SimpleNamespace()
     fake.upload_file = lambda bucket_key, file_path, options: _upload_file(

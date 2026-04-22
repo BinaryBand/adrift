@@ -223,7 +223,8 @@ def _feed_url_for_target(target: Target) -> str:
 def _fetch_feed(feed_url: str) -> feedparser.FeedParserDict:
     response = requests.get(feed_url, timeout=20)
     response.raise_for_status()
-    return feedparser.parse(response.text)
+    parsed = feedparser.parse(response.text)
+    return cast(feedparser.FeedParserDict, parsed)
 
 
 def _parse_datetime_tuple(raw: Any) -> datetime | None:
@@ -296,7 +297,8 @@ def _sample_from_entry(entry: feedparser.FeedParserDict) -> Sample | None:
 
 
 def _extract_samples(feed: feedparser.FeedParserDict) -> list[Sample]:
-    samples = [sample for entry in feed.entries if (sample := _sample_from_entry(entry))]
+    entries = cast(list[feedparser.FeedParserDict], getattr(feed, "entries", []))
+    samples = [sample for entry in entries if (sample := _sample_from_entry(entry))]
     samples.sort(key=lambda sample: sample.published_utc, reverse=True)
     return samples
 

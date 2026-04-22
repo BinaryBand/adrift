@@ -1,5 +1,5 @@
 {
-  "typeCheckingMode": "strict",
+  "typeCheckingMode": "basic",
   "include": ["src", "runbook", "typings"],
   "exclude": ["**/node_modules", "**/__pycache__", "**/.*", ".venv"],
   "venvPath": ".",

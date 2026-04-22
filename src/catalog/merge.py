@@ -8,6 +8,7 @@ from src.models import (
     EpisodeData,
     MergeResult,
     PodcastConfig,
+    ReferenceMatchTrace,
     RssEpisode,
     SourceTrace,
 )
@@ -124,14 +125,14 @@ def _merge_config_artifacts(
     references: list[RssEpisode],
     downloads: list[RssEpisode],
     options: MergeConfigOptions,
-) -> tuple[list[tuple[int, int]], list[SourceTrace], list[EpisodeData]]:
+) -> tuple[list[tuple[int, int]], list[ReferenceMatchTrace], list[EpisodeData]]:
     pairs = _timed_stage(
         "align_episodes",
         lambda: align_episodes(references, downloads, config.name),
         options,
     )
     match_traces = cast(
-        list[SourceTrace], _build_match_traces(references, downloads, pairs, config.name)
+        list[ReferenceMatchTrace], _build_match_traces(references, downloads, pairs, config.name)
     )
     episodes = _timed_stage(
         "merge_episodes",

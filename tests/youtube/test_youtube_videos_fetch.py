@@ -12,7 +12,9 @@ class TestGetYoutubeVideosCache(unittest.TestCase):
 
     @patch("src.youtube.metadata._normalize_youtube_link")
     @patch("src.youtube.ytdlp.get_youtube_videos")
-    def test_returns_episodes_from_ytdlp(self, mock_get_videos, mock_normalize):
+    def test_returns_episodes_from_ytdlp(
+        self, mock_get_videos: MagicMock, mock_normalize: MagicMock
+    ):
         """Test that get_youtube_episodes calls ytdlp.get_youtube_videos."""
         mock_normalize.return_value = "https://youtube.com/@test/videos"
 
@@ -45,7 +47,7 @@ class TestGetYoutubeVideosCache(unittest.TestCase):
 
     @patch("src.youtube.metadata._normalize_youtube_link")
     @patch("src.youtube.ytdlp.get_youtube_videos")
-    def test_cache_key_format(self, mock_get_videos, mock_normalize):
+    def test_cache_key_format(self, mock_get_videos: MagicMock, mock_normalize: MagicMock):
         """Test that get_youtube_videos is called with correct parameters."""
         normalized_url = "https://youtube.com/@test/videos"
         mock_normalize.return_value = normalized_url
@@ -61,7 +63,7 @@ class TestGetYoutubeVideosCache(unittest.TestCase):
 
     @patch("src.youtube.metadata._normalize_youtube_link")
     @patch("src.youtube.ytdlp.get_youtube_videos")
-    def test_forwards_refresh_option(self, mock_get_videos, mock_normalize):
+    def test_forwards_refresh_option(self, mock_get_videos: MagicMock, mock_normalize: MagicMock):
         """Test that refresh is forwarded to the yt-dlp layer."""
         mock_normalize.return_value = "https://youtube.com/@test/videos"
         mock_get_videos.return_value = []
@@ -80,7 +82,9 @@ class TestGetYoutubeVideosEarlyTermination(unittest.TestCase):
 
     @patch("src.youtube.metadata._normalize_youtube_link")
     @patch("src.youtube.ytdlp.get_youtube_videos")
-    def test_returns_empty_when_no_videos(self, mock_get_videos, mock_normalize):
+    def test_returns_empty_when_no_videos(
+        self, mock_get_videos: MagicMock, mock_normalize: MagicMock
+    ):
         """Test returns empty list when no videos returned."""
         mock_normalize.return_value = "https://youtube.com/@test/videos"
         mock_get_videos.return_value = []
@@ -92,7 +96,7 @@ class TestGetYoutubeVideosEarlyTermination(unittest.TestCase):
 
     @patch("src.youtube.metadata._normalize_youtube_link")
     @patch("src.youtube.ytdlp.get_youtube_videos")
-    def test_handles_single_video(self, mock_get_videos, mock_normalize):
+    def test_handles_single_video(self, mock_get_videos: MagicMock, mock_normalize: MagicMock):
         """Test handles single video case."""
         mock_normalize.return_value = "https://youtube.com/@test/videos"
 
@@ -117,7 +121,7 @@ class TestGetYoutubeVideosCompleteness(unittest.TestCase):
 
     @patch("src.youtube.metadata._normalize_youtube_link")
     @patch("src.youtube.ytdlp.get_youtube_videos")
-    def test_fetches_multiple_videos(self, mock_get_videos, mock_normalize):
+    def test_fetches_multiple_videos(self, mock_get_videos: MagicMock, mock_normalize: MagicMock):
         """Test that multiple videos are processed."""
         mock_normalize.return_value = "https://youtube.com/@test/videos"
 
@@ -161,7 +165,9 @@ class TestGetYoutubeVideosFilter(unittest.TestCase):
     @patch("src.youtube.metadata._normalize_youtube_link")
     @patch("src.youtube.ytdlp.get_youtube_videos")
     @patch("src.youtube.metadata.re_compile")
-    def test_filters_videos_by_pattern(self, mock_re_compile, mock_get_videos, mock_normalize):
+    def test_filters_videos_by_pattern(
+        self, mock_re_compile: MagicMock, mock_get_videos: MagicMock, mock_normalize: MagicMock
+    ):
         """Test that videos are filtered by title pattern."""
         mock_normalize.return_value = "https://youtube.com/@test/videos"
 
@@ -212,7 +218,9 @@ class TestGetYoutubeVideosDetailed(unittest.TestCase):
     @patch("src.youtube.metadata._normalize_youtube_link")
     @patch("src.youtube.ytdlp.get_youtube_videos")
     @patch("src.youtube.metadata._add_episode_metadata")
-    def test_adds_detailed_metadata(self, mock_add_metadata, mock_get_videos, mock_normalize):
+    def test_adds_detailed_metadata(
+        self, mock_add_metadata: MagicMock, mock_get_videos: MagicMock, mock_normalize: MagicMock
+    ):
         """Test that detailed metadata is added when detailed=True."""
         mock_normalize.return_value = "https://youtube.com/@test/videos"
 
@@ -237,7 +245,7 @@ class TestGetYoutubeVideosDetailed(unittest.TestCase):
 
     @patch("src.youtube.metadata._normalize_youtube_link")
     @patch("src.youtube.ytdlp.get_youtube_videos")
-    def test_skips_detailed_metadata(self, mock_get_videos, mock_normalize):
+    def test_skips_detailed_metadata(self, mock_get_videos: MagicMock, mock_normalize: MagicMock):
         """Test that detailed metadata is skipped when detailed=False."""
         mock_normalize.return_value = "https://youtube.com/@test/videos"
 
@@ -263,7 +271,9 @@ class TestGetYoutubeVideosEdgeCases(unittest.TestCase):
 
     @patch("src.youtube.metadata._normalize_youtube_link")
     @patch("src.youtube.ytdlp.get_youtube_videos")
-    def test_returns_empty_when_no_entries(self, mock_get_videos, mock_normalize):
+    def test_returns_empty_when_no_entries(
+        self, mock_get_videos: MagicMock, mock_normalize: MagicMock
+    ):
         """Test returns empty list when no video entries."""
         mock_normalize.return_value = "https://youtube.com/@test/videos"
         mock_get_videos.return_value = []
@@ -274,7 +284,9 @@ class TestGetYoutubeVideosEdgeCases(unittest.TestCase):
 
     @patch("src.youtube.metadata._normalize_youtube_link")
     @patch("src.youtube.ytdlp.get_youtube_videos")
-    def test_raises_exception_on_network_error(self, mock_get_videos, mock_normalize):
+    def test_raises_exception_on_network_error(
+        self, mock_get_videos: MagicMock, mock_normalize: MagicMock
+    ):
         """Test that network exceptions are propagated."""
         mock_normalize.return_value = "https://youtube.com/@test/videos"
         mock_get_videos.side_effect = Exception("Network error")

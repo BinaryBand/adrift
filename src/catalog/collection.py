@@ -1,5 +1,5 @@
 from dataclasses import dataclass
-from typing import Any
+from typing import Any, Literal
 
 from src.models import FeedSource, PodcastConfig, RssEpisode, SourceTrace, ensure_feed_source
 from src.utils.progress import Callback
@@ -30,7 +30,7 @@ def _source_has_filters(source: FeedSource) -> bool:
     return bool(filters.include or filters.exclude or filters.r_rules)
 
 
-def _source_type(source: FeedSource) -> str:
+def _source_type(source: FeedSource) -> Literal["rss", "youtube"]:
     return "youtube" if is_youtube_channel(source.url) else "rss"
 
 

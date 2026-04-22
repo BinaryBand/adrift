@@ -181,7 +181,13 @@ class S3Service:
             head_response = client.head_object(Bucket=bucket, Key=key)
         except Exception:
             return None
-        return head_response.get("Metadata", {})
+        raw_meta = head_response.get("Metadata", {})
+        if not isinstance(raw_meta, dict):
+            return {}
+        try:
+            return {str(k): str(v) for k, v in raw_meta.items()}
+        except Exception:
+            return {}
 
     def public_s3_url(self, bucket: str, key: str) -> str:
         return urljoin(

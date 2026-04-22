@@ -1,5 +1,6 @@
 # pyright: reportPrivateUsage=false
 from dataclasses import dataclass
+from typing import Literal
 
 from src.app_common import MATCH_TOLERANCE
 from src.models import MatchCandidateTrace, ReferenceMatchTrace, RssEpisode
@@ -33,7 +34,13 @@ def _candidate_reason(
     download_index: int,
     score: float,
     context: _MatchTraceContext,
-) -> str:
+) -> Literal[
+    "matched",
+    "below_threshold",
+    "download_matched_elsewhere",
+    "reference_matched_elsewhere",
+    "not_selected",
+]:
     if (reference_index, download_index) in context.pair_set:
         return "matched"
     if score < MATCH_TOLERANCE:

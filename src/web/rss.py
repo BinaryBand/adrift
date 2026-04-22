@@ -40,10 +40,10 @@ def _extract_image_url_impl(channel: FeedParserDict) -> str:
 
     Prefer the first non-empty candidate.
     """
-    val = _extract_image_from(channel.get("image"))
+    val = _extract_image_from(cast(object, channel.get("image")))
     if val:
         return val
-    val = _extract_image_from(channel.get("itunes_image"))
+    val = _extract_image_from(cast(object, channel.get("itunes_image")))
     if val:
         return val
     return ""
@@ -132,7 +132,8 @@ def get_rss_channel(rss_url: str) -> RssChannel:
 
 def _fetch_channel_feed_str(rss_url: str) -> str:
     cache_key = f"rss:{rss_url}"
-    feed_str: str | None = _rss_cache().get(cache_key)
+    cached = _rss_cache().get(cache_key)
+    feed_str: str | None = cached if isinstance(cached, str) else None
     if feed_str is None:
         response = requests.get(rss_url, timeout=15)
         feed_str = response.text
@@ -236,9 +237,19 @@ def _parse_entry_duration(entry: FeedParserDict) -> float | None:
 
 def _parse_entry_image(entry: FeedParserDict) -> str | None:
     image = getattr(entry, "itunes_image", getattr(entry, "image", None))
-    if image is not None and not isinstance(image, str):
-        return image.get("href", None) or image.get("url", None)
-    return image
+    if image is None:
+        return None
+    if isinstance(image, str):
+        return image
+    get = getattr(image, "get", None)
+    if callable(get):
+        href = get("href", None)
+        if isinstance(href, str) and href:
+            return href
+        url = get("url", None)
+        if isinstance(url, str) and url:
+            return url
+    return None
 
 
 def _align_to_tzinfo(dt: datetime, reference: datetime) -> datetime:
@@ -295,7 +306,10 @@ def get_rss_episodes(
         response = requests.get(url, timeout=15)
         feed_str = response.text
         _rss_cache().set(cache_key, feed_str, 1800)
-    entries = _filter_feed_entries(feedparser.parse(feed_str).entries, filter, r_rules)
+    parsed = feedparser.parse(feed_str)
+    raw_entries = getattr(parsed, "entries", [])
+    entries_list = cast(list[FeedParserDict], raw_entries) if isinstance(raw_entries, list) else []
+    entries = _filter_feed_entries(entries_list, filter, r_rules)
     return _parse_feed_entries(entries, callback)
 
 
