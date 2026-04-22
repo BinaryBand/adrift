@@ -40,7 +40,9 @@ jobs:
         run: poetry run vulture src runbook tests typings --min-confidence 80
 
       - name: Run Semgrep
-        run: poetry run semgrep --config .semgrep.yml
+        uses: semgrep/semgrep-action@v1
+        with:
+          config: .semgrep.yml
 
       - name: Run tests
         run: poetry run pytest -q
