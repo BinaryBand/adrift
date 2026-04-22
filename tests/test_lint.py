@@ -2,10 +2,13 @@
 
 from __future__ import annotations
 
+import os
 import subprocess
 from pathlib import Path
 from shutil import which
 from typing import Any, Iterable
+
+import pytest
 
 ROOT: Path = Path(__file__).resolve().parents[1]
 VENV_BIN = ROOT / ".venv" / "bin"
@@ -85,10 +88,14 @@ class TestLizard:
 class TestSemgrep:
     """Ensure the codebase passes the current Semgrep architecture gate."""
 
+    @pytest.mark.skipif(
+        os.environ.get("CI") == "true",
+        reason="Semgrep is already run via semgrep/semgrep-action in CI",
+    )
     def test_semgrep(self):
         """Fail if Semgrep reports any architecture or process violations."""
         result = run_resolved(
-            ["poetry", "run", "semgrep", "scan", "--config", ".semgrep.yml", "--error"],
+            ["semgrep", "scan", "--config", ".semgrep.yml", "--error"],
             capture_output=True,
             text=True,
         )
