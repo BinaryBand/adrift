@@ -4,7 +4,7 @@ import os
 import random
 from datetime import datetime, timedelta
 from pathlib import Path
-from typing import Any, cast
+from typing import cast
 
 import tomllib
 from dateutil.rrule import rrulestr
@@ -82,7 +82,7 @@ def _load_config(name_or_path: str) -> list[PodcastConfig]:
     podcasts_raw = data.get("podcasts", [])
     if not isinstance(podcasts_raw, list):
         return []
-    configs = parse_podcasts_raw(cast(list[PodcastConfig | dict[str, Any]], podcasts_raw))
+    configs = parse_podcasts_raw(cast(list[PodcastConfig], podcasts_raw))
     random.shuffle(configs)
     return configs
 

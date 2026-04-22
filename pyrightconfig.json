@@ -1,13 +1,7 @@
 {
   "typeCheckingMode": "strict",
   "include": ["src", "runbook", "typings"],
-  "exclude": [
-    "runbook/analysis",
-    "**/node_modules",
-    "**/__pycache__",
-    "**/.*",
-    ".venv"
-  ],
+  "exclude": ["**/node_modules", "**/__pycache__", "**/.*", ".venv"],
   "venvPath": ".",
   "venv": ".venv",
   "stubPath": "typings",

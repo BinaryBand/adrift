@@ -12,13 +12,13 @@ Usage:
 from __future__ import annotations
 
 import argparse
+import importlib
 import shutil
 import tempfile
 from collections import defaultdict
 from pathlib import Path
-from typing import Any
+from typing import Any, Dict, List, Tuple, cast
 
-import grimp
 import networkx as nx
 
 # ── Paths ─────────────────────────────────────────────────────────────────────
@@ -53,7 +53,7 @@ def _classify(module_key: str) -> tuple[str, str | None]:
         return _LAYER_FEATURES, top + "/"
     if top in _INFRA_DIRS:
         return _LAYER_INFRA, top + "/"
-    return "Uncategorised", None
+    return "Uncategorized", None
 
 
 # ── Node helpers ───────────────────────────────────────────────────────────────
@@ -79,16 +79,17 @@ def _is_leaf(mod: str) -> bool:
     return "." in mod.removeprefix(_PACKAGE + ".") and mod != _PACKAGE
 
 
-def _add_edges(G: nx.DiGraph, g: Any, mod: str, key: str) -> None:
+def _add_edges(G: Any, g: Any, mod: str, key: str) -> None:
     for dep in g.find_modules_directly_imported_by(mod):
         dep_key = _to_key(dep)
         if dep_key != key and dep != _PACKAGE:
             G.add_edge(key, dep_key)
 
 
-def _build_graph() -> nx.DiGraph:
-    g: Any = grimp.build_graph(_PACKAGE, include_external_packages=False)
-    G: nx.DiGraph = nx.DiGraph()
+def _build_graph() -> Any:
+    grimp_mod = cast(Any, importlib.import_module("grimp"))
+    g = grimp_mod.build_graph(_PACKAGE, include_external_packages=False)
+    G = cast(Any, nx.DiGraph())
     for mod in sorted(m for m in g.modules if _is_leaf(m)):
         key = _to_key(mod)
         G.add_node(key)
@@ -99,11 +100,11 @@ def _build_graph() -> nx.DiGraph:
 # ── Mermaid rendering ──────────────────────────────────────────────────────────
 
 
-def _group_nodes(G: nx.DiGraph) -> tuple[dict, dict]:
-    layer_groups: dict[str, list[str]] = {layer: [] for layer in _LAYER_ORDER}
+def _group_nodes(G: Any) -> tuple[Dict[str, List[str]], Dict[str, str]]:
+    layer_groups: Dict[str, List[str]] = {layer: [] for layer in _LAYER_ORDER}
     layer_groups["Uncategorised"] = []
-    node_subgraph: dict[str, str] = {}
-    for key in sorted(G.nodes):
+    node_subgraph: Dict[str, str] = {}
+    for key in sorted(str(n) for n in G.nodes):
         layer, subgraph = _classify(key)
         layer_groups.setdefault(layer, []).append(key)
         node_subgraph[key] = subgraph or ""
@@ -122,7 +123,7 @@ def _render_sub_group(lines: list[str], sub_label: str, sub_keys: list[str]) -> 
             lines.append(f'        {_node_id(key)}["{_node_label(key)}"]')
 
 
-def _render_subgraph(layer: str, keys: list[str], node_subgraph: dict) -> list[str]:
+def _render_subgraph(layer: str, keys: List[str], node_subgraph: Dict[str, str]) -> List[str]:
     if not keys:
         return []
     safe = "sg_" + layer.lower().replace(" ", "_")
@@ -136,9 +137,11 @@ def _render_subgraph(layer: str, keys: list[str], node_subgraph: dict) -> list[s
     return lines
 
 
-def _render_insights(G: nx.DiGraph) -> list[str]:
-    hubs = sorted(
-        [(n, d) for n, d in G.in_degree() if d >= 2],
+def _render_insights(G: Any) -> List[str]:
+    hubs_raw = list(G.in_degree())
+    hubs_typed = cast(List[Tuple[Any, int]], hubs_raw)
+    hubs: List[Tuple[str, int]] = sorted(
+        [(str(n), int(d)) for n, d in hubs_typed if int(d) >= 2],
         key=lambda item: (-item[1], item[0]),
     )
     lines = ["", "### What this tells us", ""]
@@ -166,7 +169,7 @@ def build_mermaid() -> str:
     for layer in _LAYER_ORDER + ["Uncategorised"]:
         lines.extend(_render_subgraph(layer, layer_groups.get(layer, []), node_subgraph))
     lines.append("")
-    for src_key, dep_key in sorted(G.edges()):
+    for src_key, dep_key in sorted((str(u), str(v)) for u, v in G.edges()):
         lines.append(f"    {_node_id(src_key)} --> {_node_id(dep_key)}")
     lines.append("```")
     lines.extend(_render_insights(G))

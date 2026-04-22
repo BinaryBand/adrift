@@ -5,6 +5,7 @@ from __future__ import annotations
 
 import argparse
 import re
+import time
 from collections import Counter
 from dataclasses import dataclass
 from datetime import datetime, timezone
@@ -18,19 +19,8 @@ import requests
 import tomllib
 from yt_dlp import YoutubeDL
 
-try:
-    from src.app_common import (
-        ensure_feed_source,
-        ensure_podcast_config,
-        parse_podcasts_raw,
-    )
-except Exception:
-    # Fallback for ad-hoc script execution environments
-    from src.app_common import (
-        ensure_feed_source,
-        ensure_podcast_config,
-        parse_podcasts_raw,
-    )
+from src.app_common import ensure_feed_source, ensure_podcast_config, parse_podcasts_raw
+from src.models.podcast_config import PodcastConfig
 
 ROOT = Path(__file__).resolve().parents[2]
 CONFIG_PATH = ROOT / "config" / "youtube.toml"
@@ -138,14 +128,6 @@ def _target_key(raw: str) -> tuple[str, str]:
     return ("feed", _normalize_feed_target(raw))
 
 
-def _exclude_lookahead(pattern: str) -> str:
-    return f"(?!{pattern[1:]})" if pattern.startswith("^") else f"(?!.*{pattern})"
-
-
-def _include_lookahead(patterns: list[str]) -> str | None:
-    return f"(?=.*(?:{'|'.join(patterns)}))" if patterns else None
-
-
 def _filters_to_regex(filters: Any) -> str | None:
     try:
         return filters.to_regex()
@@ -186,9 +168,7 @@ def _load_download_targets() -> list[Target]:
     with open(CONFIG_PATH, "rb") as f:
         data = tomllib.load(f)
 
-    raw = data.get("podcasts", [])
-    if not isinstance(raw, list):
-        return []
+    raw: list[PodcastConfig] = data.get("podcasts", [])
 
     targets: list[Target] = []
     podcasts = parse_podcasts_raw(raw)
@@ -247,10 +227,43 @@ def _fetch_feed(feed_url: str) -> feedparser.FeedParserDict:
 
 
 def _parse_datetime_tuple(raw: Any) -> datetime | None:
-    if not isinstance(raw, tuple) or len(raw) < 6:
+    # Accept `time.struct_time` or a tuple/list-like of at least 6 numeric fields.
+    if raw is None:
         return None
+
+    if isinstance(raw, time.struct_time):
+        try:
+            return datetime(
+                raw.tm_year,
+                raw.tm_mon,
+                raw.tm_mday,
+                raw.tm_hour,
+                raw.tm_min,
+                raw.tm_sec,
+                tzinfo=timezone.utc,
+            )
+        except Exception:
+            return None
+
+    if not isinstance(raw, (tuple, list)):
+        return None
+
     try:
-        return datetime(*raw[:6], tzinfo=timezone.utc)
+        raw[5]
+    except Exception:
+        return None
+
+    # Tell the type checker we expect the sequence to contain ints (or int-like values).
+    seq = cast(tuple[int, ...], raw)
+
+    try:
+        year = int(seq[0])
+        month = int(seq[1])
+        day = int(seq[2])
+        hour = int(seq[3])
+        minute = int(seq[4])
+        second = int(seq[5])
+        return datetime(year, month, day, hour, minute, second, tzinfo=timezone.utc)
     except Exception:
         return None
 
