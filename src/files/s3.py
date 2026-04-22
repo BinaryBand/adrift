@@ -16,8 +16,9 @@ from urllib.parse import urljoin
 import boto3
 from boto3.s3.transfer import TransferConfig
 from botocore.client import Config
-from diskcache import Cache
 from pydantic import BaseModel, ConfigDict
+
+from src.files.s3_cache import _s3_cache
 
 if TYPE_CHECKING:
     from mypy_boto3_s3 import S3Client
@@ -484,11 +485,6 @@ def validate_s3_provider(
     if _is_endpoint_reachable_with_provider(endpoint, active_provider):
         return
     raise RuntimeError(f"Unable to reach configured S3 endpoint: {endpoint}")
-
-
-def _s3_cache() -> Cache:
-    """Get the RSS feed cache instance."""
-    return Cache(".cache/s3")
 
 
 _P = ParamSpec("_P")
