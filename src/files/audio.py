@@ -1,4 +1,5 @@
 import json
+import logging
 import os
 import shutil
 import subprocess
@@ -7,6 +8,8 @@ from pathlib import Path
 from typing import Any, TypedDict, Unpack, cast
 
 from src.utils.progress import Callback
+
+logger = logging.getLogger(__name__)
 
 Segment = tuple[float, float]
 
@@ -123,7 +126,7 @@ def parse_duration(duration_str: str | None) -> float | None:
     if weights := _duration_weights(len(parts)):
         return sum(weight * float(part) for weight, part in zip(weights, parts))
 
-    print(f"WARNING: Unrecognized duration format: {duration_str}")
+    logger.warning("Unrecognized duration format: %s", duration_str)
     return None
 
 
@@ -134,10 +137,10 @@ def get_duration(file: Path) -> float | None:
         return _parse_ffprobe_duration(_run_ffprobe(file))
 
     except subprocess.CalledProcessError as e:
-        print(f"WARNING: ffprobe failed for {file}: exit code {e.returncode}")
+        logger.warning("ffprobe failed for %s: exit code %s", file, e.returncode)
         return None
     except Exception as e:
-        print(f"WARNING: Failed to get duration for {file}: {e}")
+        logger.warning("Failed to get duration for %s: %s", file, e)
         return None
 
 
@@ -501,16 +504,19 @@ def _log_space_change(src: Path, dest: Path) -> None:
     new_size = _file_size_or_none(dest)
 
     if original_size is None or new_size is None:
-        print(f"Converted {src} -> {dest}: size info unavailable")
+        logger.info("Converted %s -> %s: size info unavailable", src, dest)
         return
 
     diff = original_size - new_size
     if diff >= 0:
-        print("Converted %s -> %s: saved %s (%d bytes)" % (src, dest, _format_bytes(diff), diff))
+        logger.info("Converted %s -> %s: saved %s (%d bytes)", src, dest, _format_bytes(diff), diff)
     else:
-        print(
-            "Converted %s -> %s: increased size by %s (%d bytes)"
-            % (src, dest, _format_bytes(-diff), -diff)
+        logger.info(
+            "Converted %s -> %s: increased size by %s (%d bytes)",
+            src,
+            dest,
+            _format_bytes(-diff),
+            -diff,
         )
 
 

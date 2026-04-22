@@ -1,5 +1,6 @@
 # pyright: reportUnknownVariableType=false, reportUnknownMemberType=false, reportUnknownArgumentType=false
 
+import logging
 import mimetypes
 import os
 import time
@@ -33,6 +34,8 @@ _REQUIRED_S3_KEYS = ("S3_USERNAME", "S3_SECRET_KEY", "S3_ENDPOINT", "S3_REGION")
 _secret_provider: SecretProviderPort = get_secret_provider_adapter()
 
 S3_ENDPOINT = _secret_provider.get("S3_ENDPOINT", "")
+
+logger = logging.getLogger(__name__)
 
 _s3_client_lock = Lock()
 _s3_client: S3Client | None = None
@@ -125,10 +128,10 @@ def _make_retry_wrapper(
                 last_exception = e
                 if i < attempts:
                     wait = backoff_base**i
-                    print(f"{label} attempt {i}/{attempts} failed. Wait {wait}s...")
+                    logger.warning("%s attempt %d/%d failed. Wait %ss...", label, i, attempts, wait)
                     time.sleep(wait)
                 else:
-                    print(f"{label} failed all {attempts} attempts")
+                    logger.error("%s failed all %d attempts", label, attempts)
 
         raise last_exception  # type: ignore[misc]
 

@@ -14,3 +14,11 @@ rules:
     patterns:
       - pattern: subprocess.run($ARGS, shell=True)
       - pattern: subprocess.Popen($ARGS, shell=True)
+
+  - id: python.print-warning-error
+    languages: [python]
+    message: "Avoid using print(); use the logging module instead (logger.info/warning/error)."
+    severity: ERROR
+    patterns:
+      - pattern: print(...)
+      - pattern: print()

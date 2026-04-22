@@ -2,6 +2,7 @@
 SponsorBlock API integration for fetching and removing sponsored segments.
 """
 
+import logging
 from pathlib import Path
 from typing import Any, cast
 
@@ -12,6 +13,8 @@ from src.models import SponsorSegment
 from src.utils.cache import S3Cache
 from src.utils.crypto import sha256
 from src.utils.progress import Callback
+
+logger = logging.getLogger(__name__)
 
 # Constants
 _CACHE = S3Cache(".cache/sponsorblock", "sponsorblock/segments")
@@ -31,9 +34,9 @@ def _fetch_sponsor_segments(video_id: str) -> list[SponsorSegment]:
         _cache_segments(video_id, segments)
         return segments
     except requests.RequestException as e:
-        print(f"WARNING: Network error fetching segments for {video_id}: {e}")
+        logger.warning("Network error fetching segments for %s: %s", video_id, e)
     except Exception as e:
-        print(f"WARNING: Error fetching segments for {video_id}: {e}")
+        logger.warning("Error fetching segments for %s: %s", video_id, e)
 
     return []
 
@@ -64,7 +67,7 @@ def _parse_segment_payload(video_id: str, response: requests.Response) -> list[d
 
     raw_data = response.json()
     if not isinstance(raw_data, list):
-        print(f"WARNING: Unexpected API response for {video_id}: not a list")
+        logger.warning("Unexpected API response for %s: not a list", video_id)
         return []
     return _unwrap_segment_payload(cast(list[dict[str, Any]], raw_data))
 
@@ -91,7 +94,7 @@ def fetch_sponsor_segments(video_id: str) -> list[tuple[float, float]]:
         segments = _fetch_sponsor_segments(video_id)
         return [seg.segment for seg in segments]
     except Exception as e:
-        print(f"ERROR: Error fetching segments for {video_id}: {e}")
+        logger.error("Error fetching segments for %s: %s", video_id, e)
         return []
 
 
@@ -104,9 +107,9 @@ def remove_sponsors(target: Path, video_id: str, callback: Callback | None = Non
         callback(0, len(segments))
 
     try:
-        print(f"Removing {len(segments)} sponsor segments from {target}")
+        logger.info("Removing %d sponsor segments from %s", len(segments), target)
         cut_segments(target, segments, callback=callback)
         return True
     except Exception as e:
-        print(f"ERROR: Error removing sponsors from {target}: {e}")
+        logger.error("Error removing sponsors from %s: %s", target, e)
         return False
