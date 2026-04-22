@@ -1,3 +1,4 @@
+import importlib
 import os
 import shutil
 from pathlib import Path
@@ -138,7 +139,7 @@ def _try_export_firefox_cookies() -> Path | None:
     Returns the Path to the cookies file on success, or None on failure.
     """
     try:
-        import browser_cookie3  # type: ignore[import]
+        browser_cookie3 = importlib.import_module("browser_cookie3")
     except Exception:
         emit_warning("browser_cookie3 not available; cannot export Firefox cookies")
         return None

@@ -59,13 +59,13 @@ class TestRuff:
         assert result.returncode == 0, result.stdout + result.stderr
 
 
-class TestPyright:
-    """Ensure the codebase passes the current Pyright gate."""
+class TestTy:
+    """Ensure the codebase passes the current ty gate."""
 
-    def test_pyright(self):
-        """Fail if Pyright reports any type-checking violations."""
+    def test_ty(self):
+        """Fail if ty reports any type-checking violations."""
         result = run_resolved(
-            ["pyright", "--project", "pyrightconfig.json"],
+            ["ty", "check", "--project", "."],
             capture_output=True,
             text=True,
         )

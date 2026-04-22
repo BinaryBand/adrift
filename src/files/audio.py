@@ -38,7 +38,7 @@ class _OpusConversionSettings:
         self.application = application
 
 
-def _build_opus_settings(kwargs: OpusConversionKwargs) -> _OpusConversionSettings:
+def _build_opus_settings(kwargs: dict[str, Any]) -> _OpusConversionSettings:
     return _OpusConversionSettings(
         target_bitrate_kbps=kwargs.get("target_bitrate_kbps"),
         force_bitrate=kwargs.get("force_bitrate", False),

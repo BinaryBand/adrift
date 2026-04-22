@@ -460,7 +460,7 @@ def _refresh_recent_youtube_videos(
     callback: Callback | None,
     episodes: dict[str, RssEpisode],
 ) -> list[RssEpisode]:
-    batch0 = cast(int | None, BATCHES[0])
+    batch0 = BATCHES[0]
     video_entries = _fetch_video_batch(url, author, 1, batch0)
     _add_new_public_episodes(video_entries, author, episodes)
     _report_video_fetch_progress(callback, batch0, len(episodes))
@@ -488,7 +488,7 @@ def _refresh_youtube_videos(
     episodes: dict[str, RssEpisode],
 ) -> list[RssEpisode]:
     for batch_index, batch_size in enumerate(BATCHES, start=1):
-        bs = cast(int | None, batch_size)
+        bs = batch_size
         video_entries = _fetch_video_batch(url, author, batch_index, bs)
         has_new = _add_new_public_episodes(video_entries, author, episodes)
         _report_video_fetch_progress(callback, bs, len(episodes))

@@ -1,9 +1,0 @@
-{
-  "typeCheckingMode": "basic",
-  "include": ["src", "runbook", "typings"],
-  "exclude": ["**/node_modules", "**/__pycache__", "**/.*", ".venv"],
-  "venvPath": ".",
-  "venv": ".venv",
-  "stubPath": "typings",
-  "reportMissingImports": true
-}

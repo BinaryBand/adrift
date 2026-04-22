@@ -30,8 +30,8 @@ jobs:
       - name: Ruff lint check
         run: poetry run ruff check src runbook tests typings
 
-      - name: Pyright check
-        run: poetry run pyright --project pyrightconfig.json
+      - name: Type check (ty)
+        run: poetry run ty check --project .
 
       - name: Complexity check (lizard)
         run: poetry run lizard src -C 8 -L 30 -a 4

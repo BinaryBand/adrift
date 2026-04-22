@@ -17,9 +17,9 @@ def _strip_suffix(pattern: str, episode: str) -> str:
 def _clean_darknet_diaries_title(filename: str) -> str:
     slug_name = create_slug(filename)
     match = re_compile(r"ep\-*(\d{1,3}[\-a-z0-9]+)$").search(slug_name)
-    groups = list(match.groups() if match else [])
+    groups = [str(g) for g in (match.groups() if match else [])]
     groups = sorted(groups, key=len)
-    return groups[-1].strip("-") if groups else slug_name
+    return str(groups[-1]).strip("-") if groups else slug_name
 
 
 def _clean_swindled_title(filename: str) -> str:

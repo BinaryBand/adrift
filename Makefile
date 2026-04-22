@@ -5,10 +5,10 @@ ARGS ?=
 
 # Use virtualenv python if present
 PYTHON ?= $(shell [ -x .venv/bin/python ] && echo .venv/bin/python || echo python3)
-PYRIGHT ?= $(shell [ -x .venv/bin/pyright ] && echo .venv/bin/pyright || echo pyright)
+TY ?= $(shell [ -x .venv/bin/ty ] && echo .venv/bin/ty || echo ty)
 
 .PHONY: quality ruff-format ruff-format-check ruff-check ruff-check-src ruff-check-tests check-complexity check-dead-code check-import-boundaries
-.PHONY: quality ruff-format ruff-format-check ruff-format-src ruff-format-tests ruff-check ruff-check-src ruff-check-tests ruff vulture pyright lizard check-complexity check-dead-code check-import-boundaries
+.PHONY: quality ruff-format ruff-format-check ruff-format-src ruff-format-tests ruff-check ruff-check-src ruff-check-tests ruff vulture ty lizard check-complexity check-dead-code check-import-boundaries
 
 .PHONY: help download merge build
 
@@ -28,7 +28,7 @@ help:
 		'  make ruff-check-tests      Run ruff checks for tests only' \
 		'  make ruff                  Alias for make ruff-check' \
 		'  make vulture               Run vulture dead-code checks' \
-		'  make pyright               Run pyright type checks' \
+		'  make ty                   Run ty type checks' \
 		'  make lizard                Run lizard complexity gates' \
 		'  make validate-configs      Validate TOML podcast configs' \
 		'  make check-complexity      Run lizard complexity checks' \
@@ -59,8 +59,8 @@ format:
 vulture:
 	$(MAKE) check-dead-code
 
-pyright:
-	$(PYRIGHT) --project pyrightconfig.json
+ty:
+	$(TY) check --project .
 
 lizard:
 	$(MAKE) check-complexity
@@ -69,7 +69,7 @@ validate-configs:
 	$(PYTHON) -m runbook.quality.validate_configs --problems
 
 check-complexity:
-	$(PYTHON) -m runbook.quality.check_complexity --ccn 8 --length 30 --params 4
+	$(PYTHON) -m lizard src -C 8 -L 30 -a 4
 
 check-dead-code:
 	$(PYTHON) -m runbook.quality.check_dead_code --strict

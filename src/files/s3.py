@@ -10,7 +10,7 @@ from dataclasses import dataclass
 from functools import wraps
 from pathlib import Path
 from threading import Lock
-from typing import TYPE_CHECKING, Any, Callable, Iterator, ParamSpec, TypeVar, cast
+from typing import TYPE_CHECKING, Any, Callable, Iterator, ParamSpec, TypeVar
 from urllib.parse import urljoin
 
 import boto3
@@ -80,16 +80,13 @@ class S3Service:
         cfg = _make_boto_config()
         session_factory: Callable[..., Any] = session.client  # pyright: ignore[reportUnknownVariableType]
 
-        return cast(
-            S3Client,
-            session_factory(
-                "s3",
-                aws_access_key_id=values["S3_USERNAME"],
-                aws_secret_access_key=values["S3_SECRET_KEY"],
-                endpoint_url=self.get_effective_endpoint(),
-                config=cfg,
-                region_name=values["S3_REGION"],
-            ),
+        return session_factory(
+            "s3",
+            aws_access_key_id=values["S3_USERNAME"],
+            aws_secret_access_key=values["S3_SECRET_KEY"],
+            endpoint_url=self.get_effective_endpoint(),
+            config=cfg,
+            region_name=values["S3_REGION"],
         )
 
     def get_client(self) -> S3Client:
@@ -128,16 +125,13 @@ class S3Service:
         values = require_secrets(self.secret_provider, _REQUIRED_S3_KEYS)
         cfg = _make_boto_config(connect_timeout=timeout, read_timeout=timeout, max_attempts=1)
         boto3_factory: Callable[..., Any] = boto3.client  # pyright: ignore[reportUnknownVariableType]
-        return cast(
-            S3Client,
-            boto3_factory(
-                "s3",
-                aws_access_key_id=values["S3_USERNAME"],
-                aws_secret_access_key=values["S3_SECRET_KEY"],
-                endpoint_url=url,
-                config=cfg,
-                region_name=values["S3_REGION"],
-            ),
+        return boto3_factory(
+            "s3",
+            aws_access_key_id=values["S3_USERNAME"],
+            aws_secret_access_key=values["S3_SECRET_KEY"],
+            endpoint_url=url,
+            config=cfg,
+            region_name=values["S3_REGION"],
         )
 
     def is_endpoint_reachable(self, url: str, timeout: float = 2.0) -> bool:
@@ -507,8 +501,8 @@ def _make_retry_wrapper(
 ) -> Callable[_P, _T]:
     @wraps(func)
     def wrapper(*args: _P.args, **kwargs: _P.kwargs) -> _T:
-        label = func.__name__
-        last_exception = None
+        label = getattr(func, "__name__", repr(func))
+        last_exception: Exception | None = None
         for i in range(1, attempts + 1):
             try:
                 return func(*args, **kwargs)
@@ -521,7 +515,9 @@ def _make_retry_wrapper(
                 else:
                     logger.error("%s failed all %d attempts", label, attempts)
 
-        raise last_exception  # type: ignore[misc]
+        if last_exception is None:
+            raise RuntimeError(f"{label} failed after {attempts} attempts")
+        raise last_exception
 
     return wrapper
 
@@ -594,16 +590,13 @@ def _build_s3_probe_client(
     values = require_secrets(provider, _REQUIRED_S3_KEYS)
     cfg = _make_boto_config(connect_timeout=timeout, read_timeout=timeout, max_attempts=1)
     boto3_factory: Callable[..., Any] = boto3.client  # pyright: ignore[reportUnknownVariableType]
-    return cast(  # pyright: ignore[reportUnknownVariableType]
-        S3Client,
-        boto3_factory(
-            "s3",
-            aws_access_key_id=values["S3_USERNAME"],
-            aws_secret_access_key=values["S3_SECRET_KEY"],
-            endpoint_url=url,
-            config=cfg,
-            region_name=values["S3_REGION"],
-        ),
+    return boto3_factory(
+        "s3",
+        aws_access_key_id=values["S3_USERNAME"],
+        aws_secret_access_key=values["S3_SECRET_KEY"],
+        endpoint_url=url,
+        config=cfg,
+        region_name=values["S3_REGION"],
     )
 
 

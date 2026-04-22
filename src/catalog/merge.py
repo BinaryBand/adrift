@@ -2,7 +2,7 @@
 from collections.abc import Callable
 from dataclasses import dataclass
 from time import perf_counter
-from typing import TypedDict, TypeVar, Unpack, cast
+from typing import TypedDict, TypeVar, Unpack
 
 from src.models import (
     EpisodeData,
@@ -131,9 +131,7 @@ def _merge_config_artifacts(
         lambda: align_episodes(references, downloads, config.name),
         options,
     )
-    match_traces = cast(
-        list[ReferenceMatchTrace], _build_match_traces(references, downloads, pairs, config.name)
-    )
+    match_traces = _build_match_traces(references, downloads, pairs, config.name)
     episodes = _timed_stage(
         "merge_episodes",
         lambda: _merge_episode_list(references, downloads, pairs),
