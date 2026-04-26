@@ -7,11 +7,12 @@ fully functional without any configuration file.
 
 import tomllib
 from pathlib import Path
+from typing import Any
 
 _SETTINGS_PATH = Path("config/settings.toml")
 
 
-def _load_settings() -> dict:  # type: ignore[type-arg]
+def _load_settings() -> dict[str, Any]:
     if _SETTINGS_PATH.exists():
         with open(_SETTINGS_PATH, "rb") as f:
             return tomllib.load(f)
@@ -19,8 +20,8 @@ def _load_settings() -> dict:  # type: ignore[type-arg]
 
 
 _settings = _load_settings()
-_matching: dict = _settings.get("matching", {})  # type: ignore[type-arg]
-_s3: dict = _settings.get("s3", {})  # type: ignore[type-arg]
+_matching: dict[str, Any] = _settings.get("matching", {})
+_s3: dict[str, Any] = _settings.get("s3", {})
 
 # ---------------------------------------------------------------------------
 # Matching algorithm weights
