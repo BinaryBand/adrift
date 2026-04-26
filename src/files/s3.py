@@ -30,6 +30,7 @@ else:
 from src.adapters import get_secret_provider_adapter
 from src.models import CacheMetadata, MediaMetadata, S3Metadata
 from src.ports import SecretProviderPort, require_secrets
+from src.settings import PUBLIC_S3_URL
 from src.utils.progress import Callback
 
 _REQUIRED_S3_KEYS = ("S3_USERNAME", "S3_SECRET_KEY", "S3_ENDPOINT", "S3_REGION")
@@ -186,9 +187,8 @@ class S3Service:
             return {}
 
     def public_s3_url(self, bucket: str, key: str) -> str:
-        return urljoin(
-            self.secret_provider.get("S3_ENDPOINT", S3_ENDPOINT), Path(bucket, key).as_posix()
-        )
+        base = PUBLIC_S3_URL or self.secret_provider.get("S3_ENDPOINT", S3_ENDPOINT)
+        return urljoin(base, Path(bucket, key).as_posix())
 
     # -- Listing / map helpers -------------------------------------------------
     def build_file_map_from_iterator(
@@ -250,11 +250,12 @@ class S3Service:
     def get_s3_files(self, bucket: str, prefix: str) -> list[str]:
         file_list = self.get_file_list(bucket, prefix)
         root_path = Path(bucket) / prefix
+        base = PUBLIC_S3_URL or self.get_effective_endpoint()
 
         files: list[str] = []
         for file_key in file_list:
             filename = Path(file_key).name
-            location = urljoin(self.get_effective_endpoint(), (root_path / filename).as_posix())
+            location = urljoin(base, (root_path / filename).as_posix())
             files.append(location)
 
         return files
@@ -379,9 +380,7 @@ class S3Service:
         spec, metadata_dict = _prepare_upload_spec(bucket, key, file_path, options)
         self.do_s3_upload(spec)
         self.sync_upload_cache(bucket, key, metadata_dict)
-        return urljoin(
-            self.secret_provider.get("S3_ENDPOINT", S3_ENDPOINT), Path(bucket, key).as_posix()
-        )
+        return self.public_s3_url(bucket, key)
 
     def upload_cache_file(
         self,
@@ -393,9 +392,7 @@ class S3Service:
         spec, metadata_dict = _prepare_upload_spec(bucket, key, file_path, metadata)
         self.do_s3_upload(spec)
         self.sync_upload_cache(bucket, key, metadata_dict)
-        return urljoin(
-            self.secret_provider.get("S3_ENDPOINT", S3_ENDPOINT), Path(bucket, key).as_posix()
-        )
+        return self.public_s3_url(bucket, key)
 
     def download_file(self, bucket: str, key: str, download_path: Path) -> None:
         client = self.get_client()

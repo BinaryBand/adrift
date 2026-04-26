@@ -1,0 +1,44 @@
+# Global application settings
+#
+# These values are loaded at startup and take precedence over any hardcoded
+# defaults in the source code. Override them here to tune the application
+# without touching Python source files.
+
+# ---------------------------------------------------------------------------
+# Matching algorithm weights
+# ---------------------------------------------------------------------------
+# The alignment algorithm scores episode pairs using a weighted combination of
+# four signals: identifier match (id), publish date proximity (date), title
+# similarity (title), and description similarity (desc).
+#
+# Weights do not need to sum to 1.0; the algorithm normalises the total weight
+# for any pair where only a subset of signals is available (e.g. no dates).
+[matching]
+match_tolerance   = 0.75   # Minimum score for a pair to be accepted as a match
+w_id              = 0.10   # Weight for exact-identifier bonus
+w_date            = 0.30   # Weight for publish-date proximity score
+w_title           = 0.50   # Weight for title-similarity score
+w_desc            = 0.10   # Weight for description-similarity score
+sparse_title_min  = 0.98   # Title threshold below which sparse-signal pairs are rejected
+
+# Date-proximity score tiers: [[max_days_apart, score], ...]
+# Pairs with a date gap larger than the last tier receive a score of 0.0.
+date_score_tiers = [[2, 1.00], [10, 0.70], [35, 0.15]]
+
+# ---------------------------------------------------------------------------
+# S3 / storage settings
+# ---------------------------------------------------------------------------
+[s3]
+# Public-facing base URL embedded in RSS enclosure hrefs.
+#
+# When the internal upload endpoint (LOCAL_S3_ENDPOINT) is an unreachable
+# private address (e.g. http://localhost:9000), set this to the externally
+# reachable URL so that podcast clients can download episodes off-network.
+#
+# The upload path is unaffected — files are still written via LOCAL_S3_ENDPOINT
+# (or S3_ENDPOINT when that is unreachable). Only the URLs embedded in RSS
+# feeds are rewritten to use this value.
+#
+# Example: "https://s3.example.com"
+# Leave empty to fall back to the S3_ENDPOINT secret.
+public_url = ""

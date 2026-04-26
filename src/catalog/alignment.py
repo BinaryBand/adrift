@@ -10,17 +10,11 @@ from src.models import EpisodeData, RssEpisode
 from src.utils.progress import Callback
 from src.utils.text import normalize_text
 from src.utils.title_normalization import normalize_title
+from src.settings import DATE_SCORE_TIERS, SPARSE_TITLE_MIN, W_DATE, W_DESC, W_ID, W_TITLE
 
 StringSimilarityFn = Callable[[list[str], list[str]], list[list[float]]]
 
 _THUMBNAIL_RANK = {"maxres": 4, "hq": 3, "mq": 2, "sq": 1}
-
-W_ID = 0.10
-W_DATE = 0.30
-W_TITLE = 0.50
-W_DESC = 0.10
-DATE_SCORE_TIERS: tuple[tuple[int, float], ...] = ((2, 1.00), (10, 0.70), (35, 0.15))
-SPARSE_TITLE_MIN = 0.98
 
 
 def _similarity_clean(ac: str, bc: str) -> float:

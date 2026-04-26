@@ -18,8 +18,7 @@ from src.models import (
     ensure_source_filter,
     parse_podcasts_raw,
 )
-
-MATCH_TOLERANCE = 0.75
+from src.settings import MATCH_TOLERANCE
 
 __all__ = [
     "MATCH_TOLERANCE",
