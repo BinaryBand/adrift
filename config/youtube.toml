@@ -104,7 +104,7 @@ url = "yt://@LegalEagle"
 
 [[podcasts]]
 name = "Paul J Warburg"
-path = "/media/podcasts/paul-warburg"
+path = "/media/podcasts/paul-j-warburg"
 schedule = ["FREQ=WEEKLY;BYDAY=SA,TH,FR"]
 
 [[podcasts.references]]

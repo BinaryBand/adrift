@@ -1,6 +1,7 @@
 import functools
 import mimetypes
 import shutil
+import time
 import uuid
 import xml.etree.ElementTree as ET
 from datetime import datetime, timedelta, timezone
@@ -27,7 +28,31 @@ AUDIO_EXTENSIONS = {".mp3", ".m4a", ".aac", ".wav", ".flac", ".ogg", ".mp4", ".o
 @functools.cache
 def _rss_cache() -> Cache:
     """Get the RSS feed cache instance."""
-    return Cache(".cache/rss")
+    path = Path(".cache/rss").resolve()
+    path.mkdir(parents=True, exist_ok=True)
+    return Cache(str(path))
+
+
+def _cache_set_with_retry(cache: Cache, key: str, value: str, expire: int | None = None) -> None:
+    """Call `cache.set` and retry if parent directories are missing.
+
+    This guards against races where diskcache removes empty directories
+    and a concurrent writer attempts to create files in nested subdirs.
+    """
+    attempts = 3
+    for attempt in range(attempts):
+        try:
+            cache.set(key, value, expire=expire)
+            return
+        except FileNotFoundError:
+            try:
+                Path(cache.directory).mkdir(parents=True, exist_ok=True)
+            except Exception:
+                pass
+            if attempt + 1 < attempts:
+                time.sleep(0.05)
+                continue
+            raise
 
 
 def _extract_image_url(channel: FeedParserDict) -> str:
@@ -137,7 +162,7 @@ def _fetch_channel_feed_str(rss_url: str) -> str:
     if feed_str is None:
         response = requests.get(rss_url, timeout=15)
         feed_str = response.text
-        _rss_cache().set(cache_key, feed_str, expire=3600)
+        _cache_set_with_retry(_rss_cache(), cache_key, feed_str, expire=3600)
     return feed_str
 
 
@@ -305,7 +330,7 @@ def get_rss_episodes(
     if feed_str is None:
         response = requests.get(url, timeout=15)
         feed_str = response.text
-        _rss_cache().set(cache_key, feed_str, 1800)
+        _cache_set_with_retry(_rss_cache(), cache_key, feed_str, 1800)
     parsed = feedparser.parse(feed_str)
     raw_entries = getattr(parsed, "entries", [])
     entries_list = cast(list[FeedParserDict], raw_entries) if isinstance(raw_entries, list) else []
