@@ -2,23 +2,33 @@
 
 from __future__ import annotations
 
-import logging
-import mimetypes
-import os
-import time
-from dataclasses import dataclass
-from functools import wraps
 from pathlib import Path
 from threading import Lock
-from typing import TYPE_CHECKING, Any, Callable, Iterator, ParamSpec, TypeVar
+from typing import TYPE_CHECKING, Any, Callable, Iterator
 from urllib.parse import urljoin
 
 import boto3
-from boto3.s3.transfer import TransferConfig
-from botocore.client import Config
-from pydantic import BaseModel, ConfigDict
 
 from src.files.s3_cache import _s3_cache
+from src.files.s3_listing import (
+    _identifier_matches as _listing_identifier_matches,
+)
+from src.files.s3_listing import (
+    _remove_file_extensions as _listing_remove_file_extensions,
+)
+from src.files.s3_metadata import _fetch_head_metadata as _metadata_fetch_head_metadata
+from src.files.s3_types import UploadOptions, _UploadSpec
+from src.files.s3_upload import (
+    _do_s3_upload as _upload_with_client,
+)
+from src.files.s3_upload import (
+    _prepare_upload_spec,
+)
+from src.files.s3_utils import (
+    _is_endpoint_reachable_with_provider,
+    _make_boto_config,
+    retry,
+)
 
 if TYPE_CHECKING:
     from mypy_boto3_s3 import S3Client
@@ -28,17 +38,14 @@ else:
     CopySourceTypeDef = dict[str, Any]
 
 from src.adapters import get_secret_provider_adapter
-from src.models import CacheMetadata, MediaMetadata, S3Metadata
+from src.models import CacheMetadata, MediaMetadata
 from src.ports import SecretProviderPort, require_secrets
-from src.utils.progress import Callback
 
 _REQUIRED_S3_KEYS = ("S3_USERNAME", "S3_SECRET_KEY", "S3_ENDPOINT", "S3_REGION")
 
 _secret_provider: SecretProviderPort = get_secret_provider_adapter()
 
 S3_ENDPOINT = _secret_provider.get("S3_ENDPOINT", "")
-
-logger = logging.getLogger(__name__)
 
 
 # Injectable S3 service ----------------------------------------------------
@@ -173,17 +180,7 @@ class S3Service:
             self.cache.set(dst_cache_key, metadata)
 
     def fetch_head_metadata(self, client: S3Client, bucket: str, key: str) -> dict[str, str] | None:
-        try:
-            head_response = client.head_object(Bucket=bucket, Key=key)
-        except Exception:
-            return None
-        raw_meta = head_response.get("Metadata", {})
-        if not isinstance(raw_meta, dict):
-            return {}
-        try:
-            return {str(k): str(v) for k, v in raw_meta.items()}
-        except Exception:
-            return {}
+        return _metadata_fetch_head_metadata(client, bucket, key)
 
     def public_s3_url(self, bucket: str, key: str) -> str:
         return urljoin(
@@ -233,7 +230,7 @@ class S3Service:
                 yield obj
 
     def _remove_file_extensions(self, file_names: list[str]) -> list[str]:
-        return [Path(f).with_suffix("").as_posix() for f in file_names]
+        return _listing_remove_file_extensions(file_names)
 
     def get_file_list(
         self, bucket: str, prefix: str, without_extensions: bool = False
@@ -357,20 +354,7 @@ class S3Service:
         return self.public_s3_url(bucket, dest_key)
 
     def do_s3_upload(self, spec: _UploadSpec) -> None:
-        transfer_config = TransferConfig(
-            max_concurrency=4,
-            multipart_threshold=8 * 1024 * 1024,
-            multipart_chunksize=8 * 1024 * 1024,
-            use_threads=True,
-        )
-        self.get_client().upload_file(
-            Filename=spec.file_path,
-            Bucket=spec.bucket,
-            Key=spec.key,
-            ExtraArgs=spec.extra_args,
-            Config=transfer_config,
-            Callback=spec.boto_callback,
-        )
+        _upload_with_client(self.get_client(), spec)
 
     def upload_file(
         self,
@@ -484,152 +468,6 @@ def validate_s3_provider(
     raise RuntimeError(f"Unable to reach configured S3 endpoint: {endpoint}")
 
 
-_P = ParamSpec("_P")
-_T = TypeVar("_T")
-
-
-def retry(
-    attempts: int = 3, backoff_base: int = 2
-) -> Callable[[Callable[_P, _T]], Callable[_P, _T]]:
-    """Decorator to retry a function with exponential backoff on failure."""
-
-    def decorator(func: Callable[_P, _T]) -> Callable[_P, _T]:
-        return _make_retry_wrapper(func, attempts, backoff_base)
-
-    return decorator
-
-
-def _make_retry_wrapper(
-    func: Callable[_P, _T], attempts: int, backoff_base: int
-) -> Callable[_P, _T]:
-    @wraps(func)
-    def wrapper(*args: _P.args, **kwargs: _P.kwargs) -> _T:
-        label = getattr(func, "__name__", repr(func))
-        last_exception: Exception | None = None
-        for i in range(1, attempts + 1):
-            try:
-                return func(*args, **kwargs)
-            except Exception as e:
-                last_exception = e
-                if i < attempts:
-                    wait = backoff_base**i
-                    logger.warning("%s attempt %d/%d failed. Wait %ss...", label, i, attempts, wait)
-                    time.sleep(wait)
-                else:
-                    logger.error("%s failed all %d attempts", label, attempts)
-
-        if last_exception is None:
-            raise RuntimeError(f"{label} failed after {attempts} attempts")
-        raise last_exception
-
-    return wrapper
-
-
-def _build_upload_extra_args(
-    file_path: str, metadata_dict: dict[str, str] | None
-) -> dict[str, Any]:
-    """Build the ExtraArgs dict for a boto3 upload_file call."""
-    extra_args: dict[str, Any] = {"ACL": "public-read"}
-    if metadata_dict is not None:
-        extra_args["Metadata"] = metadata_dict
-    content_type, _ = mimetypes.guess_type(file_path)
-    extra_args["ContentType"] = content_type or "application/octet-stream"
-    return extra_args
-
-
-def _make_upload_callback(callback: Callback, file_size: int) -> "Callable[[int], None]":
-    """Wrap a progress Callback in a thread-safe boto3-compatible callable."""
-    lock = Lock()
-    bytes_transferred = [0]
-
-    def _cb(bytes_chunk: int) -> None:
-        with lock:
-            bytes_transferred[0] += bytes_chunk
-            callback(bytes_transferred[0], file_size)
-
-    return _cb
-
-
-def _make_boto_config(
-    connect_timeout: float = 15, read_timeout: float = 120, max_attempts: int = 5
-) -> Config:
-    """Return a standardized botocore Config for S3 clients used in this module."""
-    return Config(
-        signature_version="s3v4",
-        connect_timeout=connect_timeout,
-        read_timeout=read_timeout,
-        retries={"max_attempts": max_attempts},
-    )
-
-
-# legacy wrapper removed — use `_is_endpoint_reachable_with_provider` directly
-# if you need to probe endpoints with a specific provider.
-
-
-def _is_endpoint_reachable_with_provider(
-    url: str,
-    provider: SecretProviderPort,
-    timeout: float = 2.0,
-) -> bool:
-    """Return True if an actual S3 API call succeeds against the endpoint.
-
-    A plain HTTP GET (or TCP probe) is not sufficient — a reverse proxy may
-    return 200 for GET / while the underlying S3 backend is still unreachable,
-    causing every real S3 operation to get a 502 Bad Gateway.  We probe with
-    list_buckets() so the check exercises the same code-path as normal usage.
-    """
-    try:
-        _build_s3_probe_client(url, provider, timeout).list_buckets()
-    except Exception:
-        return False
-    return True
-
-
-def _build_s3_probe_client(
-    url: str,
-    provider: SecretProviderPort,
-    timeout: float,
-) -> S3Client:
-    values = require_secrets(provider, _REQUIRED_S3_KEYS)
-    cfg = _make_boto_config(connect_timeout=timeout, read_timeout=timeout, max_attempts=1)
-    boto3_factory: Callable[..., Any] = boto3.client  # pyright: ignore[reportUnknownVariableType]
-    return boto3_factory(
-        "s3",
-        aws_access_key_id=values["S3_USERNAME"],
-        aws_secret_access_key=values["S3_SECRET_KEY"],
-        endpoint_url=url,
-        config=cfg,
-        region_name=values["S3_REGION"],
-    )
-
-
-@dataclass
-class _UploadSpec:
-    bucket: str
-    key: str
-    file_path: str
-    extra_args: dict[str, Any]
-    boto_callback: Callable[[int], None] | None = None
-
-
-def _do_s3_upload(spec: _UploadSpec) -> None:
-    """Execute the actual S3 multipart upload via boto3."""
-    transfer_config = TransferConfig(
-        max_concurrency=4,
-        multipart_threshold=8 * 1024 * 1024,
-        multipart_chunksize=8 * 1024 * 1024,
-        use_threads=True,
-    )
-    get_s3_client().upload_file(
-        Filename=spec.file_path,
-        Bucket=spec.bucket,
-        Key=spec.key,
-        ExtraArgs=spec.extra_args,
-        Config=transfer_config,
-        Callback=spec.boto_callback,
-    )
-
-
 def _invalidate_file_map_cache(bucket: str, key: str) -> None:
     """Invalidate the file-map cache for the directory containing `key`.
 
@@ -668,121 +506,6 @@ def download_file(bucket: str, key: str, download_path: Path) -> None:
     with open(download_path, "wb") as f:
         for chunk in response["Body"].iter_chunks():
             f.write(chunk)
-
-
-class UploadOptions(BaseModel):
-    """Options model for `upload_file`.
-
-    Uses arbitrary types to allow passing a `Callback` callable.
-    """
-
-    metadata: S3Metadata | None = None
-    callback: Callback | None = None
-
-    model_config = ConfigDict(arbitrary_types_allowed=True)
-
-
-def _prepare_upload_spec(
-    bucket: str,
-    key: str,
-    file_path: Path | str,
-    options: UploadOptions | S3Metadata | dict[str, Any] | None,
-) -> tuple[_UploadSpec, dict[str, str] | None]:
-    """Prepare an _UploadSpec and metadata dict from common upload inputs.
-
-    Extracted to keep `upload_file` short and focused on orchestration.
-    """
-    _file_path = file_path if isinstance(file_path, str) else file_path.as_posix()
-    if not os.path.exists(_file_path):
-        raise FileNotFoundError(f"Local file not found: {_file_path}")
-
-    metadata, callback = _extract_upload_options(options)
-    metadata_dict = metadata.to_dict() if metadata is not None else None
-    boto_callback = _build_boto_callback_for_file(_file_path, callback)
-
-    spec = _UploadSpec(
-        bucket=bucket,
-        key=key,
-        file_path=_file_path,
-        extra_args=_build_upload_extra_args(_file_path, metadata_dict),
-        boto_callback=boto_callback,
-    )
-    return spec, metadata_dict
-
-
-def _extract_upload_options(
-    options: UploadOptions | S3Metadata | dict[str, Any] | None,
-) -> tuple[S3Metadata | None, Callback | None]:
-    """Normalize `options` to (metadata, callback).
-
-    Accepts an `UploadOptions` model, a plain `dict`, or a `MediaMetadata`
-    instance for backward compatibility.
-    """
-    if options is None:
-        return None, None
-    if isinstance(options, S3Metadata):
-        return options, None
-    if isinstance(options, UploadOptions):
-        return options.metadata, options.callback
-    # Fall back: attempt to treat remaining values as a dict-like options
-    # mapping. This avoids an `isinstance(..., dict)` check which can be
-    # noisy for the static checker in some union scenarios.
-    try:
-        return _extract_upload_options_from_dict(options)
-    except Exception:
-        return None, None
-
-
-def _extract_upload_options_from_dict(
-    options: dict[str, Any],
-) -> tuple[S3Metadata | None, Callback | None]:
-    try:
-        opts = UploadOptions.model_validate(options)
-        return opts.metadata, opts.callback
-    except Exception:
-        metadata_obj = _validate_metadata_raw(options.get("metadata"))
-        callback_obj = _adapt_callback_obj(options.get("callback"))
-        return metadata_obj, callback_obj
-
-
-def _build_boto_callback_for_file(
-    file_path: str, callback: Callback | None
-) -> Callable[[int], None] | None:
-    """Return a boto3-compatible callback for `file_path` or None."""
-    if callback is None:
-        return None
-    return _make_upload_callback(callback, os.path.getsize(file_path))
-
-
-def _validate_metadata_raw(metadata_raw: Any) -> S3Metadata | None:
-    try:
-        return MediaMetadata.model_validate(metadata_raw)
-    except Exception:
-        try:
-            return CacheMetadata.model_validate(metadata_raw)
-        except Exception:
-            if isinstance(metadata_raw, (MediaMetadata, CacheMetadata)):
-                return metadata_raw
-            return None
-
-
-def _adapt_callback_obj(callback_raw: Any) -> Callback | None:
-    if not callable(callback_raw):
-        return None
-
-    def _adapted(value: int, total_value: int | None) -> None:
-        try:
-            # Prefer calling with (value, total_value) when supported
-            callback_raw(value, total_value)
-        except TypeError:
-            try:
-                # Fallback to single-arg callbacks (boto style)
-                callback_raw(value)
-            except Exception:
-                # Swallow any exceptions from user callback
-                return
-
-    return _adapted
 
 
 @retry(attempts=3, backoff_base=2)
@@ -880,7 +603,7 @@ def _iterate_s3_objects(bucket: str, prefix: str) -> Iterator[Any]:
 
 
 def _remove_file_extensions(file_names: list[str]) -> list[str]:
-    return [Path(f).with_suffix("").as_posix() for f in file_names]
+    return _listing_remove_file_extensions(file_names)
 
 
 def get_file_list(bucket: str, prefix: str, without_extensions: bool = False) -> list[str]:
@@ -893,18 +616,8 @@ def get_s3_files(bucket: str, prefix: str) -> list[str]:
 
 def exists(bucket: str, prefix: str, extension_agnostic: bool = True) -> str | None:
     prefix = prefix.lstrip(".").rstrip("/")
-    key: Path = Path(prefix)
-
-    # Get parent directory to list files from, not the full path
-    parent_dir = key.parent.as_posix()
-    if parent_dir == ".":
-        parent_dir = ""
-
     return get_s3_service().exists(bucket, prefix, extension_agnostic)
 
 
 def _identifier_matches(name: str, identifier: str, extension_agnostic: bool) -> bool:
-    """Return True if `name` matches `identifier` under the extension policy."""
-    if extension_agnostic:
-        return Path(name).with_suffix("").as_posix() == identifier
-    return name == identifier
+    return _listing_identifier_matches(name, identifier, extension_agnostic)

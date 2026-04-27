@@ -1,23 +1,14 @@
-# Thin re-export shim for S3 listing/map helpers
+from pathlib import Path
 
-from src.files.s3 import (
-    _build_file_map_from_iterator,
-    _get_file_map,
-    _identifier_matches,
-    _iterate_s3_objects,
-    _remove_file_extensions,
-    exists,
-    get_file_list,
-    get_s3_files,
-)
 
-__all__ = [
-    "_build_file_map_from_iterator",
-    "_get_file_map",
-    "_iterate_s3_objects",
-    "_remove_file_extensions",
-    "get_file_list",
-    "get_s3_files",
-    "exists",
-    "_identifier_matches",
-]
+def _remove_file_extensions(file_names: list[str]) -> list[str]:
+    return [Path(file_name).with_suffix("").as_posix() for file_name in file_names]
+
+
+def _identifier_matches(name: str, identifier: str, extension_agnostic: bool) -> bool:
+    if extension_agnostic:
+        return Path(name).with_suffix("").as_posix() == identifier
+    return name == identifier
+
+
+__all__ = ["_remove_file_extensions", "_identifier_matches"]
