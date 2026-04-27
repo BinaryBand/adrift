@@ -248,13 +248,16 @@ class S3Service:
         return file_list
 
     def get_s3_files(self, bucket: str, prefix: str) -> list[str]:
+        from src.config import RSS_BASE_URL
+
         file_list = self.get_file_list(bucket, prefix)
         root_path = Path(bucket) / prefix
+        base_url = RSS_BASE_URL or self.get_effective_endpoint()
 
         files: list[str] = []
         for file_key in file_list:
             filename = Path(file_key).name
-            location = urljoin(self.get_effective_endpoint(), (root_path / filename).as_posix())
+            location = urljoin(base_url, (root_path / filename).as_posix())
             files.append(location)
 
         return files

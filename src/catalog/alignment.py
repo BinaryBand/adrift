@@ -5,7 +5,15 @@ from datetime import datetime
 
 from rapidfuzz import fuzz
 
-from src.app_common import MATCH_TOLERANCE
+from src.config import (
+    DATE_SCORE_TIERS,
+    MATCH_TOLERANCE,
+    SPARSE_TITLE_MIN,
+    W_DATE,
+    W_DESC,
+    W_ID,
+    W_TITLE,
+)
 from src.models import EpisodeData, RssEpisode
 from src.utils.progress import Callback
 from src.utils.text import normalize_text
@@ -14,13 +22,6 @@ from src.utils.title_normalization import normalize_title
 StringSimilarityFn = Callable[[list[str], list[str]], list[list[float]]]
 
 _THUMBNAIL_RANK = {"maxres": 4, "hq": 3, "mq": 2, "sq": 1}
-
-W_ID = 0.10
-W_DATE = 0.30
-W_TITLE = 0.50
-W_DESC = 0.10
-DATE_SCORE_TIERS: tuple[tuple[int, float], ...] = ((2, 1.00), (10, 0.70), (35, 0.15))
-SPARSE_TITLE_MIN = 0.98
 
 
 def _similarity_clean(ac: str, bc: str) -> float:
@@ -352,7 +353,11 @@ def _choose_title(ref: RssEpisode, dl: RssEpisode) -> str:
 
 
 def _earliest_pub_date(ref: RssEpisode, dl: RssEpisode) -> datetime | None:
-    return min((date for date in (ref.pub_date, dl.pub_date) if date is not None), default=None)
+    dates = [d for d in (ref.pub_date, dl.pub_date) if d is not None]
+    if len(dates) < 2:
+        return dates[0] if dates else None
+    a, b = _align_datetime_pair(dates[0], dates[1])
+    return a if a <= b else b
 
 
 def _choose_description(ref: RssEpisode, dl: RssEpisode) -> str:

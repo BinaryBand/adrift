@@ -9,6 +9,7 @@ from typing import cast
 import tomllib
 from dateutil.rrule import rrulestr
 
+from src.config import MATCH_TOLERANCE
 from src.models import (
     FeedSource,
     PodcastConfig,
@@ -18,8 +19,6 @@ from src.models import (
     ensure_source_filter,
     parse_podcasts_raw,
 )
-
-MATCH_TOLERANCE = 0.75
 
 __all__ = [
     "MATCH_TOLERANCE",
