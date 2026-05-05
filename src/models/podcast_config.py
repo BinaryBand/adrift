@@ -60,6 +60,7 @@ class PodcastConfig(BaseModel):
     references: list[FeedSource] = Field(default_factory=list)
     downloads: list[FeedSource] = Field(default_factory=list)
     schedule: list[str] = Field(default_factory=list)
+    tags: list[str] = Field(default_factory=list)
 
     @computed_field(return_type=str)
     @property
@@ -100,6 +101,7 @@ def ensure_podcast_config(podcast: PodcastConfig | dict[str, Any]) -> PodcastCon
     payload = dict(podcast)
     payload["references"] = _ensure_sources_list(payload.get("references"))
     payload["downloads"] = _ensure_sources_list(payload.get("downloads"))
+    payload["tags"] = payload.get("tags", [])
     if "path" not in payload:
         payload["path"] = f"/media/podcasts/{create_slug(payload['name'])}"
     return PodcastConfig.model_validate(payload)

@@ -11,7 +11,7 @@ from src.orchestration.download_service import DownloadProgressHooks, DownloadQu
 
 DF_TARGETS = ["config/*.toml"]
 DEFAULT_MAX_DOWNLOADS = 10
-DEFAULT_BOT_COOLDOWN = 300
+DEFAULT_BOT_COOLDOWN = 60 * 60  # 1 hour
 
 
 class _DownloadUiPort(Protocol):
@@ -65,6 +65,10 @@ def _run(
     skip_schedule_filter: Annotated[
         bool, typer.Option(help="Include configs even when their schedule does not match today.")
     ] = False,
+    tags: Annotated[
+        list[str],
+        typer.Option(help="Tag(s) or podcast names to limit downloads to"),
+    ] = [],
     skip_download: Annotated[
         bool, typer.Option(help="Skip download/upload stage (only enrich and update RSS).")
     ] = False,
@@ -96,6 +100,22 @@ def _run(
         include=include,
         skip_schedule_filter=skip_schedule_filter,
     )
+
+    # Filter configs by tags/podcast names when requested
+    if tags:
+        normalized_tags = [t.strip().lower() for t in tags if t.strip()]
+
+        def _matches_tag(cfg: PodcastConfig) -> bool:
+            if cfg.name.lower() in normalized_tags:
+                return True
+            if cfg.slug.lower() in normalized_tags:
+                return True
+            for tg in getattr(cfg, "tags", []):
+                if tg.lower() in normalized_tags:
+                    return True
+            return False
+
+        configs = [c for c in configs if _matches_tag(c)]
 
     downloaded_total = 0
 
@@ -140,6 +160,8 @@ def _run(
 
     except BotDetectionError:
         sys.stderr.write(f"\nBot detection triggered — cooling down for {bot_cooldown}s\n")
+        jitter = bot_cooldown * 0.1
+        bot_cooldown += int((time.random() - 0.5) * jitter)  # Add up to ±10% random jitter
         time.sleep(bot_cooldown)
         sys.exit(1)
 

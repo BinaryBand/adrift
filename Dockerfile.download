@@ -26,5 +26,5 @@ RUN pip install --upgrade pip poetry \
     && poetry config virtualenvs.create false \
     && poetry install --only main --no-interaction --no-ansi
 
-ENTRYPOINT ["adrift-download"]
+ENTRYPOINT ["adrift-download", "adrift-secrets"]
 CMD ["--help"]

@@ -10,7 +10,7 @@ TY ?= $(shell [ -x .venv/bin/ty ] && echo .venv/bin/ty || echo ty)
 .PHONY: quality ruff-format ruff-format-check ruff-check ruff-check-src ruff-check-tests check-complexity check-dead-code check-import-boundaries
 .PHONY: quality ruff-format ruff-format-check ruff-format-src ruff-format-tests ruff-check ruff-check-src ruff-check-tests ruff vulture ty lizard check-complexity check-dead-code check-import-boundaries
 
-.PHONY: help download merge build
+.PHONY: help download merge build check-s3
 
 help:
 	@printf '%s\n' \
@@ -18,6 +18,7 @@ help:
 		'  make help                  Show this help text' \
 		'  make download ARGS="..."   Run adrift-download in Docker' \
 		'  make merge ARGS="..."      Run adrift-merge in Docker' \
+		'  make secrets ARGS="..."    Run adrift-secrets in Docker' 
 		'  make build                 Build the Docker image used by make targets' \
 		'  make ruff-format           Run ruff formatter across the repo' \
 		'  make ruff-format-check     Check ruff formatting (no changes)' \
@@ -40,6 +41,16 @@ build:
 
 download:
 	$(DOCKER_COMPOSE) -f $(COMPOSE_FILE) run --build --rm $(APP_SERVICE) $(ARGS)
+
+secrets:
+	$(DOCKER_COMPOSE) -f $(COMPOSE_FILE) run --build --rm --entrypoint adrift-secrets $(APP_SERVICE) $(ARGS)
+
+download-lwt:
+	$(DOCKER_COMPOSE) -f $(COMPOSE_FILE) run --build --rm $(APP_SERVICE) --skip-schedule-filter --tags 'Last Week Tonight With John Oliver' $(ARGS)
+
+check-s3:
+	@echo "Running S3 connectivity check script..."
+	@$(PYTHON) scripts/check_s3.py
 
 merge:
 	$(DOCKER_COMPOSE) -f $(COMPOSE_FILE) run --build --rm --entrypoint adrift-merge $(APP_SERVICE) $(ARGS)

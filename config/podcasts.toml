@@ -5,6 +5,7 @@
 name = "Behind the Bastards"
 path = "/media/podcasts/behind-the-bastards"
 schedule = ["FREQ=WEEKLY;BYDAY=TH,TU"]
+tags = ["podcasts", "behind-the-bastards"]
 
 [[podcasts.references]]
 url = "https://www.omnycontent.com/d/playlist/e73c998e-6e60-432f-8610-ae210140c5b1/e5f91208-cc7e-4726-a312-ae280140ad11/d64f756d-6d5e-4fae-b24f-ae280140ad36/podcast.rss"
@@ -21,6 +22,7 @@ exclude = ["it could happen here", "behind the bastards presents", "czm rewind"]
 name = "Camp Gagnon"
 path = "/media/podcasts/camp-gagnon"
 schedule = ["FREQ=WEEKLY;BYDAY=TH,TU"]
+tags = ["podcasts", "camp-gagnon"]
 
 [[podcasts.references]]
 url = "https://anchor.fm/s/fc9f8628/podcast/rss"
@@ -33,6 +35,7 @@ url = "yt://@CampGagnon"
 name = "CreepCast"
 path = "/media/podcasts/creepcast"
 schedule = ["FREQ=WEEKLY;BYDAY=SU"]
+tags = ["podcasts", "creepcast"]
 
 [[podcasts.references]]
 url = "https://feeds.megaphone.fm/creepcast"
@@ -45,6 +48,7 @@ url = "yt://@CreepPodcast"
 name = "Darknet Diaries"
 path = "/media/podcasts/darknet-diaries"
 schedule = ["FREQ=WEEKLY;BYDAY=TU"]
+tags = ["podcasts", "darknet-diaries"]
 
 [[podcasts.references]]
 url = "https://podcast.darknetdiaries.com"
@@ -57,6 +61,7 @@ url = "yt://@JackRhysider"
 name = "Financial Audit"
 path = "/media/podcasts/financial-audit"
 schedule = ["FREQ=WEEKLY;BYDAY=FR,WE,SA"]
+tags = ["podcasts", "financial-audit"]
 
 [[podcasts.references]]
 url = "https://feeds.megaphone.fm/ROOSTER4571910246"
@@ -97,6 +102,7 @@ exclude = [
 name = "Morbid"
 path = "/media/podcasts/morbid"
 schedule = ["FREQ=WEEKLY;BYDAY=TH,MO,TU"]
+tags = ["podcasts", "morbid"]
 
 [[podcasts.references]]
 url = "https://feeds.simplecast.com/ohmVlJZQ"
@@ -109,6 +115,7 @@ url = "yt://@morbidpodcast"
 name = "Smosh Reads Reddit Stories"
 path = "/media/podcasts/smosh-reads-reddit-stories"
 schedule = ["FREQ=WEEKLY;BYDAY=SA"]
+tags = ["podcasts", "smosh-reads-reddit-stories"]
 
 [[podcasts.references]]
 url = "https://audioboom.com/channels/5148149.rss"
@@ -154,6 +161,7 @@ include = ["Reading Reddit Stories"]
 name = "Swindled"
 path = "/media/podcasts/swindled"
 schedule = ["FREQ=WEEKLY;BYDAY=WE,SU,SA"]
+tags = ["podcasts", "swindled"]
 
 [[podcasts.references]]
 url = "https://feeds.megaphone.fm/swindled"
@@ -168,6 +176,7 @@ exclude = ["rerun", "documentary"]
 name = "The Daily Show"
 path = "/media/podcasts/the-daily-show"
 schedule = ["FREQ=WEEKLY;BYDAY=TH,WE,SA"]
+tags = ["podcasts", "the-daily-show"]
 
 [[podcasts.references]]
 url = "https://feeds.megaphone.fm/QCD2422844292"
@@ -182,6 +191,7 @@ url = "yt://@TheDailyShow"
 name = "The Weekly Show with Jon Stewart"
 path = "/media/podcasts/the-weekly-show-with-jon-stewart"
 schedule = ["FREQ=WEEKLY;BYDAY=WE,TH,FR"]
+tags = ["podcasts", "the-weekly-show-with-jon-stewart"]
 
 [[podcasts.references]]
 url = "https://feeds.megaphone.fm/BVLLC2163264914"

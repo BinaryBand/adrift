@@ -19,6 +19,7 @@
 name = "Alyssa Grenfell"
 path = "/media/podcasts/alyssa-grenfell"
 schedule = ["FREQ=WEEKLY;BYDAY=FR,WE,MO"]
+tags = ["podcasts", "alyssa-grenfell"]
 
 [[podcasts.references]]
 url = "yt://@alyssadgrenfell"
@@ -31,6 +32,7 @@ url = "yt://@alyssadgrenfell"
 name = "Coffeezilla"
 path = "/media/podcasts/coffeezilla"
 schedule = ["FREQ=WEEKLY;BYDAY=MO,TH,WE"]
+tags = ["podcasts", "coffeezilla"]
 
 [[podcasts.references]]
 url = "yt://@Coffeezilla"
@@ -43,6 +45,7 @@ url = "yt://@Coffeezilla"
 name = "Heather Cox Richardson"
 path = "/media/podcasts/heather-cox-richardson"
 schedule = ["FREQ=WEEKLY;BYDAY=FR,SA"]
+tags = ["podcasts", "heather-cox-richardson"]
 
 [[podcasts.references]]
 url = "yt://@HeatherCoxRichardson"
@@ -55,6 +58,7 @@ url = "yt://@HeatherCoxRichardson"
 name = "Jay Bird"
 path = "/media/podcasts/jay-bird"
 schedule = ["FREQ=WEEKLY;BYDAY=TU,TH,WE"]
+tags = ["podcasts", "jay-bird"]
 
 [[podcasts.references]]
 url = "yt://@jaybird160"
@@ -67,12 +71,14 @@ url = "yt://@jaybird160"
 name = "Last Week Tonight With John Oliver"
 path = "/media/podcasts/last-week-tonight-with-john-oliver"
 schedule = ["FREQ=WEEKLY;BYDAY=MO"]
+tags = ["podcasts", "last-week-tonight-with-john-oliver"]
 
 [[podcasts.references]]
 url = "yt://@LastWeekTonight"
 
 [[podcasts.downloads]]
 url = "yt://@LastWeekTonight"
+
 [podcasts.downloads.filters]
 include = ["Last Week Tonight With John Oliver"]
 exclude = ["^s\\d{1,2}\\s*[-:]?\\s*e\\d{1,2}\\b"]
@@ -82,6 +88,7 @@ exclude = ["^s\\d{1,2}\\s*[-:]?\\s*e\\d{1,2}\\b"]
 name = "Lisa Sonni"
 path = "/media/podcasts/lisa-sonni"
 schedule = ["FREQ=WEEKLY;BYDAY=SA,WE,TH"]
+tags = ["podcasts", "lisa-sonni"]
 
 [[podcasts.references]]
 url = "yt://@lisasonni"
@@ -94,6 +101,7 @@ url = "yt://@lisasonni"
 name = "Legal Eagle"
 path = "/media/podcasts/legal-eagle"
 schedule = ["FREQ=WEEKLY;BYDAY=FR,WE,MO"]
+tags = ["podcasts", "legal-eagle"]
 
 [[podcasts.references]]
 url = "yt://@LegalEagle"
@@ -106,6 +114,7 @@ url = "yt://@LegalEagle"
 name = "Paul J Warburg"
 path = "/media/podcasts/paul-j-warburg"
 schedule = ["FREQ=WEEKLY;BYDAY=SA,TH,FR"]
+tags = ["podcasts", "paul-j-warburg"]
 
 [[podcasts.references]]
 url = "yt://@PaulJWarburg"
@@ -118,6 +127,7 @@ url = "yt://@PaulJWarburg"
 name = "YV Edit"
 path = "/media/podcasts/yv-edit"
 schedule = ["FREQ=WEEKLY;BYDAY=TH,SA,FR"]
+tags = ["podcasts", "yv-edit"]
 
 [[podcasts.references]]
 url = "yt://@yv_edit"
