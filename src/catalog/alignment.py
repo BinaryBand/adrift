@@ -1,4 +1,5 @@
 # cspell: ignore cdist
+import re
 from collections.abc import Callable
 from dataclasses import dataclass
 from datetime import datetime
@@ -22,6 +23,34 @@ from src.utils.title_normalization import normalize_title
 StringSimilarityFn = Callable[[list[str], list[str]], list[list[float]]]
 
 _THUMBNAIL_RANK = {"maxres": 4, "hq": 3, "mq": 2, "sq": 1}
+_ANCHOR_STOPWORDS = {
+    "the",
+    "a",
+    "an",
+    "and",
+    "of",
+    "with",
+    "from",
+    "for",
+    "to",
+    "in",
+    "on",
+    "at",
+    "by",
+    "episode",
+    "part",
+    "listener",
+    "tales",
+    "podcast",
+    "morbid",
+    "mini",
+    "special",
+    "guest",
+    "guests",
+    "bonus",
+    "volume",
+    "vol",
+}
 
 
 def _similarity_clean(ac: str, bc: str) -> float:
@@ -199,6 +228,48 @@ def _compute_optional_weights(
     return weighted, total
 
 
+def _extract_listener_tales_number(title: str) -> int | None:
+    match = re.search(r"\blistener\s+tales(?:\s+episode)?\s+(\d+)\b", title)
+    return int(match.group(1)) if match else None
+
+
+def _extract_part_number(title: str) -> int | None:
+    match = re.search(r"\bpart\s+(\d+)\b", title)
+    return int(match.group(1)) if match else None
+
+
+def _extract_volume_number(title: str) -> int | None:
+    match = re.search(r"\b(?:volume|vol)\s+(\d+)\b", title)
+    return int(match.group(1)) if match else None
+
+
+def _extract_episode_number(title: str) -> int | None:
+    match = re.search(r"\bepisode\s+(\d+)\b", title)
+    return int(match.group(1)) if match else None
+
+
+def _number_mismatch(extractor: Callable[[str], int | None], ref_title: str, dl_title: str) -> bool:
+    ref_value = extractor(ref_title)
+    dl_value = extractor(dl_title)
+    return ref_value is not None and dl_value is not None and ref_value != dl_value
+
+
+def _has_structured_number_mismatch(ref_title: str, dl_title: str) -> bool:
+    extractors: tuple[Callable[[str], int | None], ...] = (
+        _extract_listener_tales_number,
+        _extract_part_number,
+        _extract_volume_number,
+        _extract_episode_number,
+    )
+    return any(_number_mismatch(extractor, ref_title, dl_title) for extractor in extractors)
+
+
+def _anchor_token_overlap(ref_title: str, dl_title: str) -> int:
+    ref_tokens = {token for token in ref_title.split() if token not in _ANCHOR_STOPWORDS}
+    dl_tokens = {token for token in dl_title.split() if token not in _ANCHOR_STOPWORDS}
+    return len(ref_tokens & dl_tokens)
+
+
 def _weighted_score(
     ref: _AlignmentCandidate,
     dl: _AlignmentCandidate,
@@ -208,6 +279,14 @@ def _weighted_score(
     """Metadata-aware similarity score with ID as a small bonus."""
     s_id = _id_similarity(ref.episode, dl.episode)
     has_desc = _has_description_signal(ref, dl)
+
+    if _has_structured_number_mismatch(ref.title, dl.title):
+        return 0.0
+
+    # Avoid promoting generic title similarities when there is no meaningful token overlap.
+    if _anchor_token_overlap(ref.title, dl.title) == 0 and s_title < 0.75:
+        return 0.0
+
     if not s_id and not has_desc and s_title < SPARSE_TITLE_MIN:
         return 0.0
 

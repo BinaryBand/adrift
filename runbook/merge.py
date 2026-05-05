@@ -8,7 +8,7 @@ from typing import TYPE_CHECKING
 import dotenv
 
 if TYPE_CHECKING:
-    from src.models import MergeResult
+    from src.models import MergeResult, PodcastConfig
 
 from src.orchestration.merge_service import (
     MergeRunOptions,
@@ -77,6 +77,12 @@ def main() -> None:
         help="Include podcast configs even when their schedule does not match today.",
     )
     parser.add_argument(
+        "--tags",
+        nargs="*",
+        default=[],
+        help="Tag(s) or podcast names to limit merges to",
+    )
+    parser.add_argument(
         "--include-counts",
         action="store_true",
         default=False,
@@ -143,6 +149,22 @@ def main() -> None:
     load_duration = perf_counter() - load_start
     if args.timings:
         sys.stderr.write(f"TIMING load_configs: {_format_duration(load_duration)}\n")
+
+    # Filter configs by tags/podcast names when requested (same behaviour as runbook/download.py)
+    if args.tags:
+        normalized_tags = [t.strip().lower() for t in args.tags if t.strip()]
+
+        def _matches_tag(cfg: "PodcastConfig") -> bool:  # type: ignore[name-defined]
+            if cfg.name.lower() in normalized_tags:
+                return True
+            if cfg.slug.lower() in normalized_tags:
+                return True
+            for tg in getattr(cfg, "tags", []):
+                if tg.lower() in normalized_tags:
+                    return True
+            return False
+
+        configs = [c for c in configs if _matches_tag(c)]
 
     options = MergeRunOptions(
         include_counts=args.include_counts,

@@ -143,6 +143,111 @@ class TestAlignEpisodes(unittest.TestCase):
 
         self.assertEqual(mocked_title.call_count, len(refs) + len(dls))
 
+    def test_listener_tales_number_mismatch_rejected(self):
+        ref = _ep(
+            id="r1",
+            title="Listener Tales 59: Australia & New Zealand Edition",
+            description="listener story batch",
+            pub_date=_dt(2024, 2, 1),
+        )
+        dl = _ep(
+            id="d1",
+            title="Listener Tales 109: 80s Edition",
+            description="listener story batch",
+            pub_date=_dt(2024, 2, 1),
+        )
+        self.assertEqual(align_episodes([ref], [dl], "Morbid"), [])
+
+    def test_listener_tales_number_exact_match_allowed(self):
+        ref = _ep(
+            id="r1",
+            title="Listener Tales 92",
+            description="listener story batch",
+            pub_date=_dt(2024, 2, 1),
+        )
+        dl = _ep(
+            id="d1",
+            title="Listener Tales 92 | Morbid | Podcast",
+            description="listener story batch",
+            pub_date=_dt(2024, 2, 1),
+        )
+        self.assertEqual(align_episodes([ref], [dl], "Morbid"), [(0, 0)])
+
+    def test_part_number_mismatch_rejected(self):
+        ref = _ep(
+            id="r1",
+            title="Theodore Durrant The Demon in the Belfry Part 2",
+            description="historic case",
+            pub_date=_dt(2024, 2, 1),
+        )
+        dl = _ep(
+            id="d1",
+            title='Theodore Durrant "The Demon in the Belfry" | Part 1 | Morbid',
+            description="historic case",
+            pub_date=_dt(2024, 2, 1),
+        )
+        self.assertEqual(align_episodes([ref], [dl], "Morbid"), [])
+
+    def test_volume_number_mismatch_rejected(self):
+        ref = _ep(
+            id="r1",
+            title="Spooky Lakes Vol. 1",
+            description="spooky segment",
+            pub_date=_dt(2024, 2, 1),
+        )
+        dl = _ep(
+            id="d1",
+            title="Spooky Lakes (Volume 2) | Morbid | Podcast",
+            description="spooky segment",
+            pub_date=_dt(2024, 2, 1),
+        )
+        self.assertEqual(align_episodes([ref], [dl], "Morbid"), [])
+
+    def test_episode_number_mismatch_rejected(self):
+        ref = _ep(
+            id="r1",
+            title="Episode 1: First Story",
+            description="first",
+            pub_date=_dt(2024, 2, 1),
+        )
+        dl = _ep(
+            id="d1",
+            title="Episode 2: Second Story",
+            description="second",
+            pub_date=_dt(2024, 2, 1),
+        )
+        self.assertEqual(align_episodes([ref], [dl], "Morbid"), [])
+
+    def test_low_anchor_overlap_rejected(self):
+        ref = _ep(
+            id="r1",
+            title="The Hex House Murder",
+            description="same date and description should not force unrelated title match",
+            pub_date=_dt(2024, 2, 1),
+        )
+        dl = _ep(
+            id="d1",
+            title="Episode 753: The Hitman Murders",
+            description="same date and description should not force unrelated title match",
+            pub_date=_dt(2024, 2, 1),
+        )
+        self.assertEqual(align_episodes([ref], [dl], "Morbid"), [])
+
+    def test_anchor_overlap_allows_match(self):
+        ref = _ep(
+            id="r1",
+            title="The Hex House Murder",
+            description="haunted house case",
+            pub_date=_dt(2024, 2, 1),
+        )
+        dl = _ep(
+            id="d1",
+            title="The Hex House Murder | Morbid | Podcast",
+            description="haunted house case",
+            pub_date=_dt(2024, 2, 1),
+        )
+        self.assertEqual(align_episodes([ref], [dl], "Morbid"), [(0, 0)])
+
 
 # ---------------------------------------------------------------------------
 # merge_episode

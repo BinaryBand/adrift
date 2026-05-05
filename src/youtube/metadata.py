@@ -23,31 +23,24 @@ def _normalize_youtube_link(url: str) -> str:
     - Playlist shorthand: yt://#PLAYLIST_ID
     - Full playlist URLs: https://www.youtube.com/playlist?list=ID
     """
-    playlist: str = "videos"
+    playlist = "videos"
 
-    href_match = YT_CHANNEL.match(url)
-    yt_match = YT_CHANNEL_SHORTHAND.match(url)
-    playlist_shorthand_match = YOUTUBE_PLAYLIST_SHORTHAND_REGEX.match(url)
-    playlist_url_match = YOUTUBE_PLAYLIST_URL.match(url)
+    if (href_match := YT_CHANNEL.match(url)) is not None:
+        # Channel URLs without an explicit path should default to the videos tab.
+        return urljoin(url, playlist) if href_match.group(3) is None else url
 
-    if not (href_match or yt_match or playlist_shorthand_match or playlist_url_match):
-        raise ValueError("Invalid YouTube channel or playlist URL")
-
-    # Channel forms -> ensure /videos suffix
-    if href_match:
-        if href_match.group(3) is None:
-            url = urljoin(url, playlist)
-    elif yt_match:
+    if (yt_match := YT_CHANNEL_SHORTHAND.match(url)) is not None:
         channel_handle = yt_match.group(1)
-        url = f"https://www.youtube.com/@{channel_handle}/{playlist}"
-    elif playlist_shorthand_match:
-        playlist_id = playlist_shorthand_match.group(1)
-        url = f"https://www.youtube.com/playlist?list={playlist_id}"
-    elif playlist_url_match:
-        # already a playlist URL; use as-is
-        url = url
+        return f"https://www.youtube.com/@{channel_handle}/{playlist}"
 
-    return url
+    if (playlist_shorthand_match := YOUTUBE_PLAYLIST_SHORTHAND_REGEX.match(url)) is not None:
+        playlist_id = playlist_shorthand_match.group(1)
+        return f"https://www.youtube.com/playlist?list={playlist_id}"
+
+    if YOUTUBE_PLAYLIST_URL.match(url) is not None:
+        return url
+
+    raise ValueError("Invalid YouTube channel or playlist URL")
 
 
 def _channel_to_rss(channel_info: ytdlp.ChannelInfo, url: str) -> RssChannel:

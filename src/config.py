@@ -13,7 +13,7 @@ W_DESC = 0.10
 DATE_SCORE_TIERS: tuple[tuple[int, float], ...] = ((2, 1.00), (10, 0.70), (35, 0.15))
 
 # Minimum title similarity required when episode has no description or date signal.
-SPARSE_TITLE_MIN = 0.98
+SPARSE_TITLE_MIN = 0.85
 
 # ---------------------------------------------------------------------------
 # Match tolerance
