@@ -114,6 +114,8 @@ def test_factory_returns_youtube_adapter_for_youtube_url():
         "https://www.youtube.com/@testchannel",
         "https://youtube.com/@testchannel",
         "https://www.youtube.com/@testchannel/videos",
+        "yt://#testplaylist",
+        "https://www.youtube.com/playlist?list=PL12345",
     ]
 
     for url in youtube_urls:

@@ -3,25 +3,49 @@ from urllib.parse import urljoin
 
 from src.models import RssChannel, RssEpisode
 from src.utils.progress import Callback
-from src.utils.regex import YT_CHANNEL, YT_CHANNEL_SHORTHAND, re_compile
+from src.utils.regex import (
+    YOUTUBE_PLAYLIST_SHORTHAND_REGEX,
+    YOUTUBE_PLAYLIST_URL,
+    YT_CHANNEL,
+    YT_CHANNEL_SHORTHAND,
+    re_compile,
+)
 from src.utils.terminal import emit_info, emit_warning
 from src.youtube import ytdlp
 
 
 def _normalize_youtube_link(url: str) -> str:
+    """Normalize various YouTube link formats into a URL yt-dlp can consume.
+
+    Supported inputs:
+    - Full channel URLs (https://www.youtube.com/@handle or .../videos)
+    - Channel shorthand: yt://@handle
+    - Playlist shorthand: yt://#PLAYLIST_ID
+    - Full playlist URLs: https://www.youtube.com/playlist?list=ID
+    """
     playlist: str = "videos"
 
     href_match = YT_CHANNEL.match(url)
     yt_match = YT_CHANNEL_SHORTHAND.match(url)
-    if not (href_match or yt_match):
-        raise ValueError("Invalid YouTube channel URL")
+    playlist_shorthand_match = YOUTUBE_PLAYLIST_SHORTHAND_REGEX.match(url)
+    playlist_url_match = YOUTUBE_PLAYLIST_URL.match(url)
 
+    if not (href_match or yt_match or playlist_shorthand_match or playlist_url_match):
+        raise ValueError("Invalid YouTube channel or playlist URL")
+
+    # Channel forms -> ensure /videos suffix
     if href_match:
         if href_match.group(3) is None:
             url = urljoin(url, playlist)
     elif yt_match:
         channel_handle = yt_match.group(1)
         url = f"https://www.youtube.com/@{channel_handle}/{playlist}"
+    elif playlist_shorthand_match:
+        playlist_id = playlist_shorthand_match.group(1)
+        url = f"https://www.youtube.com/playlist?list={playlist_id}"
+    elif playlist_url_match:
+        # already a playlist URL; use as-is
+        url = url
 
     return url
 
@@ -60,8 +84,21 @@ def _add_episode_metadata(episode: RssEpisode, author: str) -> RssEpisode:
 
     _maybe_update_pub_date(episode, info)
     _maybe_update_thumbnail(episode, info, author)
+    _maybe_update_description(episode, info)
 
     return episode
+
+
+def _maybe_update_description(episode: RssEpisode, info: ytdlp.VideoInfo) -> None:
+    """Update ``episode.description`` from video info when available."""
+    try:
+        if desc := getattr(info, "description", None):
+            # Preserve existing description if present
+            if not episode.description:
+                episode.description = desc
+    except Exception:
+        # Non-fatal: do not break the enrichment pipeline for description errors.
+        pass
 
 
 def _fetch_video_info(video_id: str) -> ytdlp.VideoInfo | None:

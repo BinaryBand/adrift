@@ -4,6 +4,8 @@ from unidecode import unidecode
 
 # from src.app_common import load_static_config
 from src.utils.regex import (
+    YOUTUBE_PLAYLIST_SHORTHAND_REGEX,
+    YOUTUBE_PLAYLIST_URL,
     YT_CHANNEL,
     YT_CHANNEL_SHORTHAND,
     re_compile,
@@ -222,4 +224,9 @@ def normalize_text(text: str) -> str:
 
 def is_youtube_channel(text: str) -> bool:
     """Check if the given text is a YouTube channel URL or handle."""
-    return YT_CHANNEL.match(text) is not None or YT_CHANNEL_SHORTHAND.match(text) is not None
+    return (
+        YT_CHANNEL.match(text) is not None
+        or YT_CHANNEL_SHORTHAND.match(text) is not None
+        or YOUTUBE_PLAYLIST_SHORTHAND_REGEX.match(text) is not None
+        or YOUTUBE_PLAYLIST_URL.match(text) is not None
+    )

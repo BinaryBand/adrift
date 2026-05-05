@@ -86,7 +86,7 @@ class TestGetYoutubeVideosEarlyTermination(unittest.TestCase):
         self, mock_get_videos: MagicMock, mock_normalize: MagicMock
     ):
         """Test returns empty list when no videos returned."""
-        mock_normalize.return_value = "https://youtube.com/@test/videos"
+        mock_normalize.return_value = "https://www.youtube.com/playlist?list=PL12345"
         mock_get_videos.return_value = []
 
         result = get_youtube_episodes("https://youtube.com/@test", "test_author")
@@ -98,7 +98,7 @@ class TestGetYoutubeVideosEarlyTermination(unittest.TestCase):
     @patch("src.youtube.ytdlp.get_youtube_videos")
     def test_handles_single_video(self, mock_get_videos: MagicMock, mock_normalize: MagicMock):
         """Test handles single video case."""
-        mock_normalize.return_value = "https://youtube.com/@test/videos"
+        mock_normalize.return_value = "https://www.youtube.com/playlist?list=PL12345"
 
         mock_episode = RssEpisode(
             id="dQw4w9WgXcQ",
@@ -123,7 +123,7 @@ class TestGetYoutubeVideosCompleteness(unittest.TestCase):
     @patch("src.youtube.ytdlp.get_youtube_videos")
     def test_fetches_multiple_videos(self, mock_get_videos: MagicMock, mock_normalize: MagicMock):
         """Test that multiple videos are processed."""
-        mock_normalize.return_value = "https://youtube.com/@test/videos"
+        mock_normalize.return_value = "https://www.youtube.com/playlist?list=PL12345"
 
         # Mock multiple videos
         videos = [
@@ -169,7 +169,7 @@ class TestGetYoutubeVideosFilter(unittest.TestCase):
         self, mock_re_compile: MagicMock, mock_get_videos: MagicMock, mock_normalize: MagicMock
     ):
         """Test that videos are filtered by title pattern."""
-        mock_normalize.return_value = "https://youtube.com/@test/videos"
+        mock_normalize.return_value = "https://www.youtube.com/playlist?list=PL12345"
 
         # Mock regex pattern that matches some videos
         mock_pattern = MagicMock()
@@ -222,7 +222,7 @@ class TestGetYoutubeVideosDetailed(unittest.TestCase):
         self, mock_add_metadata: MagicMock, mock_get_videos: MagicMock, mock_normalize: MagicMock
     ):
         """Test that detailed metadata is added when detailed=True."""
-        mock_normalize.return_value = "https://youtube.com/@test/videos"
+        mock_normalize.return_value = "https://www.youtube.com/playlist?list=PL12345"
 
         mock_episode = RssEpisode(
             id="e_04ZrNroTo",
@@ -247,7 +247,7 @@ class TestGetYoutubeVideosDetailed(unittest.TestCase):
     @patch("src.youtube.ytdlp.get_youtube_videos")
     def test_skips_detailed_metadata(self, mock_get_videos: MagicMock, mock_normalize: MagicMock):
         """Test that detailed metadata is skipped when detailed=False."""
-        mock_normalize.return_value = "https://youtube.com/@test/videos"
+        mock_normalize.return_value = "https://www.youtube.com/playlist?list=PL12345"
 
         mock_episode = RssEpisode(
             id="e_04ZrNroTo",
@@ -275,7 +275,7 @@ class TestGetYoutubeVideosEdgeCases(unittest.TestCase):
         self, mock_get_videos: MagicMock, mock_normalize: MagicMock
     ):
         """Test returns empty list when no video entries."""
-        mock_normalize.return_value = "https://youtube.com/@test/videos"
+        mock_normalize.return_value = "https://www.youtube.com/playlist?list=PL12345"
         mock_get_videos.return_value = []
 
         result = get_youtube_episodes("https://youtube.com/@test", "test_author")

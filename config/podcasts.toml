@@ -180,11 +180,12 @@ tags = ["podcasts", "the-daily-show"]
 
 [[podcasts.references]]
 url = "https://feeds.megaphone.fm/QCD2422844292"
+
 [podcasts.references.filters]
-r_rules = ["DTSTART:20240124T000000Z\nRRULE:FREQ=WEEKLY;BYDAY=TU"]
+
 
 [[podcasts.downloads]]
-url = "yt://@TheDailyShow"
+url = "yt://#PLeskMkEaHJYfTMaKwmBWGq4NogX9FLF2J"
 
 
 [[podcasts]]

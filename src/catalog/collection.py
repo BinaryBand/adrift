@@ -79,11 +79,14 @@ def _fetch_source_episodes(
     from src.ports import EpisodeSourceFetchContext
 
     resolved = ensure_feed_source(source)
+    # For YouTube sources always fetch detailed metadata so we have
+    # pub_date/thumbnail information available for alignment.
+    detailed_flag = context.is_reference or is_youtube_channel(resolved.url)
     return fetch_source_episodes(
         resolved,
         EpisodeSourceFetchContext(
             title=context.title,
-            detailed=context.is_reference,
+            detailed=detailed_flag,
             callback=context.callback,
             refresh=context.refresh_sources,
         ),

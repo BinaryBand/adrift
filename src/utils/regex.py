@@ -25,3 +25,4 @@ YT_CHANNEL = re_compile(r"^https?://(www\.)?youtube\.com/@([A-Za-z0-9_\-]+)(/vid
 
 YT_CHANNEL_SHORTHAND = re_compile(r"^yt://@([A-Za-z0-9_\-]+)$")
 YOUTUBE_PLAYLIST_SHORTHAND_REGEX = re_compile(r"^yt://#([A-Za-z0-9_\-]+)$")
+YOUTUBE_PLAYLIST_URL = re_compile(r"^https?://(www\.)?youtube\.com/playlist\?list=[A-Za-z0-9_\-]+$")
