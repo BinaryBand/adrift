@@ -218,6 +218,38 @@ class TestAlignEpisodes(unittest.TestCase):
         )
         self.assertEqual(align_episodes([ref], [dl], "Morbid"), [])
 
+    def test_certainty_path_matches_despite_large_date_gap(self):
+        """Near-perfect titles match even with a 200-day date difference (YouTube backfill)."""
+        ref = _ep(
+            id="r1",
+            title="The Bermondsey Horror",
+            description="a case description",
+            pub_date=_dt(2022, 6, 1),
+        )
+        dl = _ep(
+            id="d1",
+            title="The Bermondsey Horror | Morbid: A True Crime Podcast",
+            description="a case description",
+            pub_date=_dt(2023, 1, 5),  # 218 days later
+        )
+        self.assertEqual(align_episodes([ref], [dl], "Morbid"), [(0, 0)])
+
+    def test_containment_bonus_helps_near_threshold_pair(self):
+        """Shorter title fully contained in longer title gets a boost over MATCH_TOLERANCE."""
+        ref = _ep(
+            id="r1",
+            title="Denise Huber Part 1",
+            description="cold case",
+            pub_date=_dt(2023, 1, 1),
+        )
+        dl = _ep(
+            id="d1",
+            title="The Disappearance of Denise Huber, Part 1 | Morbid | Podcast",
+            description="cold case",
+            pub_date=_dt(2023, 1, 2),
+        )
+        self.assertEqual(align_episodes([ref], [dl], "Morbid"), [(0, 0)])
+
     def test_low_anchor_overlap_rejected(self):
         ref = _ep(
             id="r1",

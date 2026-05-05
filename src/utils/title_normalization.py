@@ -51,11 +51,25 @@ def _clean_financial_audit_title(episode: str) -> str:
 def _clean_morbid_title(episode: str) -> str:
     prefix_patterns = [
         r"(?i)^episode \d{1,3}[:\-]?\s*",
+        # YouTube upload prefixes that are not part of the episode title
+        r"(?i)^fan favorite:\s*",
+        r"(?i)^episode revisit:\s*",
     ]
     for pattern in prefix_patterns:
         episode = re_compile(pattern).sub("", episode)
 
-    patterns = [r"(?i)\| morbid$", r"(?i)\| morbid \| podcast$"]
+    patterns = [
+        # Morbid branding variants (most specific first to avoid partial matches).
+        r"(?i)\|\s*morbid:\s*a true crime podcast$",
+        r"(?i)\|\s*morbid\s*\|\s*podcast\s*\|\s*video$",
+        r"(?i)\|\s*morbid\s*\|\s*podcast$",
+        r"(?i)\|\s*morbid\|\s*podcast$",
+        r"(?i)\|\s*morbid$",
+        # Inline episode numbers that YouTube embeds in video titles
+        # (e.g. "Title | Episode 355").  Strip ONLY Episode markers here;
+        # "| Part N" is kept so the number-mismatch guard can fire.
+        r"(?i)\|\s*episode\s+\d+\s*$",
+    ]
     for pattern in patterns:
         episode = _strip_suffix(pattern, episode)
     return episode

@@ -1,95 +1,92 @@
-# Alignment Mistakes: Morbid Audit Snapshot
+# Morbid Alignment Mistakes
 
-This note summarizes what is going wrong in the current Morbid alignment run, based on:
-- `downloads/morbid/manual_matches_review.csv`
-- `downloads/morbid/manual_matches_audit_detailed.csv`
-- `downloads/morbid/manual_matches_audit_summary.json`
+This file summarizes the Morbid alignment audit, the fixes applied during the
+improvement sprint, remaining failure modes, and the tests that prevent
+regressions.
 
-## At a Glance
+Source data: `downloads/morbid/manual_matches_audit_detailed.csv`,
+`downloads/morbid/feeds/combined.json` (`match_traces`),
+`tests/resources/alignment/morbid_benchmark.csv` (regression rows).
 
-Total reviewed: 518
+---
 
-| Category | Count | What it means |
-| --- | ---: | --- |
-| `likely_no_matching_download` | 180 | Reference likely has no real counterpart in current download source coverage |
-| `problematic_series_mismatch` | 67 | Same series matched to wrong numbered item (for example Listener Tales `N` -> wrong `N`) |
-| `problematic_reused_target` | 20 | One generic target is reused across many weak matches |
-| `problematic_misrank` | 13 | A better lexical candidate appears to exist, but was not selected |
-| `problematic_part_mismatch` | 2 | Same title family, wrong part number |
-| `likely_correct_variant` | 55 | Looks like acceptable title variant |
-| `unclear` | 181 | Needs manual review |
+## Snapshot (baseline: 340 matched)
 
-## Mistake Types with Examples
+Reviewed: 518 references.
 
-### 1) Missing from Source Coverage
-Reference appears valid, but no strong download candidate exists.
+- `likely_no_matching_download`: 180 — references with no download counterpart
+- `problematic_series_mismatch`: 67 — wrong episode/series index (e.g. Listener Tales)
+- `problematic_reused_target`: 20 — a generic download is repeatedly selected
+- `problematic_misrank`: 13 — better lexical candidate exists but was not chosen
+- `problematic_part_mismatch`: 2 — wrong part index in multi-part titles
+- `likely_correct_variant`: 55 — acceptable variants
+- `unclear`: 181 — require manual review
 
-Examples:
-- `ref 556`: "Tara Calico" -> "Mamie Thurman" (`best_score=0.2487`)
-- `ref 622`: "Susan Wright" -> "Caryl Chessman: The Red Light Bandit" (`best_score=0.2543`)
-- `ref 825`: "Hinterkaifek" -> "Listener Tales 81" (`best_score=0.2698`)
+Examples (representative):
 
-Interpretation:
-- These are mostly not ranking mistakes; they are absent or underrepresented in the current YouTube corpus.
+- Missing source: `ref 556` "Tara Calico" (best_score=0.249)
+- Series mismatch: `ref 386` "Listener Tales 59" → "Listener Tales 109"
+- Reused target: `download_index 242` selected by 13 refs
+- Part mismatch: "Theodore Durrant Part 2" → Part 1
 
-### 2) Series Number Mismatch
-The matcher aligns by broad phrase overlap but ignores series index semantics.
+---
 
-Examples:
-- `ref 386`: "Listener Tales 59" -> "Listener Tales 109"
-- `ref 516`: "Listener Tales 34" -> "Listener Tales 83"
-- `ref 636`: "Listener Tales 21" -> "Listener Tales 82"
+## Fixes applied (340 → 363)
 
-Interpretation:
-- Title similarity is high, but the episode number is wrong.
+Summary: three targeted normalisations and two scoring adjustments recovered 23
+real matches.
 
-### 3) Reused Generic Target
-A small set of episodes are repeatedly selected for many unrelated references.
+- Brand-suffix stripping: removed common `| Morbid...` tails in
+  `_clean_morbid_title` (5 specific patterns). (+3)
+- Title-certainty shortcut: when normalized-title score ≥ 0.97, skip date and
+  description signals (helps YouTube backfills). (+~3)
+- Containment bonus: +0.08 when shorter title's anchor tokens (≥2) appear in the
+  longer title (helps truncated RSS vs verbose YouTube titles). (+~3)
+- Trailing `| Episode N` strip: remove `| Episode <num>` that remains after
+  brand stripping (preserve `| Part N`). (+13)
+- Upload-prefix stripping: drop leading `Fan Favorite:` and `Episode Revisit:`.
+  (+~1 net)
 
-Examples:
-- `download_index 242` selected by 13 references
-- `download_index 22` selected by 11 references
-- `download_index 241` selected by 11 references
+Representative recovered cases: Bermondsey Horror (large date gap), Kelly
+Cochran (episode number noise removed), Fan Favorite / Episode Revisit uploads.
 
-Representative rows:
-- `ref 468`: "Spooky New Orleans Vol. 1" -> "Spooky Lakes (Volume 2)"
-- `ref 704`: "The Mysterious Murder of Karina Holmer" -> "The Mysterious Death of Charles Morgan"
+---
 
-Interpretation:
-- Generic terms drive false positives when stronger constraints are absent.
+## Remaining failures (concise)
 
-### 4) Misrank (Better Candidate Exists)
-A higher-quality candidate is likely available, but current scoring/greedy ordering picks another one.
+- Greedy conflicts (2): high-score candidates lost to earlier refs; requires
+  two-pass assignment or manual overrides.
+- Structural mismatches (≈3): RSS and YouTube titles use different wording — need
+  manual mapping or weaker thresholds per-case.
+- Coverage gap (~475): many refs (2018–2021) have no YouTube download; this is a
+  source-coverage problem, not a scoring bug.
 
-Examples:
-- `ref 752`: "Lizzie Borden Part 2" -> "Burke & Hare, Part 2"
-- `ref 441`: "Jack the Ripper Part 2" -> "Jack Tupper, Part 2"
-- `ref 419`: "Spooky Lakes Vol. 1" -> "Spooky Lakes (Volume 2)"
+Notes: ~22 near-misses remain in the 0.60–0.75 score band; raising the global
+threshold risks false positives, so handle borderline cases individually.
 
-Interpretation:
-- Candidate set is not always the issue; ranking and constraints are.
+---
 
-### 5) Part Mismatch
-Part-number family matches but wrong part index.
+## Tests & guards
 
-Examples:
-- `ref 417`: "JonBenet Ramsey Part 2" -> "JonBenet Ramsey Part 1"
-- `ref 369`: "Theodore Durrant Part 2" -> "Theodore Durrant Part 1"
+- Regression rows: `tests/resources/alignment/morbid_benchmark.csv`. Add a row for
+  every fixed case to prevent regressions.
+- Unit guards: `tests/catalog/test_align_episodes.py` covers:
+  - certainty-path/date-skip, containment bonus, listener-tales/part/volume
+    guards, and anchor-overlap requirements.
+- Lint/quality: `tests/test_lint.py` enforces ruff, import sort, and CCN ≤ 8.
 
-Interpretation:
-- Part number needs stricter handling than plain lexical similarity.
+---
 
-## Why This Happens
+## Recommended actions
 
-1. Coverage mismatch: references span 2018-2026, downloads mostly cover late 2022-2026.
-2. Numeric semantics are weakly enforced: `Listener Tales N`, `Part N`, `Vol N` are treated mostly as text.
-3. Greedy global assignment can lock in bad early matches.
-4. Generic phrasing in titles increases accidental overlap.
+- For greedy conflicts: implement a two-pass assignment or maintain a small
+  manual-override CSV keyed by `(ref_id, dl_id)` to reconcile contested matches.
+- For structural renames and critical missing episodes: consider a manual mapping
+  table or extend download sources (archive.org, other platforms).
+- Continue adding regression rows when a false negative is fixed.
 
-## Suggested Use of This Doc
+---
 
-Use these categories as triage labels during review:
-- `missing_source`: do not force-match.
-- `series_or_part_mismatch`: block until number-consistent candidate exists.
-- `misrank`: inspect top-N alternatives.
-- `reused_target`: treat as likely false positive unless strong corroborating signals exist.
+File: [docs/ALIGNMENT_MISTAKES.md](docs/ALIGNMENT_MISTAKES.md)
+
+***End Compact Audit***

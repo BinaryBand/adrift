@@ -264,10 +264,71 @@ def _has_structured_number_mismatch(ref_title: str, dl_title: str) -> bool:
     return any(_number_mismatch(extractor, ref_title, dl_title) for extractor in extractors)
 
 
+def _anchor_tokens(title: str) -> frozenset[str]:
+    return frozenset(t for t in title.split() if t not in _ANCHOR_STOPWORDS)
+
+
 def _anchor_token_overlap(ref_title: str, dl_title: str) -> int:
-    ref_tokens = {token for token in ref_title.split() if token not in _ANCHOR_STOPWORDS}
-    dl_tokens = {token for token in dl_title.split() if token not in _ANCHOR_STOPWORDS}
-    return len(ref_tokens & dl_tokens)
+    return len(_anchor_tokens(ref_title) & _anchor_tokens(dl_title))
+
+
+def _has_token_containment(ref_title: str, dl_title: str) -> bool:
+    """True when all anchor tokens of the shorter title appear in the longer AND ≥ 2."""
+    ref_tok = _anchor_tokens(ref_title)
+    dl_tok = _anchor_tokens(dl_title)
+    if not ref_tok or not dl_tok:
+        return False
+    if len(ref_tok) <= len(dl_tok):
+        return len(ref_tok) >= 2 and ref_tok.issubset(dl_tok)
+    return len(dl_tok) >= 2 and dl_tok.issubset(ref_tok)
+
+
+# When title similarity is at or above this value, date signal is excluded from
+# weighting — the date may be unreliable for YouTube backfills of older episodes.
+_TITLE_CERTAINTY_MIN = 0.97
+
+# Additive bonus applied when shorter title's anchor tokens are fully contained
+# in the longer title.  Helps references with simplified titles match enriched
+# download titles (e.g. "Denise Huber Part 1" ↔ "Disappearance of Denise Huber Part 1").
+_CONTAINMENT_BONUS = 0.08
+
+
+def _certainty_title_score(
+    ref: "_AlignmentCandidate",
+    dl: "_AlignmentCandidate",
+    s_title: float,
+    s_desc: float,
+) -> float:
+    """Score for near-perfect-title matches, excluding the (unreliable) date signal."""
+    s_id = _id_similarity(ref.episode, dl.episode)
+    has_desc = _has_description_signal(ref, dl)
+    weighted_sum = W_TITLE * s_title
+    total_weight = W_TITLE
+    if has_desc:
+        weighted_sum += W_DESC * s_desc
+        total_weight += W_DESC
+    return min(1.0, weighted_sum / total_weight + W_ID * s_id)
+
+
+def _is_sparse_title(s_id: float, has_desc: bool, s_title: float) -> bool:
+    return not s_id and not has_desc and s_title < SPARSE_TITLE_MIN
+
+
+def _compute_base_score(
+    ref: "_AlignmentCandidate",
+    dl: "_AlignmentCandidate",
+    s_title: float,
+    s_desc: float,
+) -> float:
+    s_id = _id_similarity(ref.episode, dl.episode)
+    weighted_sum = W_TITLE * s_title
+    total_weight = W_TITLE
+    opt_sum, opt_total = _compute_optional_weights(ref, dl, s_desc)
+    weighted_sum += opt_sum
+    total_weight += opt_total
+    base = weighted_sum / total_weight
+    containment = _CONTAINMENT_BONUS if _has_token_containment(ref.title, dl.title) else 0.0
+    return min(1.0, base + W_ID * s_id + containment)
 
 
 def _weighted_score(
@@ -277,9 +338,6 @@ def _weighted_score(
     s_desc: float,
 ) -> float:
     """Metadata-aware similarity score with ID as a small bonus."""
-    s_id = _id_similarity(ref.episode, dl.episode)
-    has_desc = _has_description_signal(ref, dl)
-
     if _has_structured_number_mismatch(ref.title, dl.title):
         return 0.0
 
@@ -287,18 +345,17 @@ def _weighted_score(
     if _anchor_token_overlap(ref.title, dl.title) == 0 and s_title < 0.75:
         return 0.0
 
-    if not s_id and not has_desc and s_title < SPARSE_TITLE_MIN:
+    # Near-perfect title match: date signal is excluded (may be unreliable for
+    # YouTube backfills where the upload date can lag RSS publication by months).
+    if s_title >= _TITLE_CERTAINTY_MIN:
+        return _certainty_title_score(ref, dl, s_title, s_desc)
+
+    s_id = _id_similarity(ref.episode, dl.episode)
+    has_desc = _has_description_signal(ref, dl)
+    if _is_sparse_title(s_id, has_desc, s_title):
         return 0.0
 
-    weighted_sum = W_TITLE * s_title
-    total_weight = W_TITLE
-
-    opt_sum, opt_total = _compute_optional_weights(ref, dl, s_desc)
-    weighted_sum += opt_sum
-    total_weight += opt_total
-
-    base_score = weighted_sum / total_weight
-    return min(1.0, base_score + (W_ID * s_id))
+    return _compute_base_score(ref, dl, s_title, s_desc)
 
 
 def _build_similarity_matrices(

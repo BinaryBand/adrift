@@ -1,5 +1,9 @@
 # Podcast Feed Builder — Specification
 
+This specification blends the concise overview and operational details. It defines the data models, pipeline phases, scoring and matching rules, merge behaviour, and the tests/quality gates that guard regressions.
+
+---
+
 ## Models
 
 ```mermaid
@@ -71,27 +75,28 @@ classDiagram
     PodcastFeed --> "0..*" EpisodeData : episodes
 ```
 
+Key types: `Podcast` (config), `FeedSource` (reference or download), `RssEpisode` (feed item), `EpisodeData` (canonical merged record), and `MergeResult` (cross-alignment + merge output).
+
 ### Source URL conventions
 
 | Scheme | Example | Description |
 | --- | --- | --- |
-| HTTP/S feed | `https://example.com/feed.rss` | Standard RSS/Atom feed |
-| YouTube channel | `yt://@channel_handle` | Channel episode list |
-| YouTube video | `yt://#video_id` | Single episode reference |
+| HTTP/S feed | <https://example.com/feed.rss> | Standard RSS/Atom feed |
+| YouTube channel | yt://@channel_handle | Channel episode list |
+| YouTube video | yt://#video_id | Single episode reference |
 
-### Schedule conventions (RFC 5545)
+---
 
-`Podcast.schedule` is a list of recurrence definitions used to decide whether a
-podcast should run on the current day.
+## Scheduling (RFC 5545)
 
-Supported formats:
+`Podcast.schedule` uses RFC 5545 RRULE strings. Supported forms include a legacy RRULE-only shorthand and `DTSTART` + `RRULE` when a start boundary is required.
 
 | Format | Example | Notes |
 | --- | --- | --- |
-| Legacy RRULE-only | `FREQ=WEEKLY;BYDAY=MO` | Backward-compatible shorthand |
-| RFC 5545 DTSTART + RRULE | `DTSTART:20240124T000000Z\nRRULE:FREQ=WEEKLY;BYDAY=MO` | Preferred when a recurrence start date is required |
+| RRULE-only | `FREQ=WEEKLY;BYDAY=MO` | Backward-compatible shorthand |
+| `DTSTART` + `RRULE` | `DTSTART:20240124T000000Z\nRRULE:FREQ=WEEKLY;BYDAY=MO` | Use when a start boundary is required |
 
-TOML example:
+Example TOML configuration:
 
 ```toml
 [[podcasts]]
@@ -99,135 +104,119 @@ name = "The Daily Show"
 schedule = ["DTSTART:20240124T000000Z\nRRULE:FREQ=WEEKLY;BYDAY=MO"]
 ```
 
-Notes:
+Schedules control when a podcast is processed (pipeline runs), not per-episode publish eligibility.
 
-- `DTSTART` establishes the recurrence start boundary.
-- `BYDAY=MO` with this start date yields Monday occurrences from the first Monday on/after the start boundary.
-- Schedule recurrence controls when a podcast is processed, not per-episode publish-date eligibility.
+---
 
-### References vs Downloads
+## References vs Downloads
 
-`Podcast.references` and `Podcast.downloads` serve distinct roles in the build pipeline, and a single episode must have a match in both.
-
-The cross-alignment step pairs each **download source** record with its corresponding **reference record**. The merged result carries the metadata from the reference side and the download URL from the download side.
+`references` supply metadata (title, description, GUID); `downloads` supply file URLs (S3, direct hosts, YouTube). Cross-alignment pairs a download record with a reference record; the merged `EpisodeData` prefers reference metadata and uses the download URL for retrieval.
 
 ```mermaid
 flowchart LR
-    REF[references - metadata sources] --> RD[Cross-aligned episode]
-    DL[downloads - file sources] --> RD
-    RD --> EP[EpisodeData with title, description, thumbnail and resolved download URL]
+  REF[references - metadata sources] --> RD[Cross-aligned episode]
+  DL[downloads - file sources] --> RD
+  RD --> EP[EpisodeData with title, description, thumbnail and resolved download URL]
 ```
 
-* * *
+Deduplication is applied within each source to collapse near-duplicates; then cross-alignment pairs the condensed lists.
 
-## Process Flow
+---
 
-The pipeline runs in two separate phases per podcast. Both phases respect `Podcast.schedule`.
+## Process (phases)
 
-### Phase 1 — Download
+Phase 1 — Download
 
-Fetch candidate episodes from both sources, cross-align them, then download only the matched subset.
+1. Fetch candidate items from `Podcast.references` (αR) and `Podcast.downloads` (αD).
+2. Deduplicate αR → R and αD → D (the same 4-signal greedy matcher used internally).
+3. Cross-align R × D → pairs using the greedy matcher.
+4. Download matched files to S3.
 
-```mermaid
-flowchart TD
-    A([Start]) --> B{today ∈ P.schedule?}
-    B -- No --> Z([Skip])
-    B -- Yes --> C(For each podcast → P)
-    C --> X[Fetch αR from P.references]
-    X --> D[Deduplicate αR → R]
-    D --> E[Fetch αD from P.downloads]
-    E --> F[Deduplicate αD → D]
-    F --> G[Cross-align R × D → RD]
-    G --> J([Download audio for each episode in RD → S3])
-```
+Phase 2 — RSS rebuild
 
-> **Note:** Steps D and F use the same 4-signal greedy matcher as the cross-alignment step (G), applied within each source list to collapse near-duplicates from overlapping feeds. The greedy algorithm prevents double-use, so no additional deduplication pass is needed after step G.
+1. Fetch `R` from `Podcast.references`.
+2. List audio files on S3 and match R episodes to S3 filenames.
+3. Emit `PodcastFeed` and upload `feed.rss`.
 
-### Phase 2 — RSS Feed Rebuild
+Notes:
 
-Rebuild the RSS feed from reference metadata matched against files already on S3.
+- The greedy matcher is used both for intra-source deduplication and for cross-alignment; it prevents double-use of the same download or reference.
+- `merge_episode` resolves a committed pair into an `EpisodeData` record (see Merge rules).
 
-```mermaid
-flowchart TD
-    A([Start]) --> B{today ∈ P.schedule?}
-    B -- No --> Z([Skip])
-    B -- Yes --> C(For each podcast → P)
-    C --> D[Fetch R from P.references]
-    D --> E[List audio files on S3]
-    E --> F[Match R episodes to S3 filenames]
-    F --> G([Emit PodcastFeed → upload feed.rss to S3])
-```
+---
 
-> **Note:** Stage 3 merge is implemented in `merge_episode` (`src/catalog.py`) and covered by tests (see `tests/catalog/test_align_episodes.py` and `tests/catalog/test_catalog.py`), but it is not yet integrated into the Phase 2 RSS rebuild. The RSS feed is currently emitted using reference metadata only; YouTube titles, thumbnails, and descriptions are not yet used in the emitted feed.
-
-### Tuning Parameters
+## Tuning parameters
 
 | Parameter | Effect |
 | --- | --- |
-| `θ` (score threshold) | Higher → fewer matches, lower → more aggressive |
-| `w_id` | Weight given to ID similarity |
-| `w_date` | Weight given to date similarity |
-| `w_title` | Weight given to title similarity |
-| `w_desc` | Weight given to description similarity |
+| `θ` (score threshold) | Minimum accepted match score; higher → stricter matching |
+| `w_id` | Weight / bonus for ID agreement |
+| `w_date` | Weight for date similarity |
+| `w_title` | Weight for title similarity |
+| `w_desc` | Weight for description similarity |
 
-### Stage 1 — Similarity Scoring
+## Stage 1 — Similarity scoring
 
-For each pair `(e1, e2)` in the cross-product of the two episode lists, compute a weighted similarity score across up to four signals:
+For each pair `(e1,e2)` compute a weighted similarity across four signals:
 
 ```text
-Score(e1, e2) =  w_id   · sim_id(e1, e2)      [bonus — added after normalization]
-              +  w_date  · sim_date(e1, e2)     [optional — omitted when either date is absent]
-              +  w_title · sim_title(e1, e2)
-              +  w_desc  · sim_desc(e1, e2)     [optional — omitted when both descriptions are empty]
-
-sim_id(e1, e2)    — 1.0 if IDs are identical; 0.0 otherwise
-sim_date(e1, e2)  — tiered by |date difference|:
-                      ≤ 2 days  → 1.00
-                      ≤ 10 days → 0.70
-                      ≤ 35 days → 0.15
-                      otherwise → 0.00
-sim_title(e1, e2) — normalized title similarity
-sim_desc(e1, e2)  — normalized description similarity
+Score(e1,e2) = w_id · sim_id + w_date · sim_date + w_title · sim_title + w_desc · sim_desc
 ```
 
-The optional signals (`w_date`, `w_desc`) are excluded from the denominator when absent, so missing metadata does not penalize pairs — the remaining signals are renormalized over the signals that are present. `w_id` is applied as an additive bonus on top of the renormalized base score rather than as part of the normalized sum, since ID matches are rare across platforms and should reward but not dominate.
+Details:
 
-A pair with no ID match, no descriptions, and a low title similarity is rejected outright without scoring.
+- `sim_id`: 1.0 if IDs match, else 0. The ID bonus is applied as an additive reward (small `w_id`) after normalization so same-platform IDs help but do not block cross-platform matching.
+- `sim_date`: tiered by absolute date difference — ≤2d → 1.00, ≤10d → 0.70, ≤35d → 0.15, otherwise 0.00.
+- `sim_title`, `sim_desc`: normalized fuzzy similarity after title and description normalization.
 
-All scored pairs are passed to the greedy matcher.
+Signals that are absent for a pair (missing date or empty descriptions) are excluded from normalization; the remaining signals are renormalized so missing fields do not unfairly penalize candidates.
 
-> **Cross-platform note:** Episodes compared across ID namespaces (e.g. a YouTube source vs an RSS feed) will always have `sim_id = 0.0`. Keeping `w_id` small ensures this is a modest same-platform bonus rather than an impassable gate.
+Reject early: pairs with no ID match, no descriptions, and very low title similarity can be skipped without full scoring.
 
-### Stage 2 — Greedy Matching
+---
 
-Sort all scored pairs descending by score. Iterate through them: if neither episode in a pair has been matched yet, commit the pair and mark both as used. Stop when the next candidate pair's score falls below θ.
+## Stage 2 — Greedy matching
 
-This guarantees the globally best match is always preferred first. It also prevents a near-duplicate title (e.g. a multi-part episode) from stealing a match that belongs to a higher-scoring pair — once the correct pair is committed, both episodes leave the pool.
+1. Score all pairs.
+2. Sort pairs by score descending.
+3. Iterate: if both episodes in the pair are unused and score ≥ `θ`, commit the pair and mark both used; otherwise skip.
+4. Stop when the next candidate score < `θ`.
 
-```mermaid
-flowchart TD
-    A[Sort all pairs by score, desc] --> B[Next pair]
-    B --> C{Score ≥ θ?}
-    C -- No --> Z([Done])
-    C -- Yes --> D{Both episodes unused?}
-    D -- No --> B
-    D -- Yes --> E[Commit pair, mark both used]
-    E --> B
-```
+This produces a one-to-one assignment favouring globally highest-scoring pairs. For more than two source lists apply iteratively: `match(match(a,b), c)`.
 
-For more than two source feeds, apply iteratively: `match(match(lst1, lst2), lst3)`.
+---
 
-### Stage 3 — Merge
+## Stage 3 — Merge rules
 
-Resolve each matched pair to a single canonical `EpisodeData` using field-level precedence:
+Field-level precedence when resolving a matched pair into `EpisodeData`:
 
-| Field | Resolution rule |
+| Field | Rule |
 | --- | --- |
-| `id` | Prefer non-URL ID; tie-break to download side (YouTube video ID › RSS GUID) |
-| `title` | Longest / most punctuated (heuristic), or modal value |
-| `upload_date` | Earliest date in pair |
+| `id` | Prefer stable non-URL ID; tie-break to download side (YouTube ID > RSS GUID) |
+| `title` | Prefer longest / most punctuated or modal value |
+| `upload_date` | Earliest date in the pair |
 | `description` | Longest non-empty value |
-| `thumbnail` | Prefer highest-resolution (inferred from URL) |
-| `source` | Union of all source URLs in pair |
+| `thumbnail` | Prefer highest-resolution or most complete URL |
+| `source` | Union of all source URLs in the pair |
 
-> **Status:** `merge_episode` is implemented in `src/catalog.py` and covered by tests (`tests/catalog/test_align_episodes.py`, `tests/catalog/test_catalog.py`). Integration into the Phase 2 RSS rebuild remains pending.
+`merge_episode` (implemented in `src/catalog.py`) performs this resolution; its behaviour is covered by unit tests (`tests/catalog/*`). Integration into the Phase 2 emitter remains pending.
+
+---
+
+## Tests & quality gates
+
+- Regression rows: `tests/resources/alignment/morbid_benchmark.csv` — add a row for every fixed false negative.
+- Unit tests: `tests/catalog/test_align_episodes.py` covers date-tiering, containment, part/volume/episode guards, and certainty-path behaviour.
+- Lint/CCN: `tests/test_lint.py` enforces ruff/import-sort and CCN ≤ 8.
+
+---
+
+## Operational recommendations
+
+- For greedy conflicts keep a small manual-override map keyed by `(ref_id, dl_id)`.
+- When structural renames occur, record an explicit mapping rather than weakening the global threshold.
+- To recover older episodes, expand download sources (archive.org, other mirrors) rather than lowering `θ`.
+
+---
+
+File: [docs/SPECS.md](docs/SPECS.md)
