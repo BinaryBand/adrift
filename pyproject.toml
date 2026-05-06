@@ -12,12 +12,9 @@ adrift-download = "runbook.download:main"
 adrift-secrets = "runbook.secrets:main"
 adrift-build-diagram = "runbook.analysis.build_diagram:main"
 adrift-build-hotspots = "runbook.analysis.build_hotspots:main"
-"runbook.download" = "runbook.download:main"
-"runbook.secrets" = "runbook.secrets:main"
-"runbook.merge" = "runbook.merge:main"
 
 [tool.poetry.dependencies]
-python = ">=3.12"
+python = ">=3.11,<4.0"
 attrs = "~=26.1.0"
 pydantic = "~=2.12.5"
 feedparser = "~=6.0.12"
@@ -78,7 +75,7 @@ select = ["E", "F", "I"]
 [tool.ty.environment]
 # `python` intentionally omitted so `ty` auto-detects the project's Python
 # environment (activated venv or environment specified by the caller).
-python-version = "3.12"
+python-version = "3.11"
 extra-paths = []
 root = ["."]
 
