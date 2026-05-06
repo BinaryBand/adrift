@@ -12,6 +12,9 @@ adrift-download = "runbook.download:main"
 adrift-secrets = "runbook.secrets:main"
 adrift-build-diagram = "runbook.analysis.build_diagram:main"
 adrift-build-hotspots = "runbook.analysis.build_hotspots:main"
+"runbook.download" = "runbook.download:main"
+"runbook.secrets" = "runbook.secrets:main"
+"runbook.merge" = "runbook.merge:main"
 
 [tool.poetry.dependencies]
 python = ">=3.12"
