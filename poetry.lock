@@ -84,6 +84,7 @@ files = [
 botocore-stubs = "*"
 mypy-boto3-s3 = {version = ">=1.42.0,<1.43.0", optional = true, markers = "extra == \"s3\""}
 types-s3transfer = "*"
+typing-extensions = {version = ">=4.1.0", markers = "python_version < \"3.12\""}
 
 [package.extras]
 accessanalyzer = ["mypy-boto3-accessanalyzer (>=1.42.0,<1.43.0)"]
@@ -1507,6 +1508,9 @@ files = [
     {file = "mypy_boto3_s3-1.42.85.tar.gz", hash = "sha256:401e3a184ac0973bc08b556cc3b2655d8f2e56570b6ed87ce635210df4f666fb"},
 ]
 
+[package.dependencies]
+typing-extensions = {version = "*", markers = "python_version < \"3.12\""}
+
 [[package]]
 name = "mypy-extensions"
 version = "1.1.0"
@@ -2542,7 +2546,7 @@ description = "C version of reader, parser and emitter for ruamel.yaml derived f
 optional = false
 python-versions = ">=3.9"
 groups = ["dev"]
-markers = "platform_python_implementation == \"CPython\" and python_version == \"3.12\""
+markers = "platform_python_implementation == \"CPython\" and python_version < \"3.13\""
 files = [
     {file = "ruamel_yaml_clib-0.2.15-cp310-cp310-macosx_10_9_x86_64.whl", hash = "sha256:88eea8baf72f0ccf232c22124d122a7f26e8a24110a0273d9bcddcb0f7e1fa03"},
     {file = "ruamel_yaml_clib-0.2.15-cp310-cp310-macosx_11_0_arm64.whl", hash = "sha256:9b6f7d74d094d1f3a4e157278da97752f16ee230080ae331fcc219056ca54f77"},
@@ -3355,5 +3359,5 @@ type = ["pytest-mypy"]
 
 [metadata]
 lock-version = "2.1"
-python-versions = ">=3.12"
-content-hash = "8ed2f89a23b4404dc00f8c469e1d1b13c5bdea56d583406a929eac05c82969db"
+python-versions = ">=3.11,<4.0"
+content-hash = "faddbe4ffb92087ac731cc819d9f3750c53fe8877bea2b75fe5099e791724c61"
