@@ -88,8 +88,10 @@ class TestLizard:
 class TestSemgrep:
     """Ensure the codebase passes the current Semgrep architecture gate."""
 
+    semgrep_available = (VENV_BIN / "semgrep").exists() or which("semgrep") is not None
+
     @pytest.mark.skipif(
-        os.environ.get("CI") == "true",
+        os.environ.get("CI") == "true" or not semgrep_available,
         reason="Semgrep is already run via semgrep/semgrep-action in CI",
     )
     def test_semgrep(self):
