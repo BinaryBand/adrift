@@ -1,0 +1,12 @@
+[Unit]
+Description=Run adrift download pipeline
+Wants=network-online.target
+After=network-online.target
+
+[Service]
+Type=oneshot
+WorkingDirectory=__ADRIFT_WORKDIR__
+Environment=PATH=/usr/local/bin:/usr/bin:/bin
+ExecStart=/home/owen/Documents/Dev/adrift/.venv/bin/python -m runbook.download
+StandardOutput=journal
+StandardError=journal
