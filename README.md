@@ -134,38 +134,22 @@ Notes:
 - The env-backed provider is writable through the TUI; non-env backends such as `docker` are inspect-only in the runbook today.
 - Set `ADRIFT_SECRETS_PROMPT_FALLBACK=1` to let runtime reads prompt interactively for missing managed S3 keys instead of failing immediately. Leave it unset for automation and non-interactive runs.
 
-## Containerized Download Run
+## Running the download pipeline locally
 
-The download pipeline can run in Docker via `compose.download.yaml` and `Dockerfile.download`.
+The project no longer maintains a Docker-based workflow. Run the download and related runbook tasks locally using the Makefile targets which invoke the runbook modules in this repository.
 
 Prerequisites:
 
-- Docker with `docker compose`
 - A populated `.env` file for S3 and other runtime settings
-- Optional: a `cookies.txt` file if you need authenticated YouTube access from inside the container
+- Optional: a `cookies.txt` file if you need authenticated YouTube access
 
-Build and run:
+Run:
 
 ```bash
-make build
 make download ARGS="--skip-download"
 ```
 
 You can pass any `runbook/download.py` CLI flags through `ARGS`, for example `make download ARGS="--include config/youtube.toml --max-downloads 3"`.
-
-The Makefile is the main Docker entrypoint:
-
-```bash
-make help
-make merge ARGS="--include config/podcasts.toml --pretty"
-```
-
-Notes:
-
-- The container persists `downloads/` and `.cache/` back to the host via bind mounts.
-- `config/` is mounted read-only so local config edits are picked up without rebuilding.
-- `LOCAL_S3_ENDPOINT` defaults to `http://host.docker.internal:9000` so a host-local MinIO/S3-compatible service remains reachable from the container.
-- Browser-cookie discovery from Firefox will not work inside the container unless that browser profile is also mounted. For YouTube auth, prefer mounting a cookie file and setting `YT_COOKIES_FILE=/app/cookies.txt`.
 
 ## Configuration
 

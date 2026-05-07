@@ -124,11 +124,6 @@ def _is_prompt_fallback_enabled(enable_prompt_fallback: bool | None) -> bool:
 
 
 def _get_base_secret_provider(selected: str):
-    if selected == "docker":
-        from src.adapters.secrets.docker_secrets import DockerSecretProvider
-
-        return DockerSecretProvider()
-
     if selected == "env":
         from src.adapters.secrets.env_secrets import EnvironmentSecretProvider
 

@@ -78,7 +78,10 @@ def test_runbook_read_only_provider_only_offers_validate_and_quit(
         return next(responses)
 
     with patch("runbook.secrets.Prompt.ask", side_effect=_ask):
-        secrets_mod._run(provider="docker", env_file=env_file.as_posix(), probe=False)
+        # Simulate a read-only provider by forcing the runbook's write-check to
+        # return False; call with the env provider so underlying resolution works.
+        with patch("runbook.secrets.is_writable_secret_store", return_value=False):
+            secrets_mod._run(provider="env", env_file=env_file.as_posix(), probe=False)
 
     output = capsys.readouterr().out
     assert "inspect-only" in output

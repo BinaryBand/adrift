@@ -11,15 +11,16 @@ Exit codes:
  1 check failures (bucket missing or shape mismatch)
  2 missing S3 env vars
 """
+
 import sys
 from pathlib import Path
-from typing import Dict, Set, List, Tuple
+from typing import Dict, List, Set, Tuple
 
-from botocore.exceptions import ClientError, EndpointConnectionError, NoCredentialsError
+from botocore.exceptions import ClientError
 
 from src.app_common import load_podcasts_config
-from src.orchestration.download_client import _s3_prefix
 from src.files import s3
+from src.orchestration.download_client import _s3_prefix
 
 
 def load_configs() -> List:
@@ -53,7 +54,6 @@ def head_bucket_exists(client, bucket: str) -> Tuple[bool, bool, str]:
     except ClientError as exc:
         err = exc.response.get("Error", {})
         code = err.get("Code", "")
-        msg = err.get("Message", str(exc))
         # AccessDenied likely means bucket exists but not accessible
         if code in ("403", "AccessDenied") or "AccessDenied" in str(exc):
             return True, False, "AccessDenied"
@@ -78,7 +78,7 @@ def list_child_names(client, bucket: str, root: str) -> Tuple[Set[str], bool]:
         for page in paginator.paginate(**params):
             for cp in page.get("CommonPrefixes", []):
                 p = cp.get("Prefix", "")
-                rel = p[len(prefix):].strip("/")
+                rel = p[len(prefix) :].strip("/")
                 if rel:
                     child_names.add(rel.split("/")[0])
             for obj in page.get("Contents", []):
@@ -86,7 +86,7 @@ def list_child_names(client, bucket: str, root: str) -> Tuple[Set[str], bool]:
                 if key == prefix:
                     continue
                 contents_found = True
-                rel = key[len(prefix):].strip("/")
+                rel = key[len(prefix) :].strip("/")
                 if rel:
                     child_names.add(rel.split("/")[0])
         return child_names, contents_found
@@ -128,7 +128,7 @@ def main() -> int:
             print(f"  ERROR: cannot access bucket '{bucket}' ({msg})", file=sys.stderr)
             overall_ok = False
             continue
-        print(f"  Bucket exists and is reachable.")
+        print("  Bucket exists and is reachable.")
 
         bucket_expected = expected.get(bucket, {})
         roots = set(bucket_expected.keys()) or {"podcasts"}
@@ -147,7 +147,10 @@ def main() -> int:
 
             expected_children = bucket_expected.get(root, set())
             if not expected_children:
-                print(f"    NOTE: found {len(actual_children)} entries under '{root}/' but no configured podcasts to compare against.")
+                print(
+                    f"    NOTE: found {len(actual_children)} entries under '{root}/'"
+                    " but no configured podcasts to compare against."
+                )
                 print(f"    Entries: {sorted(actual_children)[:20]}")
                 # do not mark as failure
                 continue
@@ -155,14 +158,20 @@ def main() -> int:
             missing = expected_children - actual_children
             extra = actual_children - expected_children
             if missing or extra:
-                print(f"    MISMATCH: expected {len(expected_children)} entries, found {len(actual_children)}.", file=sys.stderr)
+                expected_length = len(expected_children)
+                actual_length = len(actual_children)
+                print(
+                    f"    MISMATCH: expected {expected_length} entries, found {actual_length}.",
+                    file=sys.stderr,
+                )
                 if missing:
                     print(f"      Missing: {sorted(missing)}", file=sys.stderr)
                 if extra:
-                    print(f"      Extra: {sorted(extra)}")
+                    print(f"      Extra: {sorted(extra)}", file=sys.stderr)
                 overall_ok = False
             else:
-                print(f"    OK: '{root}/' children match configured podcasts ({len(actual_children)}).")
+                length = len(actual_children)
+                print(f"    OK: '{root}/' children match configured podcasts ({length}).")
 
     return 0 if overall_ok else 1
 

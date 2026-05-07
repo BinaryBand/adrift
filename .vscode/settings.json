@@ -6,7 +6,10 @@
     "**/*.cache": true,
     "**/*_cache": true,
     "**/.claude": true,
-    "**/.claude/**": true
+    "**/.claude/**": true,
+        "**/__pycache__": true,
+    "**/.pytest_cache": true,
+    "**/.ruff_cache": true
   },
   "editor.formatOnSave": true,
   "editor.codeActionsOnSave": {
