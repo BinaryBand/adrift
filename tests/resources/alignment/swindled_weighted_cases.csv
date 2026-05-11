@@ -1,0 +1,11 @@
+scenario,label,reference_id,download_id,reference_title,download_title,reference_description,download_description,reference_pub_date,download_pub_date,reason
+audio_suffix_title_only,true,sw-formula-ref,sw-formula-dl,The Formula,The Formula | Audio Podcast,,,,,Swindled suffix normalization should make exact titles match
+documentary_suffix_title_only,true,sw-doc-ref,sw-doc-dl,The Formula,The Formula | Documentary,,,,,documentary suffix should be ignored by title normalization
+exact_far_date_still_matches,true,sw-far-ref,sw-far-dl,The Formula,The Formula | Audio Podcast,, ,2024-01-01T00:00:00+00:00,2024-10-01T00:00:00+00:00,near-perfect normalized title should match despite large date gap
+parenthetical_normalized_match,true,sw-paren-ref,sw-paren-dl,The Formula (Part A),The Formula (Part A/B) | Documentary,, ,2024-01-01T00:00:00+00:00,2024-01-01T00:00:00+00:00,parenthetical slash cleanup should preserve the core title
+short_alias_same_desc_date,true,sw-alias-ref,sw-alias-dl,Formula Fraud,The Formula | Audio Podcast,shared desc,shared desc,2024-01-01T00:00:00+00:00,2024-01-01T00:00:00+00:00,shared description plus matching date should rescue short alias title
+short_alias_far_date_desc,false,sw-alias-far-ref,sw-alias-far-dl,Formula Fraud,The Formula | Audio Podcast,shared desc,shared desc,2024-01-01T00:00:00+00:00,2024-09-01T00:00:00+00:00,far date should prevent rescue for short alias title
+same_date_desc_single_extra_token,false,sw-extra-ref,sw-extra-dl,The Formula Files,The Formula | Audio Podcast,shared desc,shared desc,2024-01-01T00:00:00+00:00,2024-01-01T00:00:00+00:00,date and description should not rescue a contained title missing one discriminating token
+same_id_moderate_title,true,sw-id-ref,sw-id-ref,Formula Casefile,The Formula | Audio Podcast,, ,2024-01-01T00:00:00+00:00,2024-01-01T00:00:00+00:00,shared id should rescue a moderate title match
+different_id_moderate_title,false,sw-id-diff-ref,sw-id-diff-dl,Formula Casefile,The Formula | Audio Podcast,, ,2024-01-01T00:00:00+00:00,2024-01-01T00:00:00+00:00,without shared id the moderate title match should stay below threshold
+unrelated_same_desc_date,false,sw-unrelated-ref,sw-unrelated-dl,The Formula,The Giveaway | Audio Podcast,shared desc,shared desc,2024-01-01T00:00:00+00:00,2024-01-01T00:00:00+00:00,date and description must not rescue unrelated titles

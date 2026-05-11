@@ -47,6 +47,22 @@ _BASE_ANCHOR_STOPWORDS = {
 }
 
 _DEFAULT_ALIGNMENT = AlignmentConfig()
+_TEMPORAL_METADATA_TOKENS = frozenset(
+    {
+        "january",
+        "february",
+        "march",
+        "april",
+        "may",
+        "june",
+        "july",
+        "august",
+        "september",
+        "october",
+        "november",
+        "december",
+    }
+)
 
 
 def _similarity_clean(ac: str, bc: str) -> float:
@@ -262,9 +278,67 @@ def _has_token_containment(ref_title: str, dl_title: str, stopwords: frozenset[s
     return len(dl_tok) >= 2 and dl_tok.issubset(ref_tok)
 
 
+def _subset_extra_anchor_token_count(
+    ref_title: str, dl_title: str, stopwords: frozenset[str]
+) -> int | None:
+    extra_tokens = _subset_extra_anchor_tokens(ref_title, dl_title, stopwords)
+    return len(extra_tokens) if extra_tokens is not None else None
+
+
+def _subset_extra_anchor_tokens(
+    ref_title: str, dl_title: str, stopwords: frozenset[str]
+) -> frozenset[str] | None:
+    ref_tok = _anchor_tokens(ref_title, stopwords)
+    dl_tok = _anchor_tokens(dl_title, stopwords)
+    if not ref_tok or not dl_tok:
+        return None
+    if ref_tok.issubset(dl_tok):
+        return frozenset(dl_tok - ref_tok)
+    if dl_tok.issubset(ref_tok):
+        return frozenset(ref_tok - dl_tok)
+    return None
+
+
+def _contains_discriminating_subset_extra_token(tokens: frozenset[str]) -> bool:
+    return any(
+        any(ch.isalpha() for ch in token) and token not in _TEMPORAL_METADATA_TOKENS
+        for token in tokens
+    )
+
+
+def _should_reject_weak_anchor_match(
+    ref: _AlignmentCandidate,
+    dl: _AlignmentCandidate,
+    sims: "_Sims",
+    runtime: "_AlignmentRuntime",
+) -> bool:
+    return _anchor_token_overlap(ref.title, dl.title, runtime.stopwords) == 0 and sims.title < 0.75
+
+
+def _should_reject_metadata_subset_rescue(
+    ref: _AlignmentCandidate,
+    dl: _AlignmentCandidate,
+    sims: "_Sims",
+    runtime: "_AlignmentRuntime",
+) -> bool:
+    s_id = _id_similarity(ref.episode, dl.episode)
+    has_desc = _has_description_signal(ref, dl)
+    subset_extra_tokens = _subset_extra_anchor_tokens(ref.title, dl.title, runtime.stopwords)
+    return bool(
+        not s_id
+        and has_desc
+        and _has_date_signal(ref, dl)
+        and subset_extra_tokens is not None
+        and len(subset_extra_tokens) == 1
+        and _contains_discriminating_subset_extra_token(subset_extra_tokens)
+        and _METADATA_RESCUE_SUBSET_SIM_MIN <= sims.title < _TITLE_CERTAINTY_MIN
+    )
+
+
 # When title similarity is at or above this value, date signal is excluded from
 # weighting — the date may be unreliable for YouTube backfills of older episodes.
 _TITLE_CERTAINTY_MIN = 0.97
+_METADATA_RESCUE_SUBSET_SIM_MIN = 0.78
 
 # Additive bonus applied when shorter title's anchor tokens are fully contained
 # in the longer title.  Helps references with simplified titles match enriched
@@ -395,12 +469,9 @@ def _weighted_score(
     if _has_structured_number_mismatch(ref.title, dl.title):
         return 0.0
 
-    # Avoid promoting generic title similarities when there is no meaningful token overlap.
-    if _anchor_token_overlap(ref.title, dl.title, runtime.stopwords) == 0 and sims.title < 0.75:
+    if _should_reject_weak_anchor_match(ref, dl, sims, runtime):
         return 0.0
 
-    # Near-perfect title match: date signal is excluded (may be unreliable for
-    # YouTube backfills where the upload date can lag RSS publication by months).
     if sims.title >= _TITLE_CERTAINTY_MIN:
         return _score_with_runtime(
             _ScoreFrame(ref=ref, dl=dl, sims=sims, runtime=runtime, include_date=False)
@@ -409,6 +480,9 @@ def _weighted_score(
     s_id = _id_similarity(ref.episode, dl.episode)
     has_desc = _has_description_signal(ref, dl)
     if _is_sparse_title(s_id, has_desc, sims.title, runtime.config.sparse_title_min):
+        return 0.0
+
+    if _should_reject_metadata_subset_rescue(ref, dl, sims, runtime):
         return 0.0
 
     return _score_with_runtime(
