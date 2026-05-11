@@ -1,4 +1,3 @@
-import functools
 import mimetypes
 import shutil
 import uuid
@@ -10,7 +9,6 @@ from xml.dom import minidom
 
 import feedparser
 import requests
-from dateutil.rrule import rrulestr
 from diskcache import Cache
 from feedparser import FeedParserDict
 
@@ -24,16 +22,24 @@ from src.infrastructure.rss import (
 from src.models import RssChannel, RssEpisode
 from src.utils.progress import Callback
 from src.utils.regex import LINK_REGEX, re_compile
+from src.utils.schedule import rrule_occurrence_exists
 
 _CONTROL_CHARS_RE = re_compile(r"[\x00-\x08\x0B\x0C\x0E-\x1F\x7F]")
 
 
-@functools.cache
-def _rss_cache() -> Cache:
-    """Get the RSS feed cache instance."""
+def _build_rss_cache() -> Cache:
     path = Path(".cache/rss").resolve()
     path.mkdir(parents=True, exist_ok=True)
     return Cache(str(path))
+
+
+_RSS_CACHE = _build_rss_cache()
+_RSS_CACHE_WRAPPER = RaceAwareCacheWrapper(_RSS_CACHE)
+
+
+def _rss_cache() -> Cache:
+    """Get the RSS feed cache instance."""
+    return _RSS_CACHE
 
 
 def _cache_set_with_retry(cache: Cache, key: str, value: str, expire: int | None = None) -> None:
@@ -42,9 +48,10 @@ def _cache_set_with_retry(cache: Cache, key: str, value: str, expire: int | None
     This guards against races where diskcache removes empty directories
     and a concurrent writer attempts to create files in nested subdirs.
     """
-    # Wrap the provided cache with retry logic
-    wrapped = RaceAwareCacheWrapper(cache)
-    wrapped.set(key, value, expire=expire)
+    if cache is _RSS_CACHE:
+        _RSS_CACHE_WRAPPER.set(key, value, expire=expire)
+        return
+    RaceAwareCacheWrapper(cache).set(key, value, expire=expire)
 
 
 def get_rss_channel(rss_url: str) -> RssChannel:
@@ -62,12 +69,13 @@ def get_rss_channel(rss_url: str) -> RssChannel:
 
 def _fetch_channel_feed_str(rss_url: str) -> str:
     cache_key = f"rss:{rss_url}"
-    cached = _rss_cache().get(cache_key)
+    cache = _rss_cache()
+    cached = cache.get(cache_key)
     feed_str: str | None = cached if isinstance(cached, str) else None
     if feed_str is None:
         response = requests.get(rss_url, timeout=15)
         feed_str = response.text
-        _cache_set_with_retry(_rss_cache(), cache_key, feed_str, expire=3600)
+        _cache_set_with_retry(cache, cache_key, feed_str, expire=3600)
     return feed_str
 
 
@@ -76,41 +84,11 @@ def parse_rss_entry(entry: FeedParserDict) -> RssEpisode:
     return episode_from_feedparser(entry)
 
 
-def _align_to_tzinfo(dt: datetime, reference: datetime) -> datetime:
-    if reference.tzinfo is not None and dt.tzinfo is None:
-        return dt.replace(tzinfo=reference.tzinfo)
-    if reference.tzinfo is None and dt.tzinfo is not None:
-        return dt.replace(tzinfo=None)
-    return dt
-
-
-def _build_rrule(rule_str: str, day_start: datetime, day_end: datetime):
-    if "DTSTART" not in rule_str.upper():
-        return rrulestr(rule_str, dtstart=day_start), day_start, day_end
-    rule = rrulestr(rule_str)
-    ref = getattr(rule, "_dtstart", None)
-    if isinstance(ref, datetime):
-        day_start = _align_to_tzinfo(day_start, ref)
-        day_end = _align_to_tzinfo(day_end, ref)
-    return rule, day_start, day_end
-
-
 def _rrule_has_occurrence_on_date(pub_date: datetime, rule_str: str) -> bool:
     """Return True if the RFC 5545 RRULE produces an occurrence on pub_date's calendar day."""
     day_start = datetime.combine(pub_date.date(), datetime.min.time())
     day_end = day_start + timedelta(days=1)
-    return _rrule_occurrence_exists(rule_str, day_start, day_end)
-
-
-def _rrule_occurrence_exists(rule_str: str, day_start: datetime, day_end: datetime) -> bool:
-    try:
-        rule, day_start, day_end = _build_rrule(rule_str, day_start, day_end)
-        occ = rule.after(day_start - timedelta(microseconds=1), inc=True)
-        if occ is None:
-            return False
-        return occ < _align_to_tzinfo(day_end, occ)
-    except (TypeError, ValueError):
-        return False
+    return rrule_occurrence_exists(rule_str, day_start, day_end)
 
 
 def get_rss_episodes(
@@ -125,11 +103,12 @@ def get_rss_episodes(
     r_rules = r_rules or []
     r_rules_key = ",".join(sorted(r_rules))
     cache_key = f"feed:{url}:{filter}:{r_rules_key}"
-    feed_str: str | None = _rss_cache().get(cache_key)
+    cache = _rss_cache()
+    feed_str: str | None = cache.get(cache_key)
     if feed_str is None:
         response = requests.get(url, timeout=15)
         feed_str = response.text
-        _cache_set_with_retry(_rss_cache(), cache_key, feed_str, 1800)
+        _cache_set_with_retry(cache, cache_key, feed_str, 1800)
     parsed = feedparser.parse(feed_str)
     raw_entries = getattr(parsed, "entries", [])
     entries_list = cast(list[FeedParserDict], raw_entries) if isinstance(raw_entries, list) else []

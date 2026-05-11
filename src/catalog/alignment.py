@@ -3,7 +3,7 @@ import re
 from collections.abc import Callable
 from dataclasses import dataclass
 from datetime import datetime
-from typing import NamedTuple
+from typing import Any, NamedTuple, cast
 
 from rapidfuzz import fuzz
 
@@ -74,30 +74,9 @@ def _similarity_clean(ac: str, bc: str) -> float:
 
 
 def _cdist_similarity(a: list[str], b: list[str]) -> list[list[float]]:
-    # Extracted helpers keep this function short so complexity gates pass.
-    def _pairwise_scores(
-        a_list: list[str], b_list: list[str], scorer: Callable[[str, str], float]
-    ) -> list[list[float]]:
-        return [[scorer(x, y) / 100.0 for y in b_list] for x in a_list]
+    from rapidfuzz import process as rapidfuzz_process
 
-    def _combine_matrices(
-        ratio: list[list[float]], token_sort: list[list[float]], token_set: list[list[float]]
-    ) -> list[list[float]]:
-        result: list[list[float]] = []
-        for i in range(len(ratio)):
-            row: list[float] = []
-            for j in range(len(ratio[i])):
-                row.append(ratio[i][j] * 0.4 + token_sort[i][j] * 0.3 + token_set[i][j] * 0.3)
-            result.append(row)
-        return result
-
-    try:
-        from rapidfuzz.process import cdist  # type: ignore
-    except ImportError:
-        ratio_scores = _pairwise_scores(a, b, fuzz.ratio)
-        token_sort_scores = _pairwise_scores(a, b, fuzz.token_sort_ratio)
-        token_set_scores = _pairwise_scores(a, b, fuzz.token_set_ratio)
-        return _combine_matrices(ratio_scores, token_sort_scores, token_set_scores)
+    cdist = cast(Any, rapidfuzz_process).cdist
 
     ratio_scores = cdist(a, b, scorer=fuzz.ratio, workers=-1) / 100.0
     token_sort_scores = cdist(a, b, scorer=fuzz.token_sort_ratio, workers=-1) / 100.0
@@ -259,44 +238,45 @@ def _alignment_stopwords(alignment: AlignmentConfig) -> frozenset[str]:
     return frozenset(_BASE_ANCHOR_STOPWORDS | extras)
 
 
-def _anchor_tokens(title: str, stopwords: frozenset[str]) -> frozenset[str]:
-    return frozenset(t for t in title.split() if t not in stopwords)
+@dataclass(frozen=True)
+class AnchorTokens:
+    ref: frozenset[str]
+    dl: frozenset[str]
 
+    @classmethod
+    def from_titles(
+        cls,
+        ref_title: str,
+        dl_title: str,
+        stopwords: frozenset[str],
+    ) -> "AnchorTokens":
+        return cls(
+            ref=frozenset(token for token in ref_title.split() if token not in stopwords),
+            dl=frozenset(token for token in dl_title.split() if token not in stopwords),
+        )
 
-def _anchor_token_overlap(ref_title: str, dl_title: str, stopwords: frozenset[str]) -> int:
-    return len(_anchor_tokens(ref_title, stopwords) & _anchor_tokens(dl_title, stopwords))
+    @property
+    def overlap(self) -> int:
+        return len(self.ref & self.dl)
 
+    @property
+    def containment(self) -> bool:
+        """True when shorter anchor token set is a subset of the larger and has >= 2 tokens."""
+        if not self.ref or not self.dl:
+            return False
+        if len(self.ref) <= len(self.dl):
+            return len(self.ref) >= 2 and self.ref.issubset(self.dl)
+        return len(self.dl) >= 2 and self.dl.issubset(self.ref)
 
-def _has_token_containment(ref_title: str, dl_title: str, stopwords: frozenset[str]) -> bool:
-    """True when all anchor tokens of the shorter title appear in the longer AND ≥ 2."""
-    ref_tok = _anchor_tokens(ref_title, stopwords)
-    dl_tok = _anchor_tokens(dl_title, stopwords)
-    if not ref_tok or not dl_tok:
-        return False
-    if len(ref_tok) <= len(dl_tok):
-        return len(ref_tok) >= 2 and ref_tok.issubset(dl_tok)
-    return len(dl_tok) >= 2 and dl_tok.issubset(ref_tok)
-
-
-def _subset_extra_anchor_token_count(
-    ref_title: str, dl_title: str, stopwords: frozenset[str]
-) -> int | None:
-    extra_tokens = _subset_extra_anchor_tokens(ref_title, dl_title, stopwords)
-    return len(extra_tokens) if extra_tokens is not None else None
-
-
-def _subset_extra_anchor_tokens(
-    ref_title: str, dl_title: str, stopwords: frozenset[str]
-) -> frozenset[str] | None:
-    ref_tok = _anchor_tokens(ref_title, stopwords)
-    dl_tok = _anchor_tokens(dl_title, stopwords)
-    if not ref_tok or not dl_tok:
+    @property
+    def subset_extra_tokens(self) -> frozenset[str] | None:
+        if not self.ref or not self.dl:
+            return None
+        if self.ref.issubset(self.dl):
+            return frozenset(self.dl - self.ref)
+        if self.dl.issubset(self.ref):
+            return frozenset(self.ref - self.dl)
         return None
-    if ref_tok.issubset(dl_tok):
-        return frozenset(dl_tok - ref_tok)
-    if dl_tok.issubset(ref_tok):
-        return frozenset(ref_tok - dl_tok)
-    return None
 
 
 def _contains_discriminating_subset_extra_token(tokens: frozenset[str]) -> bool:
@@ -312,7 +292,10 @@ def _should_reject_weak_anchor_match(
     sims: "_Sims",
     runtime: "_AlignmentRuntime",
 ) -> bool:
-    return _anchor_token_overlap(ref.title, dl.title, runtime.stopwords) == 0 and sims.title < 0.75
+    anchor_tokens = AnchorTokens.from_titles(ref.title, dl.title, runtime.stopwords)
+    is_weak_overlap = anchor_tokens.overlap == 0
+    is_low_title_similarity = sims.title < 0.75
+    return is_weak_overlap and is_low_title_similarity
 
 
 def _should_reject_metadata_subset_rescue(
@@ -323,15 +306,22 @@ def _should_reject_metadata_subset_rescue(
 ) -> bool:
     s_id = _id_similarity(ref.episode, dl.episode)
     has_desc = _has_description_signal(ref, dl)
-    subset_extra_tokens = _subset_extra_anchor_tokens(ref.title, dl.title, runtime.stopwords)
+    anchor_tokens = AnchorTokens.from_titles(ref.title, dl.title, runtime.stopwords)
+    subset_extra_tokens = anchor_tokens.subset_extra_tokens
+    is_zero_id_match = not s_id
+    has_date = _has_date_signal(ref, dl)
+    has_single_subset_extra = subset_extra_tokens is not None and len(subset_extra_tokens) == 1
+    has_discriminating_extra = bool(
+        subset_extra_tokens and _contains_discriminating_subset_extra_token(subset_extra_tokens)
+    )
+    in_subset_rescue_band = _METADATA_RESCUE_SUBSET_SIM_MIN <= sims.title < _TITLE_CERTAINTY_MIN
     return bool(
-        not s_id
+        is_zero_id_match
         and has_desc
-        and _has_date_signal(ref, dl)
-        and subset_extra_tokens is not None
-        and len(subset_extra_tokens) == 1
-        and _contains_discriminating_subset_extra_token(subset_extra_tokens)
-        and _METADATA_RESCUE_SUBSET_SIM_MIN <= sims.title < _TITLE_CERTAINTY_MIN
+        and has_date
+        and has_single_subset_extra
+        and has_discriminating_extra
+        and in_subset_rescue_band
     )
 
 
@@ -359,11 +349,6 @@ class _AlignmentRuntime:
     stopwords: frozenset[str]
 
 
-class _AlignmentMatrices(NamedTuple):
-    title: list[list[float]]
-    description: list[list[float]]
-
-
 @dataclass(frozen=True)
 class _AlignmentRequest:
     show: str
@@ -372,20 +357,12 @@ class _AlignmentRequest:
 
 
 @dataclass(frozen=True)
-class _AlignmentScoreFrame:
+class _AlignmentState:
     refs: list[_AlignmentCandidate]
     dls: list[_AlignmentCandidate]
-    matrices: _AlignmentMatrices
+    title_matrix: list[list[float]]
+    description_matrix: list[list[float]]
     runtime: _AlignmentRuntime
-
-
-@dataclass(frozen=True)
-class _ScoreFrame:
-    ref: _AlignmentCandidate
-    dl: _AlignmentCandidate
-    sims: _Sims
-    runtime: _AlignmentRuntime
-    include_date: bool
 
 
 def _is_sparse_title(s_id: float, has_desc: bool, s_title: float, sparse_title_min: float) -> bool:
@@ -396,50 +373,40 @@ def _score(
     ref: "_AlignmentCandidate",
     dl: "_AlignmentCandidate",
     sims: "_Sims",
+    runtime: _AlignmentRuntime | None = None,
     include_date: bool | None = None,
 ) -> float:
-    runtime = _AlignmentRuntime(
+    resolved_runtime = runtime or _AlignmentRuntime(
         config=_DEFAULT_ALIGNMENT,
         stopwords=_alignment_stopwords(_DEFAULT_ALIGNMENT),
     )
     resolved_include_date = (
         include_date if include_date is not None else sims.title < _TITLE_CERTAINTY_MIN
     )
-    return _score_with_runtime(
-        _ScoreFrame(
-            ref=ref,
-            dl=dl,
-            sims=sims,
-            runtime=runtime,
-            include_date=resolved_include_date,
-        )
-    )
-
-
-def _score_with_runtime(frame: _ScoreFrame) -> float:
-    base = _weighted_base_score(frame)
-    containment = _containment_bonus(
-        frame.ref,
-        frame.dl,
-        frame.runtime,
-        frame.include_date,
-    )
-    id_bonus = frame.runtime.config.weights.id * _id_similarity(frame.ref.episode, frame.dl.episode)
+    base = _weighted_base_score(ref, dl, sims, resolved_runtime, resolved_include_date)
+    containment = _containment_bonus(ref, dl, resolved_runtime, resolved_include_date)
+    id_bonus = resolved_runtime.config.weights.id * _id_similarity(ref.episode, dl.episode)
     return min(1.0, base + id_bonus + containment)
 
 
-def _weighted_base_score(frame: _ScoreFrame) -> float:
-    weights = frame.runtime.config.weights
-    weighted_sum = weights.title * frame.sims.title
+def _weighted_base_score(
+    ref: _AlignmentCandidate,
+    dl: _AlignmentCandidate,
+    sims: _Sims,
+    runtime: _AlignmentRuntime,
+    include_date: bool,
+) -> float:
+    weights = runtime.config.weights
+    weighted_sum = weights.title * sims.title
     total_weight = weights.title
-    if _has_description_signal(frame.ref, frame.dl):
-        weighted_sum += weights.description * frame.sims.desc
+    if _has_description_signal(ref, dl):
+        weighted_sum += weights.description * sims.desc
         total_weight += weights.description
-    if frame.include_date and _has_date_signal(frame.ref, frame.dl):
+    if include_date and _has_date_signal(ref, dl):
         weighted_sum += weights.date * sim_date(
-            frame.ref.episode.pub_date,
-            frame.dl.episode.pub_date,
-            frame.runtime.config.date_score_tiers,
+            ref.episode.pub_date,
+            dl.episode.pub_date,
+            runtime.config.date_score_tiers,
         )
         total_weight += weights.date
     return weighted_sum / total_weight
@@ -451,15 +418,12 @@ def _containment_bonus(
     runtime: _AlignmentRuntime,
     include_date: bool,
 ) -> float:
-    has_containment = include_date and _has_token_containment(
-        ref.title,
-        dl.title,
-        runtime.stopwords,
-    )
+    anchor_tokens = AnchorTokens.from_titles(ref.title, dl.title, runtime.stopwords)
+    has_containment = include_date and anchor_tokens.containment
     return _CONTAINMENT_BONUS if has_containment else 0.0
 
 
-def _weighted_score(
+def _alignment_score(
     ref: _AlignmentCandidate,
     dl: _AlignmentCandidate,
     sims: _Sims,
@@ -473,9 +437,7 @@ def _weighted_score(
         return 0.0
 
     if sims.title >= _TITLE_CERTAINTY_MIN:
-        return _score_with_runtime(
-            _ScoreFrame(ref=ref, dl=dl, sims=sims, runtime=runtime, include_date=False)
-        )
+        return _score(ref, dl, sims, runtime, include_date=False)
 
     s_id = _id_similarity(ref.episode, dl.episode)
     has_desc = _has_description_signal(ref, dl)
@@ -485,16 +447,14 @@ def _weighted_score(
     if _should_reject_metadata_subset_rescue(ref, dl, sims, runtime):
         return 0.0
 
-    return _score_with_runtime(
-        _ScoreFrame(ref=ref, dl=dl, sims=sims, runtime=runtime, include_date=True)
-    )
+    return _score(ref, dl, sims, runtime, include_date=True)
 
 
 def _build_similarity_matrices(
     ref_candidates: list[_AlignmentCandidate],
     dl_candidates: list[_AlignmentCandidate],
     similarity: StringSimilarityFn,
-) -> _AlignmentMatrices:
+) -> tuple[list[list[float]], list[list[float]]]:
     title_matrix = similarity(
         [candidate.title for candidate in ref_candidates],
         [candidate.title for candidate in dl_candidates],
@@ -503,22 +463,22 @@ def _build_similarity_matrices(
         [candidate.description for candidate in ref_candidates],
         [candidate.description for candidate in dl_candidates],
     )
-    return _AlignmentMatrices(title=title_matrix, description=desc_matrix)
+    return title_matrix, desc_matrix
 
 
-def _score_alignment_candidates(frame: _AlignmentScoreFrame) -> dict[tuple[int, int], float]:
+def _score_alignment_candidates(state: _AlignmentState) -> dict[tuple[int, int], float]:
     scores: dict[tuple[int, int], float] = {}
-    for r_idx, ref in enumerate(frame.refs):
-        for d_idx, dl in enumerate(frame.dls):
+    for r_idx, ref in enumerate(state.refs):
+        for d_idx, dl in enumerate(state.dls):
             sims = _Sims(
-                float(frame.matrices.title[r_idx][d_idx]),
-                float(frame.matrices.description[r_idx][d_idx]),
+                float(state.title_matrix[r_idx][d_idx]),
+                float(state.description_matrix[r_idx][d_idx]),
             )
-            scores[(r_idx, d_idx)] = _weighted_score(
+            scores[(r_idx, d_idx)] = _alignment_score(
                 ref,
                 dl,
                 sims,
-                frame.runtime,
+                state.runtime,
             )
     return scores
 
@@ -551,16 +511,17 @@ def _build_alignment_scores(
     ref_candidates = _build_alignment_candidates(references, request.show)
     dl_candidates = _build_alignment_candidates(downloads, request.show)
 
-    matrices = _build_similarity_matrices(
+    title_matrix, description_matrix = _build_similarity_matrices(
         ref_candidates,
         dl_candidates,
         request.similarity,
     )
     return _score_alignment_candidates(
-        _AlignmentScoreFrame(
+        _AlignmentState(
             refs=ref_candidates,
             dls=dl_candidates,
-            matrices=matrices,
+            title_matrix=title_matrix,
+            description_matrix=description_matrix,
             runtime=request.runtime,
         )
     )
@@ -624,11 +585,12 @@ def align_episodes(
     show: str = "",
     alignment: "AlignmentConfig | None" = None,
 ) -> list[tuple[int, int]]:
-    """Public alignment entrypoint that delegates to an adapter."""
-    from src.adapters import get_alignment_adapter
+    """Public alignment entrypoint.
 
-    adapter = get_alignment_adapter()
-    return adapter.align_episodes(references, downloads, show, alignment)
+    Kept as a stable wrapper for callers while using the internal implementation
+    directly.
+    """
+    return align_episodes_impl(references, downloads, show, alignment)
 
 
 def _thumbnail_rank(url: str | None) -> int:

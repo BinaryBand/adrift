@@ -7,7 +7,6 @@ from pathlib import Path
 from typing import cast
 
 import tomllib
-from dateutil.rrule import rrulestr
 
 from src.models import (
     FeedSource,
@@ -18,6 +17,7 @@ from src.models import (
     ensure_source_filter,
     parse_podcasts_raw,
 )
+from src.utils.schedule import align_to_tzinfo, next_occurrence_in_window
 
 __all__ = [
     "SourceFilter",
@@ -37,29 +37,6 @@ __all__ = [
 def _day_window(current: datetime) -> tuple[datetime, datetime]:
     day_start = datetime.combine(current.date(), datetime.min.time())
     return day_start, day_start + timedelta(days=1)
-
-
-def _align_tz(reference: datetime, target: datetime) -> datetime:
-    state = (reference.tzinfo is None, target.tzinfo is None)
-    if state == (False, True):
-        return target.replace(tzinfo=reference.tzinfo)
-    if state == (True, False):
-        return target.replace(tzinfo=None)
-    return target
-
-
-def _next_occurrence_in_window(schedule: str, day_start: datetime) -> datetime | None:
-    # Support RFC5545 forms like:
-    #   DTSTART:20240124T000000Z\nRRULE:FREQ=WEEKLY;BYDAY=MO
-    # For bare RRULE values, seed dtstart from the day window as before.
-    if "DTSTART" in schedule.upper():
-        rule = rrulestr(schedule)
-        rule_start = getattr(rule, "_dtstart", None)
-        if isinstance(rule_start, datetime):
-            day_start = _align_tz(rule_start, day_start)
-    else:
-        rule = rrulestr(schedule, dtstart=day_start)
-    return rule.after(day_start - timedelta(microseconds=1), inc=True)
 
 
 def _load_config(name_or_path: str) -> list[PodcastConfig]:
@@ -92,10 +69,10 @@ def schedule_matches_today(schedule: str, title: str, today: datetime | None = N
     day_start, day_end = _day_window(current)
 
     try:
-        next_occurrence = _next_occurrence_in_window(schedule, day_start)
+        next_occurrence = next_occurrence_in_window(schedule, day_start)
         if next_occurrence is None:
             return False
-        day_end = _align_tz(next_occurrence, day_end)
+        day_end = align_to_tzinfo(next_occurrence, day_end)
         return next_occurrence < day_end
     except (TypeError, ValueError):
         # Fail closed: if RRULE is malformed we skip this schedule.

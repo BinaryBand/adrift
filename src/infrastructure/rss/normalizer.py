@@ -14,6 +14,14 @@ from src.utils.media import AUDIO_EXTENSIONS, parse_duration
 from src.utils.regex import LINK_REGEX
 
 
+def _getattr_multi(obj: object, *fields: str, default: object = "") -> object:
+    for field in fields:
+        value = getattr(obj, field, None)
+        if value is not None:
+            return value
+    return default
+
+
 def channel_from_feedparser(channel: FeedParserDict) -> RssChannel:
     """Convert a feedparser channel payload to a typed RssChannel."""
     return RssChannel(
@@ -73,10 +81,10 @@ def _pick_channel_field(channel: FeedParserDict, *names: str) -> str:
 
 def _entry_basic_fields(entry: FeedParserDict) -> tuple[str, str, str, str]:
     return (
-        str(getattr(entry, "id", getattr(entry, "guid", ""))),
+        str(_getattr_multi(entry, "id", "guid", default="")),
         str(getattr(entry, "title", "")),
-        str(getattr(entry, "author", getattr(entry, "itunes_author", ""))),
-        str(getattr(entry, "description", getattr(entry, "summary", ""))),
+        str(_getattr_multi(entry, "author", "itunes_author", default="")),
+        str(_getattr_multi(entry, "description", "summary", default="")),
     )
 
 
@@ -91,7 +99,7 @@ def _collect_enclosure_strings(entry: FeedParserDict) -> list[str]:
     if content:
         return _extract_urls_from_enclosures(content)
 
-    url = getattr(entry, "url", None)
+    url = _getattr_multi(entry, "url", default=None)
     if isinstance(url, str) and url:
         return [url]
     return []
@@ -125,7 +133,9 @@ def _filter_audio_urls(urls: list[str]) -> list[str]:
 
 def _parse_entry_pub_date(entry: FeedParserDict) -> datetime | None:
     try:
-        pub_date_str = getattr(entry, "published", getattr(entry, "pubDate", ""))
+        pub_date_str = _getattr_multi(entry, "published", "pubDate", default="")
+        if not isinstance(pub_date_str, str):
+            return None
         pub_date = parser.parse(pub_date_str)
         if pub_date.tzinfo is None:
             return pub_date.replace(tzinfo=timezone.utc)
@@ -142,7 +152,7 @@ def _parse_entry_duration(entry: FeedParserDict) -> float | None:
 
 
 def _parse_entry_image(entry: FeedParserDict) -> str | None:
-    image = getattr(entry, "itunes_image", getattr(entry, "image", None))
+    image = _getattr_multi(entry, "itunes_image", "image", default=None)
     if image is None:
         return None
     if isinstance(image, str):

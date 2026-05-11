@@ -134,13 +134,3 @@ def get_secret_store_adapter(
     from src.orchestration.secret_service import MANAGED_S3_KEYS
 
     return ReadOnlySecretStore(provider, known_keys=MANAGED_S3_KEYS)
-
-
-# --- Other adapters ---------------------------------------------------------
-
-
-def get_alignment_adapter():
-    """Return the default alignment adapter instance."""
-    from src.adapters.alignment import GreedyAlignmentAdapter
-
-    return GreedyAlignmentAdapter()

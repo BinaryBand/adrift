@@ -63,32 +63,18 @@ def _merge_episode_list(
     return [merge_episode(references[r_idx], downloads[d_idx]) for r_idx, d_idx in pairs]
 
 
-def _collect_reference_episodes_with_traces(
+def _collect_episodes_for_role_with_traces(
     config: PodcastConfig,
+    is_reference: bool,
     callback: Callback | None,
     refresh_sources: bool,
 ) -> tuple[list[RssEpisode], list[SourceTrace]]:
+    sources = config.references if is_reference else config.downloads
     return _collect_episodes_with_traces(
-        config.references,
+        sources,
         EpisodeFetchContext(
             title=config.name,
-            is_reference=True,
-            callback=callback,
-            refresh_sources=refresh_sources,
-        ),
-    )
-
-
-def _collect_download_episodes_with_traces(
-    config: PodcastConfig,
-    callback: Callback | None,
-    refresh_sources: bool,
-) -> tuple[list[RssEpisode], list[SourceTrace]]:
-    return _collect_episodes_with_traces(
-        config.downloads,
-        EpisodeFetchContext(
-            title=config.name,
-            is_reference=False,
+            is_reference=is_reference,
             callback=callback,
             refresh_sources=refresh_sources,
         ),
@@ -101,8 +87,9 @@ def _collect_feed_sets(
 ) -> tuple[list[RssEpisode], list[RssEpisode], list[SourceTrace]]:
     references, reference_traces = _timed_stage(
         "process_feeds",
-        lambda: _collect_reference_episodes_with_traces(
+        lambda: _collect_episodes_for_role_with_traces(
             config,
+            True,
             options.callback,
             options.refresh_sources,
         ),
@@ -110,8 +97,9 @@ def _collect_feed_sets(
     )
     downloads, download_traces = _timed_stage(
         "process_sources",
-        lambda: _collect_download_episodes_with_traces(
+        lambda: _collect_episodes_for_role_with_traces(
             config,
+            False,
             options.callback,
             options.refresh_sources,
         ),

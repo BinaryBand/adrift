@@ -18,7 +18,7 @@ if TYPE_CHECKING:
     from src.ports.storage import StoragePort
 
 
-@dataclass(frozen=True)
+@dataclass
 class EventBus:
     """Simple event publishing system for pipeline events.
 

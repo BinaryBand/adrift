@@ -13,140 +13,86 @@ from src.utils.regex import (
 
 # _CHAR_REPLACEMENTS = load_static_config("character_replacements.json")
 
+_LIGATURE_REPLACEMENTS = {
+    "ﬁ": "fi",
+    "ﬂ": "fl",
+    "ﬀ": "ff",
+    "ﬃ": "ffi",
+    "ﬄ": "ffl",
+}
 
-_CHAR_REPLACEMENTS = {
-    "accented_characters": {
-        "á": "a",
-        "à": "a",
-        "ä": "a",
-        "â": "a",
-        "ā": "a",
-        "ã": "a",
-        "é": "e",
-        "è": "e",
-        "ë": "e",
-        "ê": "e",
-        "ē": "e",
-        "í": "i",
-        "ì": "i",
-        "ï": "i",
-        "î": "i",
-        "ī": "i",
-        "ó": "o",
-        "ò": "o",
-        "ö": "o",
-        "ô": "o",
-        "ō": "o",
-        "õ": "o",
-        "ú": "u",
-        "ù": "u",
-        "ü": "u",
-        "û": "u",
-        "ū": "u",
-        "ç": "c",
-        "ñ": "n",
-        "ß": "ss",
-        "Á": "A",
-        "À": "A",
-        "Ä": "A",
-        "Â": "A",
-        "Ā": "A",
-        "Ã": "A",
-        "É": "E",
-        "È": "E",
-        "Ë": "E",
-        "Ê": "E",
-        "Ē": "E",
-        "Í": "I",
-        "Ì": "I",
-        "Ï": "I",
-        "Î": "I",
-        "Ī": "I",
-        "Ó": "O",
-        "Ò": "O",
-        "Ö": "O",
-        "Ô": "O",
-        "Ō": "O",
-        "Õ": "O",
-        "Ú": "U",
-        "Ù": "U",
-        "Ü": "U",
-        "Û": "U",
-        "Ū": "U",
-        "Ç": "C",
-        "Ñ": "N",
-    },
-    "special_characters": {
-        "@": " at ",
-        "&": " and ",
-        "+": " plus ",
-        "%": " percent ",
-        "#": " number ",
-        "$": " dollar ",
-        "=": " equals ",
-        "°": " degrees ",
-        "©": "",
-        "®": "",
-        "™": "",
-        "€": " euro ",
-        "£": " pound ",
-        "¥": " yen ",
-        "§": " section ",
-        "†": "",
-        "‡": "",
-        "•": "",
-        "…": "",
-        "\u201c": '"',
-        "\u201d": '"',
-        "\u2018": "'",
-        "\u2019": "'",
-        "–": "-",
-        "—": "-",
-    },
-    "number_words": {
-        "zero": "0",
-        "one": "1",
-        "two": "2",
-        "three": "3",
-        "four": "4",
-        "five": "5",
-        "six": "6",
-        "seven": "7",
-        "eight": "8",
-        "nine": "9",
-        "ten": "10",
-        "eleven": "11",
-        "twelve": "12",
-        "thirteen": "13",
-        "fourteen": "14",
-        "fifteen": "15",
-        "sixteen": "16",
-        "seventeen": "17",
-        "eighteen": "18",
-        "nineteen": "19",
-        "twenty": "20",
-        "thirty": "30",
-        "forty": "40",
-        "fifty": "50",
-        "sixty": "60",
-        "seventy": "70",
-        "eighty": "80",
-        "ninety": "90",
-        "hundred": "100",
-        "thousand": "1000",
-    },
-    "roman_numerals": {
-        "IV": "4",
-        "VIII": "8",
-        "VII": "7",
-        "VI": "6",
-        "V": "5",
-        "IX": "9",
-        "X": "10",
-        "III": "3",
-        "II": "2",
-        "I": "1",
-    },
+_SPECIAL_CHAR_REPLACEMENTS = {
+    "@": " at ",
+    "&": " and ",
+    "+": " plus ",
+    "%": " percent ",
+    "#": " number ",
+    "$": " dollar ",
+    "=": " equals ",
+    "°": " degrees ",
+    "©": "",
+    "®": "",
+    "™": "",
+    "€": " euro ",
+    "£": " pound ",
+    "¥": " yen ",
+    "§": " section ",
+    "†": "",
+    "‡": "",
+    "•": "",
+    "…": "",
+    "\u201c": '"',
+    "\u201d": '"',
+    "\u2018": "'",
+    "\u2019": "'",
+    "–": "-",
+    "—": "-",
+}
+
+_NUMBER_WORDS = {
+    "zero": "0",
+    "one": "1",
+    "two": "2",
+    "three": "3",
+    "four": "4",
+    "five": "5",
+    "six": "6",
+    "seven": "7",
+    "eight": "8",
+    "nine": "9",
+    "ten": "10",
+    "eleven": "11",
+    "twelve": "12",
+    "thirteen": "13",
+    "fourteen": "14",
+    "fifteen": "15",
+    "sixteen": "16",
+    "seventeen": "17",
+    "eighteen": "18",
+    "nineteen": "19",
+    "twenty": "20",
+    "thirty": "30",
+    "forty": "40",
+    "fifty": "50",
+    "sixty": "60",
+    "seventy": "70",
+    "eighty": "80",
+    "ninety": "90",
+    "hundred": "100",
+    "thousand": "1000",
+}
+
+_ROMAN_NUMERALS = {
+    "IV": "4",
+    "VIII": "8",
+    "VII": "7",
+    "VI": "6",
+    "V": "5",
+    "IX": "9",
+    "X": "10",
+    "III": "3",
+    "II": "2",
+    "I": "1",
 }
 
 
@@ -191,26 +137,33 @@ def is_slug(text: str) -> bool:
 
 
 def _apply_roman_numerals(text: str) -> str:
-    for roman, num in _CHAR_REPLACEMENTS.get("roman_numerals", {}).items():
+    for roman, num in _ROMAN_NUMERALS.items():
         text = re_compile(rf"(?i)\b{roman}\b").sub(num, text)
     return text
 
 
 def _apply_special_chars(text: str) -> str:
-    for char, replacement in _CHAR_REPLACEMENTS.get("special_characters", {}).items():
+    for char, replacement in _SPECIAL_CHAR_REPLACEMENTS.items():
         text = text.replace(char, replacement)
     return text
 
 
 def _apply_number_words(text: str) -> str:
-    for word, digit in _CHAR_REPLACEMENTS.get("number_words", {}).items():
+    for word, digit in _NUMBER_WORDS.items():
         text = re_compile(rf"(?i)\b{word}\b").sub(digit, text)
+    return text
+
+
+def _apply_ligatures(text: str) -> str:
+    for ligature, replacement in _LIGATURE_REPLACEMENTS.items():
+        text = text.replace(ligature, replacement)
     return text
 
 
 @lru_cache(maxsize=1000)
 def normalize_text(text: str) -> str:
     text = remove_file_extension(text)
+    text = _apply_ligatures(text)
     text = unidecode(text)
     text = re_compile(r"(?i)\(Pt\.?\s*(I{1,3}|IV|V|\d+)\)").sub(r"part \1", text)
     text = _apply_roman_numerals(text)

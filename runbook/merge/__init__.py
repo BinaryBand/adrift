@@ -1,17 +1,12 @@
 import json
 import sys
-from pathlib import Path
 from time import perf_counter
-from typing import TYPE_CHECKING, Annotated
+from typing import Annotated
 
 import dotenv
 import typer
 
 from src.application.merge import MergeUseCase
-
-if TYPE_CHECKING:
-    from src.models import MergeResult
-
 from src.orchestration.merge_service import (
     MergeRunOptions,
     MergeWriters,
@@ -36,11 +31,11 @@ DF_TARGETS = ["config/*.toml"]
 DEFAULT_OUTPUT_DIR = "downloads"
 
 
-def _write_json(path: Path, payload: object) -> None:
+def _write_json(path, payload: object) -> None:
     service_write_json(path, payload)
 
 
-def _write_series_outputs(output_root: Path, result: "MergeResult") -> dict[str, object]:
+def _write_series_outputs(output_root, result) -> dict[str, object]:
     return service_write_series_outputs(output_root, result, write_json_func=_write_json)
 
 

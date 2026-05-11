@@ -1,6 +1,7 @@
 # cspell: words creepcast darknet gladwell smosh
 
-from typing import Any
+from dataclasses import dataclass
+from typing import Any, Callable
 
 from cachetools import LRUCache, cached
 
@@ -91,42 +92,90 @@ def _clean_stuff_you_should_know_title(episode: str) -> str:
     return _strip_suffix(r"(?i)\| stuff you should know$", episode)
 
 
-_TITLE_CLEANERS = {
-    "Behind the Bastards": _clean_behind_the_bastards_title,
-    "Coffee Break Swedish": _clean_coffee_break_swedish_title,
-    "CreepCast": _clean_creepcast_title,
-    "Darknet Diaries": _clean_darknet_diaries_title,
-    "Financial Audit": _clean_financial_audit_title,
-    "Morbid": _clean_morbid_title,
-    "Revisionist History": _clean_revisionist_history_title,
-    "Smosh Reads Reddit Stories": _clean_smosh_reads_reddit_stories_title,
-    "Stuff They Don't Want You To Know": _clean_stuff_they_dont_want_you_to_know_title,
-    "Stuff You Should Know": _clean_stuff_you_should_know_title,
-    "Swindled": _clean_swindled_title,
+@dataclass(frozen=True)
+class _ShowRule:
+    prefix_patterns: tuple[str, ...] = ()
+    suffix_patterns: tuple[str, ...] = ()
+    slug_suffixes: tuple[str, ...] = ()
+    cleaner: Callable[[str], str] | None = None
+
+
+_SHOW_RULES = {
+    "Behind the Bastards": _ShowRule(
+        suffix_patterns=(r"(?i)\| behind the bastards$",),
+        slug_suffixes=("Behind the Bastards",),
+    ),
+    "Coffee Break Swedish": _ShowRule(
+        suffix_patterns=(r"(?i)\| coffee break swedish podcast$",),
+        slug_suffixes=("Coffee Break Swedish Podcast",),
+    ),
+    "CreepCast": _ShowRule(
+        suffix_patterns=(r"(?i)\| creep cast$", r"(?i)\| creepcast$", r"(?i)\| creep tv$"),
+        slug_suffixes=("Creep Cast", "CreepCast", "Creep TV"),
+    ),
+    "Darknet Diaries": _ShowRule(cleaner=_clean_darknet_diaries_title),
+    "Financial Audit": _ShowRule(
+        suffix_patterns=(r"(?i)\| financial audit$",),
+        slug_suffixes=("Financial Audit",),
+    ),
+    "Morbid": _ShowRule(
+        prefix_patterns=(
+            r"(?i)^episode \d{1,3}[:\-]?\s*",
+            r"(?i)^fan favorite:\s*",
+            r"(?i)^episode revisit:\s*",
+        ),
+        suffix_patterns=(
+            r"(?i)\|\s*morbid:\s*a true crime podcast$",
+            r"(?i)\|\s*morbid\s*\|\s*podcast\s*\|\s*video$",
+            r"(?i)\|\s*morbid\s*\|\s*podcast$",
+            r"(?i)\|\s*morbid\|\s*podcast$",
+            r"(?i)\|\s*morbid$",
+            r"(?i)\|\s*episode\s+\d+\s*$",
+        ),
+        slug_suffixes=("Morbid", "Morbid Podcast"),
+    ),
+    "Revisionist History": _ShowRule(
+        suffix_patterns=(r"(?i)\| revisionist history malcolm gladwell$",),
+        slug_suffixes=("Revisionist History Malcolm Gladwell",),
+    ),
+    "Smosh Reads Reddit Stories": _ShowRule(
+        suffix_patterns=(r"(?i)\| smosh reading reddit stories$",),
+        slug_suffixes=("Smosh Reading Reddit Stories",),
+    ),
+    "Stuff They Don't Want You To Know": _ShowRule(
+        suffix_patterns=(r"(?i)\| stuff they don't want you to know$",),
+        slug_suffixes=("Stuff They Don't Want You To Know",),
+    ),
+    "Stuff You Should Know": _ShowRule(
+        suffix_patterns=(r"(?i)\| stuff you should know$",),
+        slug_suffixes=("Stuff You Should Know",),
+    ),
+    "Swindled": _ShowRule(cleaner=_clean_swindled_title),
 }
 
-_TITLE_SLUG_SUFFIXES = {
-    "Behind the Bastards": ["Behind the Bastards"],
-    "Coffee Break Swedish": ["Coffee Break Swedish Podcast"],
-    "CreepCast": ["Creep Cast", "CreepCast", "Creep TV"],
-    "Financial Audit": ["Financial Audit"],
-    "Morbid": ["Morbid", "Morbid Podcast"],
-    "Revisionist History": ["Revisionist History Malcolm Gladwell"],
-    "Smosh Reads Reddit Stories": ["Smosh Reading Reddit Stories"],
-    "Stuff They Don't Want You To Know": ["Stuff They Don't Want You To Know"],
-    "Stuff You Should Know": ["Stuff You Should Know"],
-}
 
-
-def _apply_title_cleaner(show: str, episode: str) -> str:
-    cleaner = _TITLE_CLEANERS.get(show)
-    if cleaner is None:
+def _apply_show_rules(show: str, episode: str) -> str:
+    rule = _SHOW_RULES.get(show)
+    if rule is None:
         return episode
-    return cleaner(episode)
+
+    if rule.cleaner is not None:
+        episode = rule.cleaner(episode)
+
+    for pattern in rule.prefix_patterns:
+        episode = re_compile(pattern).sub("", episode)
+
+    for pattern in rule.suffix_patterns:
+        episode = _strip_suffix(pattern, episode)
+
+    return episode
 
 
 def _strip_slug_suffixes(show: str, slug: str) -> str:
-    for suffix in _TITLE_SLUG_SUFFIXES.get(show, []):
+    rule = _SHOW_RULES.get(show)
+    if rule is None:
+        return slug.strip("-")
+    for suffix in rule.slug_suffixes:
         suffix_slug = create_slug(suffix).strip("-")
         if slug.endswith(f"-{suffix_slug}"):
             slug = slug[: -len(suffix_slug) - 1]
@@ -136,7 +185,7 @@ def _strip_slug_suffixes(show: str, slug: str) -> str:
 @cached(_TITLE_CACHE)
 def normalize_title(show: str, episode: str) -> str:
     episode = remove_control_chars(episode)
-    episode = _apply_title_cleaner(show, episode)
+    episode = _apply_show_rules(show, episode)
     return _strip_slug_suffixes(show, create_slug(episode).strip("-"))
 
 

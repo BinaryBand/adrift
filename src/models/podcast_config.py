@@ -1,8 +1,10 @@
-from typing import Any, cast
+from typing import Any, TypeVar, cast
 
 from pydantic import BaseModel, ConfigDict, Field, computed_field
 
 from src.utils.text import create_slug
+
+_ModelT = TypeVar("_ModelT", bound=BaseModel)
 
 
 def _exclude_lookahead(pattern: str) -> str:
@@ -94,23 +96,28 @@ class PodcastConfig(BaseModel):
         return create_slug(self.name)
 
 
+def _ensure_model(value: Any, cls: type[_ModelT], **defaults: Any) -> _ModelT:
+    if isinstance(value, cls):
+        return value
+    if value is None:
+        return cls.model_validate(defaults)
+    if isinstance(value, dict):
+        return cls.model_validate({**defaults, **value})
+    raise TypeError(f"value must be {cls.__name__}, dict, or None")
+
+
 def ensure_source_filter(filters: SourceFilter | dict[str, Any] | None) -> SourceFilter:
-    if isinstance(filters, SourceFilter):
-        return filters
-    if filters is None:
-        return SourceFilter()
-    return SourceFilter.model_validate(filters)
+    return _ensure_model(filters, SourceFilter)
 
 
 def ensure_feed_source(source: FeedSource | dict[str, Any]) -> FeedSource:
     if isinstance(source, FeedSource):
         return source
-    try:
-        payload = dict(source)
-    except (TypeError, ValueError) as exc:
-        raise TypeError("source must be FeedSource or dict") from exc
+    if not isinstance(source, dict):
+        raise TypeError("source must be FeedSource or dict")
+    payload = dict(source)
     payload["filters"] = ensure_source_filter(payload.get("filters"))
-    return FeedSource.model_validate(payload)
+    return _ensure_model(payload, FeedSource)
 
 
 def ensure_podcast_config(podcast: PodcastConfig | dict[str, Any]) -> PodcastConfig:
@@ -124,13 +131,15 @@ def ensure_podcast_config(podcast: PodcastConfig | dict[str, Any]) -> PodcastCon
 
     if isinstance(podcast, PodcastConfig):
         return podcast
+    if not isinstance(podcast, dict):
+        raise TypeError("podcast must be PodcastConfig or dict")
     payload = dict(podcast)
     payload["references"] = _ensure_sources_list(payload.get("references"))
     payload["downloads"] = _ensure_sources_list(payload.get("downloads"))
     payload["tags"] = payload.get("tags", [])
     if "path" not in payload:
         payload["path"] = f"/media/podcasts/{create_slug(payload['name'])}"
-    return PodcastConfig.model_validate(payload)
+    return _ensure_model(payload, PodcastConfig)
 
 
 def parse_podcasts_raw(raw: list[PodcastConfig]) -> list[PodcastConfig]:
