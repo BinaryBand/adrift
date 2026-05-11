@@ -52,6 +52,18 @@ _VIDEO_CACHE_FIELDS = {
 
 _YTDLP_FETCH_ERRORS = (OSError, RuntimeError, TypeError, ValueError)
 
+_VIDEO_INFO_LOCKED_CACHE_PREFIX = "get_video_info_locked:"
+_VIDEO_INFO_LOCKED_CACHE_TTL_SECONDS = 7 * 24 * 3600
+_VIDEO_INFO_TERMINAL_REASONS = frozenset(
+    {
+        "members-only video",
+        "private video",
+        "removed video",
+        "video unavailable",
+        "geo-restricted video",
+    }
+)
+
 
 class ChannelInfo(BaseModel):
     """Typed channel information from yt-dlp."""
@@ -141,6 +153,26 @@ def _video_info_retry_reason(error: Exception) -> str:
     return yt_dlp_retry_reason(error, "requested format unavailable; trying authenticated probe")
 
 
+def _is_terminal_video_info_reason(reason: str) -> bool:
+    return reason in _VIDEO_INFO_TERMINAL_REASONS
+
+
+def _video_info_locked_cache_key(video_id: str) -> str:
+    return f"{_VIDEO_INFO_LOCKED_CACHE_PREFIX}{video_id}"
+
+
+def _cache_locked_video_info(video_id: str, reason: str) -> None:
+    _CACHE.set(
+        _video_info_locked_cache_key(video_id),
+        {"reason": reason},
+        expire=_VIDEO_INFO_LOCKED_CACHE_TTL_SECONDS,
+    )
+
+
+def _is_locked_video_info(video_id: str) -> bool:
+    return _CACHE.get(_video_info_locked_cache_key(video_id)) is not None
+
+
 def _video_info_attempt_failure_message(
     video_id: str,
     attempt_label: str,
@@ -157,14 +189,14 @@ def _fetch_video_info_attempt(
     attempt: _VideoInfoAttempt,
     attempt_index: int,
     attempt_count: int,
-) -> dict[str, Any] | None:
+) -> tuple[dict[str, Any] | None, str | None]:
     attempt_label = _video_info_attempt_label(attempt_index, attempt.label, attempt_count)
     has_more_attempts = attempt_index < attempt_count - 1
     emit_info(f"Starting video info probe {attempt_label} for {video_id}")
     try:
         info = _extract_info(_video_info_url(video_id), attempt.build_opts())
         emit_info(f"Completed video info probe {attempt_label} for {video_id}")
-        return info
+        return info, None
     except _YTDLP_FETCH_ERRORS as e:
         reason = _video_info_retry_reason(e)
         emit_info(
@@ -175,7 +207,7 @@ def _fetch_video_info_attempt(
                 has_more_attempts,
             )
         )
-        return None
+        return None, reason
 
 
 def _video_info_attempts() -> list[_VideoInfoAttempt]:
@@ -237,19 +269,28 @@ def _fetch_video_info_raw(video_id: str) -> dict[str, Any] | None:
     """Fetch raw video info using yt-dlp with fallback to authenticated."""
     attempts = _video_info_attempts()
     for attempt_index, attempt in enumerate(attempts):
-        if info := _fetch_video_info_attempt(
+        info, reason = _fetch_video_info_attempt(
             video_id,
             attempt,
             attempt_index,
             len(attempts),
-        ):
+        )
+        if info:
             return info
+        if reason is not None and _is_terminal_video_info_reason(reason):
+            _cache_locked_video_info(video_id, reason)
+            emit_info(f"Skipping further probes for {video_id}: {reason}")
+            break
     return None
 
 
 def get_video_info(video_id: str) -> VideoInfo | None:
     """Fetch video info with caching."""
     cache_key = f"get_video_info:{video_id}"
+
+    if _is_locked_video_info(video_id):
+        emit_info(f"Skipping video info fetch for locked video: {video_id}")
+        return None
 
     # Try cache first
     cached = _load_cached_video_info(cache_key)

@@ -212,6 +212,34 @@ class TestFetchVideoInfoRaw(unittest.TestCase):
 
         self.assertIsNone(result)
 
+    @patch("src.youtube.ytdlp.YoutubeDL")
+    @patch("src.youtube.ytdlp.get_auth_ydl_opts")
+    @patch("src.youtube.ytdlp.get_ydl_opts")
+    @patch("src.youtube.ytdlp._CACHE")
+    def test_terminal_members_only_failure_skips_authenticated_retry(
+        self,
+        mock_cache: MagicMock,
+        mock_get_opts: MagicMock,
+        mock_get_auth_opts: MagicMock,
+        mock_ydl_class: MagicMock,
+    ):
+        """Members-only errors should be marked locked and avoid auth fallback."""
+        mock_get_opts.return_value = {"quiet": True}
+        mock_get_auth_opts.return_value = {"cookiesfrombrowser": "firefox"}
+
+        mock_ydl = MagicMock()
+        mock_ydl.__enter__.return_value.extract_info.side_effect = RuntimeError(
+            "Join this channel to get access to members-only content"
+        )
+        mock_ydl_class.return_value = mock_ydl
+
+        result = _fetch_video_info_raw("vid123")
+
+        self.assertIsNone(result)
+        mock_get_auth_opts.assert_not_called()
+        self.assertEqual(mock_ydl.__enter__.return_value.extract_info.call_count, 1)
+        mock_cache.set.assert_called_once()
+
 
 class TestYtDlpOptsCompatibility(unittest.TestCase):
     """Regression tests for passing typed yt-dlp opts into YoutubeDL."""
@@ -243,7 +271,15 @@ class TestFetchVideoInfo(unittest.TestCase):
     def test_returns_cached_when_available(self, mock_cache: MagicMock, mock_fetch_raw: MagicMock):
         """Test returns cached data when available."""
         cached_data = {"id": "vid123", "title": "Cached Video"}
-        mock_cache.get.return_value = cached_data
+
+        def _cache_get_side_effect(key: str):
+            if key == "get_video_info_locked:vid123":
+                return None
+            if key == "get_video_info:vid123":
+                return cached_data
+            return None
+
+        mock_cache.get.side_effect = _cache_get_side_effect
 
         result = get_video_info("vid123")
 
@@ -251,7 +287,24 @@ class TestFetchVideoInfo(unittest.TestCase):
         assert result is not None
         self.assertEqual(result.id, "vid123")
         self.assertEqual(result.title, "Cached Video")
-        mock_cache.get.assert_called_once_with("get_video_info:vid123")
+        self.assertEqual(mock_cache.get.call_args_list[1].args[0], "get_video_info:vid123")
+        mock_fetch_raw.assert_not_called()
+
+    @patch("src.youtube.ytdlp._fetch_video_info_raw")
+    @patch("src.youtube.ytdlp._CACHE")
+    def test_skips_fetch_for_locked_video(self, mock_cache: MagicMock, mock_fetch_raw: MagicMock):
+        """Locked videos should short-circuit before fetch attempts."""
+
+        def _cache_get_side_effect(key: str):
+            if key == "get_video_info_locked:vid123":
+                return {"reason": "members-only video"}
+            return None
+
+        mock_cache.get.side_effect = _cache_get_side_effect
+
+        result = get_video_info("vid123")
+
+        self.assertIsNone(result)
         mock_fetch_raw.assert_not_called()
 
     @patch("src.youtube.ytdlp._fetch_video_info_raw")
@@ -275,7 +328,6 @@ class TestFetchVideoInfo(unittest.TestCase):
         assert result is not None
         self.assertEqual(result.id, "vid123")
         self.assertEqual(result.title, "Fresh Video")
-        mock_cache.get.assert_called_once_with("get_video_info:vid123")
         mock_fetch_raw.assert_called_once_with("vid123")
         mock_cache.set.assert_called_once_with(
             "get_video_info:vid123",
