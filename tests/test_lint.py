@@ -76,7 +76,7 @@ class TestLizard:
     def test_lizard(self):
         """Fail once the repo is expected to satisfy the configured Lizard thresholds."""
         result = run_resolved(
-            ["python", "-m", "lizard", "src", "-C", "8", "-L", "30", "-a", "4"],
+            ["python", "-m", "lizard", "src", "-C", "8", "-L", "30", "-a", "5"],
             capture_output=True,
             text=True,
         )

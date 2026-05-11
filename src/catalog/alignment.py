@@ -548,12 +548,13 @@ def align_episodes(
     references: list[RssEpisode],
     downloads: list[RssEpisode],
     show: str = "",
+    alignment: "AlignmentConfig | None" = None,
 ) -> list[tuple[int, int]]:
     """Public alignment entrypoint that delegates to an adapter."""
     from src.adapters import get_alignment_adapter
 
     adapter = get_alignment_adapter()
-    return adapter.align_episodes(references, downloads, show)
+    return adapter.align_episodes(references, downloads, show, alignment)
 
 
 def _thumbnail_rank(url: str | None) -> int:

@@ -206,4 +206,4 @@ def test_greedy_alignment_adapter_delegates_to_catalog_impl():
         result = adapter.align_episodes(references, downloads, "Test Show")
 
     assert result == [(0, 0)]
-    mock_align.assert_called_once_with(references, downloads, "Test Show")
+    mock_align.assert_called_once_with(references, downloads, "Test Show", None)

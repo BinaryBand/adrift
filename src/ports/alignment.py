@@ -1,6 +1,6 @@
 from typing import Protocol
 
-from src.models import RssEpisode
+from src.models import AlignmentConfig, RssEpisode
 
 
 class AlignmentPort(Protocol):
@@ -11,6 +11,7 @@ class AlignmentPort(Protocol):
         references: list[RssEpisode],
         downloads: list[RssEpisode],
         show: str = "",
+        alignment: AlignmentConfig | None = None,
     ) -> list[tuple[int, int]]:
-        """Return matched (reference_index, download_index) pairs."""
+        """Return matched (reference_index, download_index) pairs using alignment config."""
         ...
