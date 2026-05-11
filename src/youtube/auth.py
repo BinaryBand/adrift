@@ -21,6 +21,10 @@ class _QuietYtDlpLogger:
 
 _QUIET_YTDLP_LOGGER = _QuietYtDlpLogger()
 
+_COOKIE_IMPORT_ERRORS = (ImportError, ModuleNotFoundError)
+_COOKIE_LOAD_ERRORS = (AttributeError, OSError, RuntimeError, ValueError)
+_COOKIE_WRITE_ERRORS = (AttributeError, OSError, TypeError, ValueError)
+
 
 def _node_path() -> str | None:
     return shutil.which("node")
@@ -140,7 +144,7 @@ def _try_export_firefox_cookies() -> Path | None:
     """
     try:
         browser_cookie3 = importlib.import_module("browser_cookie3")
-    except Exception:
+    except _COOKIE_IMPORT_ERRORS:
         emit_warning("browser_cookie3 not available; cannot export Firefox cookies")
         return None
 
@@ -164,10 +168,10 @@ def _load_firefox_cookie_jar(browser_cookie3: Any) -> Any | None:
         # Older browser_cookie3 versions don't accept domain_name — retry without it
         try:
             return browser_cookie3.firefox()
-        except Exception as e2:
+        except _COOKIE_LOAD_ERRORS as e2:
             emit_warning(f"Failed to load Firefox cookies: {e2}")
             return None
-    except Exception as e:
+    except _COOKIE_LOAD_ERRORS as e:
         emit_warning(f"Failed to load Firefox cookies: {e}")
         return None
 
@@ -180,7 +184,7 @@ def _write_cookie_jar(cookies_path: Path, cookie_jar: Any) -> bool:
             for cookie in cookie_jar:
                 fh.write(_format_cookie_line(cookie))
         return True
-    except Exception as e:
+    except _COOKIE_WRITE_ERRORS as e:
         emit_warning(f"Failed to write cookies file: {e}")
         return False
 

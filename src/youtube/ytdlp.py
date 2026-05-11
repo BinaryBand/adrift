@@ -79,7 +79,7 @@ class VideoInfo(BaseModel):
     def _normalize_upload_date(cls, value: Any) -> datetime | None:
         try:
             return parser.parse(value)
-        except Exception:
+        except (TypeError, ValueError, OverflowError):
             return None
 
 

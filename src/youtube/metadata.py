@@ -13,6 +13,9 @@ from src.utils.regex import (
 from src.utils.terminal import emit_info, emit_warning
 from src.youtube import ytdlp
 
+_EPISODE_METADATA_ERRORS = (AttributeError, TypeError, ValueError)
+_VIDEO_INFO_FETCH_ERRORS = (OSError, RuntimeError, ValueError)
+
 
 def _normalize_youtube_link(url: str) -> str:
     """Normalize various YouTube link formats into a URL yt-dlp can consume.
@@ -89,7 +92,7 @@ def _maybe_update_description(episode: RssEpisode, info: ytdlp.VideoInfo) -> Non
             # Preserve existing description if present
             if not episode.description:
                 episode.description = desc
-    except Exception:
+    except _EPISODE_METADATA_ERRORS:
         # Non-fatal: do not break the enrichment pipeline for description errors.
         pass
 
@@ -99,7 +102,7 @@ def _fetch_video_info(video_id: str) -> ytdlp.VideoInfo | None:
 
     try:
         return ytdlp.get_video_info(video_id)
-    except Exception as e:
+    except _VIDEO_INFO_FETCH_ERRORS as e:
         emit_warning(f"Failed to fetch video info for {video_id}: {e}")
         return None
 
@@ -108,7 +111,7 @@ def _maybe_update_pub_date(episode: RssEpisode, info: ytdlp.VideoInfo) -> None:
     """Update `episode.pub_date` from video info if available."""
     try:
         episode.pub_date = info.upload_date or episode.pub_date
-    except Exception:
+    except _EPISODE_METADATA_ERRORS:
         # Be tolerant of missing fields on the returned info object
         pass
 
@@ -119,7 +122,7 @@ def _maybe_update_thumbnail(episode: RssEpisode, info: ytdlp.VideoInfo, author: 
     try:
         if thumbnail := getattr(info, "thumbnail", None):
             episode.image = thumbnail
-    except Exception:
+    except _EPISODE_METADATA_ERRORS:
         # Non-fatal: do not break the enrichment pipeline for thumbnail errors.
         pass
 
