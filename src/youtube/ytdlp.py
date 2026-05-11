@@ -197,7 +197,7 @@ def _fetch_video_info_attempt(
         info = _extract_info(_video_info_url(video_id), attempt.build_opts())
         emit_info(f"Completed video info probe {attempt_label} for {video_id}")
         return info, None
-    except _YTDLP_FETCH_ERRORS as e:
+    except Exception as e:
         reason = _video_info_retry_reason(e)
         emit_info(
             _video_info_attempt_failure_message(

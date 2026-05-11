@@ -240,6 +240,38 @@ class TestFetchVideoInfoRaw(unittest.TestCase):
         self.assertEqual(mock_ydl.__enter__.return_value.extract_info.call_count, 1)
         mock_cache.set.assert_called_once()
 
+    @patch("src.youtube.ytdlp.YoutubeDL")
+    @patch("src.youtube.ytdlp.get_auth_ydl_opts")
+    @patch("src.youtube.ytdlp.get_ydl_opts")
+    @patch("src.youtube.ytdlp._CACHE")
+    def test_terminal_members_only_non_runtime_error_skips_retry(
+        self,
+        mock_cache: MagicMock,
+        mock_get_opts: MagicMock,
+        mock_get_auth_opts: MagicMock,
+        mock_ydl_class: MagicMock,
+    ):
+        """Non-RuntimeError exceptions (e.g. yt-dlp DownloadError) trigger the locked guard."""
+        mock_get_opts.return_value = {"quiet": True}
+        mock_get_auth_opts.return_value = {"cookiesfrombrowser": "firefox"}
+
+        # Simulate yt-dlp DownloadError which is Exception but NOT RuntimeError
+        class FakeDownloadError(Exception):
+            pass
+
+        mock_ydl = MagicMock()
+        mock_ydl.__enter__.return_value.extract_info.side_effect = FakeDownloadError(
+            "ERROR: [youtube] vid123: Join this channel to get access to members-only content"
+        )
+        mock_ydl_class.return_value = mock_ydl
+
+        result = _fetch_video_info_raw("vid123")
+
+        self.assertIsNone(result)
+        mock_get_auth_opts.assert_not_called()
+        self.assertEqual(mock_ydl.__enter__.return_value.extract_info.call_count, 1)
+        mock_cache.set.assert_called_once()
+
 
 class TestYtDlpOptsCompatibility(unittest.TestCase):
     """Regression tests for passing typed yt-dlp opts into YoutubeDL."""
