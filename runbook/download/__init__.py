@@ -45,10 +45,10 @@ def _build_pipeline(
     ui,
     pipeline_options: DownloadRunOptions,
 ) -> DownloadPipeline:
+    from src.application.services.download_enrich import enrich_with_sponsors
+    from src.application.services.download_process import build_download_queue, download_and_upload
+    from src.application.services.download_rss import update_rss
     from src.catalog import MergeConfigOptions, merge_config
-    from src.orchestration.download_enrich import enrich_with_sponsors
-    from src.orchestration.download_process import build_download_queue, download_and_upload
-    from src.orchestration.download_rss import update_rss
     from src.utils.run_ui import build_merge_callbacks
     from src.youtube.downloader import BotDetectionError
 

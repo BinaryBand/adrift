@@ -131,6 +131,6 @@ def get_secret_store_adapter(
         return EnvironmentSecretStore(env_file=env_file)
 
     from src.adapters.secrets.read_only_store import ReadOnlySecretStore
-    from src.orchestration.secret_service import MANAGED_S3_KEYS
+    from src.application.services.secret_service import MANAGED_S3_KEYS
 
     return ReadOnlySecretStore(provider, known_keys=MANAGED_S3_KEYS)

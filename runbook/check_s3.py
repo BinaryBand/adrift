@@ -20,7 +20,7 @@ from botocore.exceptions import ClientError
 
 from src.app_common import load_podcasts_config
 from src.application.context import AppContext
-from src.orchestration.download_client import s3_prefix
+from src.application.services.download_client import s3_prefix
 from src.ports import require_secrets
 
 _REQUIRED_S3_KEYS = ("S3_USERNAME", "S3_SECRET_KEY", "S3_ENDPOINT", "S3_REGION")

@@ -17,9 +17,9 @@ from src.models import DownloadEpisode, PodcastConfig
 
 if TYPE_CHECKING:
     from src.application.context import AppContext
+    from src.application.services.download_process import DownloadQueueItem
     from src.catalog.merge import MergeConfigOptions
     from src.models import MergeResult
-    from src.orchestration.download_process import DownloadQueueItem
     from src.utils.progress import Callback
     from src.utils.run_ui import BaseRunUI
 

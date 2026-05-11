@@ -8,7 +8,7 @@ from rich.prompt import Confirm, Prompt
 from rich.table import Table
 
 from src.adapters import get_secret_provider_adapter, get_secret_store_adapter
-from src.orchestration.secret_service import (
+from src.application.services.secret_service import (
     MANAGED_S3_FIELDS,
     collect_secret_states,
     delete_secret_value,

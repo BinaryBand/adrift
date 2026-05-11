@@ -7,14 +7,14 @@ from time import perf_counter
 from typing import TYPE_CHECKING, Callable
 
 from src import catalog
-from src.domain.errors import PipelineError
-from src.domain.pipeline import StageResult
-from src.orchestration.merge_service import (
+from src.application.services.merge_service import (
     MergeRunOptions,
     MergeWriters,
     emit_timings,
     model_payloads,
 )
+from src.domain.errors import PipelineError
+from src.domain.pipeline import StageResult
 
 if TYPE_CHECKING:
     from src.models import MergeResult, PodcastConfig

@@ -7,23 +7,23 @@ import dotenv
 import typer
 
 from src.application.merge import MergeUseCase
-from src.orchestration.merge_service import (
+from src.application.services.merge_service import (
     MergeRunOptions,
     MergeWriters,
 )
-from src.orchestration.merge_service import (
+from src.application.services.merge_service import (
     format_duration as _format_duration,
 )
-from src.orchestration.merge_service import (
+from src.application.services.merge_service import (
     write_json as service_write_json,
 )
-from src.orchestration.merge_service import (
+from src.application.services.merge_service import (
     write_output_bundle as service_write_output_bundle,
 )
-from src.orchestration.merge_service import (
+from src.application.services.merge_service import (
     write_report_file as service_write_report_file,
 )
-from src.orchestration.merge_service import (
+from src.application.services.merge_service import (
     write_series_outputs as service_write_series_outputs,
 )
 
