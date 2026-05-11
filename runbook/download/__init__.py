@@ -48,12 +48,9 @@ def _run(
 
     from src.app_common import load_podcasts_config
     from src.catalog import MergeConfigOptions, merge_config
-    from src.orchestration.download_service import (
-        build_download_queue,
-        download_and_upload,
-        enrich_with_sponsors,
-        update_rss,
-    )
+    from src.orchestration.download_enrich import enrich_with_sponsors
+    from src.orchestration.download_process import build_download_queue, download_and_upload
+    from src.orchestration.download_rss import update_rss
     from src.utils.run_ui import build_merge_callbacks, create_run_ui
     from src.youtube.downloader import BotDetectionError
 

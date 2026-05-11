@@ -7,7 +7,7 @@ import pytest
 from src.application.context import AppContext, EventBus
 from src.application.events import DownloadCompleted, OperationStarted, ProgressUpdated
 from src.models import DownloadEpisode, MediaMetadata, PodcastConfig, RssEpisode
-from src.orchestration.download_service import (
+from src.orchestration.download_process import (
     build_download_queue,
     episode_exists_on_s3,
     process_in_tmpdir,
