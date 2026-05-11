@@ -29,6 +29,7 @@ __all__ = [
     "parse_podcasts_raw",
     "load_config",
     "load_podcasts_config",
+    "filter_podcasts_by_tags",
     "schedule_matches_today",
 ]
 
@@ -141,6 +142,28 @@ def load_podcasts_config(
     filtered = _schedule_filtered_configs(configs)
     random.shuffle(filtered)
     return filtered
+
+
+def filter_podcasts_by_tags(configs: list[PodcastConfig], tags: list[str]) -> list[PodcastConfig]:
+    """Filter configs by podcast name, slug, or declared tags.
+
+    Empty/whitespace tags are ignored. Matching is case-insensitive.
+    """
+    normalized_tags = [t.strip().lower() for t in tags if t.strip()]
+    if not normalized_tags:
+        return configs
+
+    def _matches_tag(cfg: PodcastConfig) -> bool:
+        if cfg.name.lower() in normalized_tags:
+            return True
+        if cfg.slug.lower() in normalized_tags:
+            return True
+        for tag in getattr(cfg, "tags", []):
+            if tag.lower() in normalized_tags:
+                return True
+        return False
+
+    return [cfg for cfg in configs if _matches_tag(cfg)]
 
 
 def _expand_include_targets(include: list[str]) -> list[str]:

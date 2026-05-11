@@ -8,7 +8,6 @@ from typing import TYPE_CHECKING
 import dotenv
 
 from src.application.merge import MergeUseCase
-from src.models import PodcastConfig
 
 if TYPE_CHECKING:
     from src.models import MergeResult
@@ -65,7 +64,7 @@ def _write_report_file(output_file: str, reports: list[dict[str, object]]) -> No
 def main() -> None:
     dotenv.load_dotenv()
 
-    from src.app_common import load_podcasts_config
+    from src.app_common import filter_podcasts_by_tags, load_podcasts_config
     from src.utils.run_ui import create_run_ui
 
     parser = argparse.ArgumentParser(
@@ -152,21 +151,7 @@ def main() -> None:
     if args.timings:
         sys.stderr.write(f"TIMING load_configs: {_format_duration(load_duration)}\n")
 
-    # Filter configs by tags/podcast names when requested (same behaviour as runbook/download.py)
-    if args.tags:
-        normalized_tags = [t.strip().lower() for t in args.tags if t.strip()]
-
-        def _matches_tag(cfg: PodcastConfig) -> bool:
-            if cfg.name.lower() in normalized_tags:
-                return True
-            if cfg.slug.lower() in normalized_tags:
-                return True
-            for tg in getattr(cfg, "tags", []):
-                if tg.lower() in normalized_tags:
-                    return True
-            return False
-
-        configs = [c for c in configs if _matches_tag(c)]
+    configs = filter_podcasts_by_tags(configs, args.tags)
 
     options = MergeRunOptions(
         include_counts=args.include_counts,

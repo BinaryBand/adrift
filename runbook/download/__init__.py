@@ -13,7 +13,6 @@ from src.application.download import (
     DownloadPipelineRuntime,
     DownloadRunOptions,
 )
-from src.models import PodcastConfig
 
 DF_TARGETS = ["config/*.toml"]
 DEFAULT_MAX_DOWNLOADS = 10
@@ -46,7 +45,7 @@ def _run(
     dotenv.load_dotenv()
     ctx = AppContext.from_env()
 
-    from src.app_common import load_podcasts_config
+    from src.app_common import filter_podcasts_by_tags, load_podcasts_config
     from src.catalog import MergeConfigOptions, merge_config
     from src.orchestration.download_enrich import enrich_with_sponsors
     from src.orchestration.download_process import build_download_queue, download_and_upload
@@ -59,21 +58,7 @@ def _run(
         skip_schedule_filter=skip_schedule_filter,
     )
 
-    # Filter configs by tags/podcast names when requested
-    if tags:
-        normalized_tags = [t.strip().lower() for t in tags if t.strip()]
-
-        def _matches_tag(cfg: PodcastConfig) -> bool:
-            if cfg.name.lower() in normalized_tags:
-                return True
-            if cfg.slug.lower() in normalized_tags:
-                return True
-            for tg in getattr(cfg, "tags", []):
-                if tg.lower() in normalized_tags:
-                    return True
-            return False
-
-        configs = [c for c in configs if _matches_tag(c)]
+    configs = filter_podcasts_by_tags(configs, tags)
 
     pipeline_options = DownloadRunOptions(
         skip_download=skip_download,
