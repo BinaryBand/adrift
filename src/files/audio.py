@@ -107,7 +107,7 @@ def get_duration(file: Path) -> float | None:
     except subprocess.CalledProcessError as e:
         logger.warning("ffprobe failed for %s: exit code %s", file, e.returncode)
         return None
-    except Exception as e:
+    except (OSError, TypeError, ValueError, json.JSONDecodeError) as e:
         logger.warning("Failed to get duration for %s: %s", file, e)
         return None
 
@@ -169,7 +169,7 @@ def _concat_segment_files(segment_files: list[Path], dest: Path, source_file: Pa
     cmd = _concat_command(concat, dest)
     try:
         subprocess.run(cmd, check=True, capture_output=True)
-    except Exception as e:
+    except (subprocess.CalledProcessError, OSError, RuntimeError, TypeError, ValueError) as e:
         if isinstance(e, subprocess.CalledProcessError):
             raise handle_subprocess_error(e, cmd, source_file)
         raise RuntimeError(f"Failed to concat segments for {source_file}: {e}")
@@ -397,7 +397,7 @@ def _parse_ffprobe_json(ffprobe_out: str) -> dict[str, Any] | None:
         if isinstance(raw, dict):
             return cast(dict[str, Any], raw)
         return None
-    except Exception:
+    except (json.JSONDecodeError, TypeError, ValueError):
         return None
 
 
@@ -407,7 +407,7 @@ def _kbps_from_br(br: Any) -> int | None:
     try:
         result = int(round(int(br) / 1000))
         return result if result > 0 else None
-    except Exception:
+    except (TypeError, ValueError, OverflowError):
         return None
 
 
@@ -453,7 +453,7 @@ def _decide_final_bitrate(
 def _format_bytes(num: int) -> str:
     try:
         n = float(num)
-    except Exception:
+    except (TypeError, ValueError):
         return "0B"
     for unit in ("B", "KB", "MB", "GB", "TB"):
         if n < 1024.0:
@@ -465,7 +465,7 @@ def _format_bytes(num: int) -> str:
 def _file_size_or_none(p: Path) -> int | None:
     try:
         return p.stat().st_size
-    except Exception:
+    except OSError:
         return None
 
 

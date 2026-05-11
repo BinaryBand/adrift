@@ -8,6 +8,8 @@ from typing import TYPE_CHECKING, Any, Callable, Iterator
 from urllib.parse import urljoin
 
 import boto3
+from botocore.exceptions import BotoCoreError, ClientError
+from pydantic import ValidationError
 
 from src.files.s3_cache import _s3_cache
 from src.files.s3_listing import (
@@ -41,6 +43,9 @@ from src.models import CacheMetadata, MediaMetadata
 from src.ports import SecretProviderPort, require_secrets
 
 _REQUIRED_S3_KEYS = ("S3_USERNAME", "S3_SECRET_KEY", "S3_ENDPOINT", "S3_REGION")
+
+_S3_OPERATION_ERRORS = (BotoCoreError, ClientError, OSError, RuntimeError, TypeError, ValueError)
+_METADATA_VALIDATE_ERRORS = (ValidationError, TypeError, ValueError)
 
 
 # Injectable S3 service ----------------------------------------------------
@@ -137,7 +142,7 @@ class S3Service:
     def is_endpoint_reachable(self, url: str, timeout: float = 2.0) -> bool:
         try:
             self.build_probe_client(url, timeout).list_buckets()
-        except Exception:
+        except _S3_OPERATION_ERRORS:
             return False
         return True
 
@@ -280,12 +285,12 @@ class S3Service:
                 head_response = client.head_object(Bucket=bucket, Key=key)
                 metadata = head_response.get("Metadata", {})
                 self.cache.set(cache_key, metadata)
-            except Exception:
+            except _S3_OPERATION_ERRORS:
                 pass
 
         try:
             return MediaMetadata.model_validate(metadata)
-        except Exception:
+        except _METADATA_VALIDATE_ERRORS:
             return None
 
     def set_metadata(self, bucket: str, key: str, metadata: MediaMetadata) -> None:

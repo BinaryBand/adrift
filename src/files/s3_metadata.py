@@ -2,23 +2,28 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING, Any
 
+from botocore.exceptions import BotoCoreError, ClientError
+
 if TYPE_CHECKING:
     from mypy_boto3_s3 import S3Client
 else:
     S3Client = Any
 
+_S3_HEAD_ERRORS = (BotoCoreError, ClientError, OSError, RuntimeError, TypeError, ValueError)
+_METADATA_COERCE_ERRORS = (AttributeError, TypeError, ValueError)
+
 
 def _fetch_head_metadata(client: S3Client, bucket: str, key: str) -> dict[str, str] | None:
     try:
         head_response = client.head_object(Bucket=bucket, Key=key)
-    except Exception:
+    except _S3_HEAD_ERRORS:
         return None
     raw_meta = head_response.get("Metadata", {})
     if not isinstance(raw_meta, dict):
         return {}
     try:
         return {str(k): str(v) for k, v in raw_meta.items()}
-    except Exception:
+    except _METADATA_COERCE_ERRORS:
         return {}
 
 

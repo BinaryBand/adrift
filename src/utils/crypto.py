@@ -8,6 +8,14 @@ from pathlib import Path
 
 from diskcache import Cache
 
+_AUDIO_PROBE_ERRORS = (
+    OSError,
+    RuntimeError,
+    TypeError,
+    ValueError,
+    subprocess.CalledProcessError,
+)
+
 
 @functools.cache
 def _crypto_cache() -> Cache:
@@ -80,7 +88,7 @@ def _probe_duration(path: Path) -> float | None:
         )
         value = (res.stdout or "").strip()
         return float(value) if value else None
-    except Exception:
+    except _AUDIO_PROBE_ERRORS:
         return None
 
 
@@ -154,7 +162,7 @@ def get_audio_content_hash(file_path: Path, sample_rate: int = 8000) -> str:
 
     try:
         hex_hash: str = _hash_audio_samples(file_path, sample_times, sample_window, sample_rate)
-    except Exception:
+    except _AUDIO_PROBE_ERRORS:
         hex_hash = _fallback_hash_bytes(file_path)
 
     cache.set(cache_key, hex_hash)

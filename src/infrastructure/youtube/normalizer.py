@@ -10,6 +10,8 @@ from src.utils.progress import Callback
 if TYPE_CHECKING:
     from src.models import YtDlpVideo
 
+_PROGRESS_HOOK_ERRORS = (OSError, RuntimeError, TypeError, ValueError)
+
 # ============================================================================
 # Timestamp Conversion (from metadata.py extraction)
 # ============================================================================
@@ -118,7 +120,7 @@ def make_progress_hook(callback: Callback | None = None):
             if progress is None:
                 return
             callback(*progress)
-        except Exception:
+        except _PROGRESS_HOOK_ERRORS:
             pass
 
     return progress_hook

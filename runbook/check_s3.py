@@ -24,6 +24,7 @@ from src.orchestration.download_client import s3_prefix
 from src.ports import require_secrets
 
 _REQUIRED_S3_KEYS = ("S3_USERNAME", "S3_SECRET_KEY", "S3_ENDPOINT", "S3_REGION")
+_S3_CHECK_ERRORS = (OSError, RuntimeError, TypeError, ValueError)
 
 
 def load_configs() -> List:
@@ -63,7 +64,7 @@ def head_bucket_exists(client, bucket: str) -> Tuple[bool, bool, str]:
         if code in ("404", "NoSuchBucket") or "404" in str(exc) or "Not Found" in str(exc):
             return False, False, "NotFound"
         return False, False, str(exc)
-    except Exception as exc:
+    except _S3_CHECK_ERRORS as exc:
         return False, False, str(exc)
 
 
@@ -103,14 +104,14 @@ def main() -> int:
 
     try:
         require_secrets(ctx.secrets, _REQUIRED_S3_KEYS)
-    except Exception as exc:
+    except _S3_CHECK_ERRORS as exc:
         print(f"S3 environment not configured: {exc}", file=sys.stderr)
         return 2
 
     client = s3_service.get_client()
     try:
         client.list_buckets()
-    except Exception as exc:
+    except _S3_CHECK_ERRORS as exc:
         print(f"Credential check failed: {exc}", file=sys.stderr)
         return 1
     print("S3 credentials appear valid (list_buckets succeeded).")
@@ -142,7 +143,7 @@ def main() -> int:
             print(f"  Inspecting prefix: {root}/")
             try:
                 actual_children, contents_found = list_child_names(client, bucket, root)
-            except Exception as exc:
+            except _S3_CHECK_ERRORS as exc:
                 print(f"    ERROR listing '{root}/': {exc}", file=sys.stderr)
                 overall_ok = False
                 continue

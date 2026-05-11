@@ -9,6 +9,7 @@ from typing import TYPE_CHECKING, Any, Callable, ParamSpec, TypeVar
 
 import boto3
 from botocore.client import Config
+from botocore.exceptions import BotoCoreError, ClientError
 
 from src.ports import SecretProviderPort, require_secrets
 from src.utils.progress import Callback
@@ -23,6 +24,8 @@ logger = logging.getLogger(__name__)
 
 _P = ParamSpec("_P")
 _T = TypeVar("_T")
+
+_S3_OPERATION_ERRORS = (BotoCoreError, ClientError, OSError, RuntimeError, TypeError, ValueError)
 
 
 def retry(
@@ -46,7 +49,7 @@ def _make_retry_wrapper(
         for i in range(1, attempts + 1):
             try:
                 return func(*args, **kwargs)
-            except Exception as exc:
+            except _S3_OPERATION_ERRORS as exc:
                 last_exception = exc
                 if i < attempts:
                     wait = backoff_base**i
@@ -103,7 +106,7 @@ def _is_endpoint_reachable_with_provider(
 ) -> bool:
     try:
         _build_s3_probe_client(url, provider, timeout).list_buckets()
-    except Exception:
+    except _S3_OPERATION_ERRORS:
         return False
     return True
 

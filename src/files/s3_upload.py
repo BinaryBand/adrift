@@ -5,6 +5,7 @@ from pathlib import Path
 from typing import TYPE_CHECKING, Any, Callable
 
 from boto3.s3.transfer import TransferConfig
+from pydantic import ValidationError
 
 from src.files.s3_types import UploadOptions, _UploadSpec
 from src.files.s3_utils import _build_upload_extra_args, _make_upload_callback
@@ -15,6 +16,9 @@ if TYPE_CHECKING:
     from mypy_boto3_s3 import S3Client
 else:
     S3Client = Any
+
+_UPLOAD_OPTIONS_ERRORS = (AttributeError, TypeError, ValueError)
+_UPLOAD_VALIDATE_ERRORS = (ValidationError, TypeError, ValueError)
 
 
 def _do_s3_upload(client: S3Client, spec: _UploadSpec) -> None:
@@ -69,7 +73,7 @@ def _extract_upload_options(
         return options.metadata, options.callback
     try:
         return _extract_upload_options_from_dict(options)
-    except Exception:
+    except _UPLOAD_OPTIONS_ERRORS:
         return None, None
 
 
@@ -79,7 +83,7 @@ def _extract_upload_options_from_dict(
     try:
         opts = UploadOptions.model_validate(options)
         return opts.metadata, opts.callback
-    except Exception:
+    except _UPLOAD_VALIDATE_ERRORS:
         metadata_obj = _validate_metadata_raw(options.get("metadata"))
         callback_obj = _adapt_callback_obj(options.get("callback"))
         return metadata_obj, callback_obj
@@ -96,10 +100,10 @@ def _build_boto_callback_for_file(
 def _validate_metadata_raw(metadata_raw: Any) -> S3Metadata | None:
     try:
         return MediaMetadata.model_validate(metadata_raw)
-    except Exception:
+    except _UPLOAD_VALIDATE_ERRORS:
         try:
             return CacheMetadata.model_validate(metadata_raw)
-        except Exception:
+        except _UPLOAD_VALIDATE_ERRORS:
             if isinstance(metadata_raw, (MediaMetadata, CacheMetadata)):
                 return metadata_raw
             return None
@@ -115,7 +119,7 @@ def _adapt_callback_obj(callback_raw: Any) -> Callback | None:
         except TypeError:
             try:
                 callback_raw(value)
-            except Exception:
+            except (AttributeError, RuntimeError, TypeError, ValueError):
                 return
 
     return _adapted
