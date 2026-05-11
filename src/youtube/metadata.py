@@ -105,6 +105,11 @@ def _fetch_video_info(video_id: str) -> ytdlp.VideoInfo | None:
     except _VIDEO_INFO_FETCH_ERRORS as e:
         emit_warning(f"Failed to fetch video info for {video_id}: {e}")
         return None
+    except Exception as e:
+        # yt-dlp may raise extractor-specific errors that don't inherit from
+        # our local error tuple; metadata enrichment should remain best-effort.
+        emit_warning(f"Failed to fetch video info for {video_id}: {e}")
+        return None
 
 
 def _maybe_update_pub_date(episode: RssEpisode, info: ytdlp.VideoInfo) -> None:

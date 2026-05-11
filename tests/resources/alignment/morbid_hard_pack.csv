@@ -1,0 +1,13 @@
+label,reference_title,download_title,category,reason
+true,The 1916 Jersey Shore Shark Attacks (Part 2),Episode 765: 1916 Jersey Shore Shark Attacks (Part 2),MATCHED,perfect structured match
+true,The Manhattan Alien Abduction,714: The Manhattan Alien Abduction,MATCHED,number-prefix variant
+true,April Bonus Episode:  Eclipse,Episode 779: April Bonus Episode - Eclipse,MATCHED,bonus formatting variant
+true,Move-In Ready (To Ruin Your Life),Episode 777: Move-In Ready (To Ruin Your Life),MATCHED,exact phrase with punctuation
+true,The Stallings Family Haunting,Episode 734: The Stallings Family Haunting,MATCHED,existing benchmark overlap
+false,LIVE SHOW ANNOUNCEMENT: Radio City Music Hall!,Bobby Mackey's Music World | Morbid | Podcast,REUSED_TARGET,announcement mismatched to episode
+false,The Watts Family Murders (Part 1),The Amato Family Murders | Morbid,REUSED_TARGET,different case and subject
+false,The Kidnapping of Charlie Lindbergh (Part 2),Episode 704: The Kidnapping of Patty Hearst (Part 2),REUSED_TARGET,different kidnapping target
+false,Spooky Games That Will Ruin Your Actual Life Vol.2,Spooky Games That Will Ruin Your Actual Life Vol. 4 | Morbid | Podcast,REUSED_TARGET,volume number mismatch currently slipping through
+false,Haunted Roadtrip: West Virginia Edition!,Episode 770: Haunted Getaways - West Virginia Edition!,REUSED_TARGET,high-similarity but semantically distinct
+false,Spooky Asylums and Cemeteries with Nicholas,Random Creepy Things with Nicholas | Morbid | Podcast,BORDERLINE,borderline theme drift
+false,"Listener Tales 72: Dream, Astral Projections & Alternate Dimensions",Listener Tales 72 | Morbid,BORDERLINE,borderline title truncation

@@ -214,6 +214,21 @@ class TestAlignEpisodes(unittest.TestCase):
         )
         self.assertEqual(align_episodes_impl([ref], [dl], "Morbid", _MORBID_ALIGNMENT), [])
 
+    def test_volume_number_mismatch_rejected_with_compact_dot_notation(self):
+        ref = _ep(
+            id="r1",
+            title="Spooky Games That Will Ruin Your Actual Life Vol.2",
+            description="spooky segment",
+            pub_date=_dt(2024, 2, 1),
+        )
+        dl = _ep(
+            id="d1",
+            title="Spooky Games That Will Ruin Your Actual Life Vol. 4 | Morbid | Podcast",
+            description="spooky segment",
+            pub_date=_dt(2024, 2, 1),
+        )
+        self.assertEqual(align_episodes_impl([ref], [dl], "Morbid", _MORBID_ALIGNMENT), [])
+
     def test_episode_number_mismatch_rejected(self):
         ref = _ep(
             id="r1",

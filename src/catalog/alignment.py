@@ -215,7 +215,7 @@ def _has_description_signal(ref: _AlignmentCandidate, dl: _AlignmentCandidate) -
 _NUMBERED_MARKER_PATTERNS = (
     r"\blistener\s+tales(?:\s+episode)?\s+(\d+)\b",
     r"\bpart\s+(\d+)\b",
-    r"\b(?:volume|vol)\s+(\d+)\b",
+    r"\b(?:volume|vol\.?)\s*(\d+)\b",
     r"\bepisode\s+(\d+)\b",
 )
 
