@@ -1,13 +1,21 @@
 import os
 from abc import ABC, abstractmethod
-from datetime import datetime, timezone
+from datetime import datetime
 from typing import Any, Callable
 
 import pydantic
 from dotenv import find_dotenv, load_dotenv
 from pydantic import BaseModel, ConfigDict
 
-from src.utils.image import extract_image_from_ytdlp_list
+from src.infrastructure.youtube.normalizer import (
+    coerce_str,
+    ensure_ytdlp_model,
+    extract_image_from_list,
+    extract_image_url,
+    parse_upload_date_string,
+    unix_timestamp_to_datetime,
+    ytdlp_pub_date,
+)
 
 load_dotenv(find_dotenv())
 DEVICE = os.getenv("DEVICE", "UnknownDevice")
@@ -91,33 +99,18 @@ class YtDlpParams(BaseModel):
 
 
 def _from_unix_timestamp(raw: Any) -> datetime | None:
-    if isinstance(raw, (int, float)):
-        return datetime.fromtimestamp(float(raw), tz=timezone.utc)
-    if isinstance(raw, str) and raw.isdigit():
-        return datetime.fromtimestamp(float(raw), tz=timezone.utc)
-    return None
+    """Convert unix timestamp to datetime. Delegates to normalizer."""
+    return unix_timestamp_to_datetime(raw)
 
 
 def _parse_upload_date(raw: Any) -> datetime | None:
-    if not isinstance(raw, str) or len(raw) != 8 or not raw.isdigit():
-        return None
-    try:
-        return datetime.strptime(raw, "%Y%m%d").replace(tzinfo=timezone.utc)
-    except ValueError:
-        return None
+    """Parse YYYYMMDD format to datetime. Delegates to normalizer."""
+    return parse_upload_date_string(raw)
 
 
 def _coalesce_str(*values: Any) -> str:
-    """Return the first truthy value as a string, or empty string.
-
-    This helper centralises simple fallback chains into one place so
-    that small methods using multiple `or` fallbacks have reduced
-    cyclomatic complexity.
-    """
-    for v in values:
-        if v:
-            return str(v)
-    return ""
+    """Return the first truthy value as a string. Delegates to normalizer."""
+    return coerce_str(*values)
 
 
 try:
@@ -129,24 +122,13 @@ except Exception:
 
 
 def _parse_ytdlp_pub_date(data: YtDlpVideo | dict[str, Any]) -> datetime | None:
-    # Accept either a validated YtDlpVideo model or a raw dict and
-    # normalise to a mapping for existing parsing helpers.
-    mapping: dict[str, Any]
-    if isinstance(data, YtDlpVideo):
-        mapping = data.model_dump()
-    else:
-        mapping = data
-
-    for key in ("timestamp", "release_timestamp"):
-        if dt := _from_unix_timestamp(mapping.get(key)):
-            return dt
-    return _parse_upload_date(mapping.get("upload_date"))
+    """Parse publication date from yt-dlp video data. Delegates to normalizer."""
+    return ytdlp_pub_date(data)
 
 
 def _ensure_ytdlp_model(data: YtDlpVideo | dict[str, Any]) -> YtDlpVideo:
-    if isinstance(data, YtDlpVideo):
-        return data
-    return YtDlpVideo.model_validate(data)
+    """Ensure data is a YtDlpVideo model. Delegates to normalizer."""
+    return ensure_ytdlp_model(data)
 
 
 class RssChannel(BaseModel):
@@ -186,8 +168,8 @@ class RssChannel(BaseModel):
         if not data:
             return ""
         if isinstance(data, list):
-            return extract_image_from_ytdlp_list(data)
-        return data
+            return extract_image_from_list(data)
+        return extract_image_url(data)
 
 
 class RssEpisode(BaseModel):

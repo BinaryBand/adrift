@@ -1,7 +1,6 @@
 import functools
 import mimetypes
 import shutil
-import time
 import uuid
 import xml.etree.ElementTree as ET
 from datetime import datetime, timedelta
@@ -15,6 +14,7 @@ from dateutil.rrule import rrulestr
 from diskcache import Cache
 from feedparser import FeedParserDict
 
+from src.adapters.cache_retry import RaceAwareCacheWrapper
 from src.infrastructure.rss import (
     channel_from_feedparser,
     entry_pub_date_from_feedparser,
@@ -36,26 +36,21 @@ def _rss_cache() -> Cache:
     return Cache(str(path))
 
 
+@functools.cache
+def _rss_cache_wrapped() -> RaceAwareCacheWrapper:
+    """Get a race-aware wrapped RSS cache instance."""
+    return RaceAwareCacheWrapper(_rss_cache())
+
+
 def _cache_set_with_retry(cache: Cache, key: str, value: str, expire: int | None = None) -> None:
     """Call `cache.set` and retry if parent directories are missing.
 
     This guards against races where diskcache removes empty directories
     and a concurrent writer attempts to create files in nested subdirs.
     """
-    attempts = 3
-    for attempt in range(attempts):
-        try:
-            cache.set(key, value, expire=expire)
-            return
-        except FileNotFoundError:
-            try:
-                Path(cache.directory).mkdir(parents=True, exist_ok=True)
-            except Exception:
-                pass
-            if attempt + 1 < attempts:
-                time.sleep(0.05)
-                continue
-            raise
+    # Wrap the provided cache with retry logic
+    wrapped = RaceAwareCacheWrapper(cache)
+    wrapped.set(key, value, expire=expire)
 
 
 def get_rss_channel(rss_url: str) -> RssChannel:

@@ -9,7 +9,6 @@ from typing import cast
 import tomllib
 from dateutil.rrule import rrulestr
 
-from src.config import MATCH_TOLERANCE
 from src.models import (
     FeedSource,
     PodcastConfig,
@@ -21,7 +20,6 @@ from src.models import (
 )
 
 __all__ = [
-    "MATCH_TOLERANCE",
     "SourceFilter",
     "FeedSource",
     "PodcastConfig",

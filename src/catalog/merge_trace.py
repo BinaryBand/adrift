@@ -2,12 +2,13 @@
 from dataclasses import dataclass
 from typing import Literal
 
-from src.app_common import MATCH_TOLERANCE
-from src.models import MatchCandidateTrace, ReferenceMatchTrace, RssEpisode
+from src.models import AlignmentConfig, MatchCandidateTrace, ReferenceMatchTrace, RssEpisode
 
 from .alignment import _build_alignment_scores
 
 _MATCH_DEBUG_CANDIDATE_LIMIT = 3
+# Default match tolerance threshold (pairs below this are discarded)
+_DEFAULT_MATCH_TOLERANCE = AlignmentConfig().match_tolerance
 
 
 @dataclass(frozen=True)
@@ -43,7 +44,7 @@ def _candidate_reason(
 ]:
     if (reference_index, download_index) in context.pair_set:
         return "matched"
-    if score < MATCH_TOLERANCE:
+    if score < _DEFAULT_MATCH_TOLERANCE:
         return "below_threshold"
     if _matched_elsewhere(
         context.matched_by_download.get(download_index),

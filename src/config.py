@@ -1,27 +1,6 @@
 import os
 
 # ---------------------------------------------------------------------------
-# Episode alignment weights
-# ---------------------------------------------------------------------------
-# These four weights must sum to 1.0 (ID is applied as an additive bonus).
-W_ID = 0.10
-W_DATE = 0.30
-W_TITLE = 0.50
-W_DESC = 0.10
-
-# Tiered date-similarity scoring: (max_days_delta, score)
-DATE_SCORE_TIERS: tuple[tuple[int, float], ...] = ((2, 1.00), (10, 0.70), (35, 0.15))
-
-# Minimum title similarity required when episode has no description or date signal.
-SPARSE_TITLE_MIN = 0.85
-
-# ---------------------------------------------------------------------------
-# Match tolerance
-# ---------------------------------------------------------------------------
-# Pairs whose combined score falls below this threshold are discarded.
-MATCH_TOLERANCE = 0.75
-
-# ---------------------------------------------------------------------------
 # RSS feed URL override
 # ---------------------------------------------------------------------------
 # When set, RSS enclosure URLs use this as the base instead of S3_ENDPOINT.
