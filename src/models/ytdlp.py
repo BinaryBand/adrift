@@ -87,7 +87,7 @@ class YtDlpVideo(BaseModel):
     def __setitem__(self, key: str, value: Any) -> None:
         try:
             setattr(self, key, value)
-        except Exception:
+        except (AttributeError, TypeError, ValueError):
             data = self.model_dump()
             data[key] = value
             self.model_validate(data)

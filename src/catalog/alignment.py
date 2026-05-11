@@ -77,7 +77,7 @@ def _cdist_similarity(a: list[str], b: list[str]) -> list[list[float]]:
 
     try:
         from rapidfuzz.process import cdist  # type: ignore
-    except Exception:
+    except ImportError:
         ratio_scores = _pairwise_scores(a, b, fuzz.ratio)
         token_sort_scores = _pairwise_scores(a, b, fuzz.token_sort_ratio)
         token_set_scores = _pairwise_scores(a, b, fuzz.token_set_ratio)

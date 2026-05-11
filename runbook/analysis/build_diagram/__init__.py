@@ -38,7 +38,7 @@ _LAYER_FEATURES = "Features"
 _LAYER_INFRA = "Infrastructure"
 _LAYER_ORDER = [_LAYER_ENTRY, _LAYER_APP, _LAYER_FEATURES, _LAYER_INFRA]
 
-_APP_MODULES = {"app_common", "app_runner"}
+_APP_MODULES = {"app_common"}
 _FEATURE_DIRS = {"web", "youtube"}
 _INFRA_DIRS = {"files", "utils", "models"}
 

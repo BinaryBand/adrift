@@ -26,6 +26,10 @@ ROOT = Path(__file__).resolve().parents[2]
 CONFIG_PATH = ROOT / "config" / "youtube.toml"
 WEEKDAYS = ("MO", "TU", "WE", "TH", "FR", "SA", "SU")
 
+_CONFIG_COERCE_ERRORS = (AttributeError, TypeError, ValueError)
+_DATETIME_PARSE_ERRORS = (IndexError, TypeError, ValueError, OverflowError)
+_ANALYSIS_RUNTIME_ERRORS = (OSError, TypeError, ValueError, requests.RequestException)
+
 
 @dataclass(frozen=True)
 class Target:
@@ -131,14 +135,14 @@ def _target_key(raw: str) -> tuple[str, str]:
 def _filters_to_regex(filters: Any) -> str | None:
     try:
         return filters.to_regex()
-    except Exception:
+    except _CONFIG_COERCE_ERRORS:
         return None
 
 
 def _build_target(name: str, idx: int, source: Any) -> Target | None:
     try:
         fs = ensure_feed_source(source)
-    except Exception:
+    except _CONFIG_COERCE_ERRORS:
         return None
 
     url = fs.url
@@ -154,7 +158,7 @@ def _build_target(name: str, idx: int, source: Any) -> Target | None:
 def _targets_from_podcast(podcast: Any) -> list[Target]:
     try:
         pc = ensure_podcast_config(podcast)
-    except Exception:
+    except _CONFIG_COERCE_ERRORS:
         return []
     name = pc.name or "Unknown"
     targets: list[Target] = []
@@ -243,7 +247,7 @@ def _parse_datetime_tuple(raw: Any) -> datetime | None:
                 raw.tm_sec,
                 tzinfo=timezone.utc,
             )
-        except Exception:
+        except _DATETIME_PARSE_ERRORS:
             return None
 
     if not isinstance(raw, (tuple, list)):
@@ -251,7 +255,7 @@ def _parse_datetime_tuple(raw: Any) -> datetime | None:
 
     try:
         raw[5]
-    except Exception:
+    except _DATETIME_PARSE_ERRORS:
         return None
 
     # Tell the type checker we expect the sequence to contain ints (or int-like values).
@@ -265,7 +269,7 @@ def _parse_datetime_tuple(raw: Any) -> datetime | None:
         minute = int(seq[4])
         second = int(seq[5])
         return datetime(year, month, day, hour, minute, second, tzinfo=timezone.utc)
-    except Exception:
+    except _DATETIME_PARSE_ERRORS:
         return None
 
 
@@ -457,7 +461,7 @@ def _run_target(idx: int, target: Target, context: RunContext) -> bool:
         print(f"[{idx}/{context.total}]")
         _print_result(analysis, context.tz)
         return False
-    except Exception as exc:
+    except _ANALYSIS_RUNTIME_ERRORS as exc:
         print(f"[{idx}/{context.total}] ERROR: {target.source}: {exc}")
         return True
 

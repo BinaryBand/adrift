@@ -61,6 +61,89 @@ def _write_report_file(output_file: str, reports: list[dict[str, object]]) -> No
     service_write_report_file(output_file, reports, write_json_func=_write_json)
 
 
+def _normalize_cli_inputs(
+    include: list[str] | None,
+    tags: list[str] | None,
+    output_dir: str,
+) -> tuple[list[str], list[str], str]:
+    return (include or DF_TARGETS, tags or [], output_dir or DEFAULT_OUTPUT_DIR)
+
+
+def _load_configs(
+    include: list[str],
+    skip_schedule_filter: bool,
+    tags: list[str],
+    timings: bool,
+) -> list[object]:
+    from src.app_common import filter_podcasts_by_tags, load_podcasts_config
+
+    load_start = perf_counter()
+    configs = load_podcasts_config(
+        include=include,
+        skip_schedule_filter=skip_schedule_filter,
+    )
+    load_duration = perf_counter() - load_start
+    if timings:
+        sys.stderr.write(f"TIMING load_configs: {_format_duration(load_duration)}\n")
+    return filter_podcasts_by_tags(configs, tags)
+
+
+def _build_run_options(
+    include_counts: bool,
+    pretty: bool,
+    output_dir: str,
+    output_file: str | None,
+    refresh_sources: bool,
+    timings: bool,
+    skip_sankey: bool,
+    skip_report: bool,
+    sankey_format: Literal["sankey", "flowchart"],
+) -> MergeRunOptions:
+    return MergeRunOptions(
+        include_counts=include_counts,
+        pretty=pretty,
+        output_dir=output_dir,
+        output_file=output_file,
+        refresh_sources=refresh_sources,
+        timings_enabled=timings,
+        skip_sankey=skip_sankey,
+        skip_report=skip_report,
+        sankey_format=sankey_format,
+    )
+
+
+def _run_merge(configs: list[object], options: MergeRunOptions):
+    from src.utils.run_ui import create_run_ui
+
+    writers = MergeWriters(
+        write_json=_write_json,
+        write_series_outputs=_write_series_outputs,
+        write_output_bundle=_write_output_bundle,
+        write_report_file=_write_report_file,
+    )
+    with create_run_ui(len(configs), "Matching") as ui, ui.output_context():
+        return MergeUseCase(writers=writers).run(configs, options, ui)
+
+
+def _build_stdout_output(merge_result, include_counts: bool) -> list[dict[str, object]]:
+    return [
+        {
+            "name": merged.config.name,
+            "merged_count": len(merged.episodes),
+            **(
+                {
+                    "references_count": len(merged.references),
+                    "downloads_count": len(merged.downloads),
+                }
+                if include_counts
+                else {}
+            ),
+            "episodes": [episode.model_dump(mode="json") for episode in merged.episodes],
+        }
+        for merged in merge_result.value
+    ]
+
+
 def _run(
     include: Annotated[
         list[str] | None,
@@ -119,62 +202,21 @@ def _run(
     ] = "sankey",
 ) -> None:
     dotenv.load_dotenv()
-
-    from src.app_common import filter_podcasts_by_tags, load_podcasts_config
-    from src.utils.run_ui import create_run_ui
-
-    include = include or DF_TARGETS
-    tags = tags or []
-    output_dir = output_dir or DEFAULT_OUTPUT_DIR
-
-    load_start = perf_counter()
-    configs = load_podcasts_config(
-        include=include,
-        skip_schedule_filter=skip_schedule_filter,
+    include, tags, output_dir = _normalize_cli_inputs(include, tags, output_dir)
+    configs = _load_configs(include, skip_schedule_filter, tags, timings)
+    options = _build_run_options(
+        include_counts,
+        pretty,
+        output_dir,
+        output_file,
+        refresh_sources,
+        timings,
+        skip_sankey,
+        skip_report,
+        sankey_format,
     )
-    load_duration = perf_counter() - load_start
-    if timings:
-        sys.stderr.write(f"TIMING load_configs: {_format_duration(load_duration)}\n")
-
-    configs = filter_podcasts_by_tags(configs, tags)
-
-    options = MergeRunOptions(
-        include_counts=include_counts,
-        pretty=pretty,
-        output_dir=output_dir,
-        output_file=output_file,
-        refresh_sources=refresh_sources,
-        timings_enabled=timings,
-        skip_sankey=skip_sankey,
-        skip_report=skip_report,
-        sankey_format=sankey_format,
-    )
-    writers = MergeWriters(
-        write_json=_write_json,
-        write_series_outputs=_write_series_outputs,
-        write_output_bundle=_write_output_bundle,
-        write_report_file=_write_report_file,
-    )
-    with create_run_ui(len(configs), "Matching") as ui, ui.output_context():
-        merge_result = MergeUseCase(writers=writers).run(configs, options, ui)
-
-    output = [
-        {
-            "name": merged.config.name,
-            "merged_count": len(merged.episodes),
-            **(
-                {
-                    "references_count": len(merged.references),
-                    "downloads_count": len(merged.downloads),
-                }
-                if include_counts
-                else {}
-            ),
-            "episodes": [episode.model_dump(mode="json") for episode in merged.episodes],
-        }
-        for merged in merge_result.value
-    ]
-
+    merge_result = _run_merge(configs, options)
+    output = _build_stdout_output(merge_result, include_counts)
     json.dump(output, sys.stdout, indent=2 if pretty else None)
     sys.stdout.write("\n")
 
