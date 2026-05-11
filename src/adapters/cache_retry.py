@@ -7,6 +7,8 @@ from typing import Any
 
 from src.ports.cache import CachePort
 
+_CACHE_RECREATE_ERRORS = (AttributeError, OSError, RuntimeError, TypeError, ValueError)
+
 
 class RaceAwareCacheWrapper:
     """Wraps a cache instance with race-aware retry logic for concurrent access.
@@ -63,6 +65,6 @@ class RaceAwareCacheWrapper:
                 return
             cache_dir = Path(cache_dir_raw)
             cache_dir.mkdir(parents=True, exist_ok=True)
-        except Exception:
+        except _CACHE_RECREATE_ERRORS:
             # Ignore errors during directory recreation; the next retry will handle it
             pass

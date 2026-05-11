@@ -109,7 +109,7 @@ def _rrule_occurrence_exists(rule_str: str, day_start: datetime, day_end: dateti
         if occ is None:
             return False
         return occ < _align_to_tzinfo(day_end, occ)
-    except Exception:
+    except (TypeError, ValueError):
         return False
 
 

@@ -113,7 +113,7 @@ def _coalesce_str(*values: Any) -> str:
 
 try:
     from .ytdlp import YtDlpImage, YtDlpVideo
-except Exception:
+except (ImportError, ModuleNotFoundError):
     # When executed as a script the package-relative import may fail;
     # fall back to absolute import using the `src` package on sys.path.
     from src.models import YtDlpImage, YtDlpVideo

@@ -97,7 +97,7 @@ def schedule_matches_today(schedule: str, title: str, today: datetime | None = N
             return False
         day_end = _align_tz(next_occurrence, day_end)
         return next_occurrence < day_end
-    except Exception:
+    except (TypeError, ValueError):
         # Fail closed: if RRULE is malformed we skip this schedule.
         return False
 

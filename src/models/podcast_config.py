@@ -107,7 +107,7 @@ def ensure_feed_source(source: FeedSource | dict[str, Any]) -> FeedSource:
         return source
     try:
         payload = dict(source)
-    except Exception as exc:
+    except (TypeError, ValueError) as exc:
         raise TypeError("source must be FeedSource or dict") from exc
     payload["filters"] = ensure_source_filter(payload.get("filters"))
     return FeedSource.model_validate(payload)
