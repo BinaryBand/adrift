@@ -50,6 +50,8 @@ _VIDEO_CACHE_FIELDS = {
     "comment_count",
 }
 
+_YTDLP_FETCH_ERRORS = (OSError, RuntimeError, TypeError, ValueError)
+
 
 class ChannelInfo(BaseModel):
     """Typed channel information from yt-dlp."""
@@ -110,7 +112,7 @@ def _fetch_channel_info_raw(url: str, fetch_videos: bool = False) -> dict[str, A
         with YoutubeDL(cast(Any, _ydl_opts_dict(opts))) as ydl:
             info = ydl.extract_info(url, download=False)
             return cast(dict[str, Any], info) if info else None
-    except Exception as e:
+    except _YTDLP_FETCH_ERRORS as e:
         emit_error(f"Failed to fetch channel info from {url}: {e}")
         return None
 
@@ -163,7 +165,7 @@ def _fetch_video_info_attempt(
         info = _extract_info(_video_info_url(video_id), attempt.build_opts())
         emit_info(f"Completed video info probe {attempt_label} for {video_id}")
         return info
-    except Exception as e:
+    except _YTDLP_FETCH_ERRORS as e:
         reason = _video_info_retry_reason(e)
         emit_info(
             _video_info_attempt_failure_message(
@@ -307,7 +309,7 @@ def _fetch_channel_videos_raw(
                 return []
 
             return cast(list[dict[str, Any]], channel_info.get("entries", []))
-    except Exception as e:
+    except _YTDLP_FETCH_ERRORS as e:
         emit_error(f"Failed to fetch videos from {url}: {e}")
         return []
 

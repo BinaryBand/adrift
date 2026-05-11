@@ -176,7 +176,7 @@ class TestFetchVideoInfoRaw(unittest.TestCase):
         # First call (unauthenticated) fails
         # Second call (authenticated) succeeds
         mock_ydl.__enter__.return_value.extract_info.side_effect = [
-            Exception("Access denied"),
+            RuntimeError("Access denied"),
             {"id": "vid123", "title": "Test Video"},
         ]
         mock_ydl_class.return_value = mock_ydl
@@ -205,7 +205,7 @@ class TestFetchVideoInfoRaw(unittest.TestCase):
         mock_get_auth_opts.return_value = {"cookiesfrombrowser": "firefox"}
 
         mock_ydl = MagicMock()
-        mock_ydl.__enter__.return_value.extract_info.side_effect = Exception("Network error")
+        mock_ydl.__enter__.return_value.extract_info.side_effect = RuntimeError("Network error")
         mock_ydl_class.return_value = mock_ydl
 
         result = _fetch_video_info_raw("vid123")
@@ -353,7 +353,7 @@ class TestFetchChannelInfoRaw(unittest.TestCase):
         mock_get_opts.return_value = YtDlpParams()
 
         mock_ydl = MagicMock()
-        mock_ydl.__enter__.return_value.extract_info.side_effect = Exception("Network error")
+        mock_ydl.__enter__.return_value.extract_info.side_effect = RuntimeError("Network error")
         mock_ydl_class.return_value = mock_ydl
 
         result = _fetch_channel_info_raw("https://youtube.com/@test")
@@ -414,7 +414,7 @@ class TestFetchChannelVideosRaw(unittest.TestCase):
         mock_get_opts.return_value = YtDlpParams()
 
         mock_ydl = MagicMock()
-        mock_ydl.__enter__.return_value.extract_info.side_effect = Exception("Network error")
+        mock_ydl.__enter__.return_value.extract_info.side_effect = RuntimeError("Network error")
         mock_ydl_class.return_value = mock_ydl
 
         result = _fetch_channel_videos_raw("https://youtube.com/@test")

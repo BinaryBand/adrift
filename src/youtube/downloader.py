@@ -36,6 +36,8 @@ _BOT_INDICATORS = [
     "bot detection",
 ]
 
+_YTDLP_OPERATION_ERRORS = (OSError, RuntimeError, TypeError, ValueError)
+
 
 def _extract_video_id(url: str) -> str | None:
     """Extract YouTube video ID from URL."""
@@ -93,7 +95,7 @@ def _ytdlp_download(id: str, dir: Path, callback: Callback | None = None) -> Pat
         emit_info(f"Starting yt-dlp {label} for {id}")
         try:
             result = _run_download_attempt(id, dir, callback, attempt_config)
-        except Exception as e:
+        except _YTDLP_OPERATION_ERRORS as e:
             if _should_retry_attempt(e, attempt):
                 emit_info(f"Retrying {id} after {label} failed: {_retry_reason(e)}")
                 continue
@@ -312,7 +314,7 @@ def download_video(url: str, dir: Path, callback: Callback | None = None) -> Pat
         return _ytdlp_download(video_id, dir, callback)
     except BotDetectionError:
         raise
-    except Exception as e:
+    except _YTDLP_OPERATION_ERRORS as e:
         return _handle_download_failure(url, e)
 
 
