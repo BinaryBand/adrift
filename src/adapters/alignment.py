@@ -10,7 +10,10 @@ class GreedyAlignmentAdapter(AlignmentPort):
     """
 
     def align_episodes(
-        self, references: list[RssEpisode], downloads: list[RssEpisode], show: str = ""
+        self,
+        references: list[RssEpisode],
+        downloads: list[RssEpisode],
+        show: str = "",
     ) -> list[tuple[int, int]]:
         # Local import to avoid circular imports at module import time.
         # Delegate to the catalog implementation function to avoid recursion

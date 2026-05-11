@@ -10,8 +10,16 @@ os.environ.setdefault("S3_SECRET_KEY", "_test")
 os.environ.setdefault("S3_ENDPOINT", "http://localhost")
 os.environ.setdefault("S3_REGION", "us-east-1")
 
-from src.catalog import _best_thumbnail, align_episodes, merge_episode, sim_date
-from src.models import RssEpisode
+from src.catalog import (
+    _best_thumbnail,
+    align_episodes,
+    align_episodes_impl,
+    merge_episode,
+    sim_date,
+)
+from src.models import AlignmentConfig, RssEpisode
+
+_MORBID_ALIGNMENT = AlignmentConfig(extra_stopwords=["morbid"])
 
 
 def _dt(year: int, month: int, day: int) -> datetime:
@@ -156,7 +164,7 @@ class TestAlignEpisodes(unittest.TestCase):
             description="listener story batch",
             pub_date=_dt(2024, 2, 1),
         )
-        self.assertEqual(align_episodes([ref], [dl], "Morbid"), [])
+        self.assertEqual(align_episodes_impl([ref], [dl], "Morbid", _MORBID_ALIGNMENT), [])
 
     def test_listener_tales_number_exact_match_allowed(self):
         ref = _ep(
@@ -171,7 +179,10 @@ class TestAlignEpisodes(unittest.TestCase):
             description="listener story batch",
             pub_date=_dt(2024, 2, 1),
         )
-        self.assertEqual(align_episodes([ref], [dl], "Morbid"), [(0, 0)])
+        self.assertEqual(
+            align_episodes_impl([ref], [dl], "Morbid", _MORBID_ALIGNMENT),
+            [(0, 0)],
+        )
 
     def test_part_number_mismatch_rejected(self):
         ref = _ep(
@@ -186,7 +197,7 @@ class TestAlignEpisodes(unittest.TestCase):
             description="historic case",
             pub_date=_dt(2024, 2, 1),
         )
-        self.assertEqual(align_episodes([ref], [dl], "Morbid"), [])
+        self.assertEqual(align_episodes_impl([ref], [dl], "Morbid", _MORBID_ALIGNMENT), [])
 
     def test_volume_number_mismatch_rejected(self):
         ref = _ep(
@@ -201,7 +212,7 @@ class TestAlignEpisodes(unittest.TestCase):
             description="spooky segment",
             pub_date=_dt(2024, 2, 1),
         )
-        self.assertEqual(align_episodes([ref], [dl], "Morbid"), [])
+        self.assertEqual(align_episodes_impl([ref], [dl], "Morbid", _MORBID_ALIGNMENT), [])
 
     def test_episode_number_mismatch_rejected(self):
         ref = _ep(
@@ -216,7 +227,7 @@ class TestAlignEpisodes(unittest.TestCase):
             description="second",
             pub_date=_dt(2024, 2, 1),
         )
-        self.assertEqual(align_episodes([ref], [dl], "Morbid"), [])
+        self.assertEqual(align_episodes_impl([ref], [dl], "Morbid", _MORBID_ALIGNMENT), [])
 
     def test_certainty_path_matches_despite_large_date_gap(self):
         """Near-perfect titles match even with a 200-day date difference (YouTube backfill)."""
@@ -232,7 +243,10 @@ class TestAlignEpisodes(unittest.TestCase):
             description="a case description",
             pub_date=_dt(2023, 1, 5),  # 218 days later
         )
-        self.assertEqual(align_episodes([ref], [dl], "Morbid"), [(0, 0)])
+        self.assertEqual(
+            align_episodes_impl([ref], [dl], "Morbid", _MORBID_ALIGNMENT),
+            [(0, 0)],
+        )
 
     def test_containment_bonus_helps_near_threshold_pair(self):
         """Shorter title fully contained in longer title gets a boost over MATCH_TOLERANCE."""
@@ -248,7 +262,10 @@ class TestAlignEpisodes(unittest.TestCase):
             description="cold case",
             pub_date=_dt(2023, 1, 2),
         )
-        self.assertEqual(align_episodes([ref], [dl], "Morbid"), [(0, 0)])
+        self.assertEqual(
+            align_episodes_impl([ref], [dl], "Morbid", _MORBID_ALIGNMENT),
+            [(0, 0)],
+        )
 
     def test_low_anchor_overlap_rejected(self):
         ref = _ep(
@@ -263,7 +280,7 @@ class TestAlignEpisodes(unittest.TestCase):
             description="same date and description should not force unrelated title match",
             pub_date=_dt(2024, 2, 1),
         )
-        self.assertEqual(align_episodes([ref], [dl], "Morbid"), [])
+        self.assertEqual(align_episodes_impl([ref], [dl], "Morbid", _MORBID_ALIGNMENT), [])
 
     def test_anchor_overlap_allows_match(self):
         ref = _ep(
@@ -278,7 +295,10 @@ class TestAlignEpisodes(unittest.TestCase):
             description="haunted house case",
             pub_date=_dt(2024, 2, 1),
         )
-        self.assertEqual(align_episodes([ref], [dl], "Morbid"), [(0, 0)])
+        self.assertEqual(
+            align_episodes_impl([ref], [dl], "Morbid", _MORBID_ALIGNMENT),
+            [(0, 0)],
+        )
 
 
 # ---------------------------------------------------------------------------

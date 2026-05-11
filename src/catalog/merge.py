@@ -14,7 +14,7 @@ from src.models import (
 )
 from src.utils.progress import Callback
 
-from .alignment import align_episodes, merge_episode
+from .alignment import align_episodes_impl, merge_episode
 from .collection import EpisodeFetchContext, _collect_episodes_with_traces
 from .merge_trace import _build_match_traces
 
@@ -128,7 +128,7 @@ def _merge_config_artifacts(
 ) -> tuple[list[tuple[int, int]], list[ReferenceMatchTrace], list[EpisodeData]]:
     pairs = _timed_stage(
         "align_episodes",
-        lambda: align_episodes(references, downloads, config.name),
+        lambda: align_episodes_impl(references, downloads, config.name, config.alignment),
         options,
     )
     match_traces = _build_match_traces(references, downloads, pairs, config.name)

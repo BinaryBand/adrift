@@ -50,6 +50,31 @@ class FeedSource(BaseModel):
     filters: SourceFilter = Field(default_factory=SourceFilter)
 
 
+class ScoringWeights(BaseModel):
+    """Alignment signal weights for title/date/description/id scoring."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    id: float = 0.10
+    date: float = 0.30
+    title: float = 0.50
+    description: float = 0.10
+
+
+class AlignmentConfig(BaseModel):
+    """Per-podcast alignment tuning knobs."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    weights: ScoringWeights = Field(default_factory=ScoringWeights)
+    date_score_tiers: list[tuple[int, float]] = Field(
+        default_factory=lambda: [(2, 1.00), (10, 0.70), (35, 0.15)]
+    )
+    sparse_title_min: float = 0.85
+    match_tolerance: float = 0.75
+    extra_stopwords: list[str] = Field(default_factory=list)
+
+
 class PodcastConfig(BaseModel):
     """Configuration for a single podcast series."""
 
@@ -61,6 +86,7 @@ class PodcastConfig(BaseModel):
     downloads: list[FeedSource] = Field(default_factory=list)
     schedule: list[str] = Field(default_factory=list)
     tags: list[str] = Field(default_factory=list)
+    alignment: AlignmentConfig = Field(default_factory=AlignmentConfig)
 
     @computed_field(return_type=str)
     @property

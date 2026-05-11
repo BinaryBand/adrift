@@ -8,8 +8,10 @@ os.environ.setdefault("S3_SECRET_KEY", "_test")
 os.environ.setdefault("S3_ENDPOINT", "http://localhost")
 os.environ.setdefault("S3_REGION", "us-east-1")
 
-from src.catalog import align_episodes
-from src.models import RssEpisode
+from src.catalog import align_episodes_impl
+from src.models import AlignmentConfig, RssEpisode
+
+_MORBID_ALIGNMENT = AlignmentConfig(extra_stopwords=["morbid"])
 
 
 def _dt(year: int, month: int, day: int) -> datetime:
@@ -52,7 +54,7 @@ class TestMorbidBenchmark(unittest.TestCase):
                 ref = _ep(id=f"r{idx}", title=ref_title, pub_date=pub, description=desc)
                 dl = _ep(id=f"d{idx}", title=dl_title, pub_date=pub, description=desc)
 
-                pairs = align_episodes([ref], [dl], "Morbid")
+                pairs = align_episodes_impl([ref], [dl], "Morbid", _MORBID_ALIGNMENT)
 
                 msg = f"Row {idx}: {ref_title!r} <> {dl_title!r}"
                 if should_match:

@@ -19,8 +19,10 @@ from .pipeline import (
     SourceTrace,
 )
 from .podcast_config import (
+    AlignmentConfig,
     FeedSource,
     PodcastConfig,
+    ScoringWeights,
     SourceFilter,
     ensure_feed_source,
     ensure_podcast_config,
@@ -40,6 +42,8 @@ __all__ = [
     "RssChannel",
     "RssEpisode",
     "SourceFilter",
+    "ScoringWeights",
+    "AlignmentConfig",
     "FeedSource",
     "PodcastConfig",
     "EpisodeData",

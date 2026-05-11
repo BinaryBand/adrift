@@ -110,6 +110,9 @@ url = "https://feeds.simplecast.com/ohmVlJZQ"
 [[podcasts.downloads]]
 url = "yt://@morbidpodcast"
 
+[podcasts.alignment]
+extra_stopwords = ["morbid"]
+
 
 [[podcasts]]
 name = "Smosh Reads Reddit Stories"
