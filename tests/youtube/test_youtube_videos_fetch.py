@@ -89,7 +89,11 @@ class TestGetYoutubeVideosEarlyTermination(unittest.TestCase):
         mock_normalize.return_value = "https://www.youtube.com/playlist?list=PL12345"
         mock_get_videos.return_value = []
 
-        result = get_youtube_episodes("https://youtube.com/@test", "test_author")
+        result = get_youtube_episodes(
+            "https://youtube.com/@test",
+            "test_author",
+            YtFetchOptions(detailed=False),
+        )
 
         # Should return empty list
         self.assertEqual(result, [])
@@ -203,7 +207,9 @@ class TestGetYoutubeVideosFilter(unittest.TestCase):
         mock_get_videos.return_value = mock_episodes
 
         result = get_youtube_episodes(
-            "https://youtube.com/@test", "test_author", YtFetchOptions(filter="test")
+            "https://youtube.com/@test",
+            "test_author",
+            YtFetchOptions(detailed=False, filter="test"),
         )
 
         # Should only include videos with "test" in title

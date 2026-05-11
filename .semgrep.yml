@@ -28,6 +28,7 @@ rules:
     severity: ERROR
     patterns:
       - pattern: assert $X
-    paths-ignore:
-      - "tests/**"
-      - '**/tests/**'
+    paths:
+      exclude:
+        - "tests/**"
+        - '**/tests/**'
