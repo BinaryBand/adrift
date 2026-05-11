@@ -101,10 +101,10 @@ def _ydl_opts_dict(opts: YtDlpParams | dict[str, Any]) -> dict[str, Any]:
 def _fetch_channel_info_raw(url: str, fetch_videos: bool = False) -> dict[str, Any] | None:
     """Fetch raw channel information from yt-dlp."""
     opts: YtDlpParams = get_ydl_opts()
-    opts["extract_flat"] = True
+    opts.extract_flat = True
 
     if not fetch_videos:
-        opts["playlistend"] = 0  # Don't fetch any video entries
+        opts.playlistend = 0  # Don't fetch any video entries
 
     try:
         with YoutubeDL(cast(Any, _ydl_opts_dict(opts))) as ydl:
@@ -295,10 +295,10 @@ def _fetch_channel_videos_raw(
 ) -> list[dict[str, Any]]:
     """Fetch video entries from a channel/playlist."""
     opts: YtDlpParams = get_ydl_opts()
-    opts["extract_flat"] = True
-    opts["playlistreverse"] = reverse
-    opts["playliststart"] = start
-    opts["playlistend"] = end
+    opts.extract_flat = True
+    opts.playlistreverse = reverse
+    opts.playliststart = start
+    opts.playlistend = end
 
     try:
         with YoutubeDL(cast(Any, _ydl_opts_dict(opts))) as ydl:

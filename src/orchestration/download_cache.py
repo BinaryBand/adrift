@@ -5,7 +5,7 @@ from functools import lru_cache
 from pathlib import Path
 
 from src.files.s3 import get_file_list, get_metadata
-from src.orchestration.download_client import _prefixed_s3_key
+from src.orchestration.download_client import prefixed_s3_key
 from src.utils.regex import YOUTUBE_VIDEO_REGEX
 from src.utils.title_normalization import normalize_title
 
@@ -34,7 +34,7 @@ def _existing_media_sources(bucket: str, prefix: str, show: str) -> _ExistingMed
 
     for name in get_file_list(bucket, prefix, False):
         cleaned_slugs.add(normalize_title(show, Path(name).stem))
-        metadata = get_metadata(bucket, _prefixed_s3_key(prefix, name))
+        metadata = get_metadata(bucket, prefixed_s3_key(prefix, name))
         if metadata is None:
             continue
         source = getattr(metadata, "source", None)

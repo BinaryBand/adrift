@@ -6,7 +6,7 @@ from src.catalog import match, process_feeds
 from src.files.audio import is_audio
 from src.files.s3 import get_s3_files, upload_file
 from src.models import PodcastConfig, RssChannel, RssEpisode
-from src.orchestration.download_client import _s3_prefix
+from src.orchestration.download_client import s3_prefix
 from src.web.rss import podcast_to_rss
 
 
@@ -80,7 +80,7 @@ def _upload_rss(bucket: str, prefix: str, rss_xml: str) -> None:
 
 
 def update_rss(config: PodcastConfig) -> None:
-    bucket, prefix = _s3_prefix(config)
+    bucket, prefix = s3_prefix(config)
     channel = _build_channel(config)
     ref_episodes = process_feeds(config)
     matched = _match_to_s3(config, ref_episodes, bucket, prefix)

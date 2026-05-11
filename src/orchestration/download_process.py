@@ -10,6 +10,7 @@ from src.files.audio import convert_to_opus, cut_segments, get_duration
 from src.files.s3 import exists
 from src.models import DownloadEpisode, MediaMetadata, PodcastConfig
 from src.orchestration.download_cache import _existing_media_sources
+from src.orchestration.download_client import s3_prefix
 from src.orchestration.download_upload import _build_upload_request, _upload_episode_audio
 from src.utils.progress import Callback
 from src.utils.title_normalization import normalize_title
@@ -25,25 +26,9 @@ class DownloadQueueItem:
 
 @dataclass(frozen=True)
 class DownloadProgressHooks:
-    on_operation: Callable[[str], None] | None = None
-    on_progress: Callback | None = None
-    on_complete: Callable[[], None] | None = None
-
-
-def _start_operation(hooks: DownloadProgressHooks | None, label: str) -> None:
-    if hooks is not None and hooks.on_operation is not None:
-        hooks.on_operation(label)
-
-
-def _complete_operation(hooks: DownloadProgressHooks | None) -> None:
-    if hooks is not None and hooks.on_complete is not None:
-        hooks.on_complete()
-
-
-def _operation_progress(hooks: DownloadProgressHooks | None) -> Callback | None:
-    if hooks is None:
-        return None
-    return hooks.on_progress
+    on_operation: Callable[[str], None] = lambda _: None
+    on_progress: Callback = lambda *_: None
+    on_complete: Callable[[], None] = lambda: None
 
 
 def _episode_slug(config: PodcastConfig, ep: DownloadEpisode) -> str:
@@ -51,9 +36,7 @@ def _episode_slug(config: PodcastConfig, ep: DownloadEpisode) -> str:
 
 
 def episode_exists_on_s3(ep: DownloadEpisode, config: PodcastConfig) -> bool:
-    from src.orchestration import download_service as _download_service
-
-    bucket, prefix = _download_service._s3_prefix(config)
+    bucket, prefix = s3_prefix(config)
     cleaned_slug = _episode_slug(config, ep)
     key_prefix = f"{prefix}/{cleaned_slug}"
     if exists(bucket, key_prefix) is not None:
@@ -97,14 +80,13 @@ def download_and_upload(
 
     Returns True if newly uploaded, False if already present on S3.
     """
-    from src.orchestration import download_service as _download_service
-
-    bucket, prefix = _download_service._s3_prefix(config)
+    hooks = progress_hooks or DownloadProgressHooks()
+    bucket, prefix = s3_prefix(config)
     key_prefix = f"{prefix}/{_episode_slug(config, ep)}"
     if exists(bucket, key_prefix):
         return False
     with tempfile.TemporaryDirectory() as tmp:
-        return process_in_tmpdir(ep, config, Path(tmp), progress_hooks)
+        return process_in_tmpdir(ep, config, Path(tmp), hooks)
 
 
 def process_in_tmpdir(
@@ -113,20 +95,19 @@ def process_in_tmpdir(
     tmp: Path,
     progress_hooks: DownloadProgressHooks | None,
 ) -> bool:
-    from src.orchestration import download_service as _download_service
-
-    bucket, prefix = _download_service._s3_prefix(config)
+    hooks = progress_hooks or DownloadProgressHooks()
+    bucket, prefix = s3_prefix(config)
     key_prefix = f"{prefix}/{_episode_slug(config, ep)}"
-    audio = _download_episode_audio(ep, tmp, progress_hooks)
+    audio = _download_episode_audio(ep, tmp, hooks)
     if audio is None:
-        _complete_operation(progress_hooks)
+        hooks.on_complete()
         return False
-    opus = _prepare_upload_audio(ep, audio, progress_hooks)
+    opus = _prepare_upload_audio(ep, audio, hooks)
     duration = get_duration(opus)
     metadata = _build_metadata(ep, duration, sponsors_removed=bool(ep.sponsor_segments))
     upload_request = _build_upload_request(bucket, key_prefix, opus, metadata)
-    _upload_episode_audio(ep, upload_request, progress_hooks)
-    _complete_operation(progress_hooks)
+    _upload_episode_audio(ep, upload_request, hooks)
+    hooks.on_complete()
     return True
 
 
@@ -139,20 +120,18 @@ def _download_audio(
 
 
 def _download_episode_audio(
-    ep: DownloadEpisode, tmp: Path, progress_hooks: DownloadProgressHooks | None
+    ep: DownloadEpisode, tmp: Path, hooks: DownloadProgressHooks
 ) -> Path | None:
-    _start_operation(progress_hooks, f"download audio: {ep.episode.title}")
-    return _download_audio(ep, tmp, _operation_progress(progress_hooks))
+    hooks.on_operation(f"download audio: {ep.episode.title}")
+    return _download_audio(ep, tmp, hooks.on_progress)
 
 
-def _prepare_upload_audio(
-    ep: DownloadEpisode, audio: Path, progress_hooks: DownloadProgressHooks | None
-) -> Path:
+def _prepare_upload_audio(ep: DownloadEpisode, audio: Path, hooks: DownloadProgressHooks) -> Path:
     if ep.sponsor_segments:
-        _start_operation(progress_hooks, f"cut sponsors: {ep.episode.title}")
-        cut_segments(audio, ep.sponsor_segments, callback=_operation_progress(progress_hooks))
-    _start_operation(progress_hooks, f"convert opus: {ep.episode.title}")
-    return convert_to_opus(audio, callback=_operation_progress(progress_hooks))
+        hooks.on_operation(f"cut sponsors: {ep.episode.title}")
+        cut_segments(audio, ep.sponsor_segments, callback=hooks.on_progress)
+    hooks.on_operation(f"convert opus: {ep.episode.title}")
+    return convert_to_opus(audio, callback=hooks.on_progress)
 
 
 def _build_metadata(

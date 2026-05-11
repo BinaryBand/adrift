@@ -4,9 +4,11 @@ import os
 import shutil
 import subprocess
 import tempfile
+from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, TypedDict, Unpack, cast
 
+from src.utils.media import AUDIO_EXTENSIONS
 from src.utils.progress import Callback
 
 logger = logging.getLogger(__name__)
@@ -17,8 +19,6 @@ MIN_LENGTH = 0.1  # seconds
 
 _FFMPEG_BASE = ["ffmpeg", "-hide_banner", "-loglevel", "error"]
 
-AUDIO_EXTENSIONS = {".mp3", ".m4a", ".aac", ".wav", ".flac", ".ogg", ".mp4", ".opus"}
-
 
 class OpusConversionKwargs(TypedDict, total=False):
     target_bitrate_kbps: int | None
@@ -26,33 +26,11 @@ class OpusConversionKwargs(TypedDict, total=False):
     application: str
 
 
+@dataclass
 class _OpusConversionSettings:
-    def __init__(
-        self,
-        target_bitrate_kbps: int | None = None,
-        force_bitrate: bool = False,
-        application: str = "audio",
-    ) -> None:
-        self.target_bitrate_kbps = target_bitrate_kbps
-        self.force_bitrate = force_bitrate
-        self.application = application
-
-
-def _build_opus_settings(kwargs: dict[str, Any]) -> _OpusConversionSettings:
-    return _OpusConversionSettings(
-        target_bitrate_kbps=kwargs.get("target_bitrate_kbps"),
-        force_bitrate=kwargs.get("force_bitrate", False),
-        application=kwargs.get("application", "audio"),
-    )
-
-
-def _duration_weights(part_count: int) -> tuple[int, ...] | None:
-    weights_map: dict[int, tuple[int, ...]] = {
-        1: (1,),
-        2: (60, 1),
-        3: (3600, 60, 1),
-    }
-    return weights_map.get(part_count)
+    target_bitrate_kbps: int | None = None
+    force_bitrate: bool = False
+    application: str = "audio"
 
 
 def _run_ffprobe(file: Path) -> str:
@@ -117,19 +95,6 @@ def handle_subprocess_error(
 def is_audio(filename: Path | str) -> bool:
     ext = Path(filename).suffix.lower()
     return ext in AUDIO_EXTENSIONS
-
-
-def parse_duration(duration_str: str | None) -> float | None:
-    """Parse duration string in HH:MM:SS or MM:SS format to total seconds."""
-    if duration_str is None or duration_str == "":
-        return None
-
-    parts = duration_str.split(":")
-    if weights := _duration_weights(len(parts)):
-        return sum(weight * float(part) for weight, part in zip(weights, parts))
-
-    logger.warning("Unrecognized duration format: %s", duration_str)
-    return None
 
 
 def get_duration(file: Path) -> float | None:
@@ -555,7 +520,7 @@ def convert_to_opus(
     if file.suffix.lower() == ".opus":
         return file
 
-    settings = _build_opus_settings(kwargs)
+    settings = _OpusConversionSettings(**kwargs)
     output, cmd, ffprobe_out = _prepare_opus_conversion(file, settings)
     if callback is None:
         _run_ffmpeg_convert(cmd, file, ffprobe_out)

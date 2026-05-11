@@ -308,7 +308,7 @@ class TestFetchChannelInfoRaw(unittest.TestCase):
         self, mock_get_opts: MagicMock, mock_ydl_class: MagicMock
     ):
         """Test fetching channel metadata without video entries."""
-        mock_get_opts.return_value = {}
+        mock_get_opts.return_value = YtDlpParams()
 
         mock_ydl = MagicMock()
         mock_ydl.__enter__.return_value.extract_info.return_value = {
@@ -323,14 +323,14 @@ class TestFetchChannelInfoRaw(unittest.TestCase):
         self.assertEqual(result["title"], "Test Channel")
         # Verify playlistend=0 was set
         opts = mock_get_opts.return_value
-        self.assertEqual(opts["extract_flat"], True)
-        self.assertEqual(opts["playlistend"], 0)
+        self.assertEqual(opts.extract_flat, True)
+        self.assertEqual(opts.playlistend, 0)
 
     @patch("src.youtube.ytdlp.YoutubeDL")
     @patch("src.youtube.ytdlp.get_ydl_opts")
     def test_fetch_channel_with_videos(self, mock_get_opts: MagicMock, mock_ydl_class: MagicMock):
         """Test fetching channel with video entries."""
-        mock_get_opts.return_value = {}
+        mock_get_opts.return_value = YtDlpParams()
 
         mock_ydl = MagicMock()
         mock_ydl.__enter__.return_value.extract_info.return_value = {
@@ -342,15 +342,15 @@ class TestFetchChannelInfoRaw(unittest.TestCase):
         result = _fetch_channel_info_raw("https://youtube.com/@test", fetch_videos=True)
 
         self.assertIsNotNone(result)
-        # Verify playlistend was NOT set
+        # Verify playlistend was NOT set (still None — only set when fetch_videos=False)
         opts = mock_get_opts.return_value
-        self.assertNotIn("playlistend", opts)
+        self.assertIsNone(opts.playlistend)
 
     @patch("src.youtube.ytdlp.YoutubeDL")
     @patch("src.youtube.ytdlp.get_ydl_opts")
     def test_returns_none_on_error(self, mock_get_opts: MagicMock, mock_ydl_class: MagicMock):
         """Test returns None when fetch fails."""
-        mock_get_opts.return_value = {}
+        mock_get_opts.return_value = YtDlpParams()
 
         mock_ydl = MagicMock()
         mock_ydl.__enter__.return_value.extract_info.side_effect = Exception("Network error")
@@ -368,7 +368,7 @@ class TestFetchChannelVideosRaw(unittest.TestCase):
     @patch("src.youtube.ytdlp.get_ydl_opts")
     def test_fetch_with_default_params(self, mock_get_opts: MagicMock, mock_ydl_class: MagicMock):
         """Test fetching with default parameters."""
-        mock_get_opts.return_value = {}
+        mock_get_opts.return_value = YtDlpParams()
 
         mock_ydl = MagicMock()
         mock_ydl.__enter__.return_value.extract_info.return_value = {
@@ -385,16 +385,16 @@ class TestFetchChannelVideosRaw(unittest.TestCase):
         self.assertEqual(result[0]["id"], "vid1")
         # Verify default opts
         opts = mock_get_opts.return_value
-        self.assertEqual(opts["extract_flat"], True)
-        self.assertEqual(opts["playlistreverse"], False)
-        self.assertEqual(opts["playliststart"], 1)
-        self.assertIsNone(opts["playlistend"])
+        self.assertEqual(opts.extract_flat, True)
+        self.assertEqual(opts.playlistreverse, False)
+        self.assertEqual(opts.playliststart, 1)
+        self.assertIsNone(opts.playlistend)
 
     @patch("src.youtube.ytdlp.YoutubeDL")
     @patch("src.youtube.ytdlp.get_ydl_opts")
     def test_fetch_with_custom_range(self, mock_get_opts: MagicMock, mock_ydl_class: MagicMock):
         """Test fetching with custom start/end range."""
-        mock_get_opts.return_value = {}
+        mock_get_opts.return_value = YtDlpParams()
 
         mock_ydl = MagicMock()
         mock_ydl.__enter__.return_value.extract_info.return_value = {"entries": []}
@@ -403,15 +403,15 @@ class TestFetchChannelVideosRaw(unittest.TestCase):
         _fetch_channel_videos_raw("https://youtube.com/@test", start=10, end=25, reverse=True)
 
         opts = mock_get_opts.return_value
-        self.assertEqual(opts["playliststart"], 10)
-        self.assertEqual(opts["playlistend"], 25)
-        self.assertEqual(opts["playlistreverse"], True)
+        self.assertEqual(opts.playliststart, 10)
+        self.assertEqual(opts.playlistend, 25)
+        self.assertEqual(opts.playlistreverse, True)
 
     @patch("src.youtube.ytdlp.YoutubeDL")
     @patch("src.youtube.ytdlp.get_ydl_opts")
     def test_returns_empty_list_on_error(self, mock_get_opts: MagicMock, mock_ydl_class: MagicMock):
         """Test returns empty list when fetch fails."""
-        mock_get_opts.return_value = {}
+        mock_get_opts.return_value = YtDlpParams()
 
         mock_ydl = MagicMock()
         mock_ydl.__enter__.return_value.extract_info.side_effect = Exception("Network error")
@@ -425,7 +425,7 @@ class TestFetchChannelVideosRaw(unittest.TestCase):
     @patch("src.youtube.ytdlp.get_ydl_opts")
     def test_handles_none_response(self, mock_get_opts: MagicMock, mock_ydl_class: MagicMock):
         """Test handles None response from yt-dlp."""
-        mock_get_opts.return_value = {}
+        mock_get_opts.return_value = YtDlpParams()
 
         mock_ydl = MagicMock()
         mock_ydl.__enter__.return_value.extract_info.return_value = None

@@ -3,6 +3,7 @@ import re
 from collections.abc import Callable
 from dataclasses import dataclass
 from datetime import datetime
+from typing import NamedTuple
 
 from rapidfuzz import fuzz
 
@@ -23,6 +24,9 @@ from src.utils.title_normalization import normalize_title
 StringSimilarityFn = Callable[[list[str], list[str]], list[list[float]]]
 
 _THUMBNAIL_RANK = {"maxres": 4, "hq": 3, "mq": 2, "sq": 1}
+# Podcast-specific brand words ("morbid", "tales", "listener") are included
+# because they appear in nearly every episode title on their respective feeds,
+# making them useless as discriminating anchor tokens.
 _ANCHOR_STOPWORDS = {
     "the",
     "a",
@@ -228,40 +232,26 @@ def _compute_optional_weights(
     return weighted, total
 
 
-def _extract_listener_tales_number(title: str) -> int | None:
-    match = re.search(r"\blistener\s+tales(?:\s+episode)?\s+(\d+)\b", title)
-    return int(match.group(1)) if match else None
+_NUMBERED_MARKER_PATTERNS = (
+    r"\blistener\s+tales(?:\s+episode)?\s+(\d+)\b",
+    r"\bpart\s+(\d+)\b",
+    r"\b(?:volume|vol)\s+(\d+)\b",
+    r"\bepisode\s+(\d+)\b",
+)
 
 
-def _extract_part_number(title: str) -> int | None:
-    match = re.search(r"\bpart\s+(\d+)\b", title)
-    return int(match.group(1)) if match else None
-
-
-def _extract_volume_number(title: str) -> int | None:
-    match = re.search(r"\b(?:volume|vol)\s+(\d+)\b", title)
-    return int(match.group(1)) if match else None
-
-
-def _extract_episode_number(title: str) -> int | None:
-    match = re.search(r"\bepisode\s+(\d+)\b", title)
-    return int(match.group(1)) if match else None
-
-
-def _number_mismatch(extractor: Callable[[str], int | None], ref_title: str, dl_title: str) -> bool:
-    ref_value = extractor(ref_title)
-    dl_value = extractor(dl_title)
-    return ref_value is not None and dl_value is not None and ref_value != dl_value
+def _extract_numbered_marker(pattern: str, title: str) -> int | None:
+    m = re.search(pattern, title)
+    return int(m.group(1)) if m else None
 
 
 def _has_structured_number_mismatch(ref_title: str, dl_title: str) -> bool:
-    extractors: tuple[Callable[[str], int | None], ...] = (
-        _extract_listener_tales_number,
-        _extract_part_number,
-        _extract_volume_number,
-        _extract_episode_number,
-    )
-    return any(_number_mismatch(extractor, ref_title, dl_title) for extractor in extractors)
+    for pattern in _NUMBERED_MARKER_PATTERNS:
+        ref_val = _extract_numbered_marker(pattern, ref_title)
+        dl_val = _extract_numbered_marker(pattern, dl_title)
+        if ref_val is not None and dl_val is not None and ref_val != dl_val:
+            return True
+    return False
 
 
 def _anchor_tokens(title: str) -> frozenset[str]:
@@ -293,41 +283,42 @@ _TITLE_CERTAINTY_MIN = 0.97
 _CONTAINMENT_BONUS = 0.08
 
 
-def _certainty_title_score(
-    ref: "_AlignmentCandidate",
-    dl: "_AlignmentCandidate",
-    s_title: float,
-    s_desc: float,
-) -> float:
-    """Score for near-perfect-title matches, excluding the (unreliable) date signal."""
-    s_id = _id_similarity(ref.episode, dl.episode)
-    has_desc = _has_description_signal(ref, dl)
-    weighted_sum = W_TITLE * s_title
-    total_weight = W_TITLE
-    if has_desc:
-        weighted_sum += W_DESC * s_desc
-        total_weight += W_DESC
-    return min(1.0, weighted_sum / total_weight + W_ID * s_id)
+class _Sims(NamedTuple):
+    """Pre-computed title and description similarity scores for a candidate pair."""
+
+    title: float
+    desc: float = 0.0
 
 
 def _is_sparse_title(s_id: float, has_desc: bool, s_title: float) -> bool:
     return not s_id and not has_desc and s_title < SPARSE_TITLE_MIN
 
 
-def _compute_base_score(
+def _score(
     ref: "_AlignmentCandidate",
     dl: "_AlignmentCandidate",
-    s_title: float,
-    s_desc: float,
+    sims: "_Sims",
+    *,
+    include_date: bool,
 ) -> float:
+    """Weighted similarity score.
+
+    When ``include_date`` is False (near-perfect title matches) the date signal
+    is excluded because YouTube backfill upload dates can lag RSS publication by
+    months, making them unreliable anchors for high-confidence title pairs.
+    """
     s_id = _id_similarity(ref.episode, dl.episode)
-    weighted_sum = W_TITLE * s_title
+    weighted_sum = W_TITLE * sims.title
     total_weight = W_TITLE
-    opt_sum, opt_total = _compute_optional_weights(ref, dl, s_desc)
-    weighted_sum += opt_sum
-    total_weight += opt_total
+    if _has_description_signal(ref, dl):
+        weighted_sum += W_DESC * sims.desc
+        total_weight += W_DESC
+    if include_date and _has_date_signal(ref, dl):
+        weighted_sum += W_DATE * sim_date(ref.episode.pub_date, dl.episode.pub_date)
+        total_weight += W_DATE
     base = weighted_sum / total_weight
-    containment = _CONTAINMENT_BONUS if _has_token_containment(ref.title, dl.title) else 0.0
+    has_containment = include_date and _has_token_containment(ref.title, dl.title)
+    containment = _CONTAINMENT_BONUS if has_containment else 0.0
     return min(1.0, base + W_ID * s_id + containment)
 
 
@@ -348,14 +339,14 @@ def _weighted_score(
     # Near-perfect title match: date signal is excluded (may be unreliable for
     # YouTube backfills where the upload date can lag RSS publication by months).
     if s_title >= _TITLE_CERTAINTY_MIN:
-        return _certainty_title_score(ref, dl, s_title, s_desc)
+        return _score(ref, dl, _Sims(s_title, s_desc), include_date=False)
 
     s_id = _id_similarity(ref.episode, dl.episode)
     has_desc = _has_description_signal(ref, dl)
     if _is_sparse_title(s_id, has_desc, s_title):
         return 0.0
 
-    return _compute_base_score(ref, dl, s_title, s_desc)
+    return _score(ref, dl, _Sims(s_title, s_desc), include_date=True)
 
 
 def _build_similarity_matrices(
@@ -455,13 +446,10 @@ def align_episodes(
     references: list[RssEpisode], downloads: list[RssEpisode], show: str = ""
 ) -> list[tuple[int, int]]:
     """Public alignment entrypoint that delegates to an adapter."""
-    try:
-        from src.adapters import get_alignment_adapter
+    from src.adapters import get_alignment_adapter
 
-        adapter = get_alignment_adapter()
-        return adapter.align_episodes(references, downloads, show)
-    except Exception:
-        return align_episodes_impl(references, downloads, show)
+    adapter = get_alignment_adapter()
+    return adapter.align_episodes(references, downloads, show)
 
 
 def _thumbnail_rank(url: str | None) -> int:

@@ -17,12 +17,12 @@ from diskcache import Cache
 from feedparser import FeedParserDict
 
 from src.models import RssChannel, RssEpisode
+from src.utils.image import extract_image_from_feedparser
+from src.utils.media import AUDIO_EXTENSIONS, parse_duration
 from src.utils.progress import Callback
 from src.utils.regex import LINK_REGEX, re_compile
 
 _CONTROL_CHARS_RE = re_compile(r"[\x00-\x08\x0B\x0C\x0E-\x1F\x7F]")
-
-AUDIO_EXTENSIONS = {".mp3", ".m4a", ".aac", ".wav", ".flac", ".ogg", ".mp4", ".opus"}
 
 
 @functools.cache
@@ -56,83 +56,11 @@ def _cache_set_with_retry(cache: Cache, key: str, value: str, expire: int | None
 
 
 def _extract_image_url(channel: FeedParserDict) -> str:
-    """Thin wrapper to keep a small replaceable root for image extraction."""
-    return _extract_image_url_impl(channel)
-
-
-def _extract_image_url_impl(channel: FeedParserDict) -> str:
-    """Extract image URL from various possible locations in the feed.
-
-    Prefer the first non-empty candidate.
-    """
-    val = _extract_image_from(cast(object, channel.get("image")))
+    """Extract image URL from the 'image' or 'itunes_image' field of a feed channel."""
+    val = extract_image_from_feedparser(cast(object, channel.get("image")))
     if val:
         return val
-    val = _extract_image_from(cast(object, channel.get("itunes_image")))
-    if val:
-        return val
-    return ""
-
-
-def _extract_image_from(obj: object) -> str:
-    # Try string-like
-    res = _extract_image_from_str(obj)
-    if res:
-        return res
-    # Try mapping-like objects with .get
-    res = _extract_image_from_get(obj)
-    if res:
-        return res
-    # Try attribute access
-    res = _extract_image_from_attrs(obj)
-    if res:
-        return res
-    return ""
-
-
-def _extract_image_from_str(obj: object) -> str:
-    if isinstance(obj, str) and obj:
-        return obj
-    return ""
-
-
-def _extract_image_from_get(obj: object) -> str:
-    get = getattr(obj, "get", None)
-    if not callable(get):
-        return ""
-    for key in ("href", "url"):
-        val = get(key, None)
-        if isinstance(val, str) and val:
-            return val
-    return ""
-
-
-def _extract_image_from_attrs(obj: object) -> str:
-    href = getattr(obj, "href", None)
-    if isinstance(href, str) and href:
-        return href
-    url = getattr(obj, "url", None)
-    if isinstance(url, str) and url:
-        return url
-    return ""
-
-
-def parse_duration(duration_str: str | None) -> float | None:
-    """Parse duration string in HH:MM:SS or MM:SS format to total seconds."""
-    if duration_str is None or duration_str == "":
-        return None
-
-    parts = duration_str.split(":")
-    weights_map: dict[int, tuple[int, ...]] = {
-        1: (1,),
-        2: (60, 1),
-        3: (3600, 60, 1),
-    }
-    weights = weights_map.get(len(parts))
-    if weights is None:
-        print(f"WARNING: Unrecognized duration format: {duration_str}")
-        return None
-    return sum(weight * float(part) for weight, part in zip(weights, parts))
+    return extract_image_from_feedparser(cast(object, channel.get("itunes_image")))
 
 
 def get_rss_channel(rss_url: str) -> RssChannel:

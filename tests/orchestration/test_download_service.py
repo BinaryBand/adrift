@@ -217,7 +217,7 @@ def test_process_in_tmpdir_reports_upload_progress(
         return 42.0
 
     monkeypatch.setattr(
-        "src.orchestration.download_service._s3_prefix",
+        "src.orchestration.download_process.s3_prefix",
         _s3_prefix_fn,
     )
     monkeypatch.setattr(

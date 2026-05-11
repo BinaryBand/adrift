@@ -5,7 +5,7 @@ implementation is split into smaller files under src.orchestration.
 """
 
 from src.orchestration.download_cache import _existing_media_sources, _ExistingMediaSources
-from src.orchestration.download_client import _prefixed_s3_key, _s3_prefix
+from src.orchestration.download_client import prefixed_s3_key, s3_prefix
 from src.orchestration.download_enrich import _extract_video_id, enrich_with_sponsors
 from src.orchestration.download_process import (
     DownloadProgressHooks,
@@ -25,8 +25,8 @@ from src.orchestration.download_upload import (
 __all__ = [
     "enrich_with_sponsors",
     "_extract_video_id",
-    "_s3_prefix",
-    "_prefixed_s3_key",
+    "s3_prefix",
+    "prefixed_s3_key",
     "_existing_media_sources",
     "_ExistingMediaSources",
     "DownloadQueueItem",

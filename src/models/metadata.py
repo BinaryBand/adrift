@@ -1,11 +1,13 @@
 import os
 from abc import ABC, abstractmethod
 from datetime import datetime, timezone
-from typing import Any, Callable, cast
+from typing import Any, Callable
 
 import pydantic
 from dotenv import find_dotenv, load_dotenv
 from pydantic import BaseModel, ConfigDict
+
+from src.utils.image import extract_image_from_ytdlp_list
 
 load_dotenv(find_dotenv())
 DEVICE = os.getenv("DEVICE", "UnknownDevice")
@@ -59,9 +61,8 @@ class MediaMetadata(S3Metadata):
 class YtDlpParams(BaseModel):
     """Typed yt-dlp options as a Pydantic model.
 
-    This model is intentionally permissive (extra fields allowed) and
-    implements mapping-style access so it can be used interchangeably with
-    plain dicts in existing call sites (e.g., `opts["format"] = "..."`).
+    All fields are optional (None means yt-dlp uses its own default).  Use
+    attribute access to read and write: ``opts.format = "bestaudio"``.
     """
 
     quiet: bool | None = None
@@ -87,36 +88,6 @@ class YtDlpParams(BaseModel):
     js_runtimes: dict[str, dict[str, Any]] | None = None
 
     model_config = ConfigDict(extra="allow", arbitrary_types_allowed=True)
-
-    def __getitem__(self, key: str) -> Any:
-        return getattr(self, key) if hasattr(self, key) else self.model_dump().get(key)
-
-    def __setitem__(self, key: str, value: Any) -> None:
-        try:
-            setattr(self, key, value)
-        except Exception:
-            # Fallback to storing in the extra dict
-            data = self.model_dump()
-            data[key] = value
-            self.model_validate(data)
-
-
-def _extract_image_url(value: Any) -> str:
-    if isinstance(value, YtDlpImage):
-        return value.url or ""
-    if isinstance(value, dict):
-        value_dict = cast(dict[str, Any], value)
-        url_value = value_dict.get("url")
-        return url_value if isinstance(url_value, str) else ""
-    return ""
-
-
-def _extract_image_from_list(data: list[Any]) -> str:
-    if not data:
-        return ""
-
-    last = data[-1]
-    return _extract_image_url(last)
 
 
 def _from_unix_timestamp(raw: Any) -> datetime | None:
@@ -215,7 +186,7 @@ class RssChannel(BaseModel):
         if not data:
             return ""
         if isinstance(data, list):
-            return _extract_image_from_list(data)
+            return extract_image_from_ytdlp_list(data)
         return data
 
 

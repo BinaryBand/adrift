@@ -22,20 +22,14 @@ def _build_upload_request(
     return _UploadRequest(bucket=bucket, key=f"{key_prefix}.opus", opus=opus, metadata=metadata)
 
 
-def _upload_episode_audio(ep: DownloadEpisode, request: _UploadRequest, hooks: Any | None) -> None:
-    """Upload an opus file, using optional `hooks` for progress notifications.
-
-    `hooks` is expected to have `.on_operation` and `.on_progress` attributes,
-    but is typed as `Any` to avoid circular imports with the orchestration
-    module.
-    """
-    if hooks is not None and getattr(hooks, "on_operation", None) is not None:
-        hooks.on_operation(f"upload opus: {ep.episode.title}")
+def _upload_episode_audio(ep: DownloadEpisode, request: _UploadRequest, hooks: Any) -> None:
+    """Upload an opus file, using `hooks` for progress notifications."""
+    hooks.on_operation(f"upload opus: {ep.episode.title}")
     upload_file(
         request.bucket,
         request.key,
         request.opus,
-        UploadOptions(metadata=request.metadata, callback=getattr(hooks, "on_progress", None)),
+        UploadOptions(metadata=request.metadata, callback=hooks.on_progress),
     )
 
 

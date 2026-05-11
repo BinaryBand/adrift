@@ -67,16 +67,16 @@ def get_auth_ydl_opts(
 
 
 def _apply_authenticated_download_defaults(opts: YtDlpParams) -> None:
-    opts["ratelimit"] = 2 * 1024 * 1024  # 2 MB/s — throttle media downloads only
+    opts.ratelimit = 2 * 1024 * 1024  # 2 MB/s — throttle media downloads only
     # Provide Node.js so yt-dlp can solve YouTube's n-challenge (required for
     # age-restricted and some other videos). remote_components lets it fetch the
     # challenge solver script from GitHub on first use.
     node = _node_path()
-    opts["js_runtimes"] = {"node": {"path": node} if node else {}}
-    opts["remote_components"] = {"ejs:github"}
+    opts.js_runtimes = {"node": {"path": node} if node else {}}
+    opts.remote_components = {"ejs:github"}
     # Age-restricted videos require JS for auth token verification; remove the
     # skip that get_ydl_opts sets for unauthenticated use.
-    opts["extractor_args"] = {"youtube": {}}
+    opts.extractor_args = {"youtube": {}}
 
 
 def _apply_cookiefile(
@@ -87,7 +87,7 @@ def _apply_cookiefile(
 ) -> bool:
     try:
         if cookie_path.stat().st_size > 0:
-            opts["cookiefile"] = str(cookie_path)
+            opts.cookiefile = str(cookie_path)
             emit_info(success_message.format(path=cookie_path))
             return True
     except FileNotFoundError:
@@ -119,17 +119,17 @@ def _apply_repo_cookiefile(opts: YtDlpParams) -> bool:
 
 def _apply_browser_fallback(opts: YtDlpParams, prefer_native: bool) -> None:
     if prefer_native:
-        opts["cookiesfrombrowser"] = ("firefox",)
+        opts.cookiesfrombrowser = ("firefox",)
         emit_info("Using Firefox browser cookies via yt-dlp browser fallback")
         return
 
     cookies_file = _try_export_firefox_cookies()
     if cookies_file is not None:
-        opts["cookiefile"] = str(cookies_file)
+        opts.cookiefile = str(cookies_file)
         emit_info(f"Using exported Firefox cookies file: {cookies_file}")
         return
 
-    opts["cookiesfrombrowser"] = ("firefox",)
+    opts.cookiesfrombrowser = ("firefox",)
     emit_warning("Export failed; falling back to Firefox cookies via yt-dlp browser fallback")
 
 

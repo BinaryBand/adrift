@@ -123,15 +123,15 @@ def _build_download_opts(
     attempt_config = _coerce_attempt_config(attempt)
     opts: YtDlpParams = _base_download_opts(attempt_config)
     if attempt_config.format_selector is not None:
-        opts["format"] = attempt_config.format_selector
-    opts["outtmpl"] = (dir / f"{id}.%(ext)s").as_posix()
-    opts["postprocessors"] = [_audio_postprocessor()]
+        opts.format = attempt_config.format_selector
+    opts.outtmpl = (dir / f"{id}.%(ext)s").as_posix()
+    opts.postprocessors = [_audio_postprocessor()]
     if attempt_config.player_clients is not None:
-        opts["extractor_args"] = {"youtube": {"player_client": attempt_config.player_clients}}
+        opts.extractor_args = {"youtube": {"player_client": attempt_config.player_clients}}
 
     progress_hook = _make_progress_hook(callback)
     if progress_hook is not None:
-        opts["progress_hooks"] = [progress_hook]
+        opts.progress_hooks = [progress_hook]
 
     return opts
 
