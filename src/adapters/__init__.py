@@ -144,15 +144,3 @@ def get_alignment_adapter():
     from src.adapters.alignment import GreedyAlignmentAdapter
 
     return GreedyAlignmentAdapter()
-
-
-def get_mermaid_adapter():
-    """Return the default Mermaid adapter instance."""
-    from src.adapters.mermaid import FileMermaidAdapter
-
-    return FileMermaidAdapter()
-
-
-def get_report_adapter():
-    """Return the default report adapter instance."""
-    return None

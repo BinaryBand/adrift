@@ -49,8 +49,6 @@ class TestRuff:
                 "ruff",
                 "format",
                 "--check",
-                "--exclude",
-                "runbook/.timer",
                 *self.PATHS,
             ],
             capture_output=True,

@@ -121,7 +121,6 @@ ipython_config.py
 
 # Ignore local database scripts
 runbook/database/
-runbook/.timer/
 
 # pixi
 #   Similar to Pipfile.lock, it is generally recommended to include pixi.lock in version control.
