@@ -1,4 +1,5 @@
 import os
+from collections.abc import Mapping
 from pathlib import Path
 
 from dotenv import find_dotenv, load_dotenv
@@ -8,6 +9,9 @@ from src.ports import SecretProviderPort, SecretStorePort
 
 class EnvironmentSecretProvider(SecretProviderPort):
     """Default adapter that reads secrets from process environment variables."""
+
+    source_name = "env"
+    writable = True  # signals that this backend has a writable EnvironmentSecretStore
 
     def __init__(self, load_dotenv_file: bool = True):
         if load_dotenv_file:
@@ -19,6 +23,8 @@ class EnvironmentSecretProvider(SecretProviderPort):
 
 class EnvironmentSecretStore(SecretStorePort):
     """Writable `.env` store used by the secret-management TUI."""
+
+    source_name = "env"
 
     def __init__(self, env_file: str = ".env"):
         self.env_path = Path(env_file)
@@ -32,7 +38,7 @@ class EnvironmentSecretStore(SecretStorePort):
     def has(self, key: str) -> bool:
         return key in self._values
 
-    def items(self) -> dict[str, str]:
+    def items(self) -> Mapping[str, str]:
         return dict(self._values)
 
     def set(self, key: str, value: str) -> None:

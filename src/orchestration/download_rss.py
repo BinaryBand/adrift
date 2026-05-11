@@ -11,14 +11,14 @@ from src.web.rss import podcast_to_rss
 
 
 def _build_channel(config: PodcastConfig) -> RssChannel:
-    from src.adapters import fetch_source_channel
+    from src.adapters import get_episode_source_adapter
 
     channel = RssChannel(
         title=config.name, author="", subtitle="", url="", description="", image=""
     )
     for source in config.references:
         try:
-            _fill_channel(channel, fetch_source_channel(source))
+            _fill_channel(channel, get_episode_source_adapter(source).fetch_channel(source))
         except Exception:
             pass
     return channel

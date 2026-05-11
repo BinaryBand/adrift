@@ -1,7 +1,7 @@
 from pathlib import Path
 
 from src.models import MergeResult
-from src.ports import MermaidRenderOptions
+from src.ports import MermaidPort, MermaidRenderOptions
 
 
 def _sanitize_label(s: str | None, max_len: int = 60) -> str:
@@ -221,7 +221,7 @@ def _build_markdown(result: MergeResult, format_name: str) -> str:
     return "\n".join(lines) + "\n"
 
 
-class FileMermaidAdapter:
+class FileMermaidAdapter(MermaidPort):
     """File-backed Mermaid adapter that writes a Markdown file with a Mermaid block."""
 
     def generate_diagrams(

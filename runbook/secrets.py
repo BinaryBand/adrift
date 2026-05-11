@@ -52,7 +52,7 @@ def _render_secret_table(console: Console, provider_name: str, env_file: str) ->
     table.add_column("Source")
     table.add_column("Value")
 
-    for state in collect_secret_states(store, provider, provider_name=provider_name):
+    for state in collect_secret_states(store, provider):
         table.add_row(state.field.key, state.field.label, state.source, state.masked_value)
 
     console.print(table)

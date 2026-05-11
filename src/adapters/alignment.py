@@ -1,16 +1,17 @@
-from typing import Any
-
+from src.models import RssEpisode
 from src.ports import AlignmentPort
 
 
 class GreedyAlignmentAdapter(AlignmentPort):
     """Default greedy alignment adapter.
 
-    For now this delegates to the existing catalog implementation. The adapter
-    is a stable seam for future alternative implementations (Rust, C, etc.).
+    Delegates to the existing catalog implementation. This is a stable seam for
+    future alternative implementations (Rust, C, etc.).
     """
 
-    def align_episodes(self, references: list[Any], downloads: list[Any], show: str = ""):
+    def align_episodes(
+        self, references: list[RssEpisode], downloads: list[RssEpisode], show: str = ""
+    ) -> list[tuple[int, int]]:
         # Local import to avoid circular imports at module import time.
         # Delegate to the catalog implementation function to avoid recursion
         # through the public `align_episodes` wrapper.

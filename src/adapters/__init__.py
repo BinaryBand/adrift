@@ -3,9 +3,8 @@
 import os
 from collections.abc import Callable
 
-from src.models import FeedSource, RssChannel, RssEpisode
+from src.models import FeedSource
 from src.ports import (
-    EpisodeSourceFetchContext,
     EpisodeSourcePort,
     ReadOnlySecretStorePort,
     SecretProviderPort,
@@ -21,65 +20,16 @@ def _require_source_url(source: FeedSource) -> str:
     return url
 
 
-def _is_youtube_source(source: FeedSource) -> bool:
-    return is_youtube_channel(_require_source_url(source))
-
-
-def fetch_source_episodes(
-    source: FeedSource,
-    context: EpisodeSourceFetchContext | None = None,
-) -> list[RssEpisode]:
-    """Fetch episodes directly from the concrete source type."""
-    resolved_context = context or EpisodeSourceFetchContext()
-    url = _require_source_url(source)
-    filter_regex = source.filters.to_regex() if source.filters else None
-    if _is_youtube_source(source):
-        from src.youtube.metadata import YtFetchOptions, get_youtube_episodes
-
-        return get_youtube_episodes(
-            url,
-            resolved_context.title,
-            YtFetchOptions(
-                filter=filter_regex,
-                detailed=resolved_context.detailed,
-                callback=resolved_context.callback,
-                refresh=resolved_context.refresh,
-            ),
-        )
-
-    from src.web.rss import get_rss_episodes
-
-    r_rules = source.filters.r_rules if source.filters else None
-    return get_rss_episodes(url, filter_regex, r_rules, resolved_context.callback)
-
-
-def fetch_source_channel(source: FeedSource) -> RssChannel:
-    """Fetch channel metadata directly from the concrete source type."""
-    url = _require_source_url(source)
-    if _is_youtube_source(source):
-        from src.youtube.metadata import get_youtube_channel
-
-        title = source.filters.to_regex() if source.filters else ""
-        return get_youtube_channel(url, title or "")
-
-    from src.web.rss import get_rss_channel
-
-    return get_rss_channel(url)
-
-
 def get_episode_source_adapter(source: FeedSource) -> EpisodeSourcePort:
-    """Get the appropriate episode source adapter for a FeedSource.
+    """Return the appropriate episode source adapter for a FeedSource.
 
-    Routes to YouTube adapter if URL is a YouTube channel, otherwise RSS adapter.
-
-    Args:
-        source: FeedSource with URL to analyze
-
-    Returns:
-        EpisodeSourcePort adapter instance
+    Routes to the YouTube adapter when the URL is a YouTube channel, otherwise
+    to the RSS adapter.  This is the single dispatch point for source type —
+    callers should use the returned adapter's methods rather than calling
+    source-specific functions directly.
     """
-    _require_source_url(source)
-    if _is_youtube_source(source):
+    url = _require_source_url(source)
+    if is_youtube_channel(url):
         from src.adapters.episode_sources.episode_source_youtube import YouTubeEpisodeSourceAdapter
 
         return YouTubeEpisodeSourceAdapter()
@@ -113,7 +63,8 @@ def get_report_adapter():
 
 
 def _resolve_secret_provider_name(provider_name: str | None = None) -> str:
-    return (provider_name or os.getenv("ADRIFT_SECRETS_PROVIDER", "env")).lower()
+    raw = provider_name or os.getenv("ADRIFT_SECRETS_PROVIDER") or "env"
+    return raw.lower()
 
 
 def _is_prompt_fallback_enabled(enable_prompt_fallback: bool | None) -> bool:
@@ -156,9 +107,15 @@ def get_secret_store_adapter(
     *,
     env_file: str = ".env",
 ) -> ReadOnlySecretStorePort | SecretStorePort:
-    """Return a store-like adapter for the selected provider."""
+    """Return a store-like adapter for the selected provider.
+
+    Providers that expose ``writable = True`` (currently only 'env') get a
+    full ``SecretStorePort``; all others are wrapped in a read-only view.
+    """
     selected = _resolve_secret_provider_name(provider_name)
-    if selected == "env":
+    provider = _get_base_secret_provider(selected)
+
+    if getattr(provider, "writable", False):
         from src.adapters.secrets.env_secrets import EnvironmentSecretStore
 
         return EnvironmentSecretStore(env_file=env_file)
@@ -166,4 +123,4 @@ def get_secret_store_adapter(
     from src.adapters.secrets.read_only_store import ReadOnlySecretStore
     from src.orchestration.secret_service import MANAGED_S3_KEYS
 
-    return ReadOnlySecretStore(_get_base_secret_provider(selected), known_keys=MANAGED_S3_KEYS)
+    return ReadOnlySecretStore(provider, known_keys=MANAGED_S3_KEYS)

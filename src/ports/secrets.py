@@ -6,6 +6,9 @@ from typing import Protocol, runtime_checkable
 class SecretProviderPort(Protocol):
     """Port for reading string secrets/config values by key."""
 
+    source_name: str
+    """Short identifier used in UI source labels (e.g. 'env', 'vault')."""
+
     def get(self, key: str, default: str = "") -> str: ...
 
 

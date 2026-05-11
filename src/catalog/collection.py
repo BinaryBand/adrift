@@ -75,18 +75,15 @@ def _fetch_source_episodes(
     source: FeedSource | dict[str, Any],
     context: EpisodeFetchContext,
 ) -> list[RssEpisode]:
-    from src.adapters import fetch_source_episodes
+    from src.adapters import get_episode_source_adapter
     from src.ports import EpisodeSourceFetchContext
 
     resolved = ensure_feed_source(source)
-    # For YouTube sources always fetch detailed metadata so we have
-    # pub_date/thumbnail information available for alignment.
-    detailed_flag = context.is_reference or is_youtube_channel(resolved.url)
-    return fetch_source_episodes(
+    return get_episode_source_adapter(resolved).fetch_episodes(
         resolved,
         EpisodeSourceFetchContext(
             title=context.title,
-            detailed=detailed_flag,
+            detailed=context.is_reference,
             callback=context.callback,
             refresh=context.refresh_sources,
         ),

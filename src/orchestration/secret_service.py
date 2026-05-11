@@ -79,17 +79,13 @@ def _state_source_and_value(
     key: str,
     store: ReadOnlySecretStorePort | SecretStorePort,
     provider: SecretProviderPort,
-    provider_name: str,
 ) -> tuple[str, str]:
-    if provider_name == "env" and store.has(key):
-        return ".env", store.get(key, "")
-
+    if store.has(key):
+        return f".{provider.source_name}", store.get(key, "")
     value = provider.get(key, "")
     if not value:
         return "missing", ""
-    if provider_name == "env":
-        return "environment", value
-    return f"{provider_name}/env", value
+    return provider.source_name, value
 
 
 def _require_writable_store(store: ReadOnlySecretStorePort | SecretStorePort) -> SecretStorePort:
@@ -101,12 +97,10 @@ def _require_writable_store(store: ReadOnlySecretStorePort | SecretStorePort) ->
 def collect_secret_states(
     store: ReadOnlySecretStorePort | SecretStorePort,
     provider: SecretProviderPort,
-    *,
-    provider_name: str = "env",
 ) -> list[ManagedSecretState]:
     states: list[ManagedSecretState] = []
     for field in MANAGED_S3_FIELDS:
-        source, value = _state_source_and_value(field.key, store, provider, provider_name)
+        source, value = _state_source_and_value(field.key, store, provider)
         states.append(ManagedSecretState(field=field, value=value, source=source))
     return states
 

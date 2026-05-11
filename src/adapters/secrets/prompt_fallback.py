@@ -26,6 +26,7 @@ class PromptFallbackProvider(SecretProviderPort):
         self._provider = provider
         self._prompt_callback = prompt_callback
         self._cache: dict[str, str] = {}
+        self.source_name = provider.source_name
 
     def get(self, key: str, default: str = "") -> str:
         cached_value = self._cache.get(key)
