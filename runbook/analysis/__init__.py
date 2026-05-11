@@ -1,1 +1,0 @@
-"""Analysis helpers for generated project docs."""
