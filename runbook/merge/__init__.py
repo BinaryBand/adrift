@@ -8,9 +8,10 @@ from typing import TYPE_CHECKING
 import dotenv
 
 from src.application.merge import MergeUseCase
+from src.models import PodcastConfig
 
 if TYPE_CHECKING:
-    from src.models import MergeResult, PodcastConfig
+    from src.models import MergeResult
 
 from src.orchestration.merge_service import (
     MergeRunOptions,
@@ -155,7 +156,7 @@ def main() -> None:
     if args.tags:
         normalized_tags = [t.strip().lower() for t in args.tags if t.strip()]
 
-        def _matches_tag(cfg: "PodcastConfig") -> bool:
+        def _matches_tag(cfg: PodcastConfig) -> bool:
             if cfg.name.lower() in normalized_tags:
                 return True
             if cfg.slug.lower() in normalized_tags:

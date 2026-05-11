@@ -10,14 +10,14 @@ import requests
 
 from src.files.audio import cut_segments
 from src.models import SponsorSegment
-from src.utils.cache import S3Cache
+from src.ports.cache import DiskCacheAdapter
 from src.utils.crypto import sha256
 from src.utils.progress import Callback
 
 logger = logging.getLogger(__name__)
 
 # Constants
-_CACHE = S3Cache(".cache/sponsorblock", "sponsorblock/segments")
+_CACHE = DiskCacheAdapter(".cache/sponsorblock")
 _CACHE_EXPIRY_DAYS = {False: 7, True: 35}  # Days to cache (no segments vs has segments)
 _API_TIMEOUT = 10
 

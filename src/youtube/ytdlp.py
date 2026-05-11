@@ -16,14 +16,14 @@ from pydantic import BaseModel, ValidationError, field_validator
 from yt_dlp import YoutubeDL
 
 from src.models import RssEpisode, YtDlpImage, YtDlpParams
-from src.utils.cache import S3Cache
+from src.ports.cache import DiskCacheAdapter
 from src.utils.progress import Callback
 from src.utils.terminal import emit_error, emit_info, emit_warning
 from src.youtube.auth import get_auth_ydl_opts, get_ydl_opts
 from src.youtube.error_utils import yt_dlp_retry_reason
 
 # Constants
-_CACHE = S3Cache(".cache/yt-dlp", "yt-dlp")
+_CACHE = DiskCacheAdapter(".cache/yt-dlp")
 
 _CHANNEL_CACHE_FIELDS = {
     "title",

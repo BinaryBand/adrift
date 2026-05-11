@@ -9,7 +9,7 @@ T = TypeVar("T")
 class CachePort(Protocol[T]):
     """Protocol for caching operations.
 
-    Implementations provide get, set, and delete with optional TTL.
+    Implementations provide get, set, and delete with optional expiration.
     This abstraction allows swapping diskcache for in-memory or Redis
     without changing callers (e.g., RSS fetcher, YouTube metadata fetcher).
     """
@@ -26,13 +26,13 @@ class CachePort(Protocol[T]):
         """
         ...
 
-    def set(self, key: str, value: T, ttl: int | None = None) -> None:  # noqa: F841
+    def set(self, key: str, value: T, expire: int | None = None) -> None:  # noqa: F841
         """Set a value in the cache.
 
         Args:
             key: Cache key
             value: Value to cache (must be serializable)
-            ttl: Optional time-to-live in seconds
+            expire: Optional time-to-live in seconds
 
         Raises:
             CacheError if set fails
@@ -71,9 +71,9 @@ class DiskCacheAdapter(Generic[T]):
         """Get value from disk cache."""
         return self._cache.get(key, default)
 
-    def set(self, key: str, value: T, ttl: int | None = None) -> None:  # noqa: F841
-        """Set value in disk cache with optional TTL."""
-        self._cache[key] = value
+    def set(self, key: str, value: T, expire: int | None = None) -> None:  # noqa: F841
+        """Set value in disk cache with optional expiration in seconds."""
+        self._cache.set(key, value, expire=expire)
 
     def delete(self, key: str) -> None:
         """Delete value from disk cache."""
@@ -94,8 +94,9 @@ class InMemoryCache(Generic[T]):
         """Get value from memory."""
         return self._store.get(key, default)
 
-    def set(self, key: str, value: T, ttl: int | None = None) -> None:  # noqa: F841
-        """Set value in memory (ignores ttl)."""
+    def set(self, key: str, value: T, expire: int | None = None) -> None:  # noqa: F841
+        """Set value in memory (ignores expiration)."""
+        del expire
         self._store[key] = value
 
     def delete(self, key: str) -> None:

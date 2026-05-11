@@ -68,6 +68,7 @@ class DownloadPipeline:
     def __init__(self, runtime: DownloadPipelineRuntime, deps: DownloadPipelineDeps) -> None:
         self._runtime = runtime
         self._deps = deps
+        self._events_subscribed = False
 
     def run(self, configs: list[PodcastConfig]) -> StageResult[int]:
         self._subscribe_download_events()
@@ -163,6 +164,8 @@ class DownloadPipeline:
         return additional_downloads
 
     def _subscribe_download_events(self) -> None:
+        if self._events_subscribed:
+            return
         self._runtime.ctx.event_bus.subscribe(
             OperationStarted,
             lambda event: self._runtime.ui.set_operation(event.label),
@@ -179,6 +182,7 @@ class DownloadPipeline:
             DownloadFailed,
             lambda _event: self._runtime.ui.clear_operation(),
         )
+        self._events_subscribed = True
 
 
 __all__ = [

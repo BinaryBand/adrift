@@ -3,30 +3,9 @@
 from __future__ import annotations
 
 import time
-from typing import Protocol, TypeVar
+from typing import Any
 
-T = TypeVar("T")
-
-
-class CachePort(Protocol):
-    """Minimal cache interface for retry wrapper operations."""
-
-    def get(self, key: str) -> T:
-        """Get a value from cache."""
-        ...
-
-    def set(self, key: str, value: T, expire: int | None = None) -> None:
-        """Set a value in cache."""
-        ...
-
-    def delete(self, key: str) -> None:
-        """Delete a key from cache."""
-        ...
-
-    @property
-    def directory(self) -> str:
-        """Get the cache directory path."""
-        ...
+from src.ports.cache import CachePort
 
 
 class RaceAwareCacheWrapper:
@@ -38,7 +17,7 @@ class RaceAwareCacheWrapper:
     recreation.
     """
 
-    def __init__(self, cache: CachePort, max_attempts: int = 3, retry_delay: float = 0.05):
+    def __init__(self, cache: CachePort[Any], max_attempts: int = 3, retry_delay: float = 0.05):
         """Initialize the wrapper.
 
         Args:
@@ -79,7 +58,10 @@ class RaceAwareCacheWrapper:
         try:
             from pathlib import Path
 
-            cache_dir = Path(self.cache.directory)
+            cache_dir_raw = getattr(self.cache, "directory", None)
+            if not isinstance(cache_dir_raw, str):
+                return
+            cache_dir = Path(cache_dir_raw)
             cache_dir.mkdir(parents=True, exist_ok=True)
         except Exception:
             # Ignore errors during directory recreation; the next retry will handle it
