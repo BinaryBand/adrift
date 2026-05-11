@@ -154,7 +154,7 @@ def main() -> None:
     if args.tags:
         normalized_tags = [t.strip().lower() for t in args.tags if t.strip()]
 
-        def _matches_tag(cfg: "PodcastConfig") -> bool:  # type: ignore[name-defined]
+        def _matches_tag(cfg: "PodcastConfig") -> bool:
             if cfg.name.lower() in normalized_tags:
                 return True
             if cfg.slug.lower() in normalized_tags:

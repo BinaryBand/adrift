@@ -1,3 +1,4 @@
+import random
 import sys
 import time
 from collections.abc import Callable
@@ -161,7 +162,7 @@ def _run(
     except BotDetectionError:
         sys.stderr.write(f"\nBot detection triggered — cooling down for {bot_cooldown}s\n")
         jitter = bot_cooldown * 0.1
-        bot_cooldown += int((time.random() - 0.5) * jitter)  # Add up to ±10% random jitter
+        bot_cooldown += int((random.random() - 0.5) * jitter)  # Add up to ±10% random jitter
         time.sleep(bot_cooldown)
         sys.exit(1)
 
