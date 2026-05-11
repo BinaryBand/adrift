@@ -114,7 +114,11 @@ class TestGetYoutubeVideosEarlyTermination(unittest.TestCase):
 
         mock_get_videos.return_value = [mock_episode]
 
-        result = get_youtube_episodes("https://youtube.com/@test", "test_author")
+        result = get_youtube_episodes(
+            "https://youtube.com/@test",
+            "test_author",
+            YtFetchOptions(detailed=False),
+        )
 
         self.assertEqual(len(result), 1)
         self.assertEqual(result[0].id, "dQw4w9WgXcQ")
@@ -155,7 +159,11 @@ class TestGetYoutubeVideosCompleteness(unittest.TestCase):
 
         mock_get_videos.return_value = mock_episodes
 
-        result = get_youtube_episodes("https://youtube.com/@test", "test_author")
+        result = get_youtube_episodes(
+            "https://youtube.com/@test",
+            "test_author",
+            YtFetchOptions(detailed=False),
+        )
 
         # Should fetch all videos
         self.assertEqual(len(result), 10)
