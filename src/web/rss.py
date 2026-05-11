@@ -36,12 +36,6 @@ def _rss_cache() -> Cache:
     return Cache(str(path))
 
 
-@functools.cache
-def _rss_cache_wrapped() -> RaceAwareCacheWrapper:
-    """Get a race-aware wrapped RSS cache instance."""
-    return RaceAwareCacheWrapper(_rss_cache())
-
-
 def _cache_set_with_retry(cache: Cache, key: str, value: str, expire: int | None = None) -> None:
     """Call `cache.set` and retry if parent directories are missing.
 

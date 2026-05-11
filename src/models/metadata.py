@@ -4,7 +4,6 @@ from datetime import datetime
 from typing import Any, Callable
 
 import pydantic
-from dotenv import find_dotenv, load_dotenv
 from pydantic import BaseModel, ConfigDict
 
 from src.infrastructure.youtube.normalizer import (
@@ -17,7 +16,6 @@ from src.infrastructure.youtube.normalizer import (
     ytdlp_pub_date,
 )
 
-load_dotenv(find_dotenv())
 DEVICE = os.getenv("DEVICE", "UnknownDevice")
 PROJECT = os.getenv("PROJECT", "UnknownProject")
 

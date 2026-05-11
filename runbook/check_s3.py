@@ -20,7 +20,7 @@ from botocore.exceptions import ClientError
 
 from src.app_common import load_podcasts_config
 from src.application.context import AppContext
-from src.orchestration.download_client import _s3_prefix
+from src.orchestration.download_client import s3_prefix
 from src.ports import require_secrets
 
 _REQUIRED_S3_KEYS = ("S3_USERNAME", "S3_SECRET_KEY", "S3_ENDPOINT", "S3_REGION")
@@ -37,7 +37,7 @@ def expected_slugs_by_bucket(configs: List) -> Dict[str, Dict[str, Set[str]]]:
     """
     d: Dict[str, Dict[str, Set[str]]] = {}
     for cfg in configs:
-        bucket, prefix = _s3_prefix(cfg)
+        bucket, prefix = s3_prefix(cfg)
         parts = Path(prefix).parts
         if not parts:
             continue
