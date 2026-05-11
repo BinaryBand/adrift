@@ -50,15 +50,22 @@ def test_download_episodes_skips_existing_and_counts_new_uploads() -> None:
         del episodes, cfg
         return queue
 
-    def _download_and_upload(download_episode: Any, cfg: Any, progress_hooks: Any) -> bool:
+    def _download_and_upload(download_episode: Any, cfg: Any, ctx: Any) -> bool:
         del cfg
-        assert progress_hooks is not None
-        if progress_hooks.on_operation is not None:
-            progress_hooks.on_operation(f"download audio: {download_episode.episode.title}")
+        assert ctx is not None
+        ctx.event_bus.publish(
+            SimpleNamespace(label=f"download audio: {download_episode.episode.title}")
+        )
         uploaded_titles.append(download_episode.episode.title)
-        if progress_hooks.on_complete is not None:
-            progress_hooks.on_complete()
         return True
+
+    class _EventBus:
+        def publish(self, event: Any) -> None:
+            if hasattr(event, "label"):
+                operations.append(event.label)
+            operations.append("<cleared>")
+
+    ctx = SimpleNamespace(event_bus=_EventBus())
 
     added = _download_episodes(
         [],
@@ -69,6 +76,7 @@ def test_download_episodes_skips_existing_and_counts_new_uploads() -> None:
         build_download_queue=_build_download_queue,
         download_and_upload=_download_and_upload,
         bot_detection_error=RuntimeError,
+        ctx=ctx,
     )
 
     assert added == 2
@@ -122,12 +130,14 @@ def test_download_episodes_reports_nonfatal_errors_and_continues() -> None:
         del episodes, cfg
         return queue
 
-    def _download_and_upload(download_episode: Any, cfg: Any, progress_hooks: Any) -> bool:
+    def _download_and_upload(download_episode: Any, cfg: Any, ctx: Any) -> bool:
         del cfg
-        assert progress_hooks is not None
+        assert ctx is not None
         if download_episode.episode.title == "Broken":
             raise ValueError("boom")
         return True
+
+    ctx = SimpleNamespace(event_bus=SimpleNamespace(publish=lambda event: None))
 
     added = _download_episodes(
         [],
@@ -138,6 +148,7 @@ def test_download_episodes_reports_nonfatal_errors_and_continues() -> None:
         build_download_queue=_build_download_queue,
         download_and_upload=_download_and_upload,
         bot_detection_error=RuntimeError,
+        ctx=ctx,
     )
 
     assert added == 1

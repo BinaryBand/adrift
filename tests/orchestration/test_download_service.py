@@ -4,13 +4,15 @@ from types import SimpleNamespace
 
 import pytest
 
+from src.application.context import AppContext, EventBus
+from src.application.events import DownloadCompleted, OperationStarted, ProgressUpdated
 from src.models import DownloadEpisode, MediaMetadata, PodcastConfig, RssEpisode
 from src.orchestration.download_service import (
-    DownloadProgressHooks,
     build_download_queue,
     episode_exists_on_s3,
     process_in_tmpdir,
 )
+from src.ports.cache import InMemoryCache
 
 
 def _episode(title: str, pub_date: datetime | None = None) -> DownloadEpisode:
@@ -33,6 +35,16 @@ def _config() -> PodcastConfig:
         path="/media/podcasts/creepcast",
         references=[],
         downloads=[],
+    )
+
+
+def _ctx() -> AppContext:
+    return AppContext(
+        s3=SimpleNamespace(),
+        secrets=SimpleNamespace(source_name="test", get=lambda key, default="": default),
+        rss_cache=InMemoryCache(),
+        yt_cache=InMemoryCache(),
+        event_bus=EventBus(),
     )
 
 
@@ -203,11 +215,12 @@ def test_process_in_tmpdir_reports_upload_progress(
 
     operations: list[str] = []
     updates: list[tuple[int, int | None]] = []
+    completions: list[str] = []
 
     def _s3_prefix_fn(cfg: PodcastConfig) -> tuple[str, str]:
         return ("bucket", "podcasts/creepcast")
 
-    def _download_audio_fn(ep: DownloadEpisode, dest: Path, callback: object | None = None) -> Path:
+    def _download_audio_fn(ep: DownloadEpisode, dest: Path, ctx: object | None = None) -> Path:
         return audio_path
 
     def _convert_to_opus_fn(audio: Path, callback: object | None = None) -> Path:
@@ -248,22 +261,24 @@ def test_process_in_tmpdir_reports_upload_progress(
     )
     monkeypatch.setattr("src.files.s3._default_s3_service", fake)
 
-    hooks = DownloadProgressHooks(
-        on_operation=operations.append,
-        on_progress=lambda current, total: updates.append((current, total)),
-        on_complete=lambda: operations.append("<cleared>"),
+    ctx = _ctx()
+    ctx.event_bus.subscribe(OperationStarted, lambda event: operations.append(event.label))
+    ctx.event_bus.subscribe(
+        ProgressUpdated,
+        lambda event: updates.append((event.current, event.total)),
     )
+    ctx.event_bus.subscribe(DownloadCompleted, lambda event: completions.append(event.s3_key))
 
-    uploaded = process_in_tmpdir(episode, config, tmp_path, hooks)
+    uploaded = process_in_tmpdir(episode, config, tmp_path, ctx)
 
     assert uploaded is True
     assert operations == [
         "download audio: Upload Progress",
         "convert opus: Upload Progress",
         "upload opus: Upload Progress",
-        "<cleared>",
     ]
     assert updates == [(3, 10)]
+    assert completions == ["podcasts/creepcast/upload-progress.opus"]
     options = captured["options"]
     assert isinstance(options, object)
     assert captured["bucket"] == "bucket"

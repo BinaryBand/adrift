@@ -1,7 +1,6 @@
 """Thin re-export shim for download worker helpers."""
 
 from src.orchestration.download_process import (
-    DownloadProgressHooks,
     _build_metadata,
     _download_episode_audio,
     _episode_slug,
@@ -16,7 +15,6 @@ from src.orchestration.download_upload import (
 )
 
 __all__ = [
-    "DownloadProgressHooks",
     "_UploadRequest",
     "download_and_upload",
     "process_in_tmpdir",

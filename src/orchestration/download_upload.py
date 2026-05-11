@@ -2,10 +2,10 @@
 
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any
 
 from src.files.s3 import UploadOptions, upload_file
-from src.models import DownloadEpisode, MediaMetadata
+from src.models import MediaMetadata
+from src.utils.progress import Callback
 
 
 @dataclass(frozen=True)
@@ -22,14 +22,13 @@ def _build_upload_request(
     return _UploadRequest(bucket=bucket, key=f"{key_prefix}.opus", opus=opus, metadata=metadata)
 
 
-def _upload_episode_audio(ep: DownloadEpisode, request: _UploadRequest, hooks: Any) -> None:
-    """Upload an opus file, using `hooks` for progress notifications."""
-    hooks.on_operation(f"upload opus: {ep.episode.title}")
+def _upload_episode_audio(request: _UploadRequest, callback: Callback | None = None) -> None:
+    """Upload an opus file with an optional progress callback."""
     upload_file(
         request.bucket,
         request.key,
         request.opus,
-        UploadOptions(metadata=request.metadata, callback=hooks.on_progress),
+        UploadOptions(metadata=request.metadata, callback=callback),
     )
 
 

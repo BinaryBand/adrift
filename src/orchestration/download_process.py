@@ -1,34 +1,41 @@
 """Process and orchestration helpers for download pipeline."""
 
+from __future__ import annotations
+
 import tempfile
 from dataclasses import dataclass
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Callable
+from typing import TYPE_CHECKING
 
+from src.application.events import (
+    DownloadCompleted,
+    DownloadFailed,
+    OperationStarted,
+    ProgressUpdated,
+)
 from src.files.audio import convert_to_opus, cut_segments, get_duration
 from src.files.s3 import exists
 from src.models import DownloadEpisode, MediaMetadata, PodcastConfig
 from src.orchestration.download_cache import _existing_media_sources
 from src.orchestration.download_client import s3_prefix
-from src.orchestration.download_upload import _build_upload_request, _upload_episode_audio
-from src.utils.progress import Callback
+from src.orchestration.download_upload import (
+    _build_upload_request,
+    _upload_episode_audio,
+    _UploadRequest,
+)
 from src.utils.title_normalization import normalize_title
 from src.web.rss import download_direct
 from src.youtube.downloader import download_video
+
+if TYPE_CHECKING:
+    from src.application.context import AppContext
 
 
 @dataclass(frozen=True)
 class DownloadQueueItem:
     episode: DownloadEpisode
     exists_on_s3: bool
-
-
-@dataclass(frozen=True)
-class DownloadProgressHooks:
-    on_operation: Callable[[str], None] = lambda _: None
-    on_progress: Callback = lambda *_: None
-    on_complete: Callable[[], None] = lambda: None
 
 
 def _episode_slug(config: PodcastConfig, ep: DownloadEpisode) -> str:
@@ -74,64 +81,95 @@ def _episode_sort_timestamp(pub_date: datetime | None) -> float:
 def download_and_upload(
     ep: DownloadEpisode,
     config: PodcastConfig,
-    progress_hooks: DownloadProgressHooks | None = None,
+    ctx: AppContext,
 ) -> bool:
     """Download one episode, remove ads, convert to Opus, upload to S3.
 
     Returns True if newly uploaded, False if already present on S3.
     """
-    hooks = progress_hooks or DownloadProgressHooks()
     bucket, prefix = s3_prefix(config)
     key_prefix = f"{prefix}/{_episode_slug(config, ep)}"
     if exists(bucket, key_prefix):
         return False
     with tempfile.TemporaryDirectory() as tmp:
-        return process_in_tmpdir(ep, config, Path(tmp), hooks)
+        return process_in_tmpdir(ep, config, Path(tmp), ctx)
 
 
 def process_in_tmpdir(
     ep: DownloadEpisode,
     config: PodcastConfig,
     tmp: Path,
-    progress_hooks: DownloadProgressHooks | None,
+    ctx: AppContext,
 ) -> bool:
-    hooks = progress_hooks or DownloadProgressHooks()
     bucket, prefix = s3_prefix(config)
     key_prefix = f"{prefix}/{_episode_slug(config, ep)}"
-    audio = _download_episode_audio(ep, tmp, hooks)
+    audio = _download_episode_audio(ep, tmp, ctx)
     if audio is None:
-        hooks.on_complete()
+        _publish_download_failed(ctx, ep)
         return False
-    opus = _prepare_upload_audio(ep, audio, hooks)
+    opus = _prepare_upload_audio(ep, audio, ctx)
     duration = get_duration(opus)
     metadata = _build_metadata(ep, duration, sponsors_removed=bool(ep.sponsor_segments))
     upload_request = _build_upload_request(bucket, key_prefix, opus, metadata)
-    _upload_episode_audio(ep, upload_request, hooks)
-    hooks.on_complete()
+    return _upload_and_publish_completion(ep, upload_request, ctx)
+
+
+def _publish_download_failed(ctx: AppContext, ep: DownloadEpisode) -> None:
+    ctx.event_bus.publish(
+        DownloadFailed(
+            episode=ep.episode,
+            error="Audio download failed",
+            recoverable=True,
+        )
+    )
+
+
+def _upload_and_publish_completion(
+    ep: DownloadEpisode,
+    upload_request: _UploadRequest,
+    ctx: AppContext,
+) -> bool:
+    ctx.event_bus.publish(OperationStarted(label=f"upload opus: {ep.episode.title}"))
+    _upload_episode_audio(upload_request, callback=_progress_callback(ctx))
+    ctx.event_bus.publish(
+        DownloadCompleted(
+            episode=ep.episode,
+            s3_key=upload_request.key,
+            sponsors_removed=bool(ep.sponsor_segments),
+        )
+    )
     return True
 
 
-def _download_audio(
-    ep: DownloadEpisode, dest: Path, callback: Callback | None = None
-) -> Path | None:
+def _progress_callback(ctx: AppContext):
+    def callback(current: int, total: int | None) -> None:
+        ctx.event_bus.publish(ProgressUpdated(current=current, total=total))
+
+    return callback
+
+
+def _download_audio(ep: DownloadEpisode, dest: Path, ctx: AppContext) -> Path | None:
+    callback = _progress_callback(ctx)
     if ep.video_id:
         return download_video(ep.episode.content, dest, callback=callback)
     return download_direct(ep.episode.content, dest)
 
 
-def _download_episode_audio(
-    ep: DownloadEpisode, tmp: Path, hooks: DownloadProgressHooks
-) -> Path | None:
-    hooks.on_operation(f"download audio: {ep.episode.title}")
-    return _download_audio(ep, tmp, hooks.on_progress)
+def _download_episode_audio(ep: DownloadEpisode, tmp: Path, ctx: AppContext) -> Path | None:
+    ctx.event_bus.publish(OperationStarted(label=f"download audio: {ep.episode.title}"))
+    return _download_audio(ep, tmp, ctx)
 
 
-def _prepare_upload_audio(ep: DownloadEpisode, audio: Path, hooks: DownloadProgressHooks) -> Path:
+def _prepare_upload_audio(ep: DownloadEpisode, audio: Path, ctx: AppContext) -> Path:
     if ep.sponsor_segments:
-        hooks.on_operation(f"cut sponsors: {ep.episode.title}")
-        cut_segments(audio, ep.sponsor_segments, callback=hooks.on_progress)
-    hooks.on_operation(f"convert opus: {ep.episode.title}")
-    return convert_to_opus(audio, callback=hooks.on_progress)
+        ctx.event_bus.publish(OperationStarted(label=f"cut sponsors: {ep.episode.title}"))
+        cut_segments(
+            audio,
+            ep.sponsor_segments,
+            callback=_progress_callback(ctx),
+        )
+    ctx.event_bus.publish(OperationStarted(label=f"convert opus: {ep.episode.title}"))
+    return convert_to_opus(audio, callback=_progress_callback(ctx))
 
 
 def _build_metadata(
@@ -148,7 +186,6 @@ def _build_metadata(
 
 __all__ = [
     "DownloadQueueItem",
-    "DownloadProgressHooks",
     "build_download_queue",
     "episode_exists_on_s3",
     "download_and_upload",

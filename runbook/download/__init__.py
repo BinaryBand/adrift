@@ -7,8 +7,15 @@ from typing import Annotated, Any, Protocol
 import dotenv
 import typer
 
+from src.application.context import AppContext
+from src.application.events import (
+    DownloadCompleted,
+    DownloadFailed,
+    OperationStarted,
+    ProgressUpdated,
+)
 from src.models import DownloadEpisode, PodcastConfig
-from src.orchestration.download_service import DownloadProgressHooks, DownloadQueueItem
+from src.orchestration.download_service import DownloadQueueItem
 
 DF_TARGETS = ["config/*.toml"]
 DEFAULT_MAX_DOWNLOADS = 10
@@ -25,6 +32,34 @@ class _DownloadUiPort(Protocol):
     def operation_callback(self, current: int, total: int | None) -> None: ...
 
 
+class _DownloadAndUploadPort(Protocol):
+    def __call__(
+        self,
+        ep: DownloadEpisode,
+        config: PodcastConfig,
+        ctx: AppContext,
+    ) -> bool: ...
+
+
+def _subscribe_download_events(ui: _DownloadUiPort, ctx: AppContext) -> None:
+    ctx.event_bus.subscribe(
+        OperationStarted,
+        lambda event: ui.set_operation(event.label),
+    )
+    ctx.event_bus.subscribe(
+        ProgressUpdated,
+        lambda event: ui.operation_callback(event.current, event.total),
+    )
+    ctx.event_bus.subscribe(
+        DownloadCompleted,
+        lambda _event: ui.clear_operation(),
+    )
+    ctx.event_bus.subscribe(
+        DownloadFailed,
+        lambda _event: ui.clear_operation(),
+    )
+
+
 def _download_episodes(
     episodes: list[DownloadEpisode],
     config: PodcastConfig,
@@ -33,10 +68,9 @@ def _download_episodes(
     max_downloads: int,
     ui: _DownloadUiPort,
     build_download_queue: Callable[[list[DownloadEpisode], PodcastConfig], list[DownloadQueueItem]],
-    download_and_upload: Callable[
-        [DownloadEpisode, PodcastConfig, DownloadProgressHooks | None], bool
-    ],
+    download_and_upload: _DownloadAndUploadPort,
     bot_detection_error: type[BaseException],
+    ctx: AppContext,
 ) -> int:
     additional_downloads = 0
     for queue_item in build_download_queue(episodes, config):
@@ -45,12 +79,7 @@ def _download_episodes(
         if queue_item.exists_on_s3:
             continue
         try:
-            progress_hooks = DownloadProgressHooks(
-                on_operation=ui.set_operation,
-                on_progress=ui.operation_callback,
-                on_complete=ui.clear_operation,
-            )
-            newly_uploaded = download_and_upload(queue_item.episode, config, progress_hooks)
+            newly_uploaded = download_and_upload(queue_item.episode, config, ctx)
             if newly_uploaded:
                 additional_downloads += 1
         except bot_detection_error:
@@ -85,6 +114,7 @@ def _run(
     ] = False,
 ) -> None:
     dotenv.load_dotenv()
+    ctx = AppContext.from_env()
 
     from src.app_common import load_podcasts_config
     from src.catalog import MergeConfigOptions, merge_config
@@ -122,6 +152,7 @@ def _run(
 
     try:
         with create_run_ui(len(configs), "Downloading") as ui, ui.output_context():
+            _subscribe_download_events(ui, ctx)
             on_stage, callback = build_merge_callbacks(ui)
             for config in configs:
                 ui.set_podcast(config.name)
@@ -150,6 +181,7 @@ def _run(
                         build_download_queue=build_download_queue,
                         download_and_upload=download_and_upload,
                         bot_detection_error=BotDetectionError,
+                        ctx=ctx,
                     )
 
                 if not skip_update:

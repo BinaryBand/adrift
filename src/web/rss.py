@@ -16,6 +16,7 @@ from dateutil.rrule import rrulestr
 from diskcache import Cache
 from feedparser import FeedParserDict
 
+from src.infrastructure.rss import channel_from_feedparser, episode_from_feedparser
 from src.models import RssChannel, RssEpisode
 from src.utils.image import extract_image_from_feedparser
 from src.utils.media import AUDIO_EXTENSIONS, parse_duration
@@ -73,14 +74,7 @@ def get_rss_channel(rss_url: str) -> RssChannel:
         print(f"WARNING: RSS feed may have issues: {issue}")
 
     channel: FeedParserDict = feed.feed
-    return RssChannel(
-        title=_pick_channel_field(channel, "title"),
-        author=_pick_channel_field(channel, "author", "itunes_author", "creator"),
-        subtitle=_pick_channel_field(channel, "subtitle", "itunes_subtitle"),
-        url=_pick_channel_field(channel, "url"),
-        description=_pick_channel_field(channel, "description", "summary"),
-        image=_extract_image_url(channel),
-    )
+    return channel_from_feedparser(channel)
 
 
 def _fetch_channel_feed_str(rss_url: str) -> str:
@@ -148,28 +142,7 @@ def _filter_audio_urls(urls: list[str]) -> list[str]:
 
 def parse_rss_entry(entry: FeedParserDict) -> RssEpisode:
     """Parse a single RSS feed entry to extract episode information."""
-    id, title, author, description = _entry_basic_fields(entry)
-
-    content = _extract_content_url(entry)
-    if content is None:
-        raise ValueError("No valid audio content URL found")
-
-    pub_date = _parse_entry_pub_date(entry)
-
-    duration = _parse_entry_duration(entry)
-
-    image = _parse_entry_image(entry)
-
-    return RssEpisode(
-        id=id,
-        title=title,
-        author=author,
-        description=description,
-        content=content,
-        pub_date=pub_date,
-        duration=duration,
-        image=image,
-    )
+    return episode_from_feedparser(entry)
 
 
 def _entry_basic_fields(entry: FeedParserDict) -> tuple[str, str, str, str]:

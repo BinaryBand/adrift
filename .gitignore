@@ -241,4 +241,5 @@ cookies.txt
 .vscode/bookmarks.json
 .vscode/schemas/*.json
 config/**/.*.toml
+docs/*.*
 runbook/**/.*
