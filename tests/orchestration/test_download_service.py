@@ -39,8 +39,12 @@ def _config() -> PodcastConfig:
 
 
 def _ctx() -> AppContext:
+    return _ctx_with_s3(SimpleNamespace())
+
+
+def _ctx_with_s3(s3: object) -> AppContext:
     return AppContext(
-        s3=SimpleNamespace(),
+        s3=s3,
         secrets=SimpleNamespace(source_name="test", get=lambda key, default="": default),
         rss_cache=InMemoryCache(),
         yt_cache=InMemoryCache(),
@@ -57,8 +61,9 @@ def test_build_download_queue_prioritizes_missing_then_newest(
 
     existing_titles = {"Newest Existing"}
 
-    def _exists_on_s3(ep: DownloadEpisode, config: PodcastConfig) -> bool:
+    def _exists_on_s3(ep: DownloadEpisode, config: PodcastConfig, ctx: AppContext) -> bool:
         del config
+        del ctx
         return ep.episode.title in existing_titles
 
     monkeypatch.setattr(
@@ -66,7 +71,11 @@ def test_build_download_queue_prioritizes_missing_then_newest(
         _exists_on_s3,
     )
 
-    queue = build_download_queue([older_missing, newest_existing, newest_missing], _config())
+    queue = build_download_queue(
+        [older_missing, newest_existing, newest_missing],
+        _config(),
+        _ctx(),
+    )
 
     assert [item.episode.episode.title for item in queue] == [
         "Newest Missing",
@@ -81,7 +90,10 @@ def test_build_download_queue_preserves_unknown_dates_after_dated_missing(
     dated_missing = _episode("Dated Missing", datetime(2026, 4, 20, tzinfo=timezone.utc))
     undated_missing = _episode("Undated Missing")
 
-    def _always_missing(ep: DownloadEpisode, config: PodcastConfig) -> bool:
+    def _always_missing(ep: DownloadEpisode, config: PodcastConfig, ctx: AppContext) -> bool:
+        del ep
+        del config
+        del ctx
         return False
 
     monkeypatch.setattr(
@@ -89,7 +101,7 @@ def test_build_download_queue_preserves_unknown_dates_after_dated_missing(
         _always_missing,
     )
 
-    queue = build_download_queue([undated_missing, dated_missing], _config())
+    queue = build_download_queue([undated_missing, dated_missing], _config(), _ctx())
 
     assert [item.episode.episode.title for item in queue] == [
         "Dated Missing",
@@ -122,12 +134,7 @@ def test_episode_exists_on_s3_matches_existing_youtube_video_id(
         upload_date=datetime(2026, 4, 19, tzinfo=timezone.utc),
         sponsors_removed=False,
     )
-    monkeypatch.setattr("src.files.s3._default_s3_service", fake)
-    from src.orchestration import download_service
-
-    download_service._existing_media_sources.cache_clear()
-
-    assert episode_exists_on_s3(episode, config) is True
+    assert episode_exists_on_s3(episode, config, _ctx_with_s3(fake)) is True
 
 
 def test_episode_exists_on_s3_matches_existing_direct_source_url(
@@ -160,12 +167,7 @@ def test_episode_exists_on_s3_matches_existing_direct_source_url(
         upload_date=datetime(2026, 4, 19, tzinfo=timezone.utc),
         sponsors_removed=False,
     )
-    monkeypatch.setattr("src.files.s3._default_s3_service", fake)
-    from src.orchestration import download_service
-
-    download_service._existing_media_sources.cache_clear()
-
-    assert episode_exists_on_s3(episode, config) is True
+    assert episode_exists_on_s3(episode, config, _ctx_with_s3(fake)) is True
 
 
 def test_episode_exists_on_s3_matches_cleaned_existing_filename(
@@ -195,12 +197,7 @@ def test_episode_exists_on_s3_matches_cleaned_existing_filename(
         "ann-billy-woodward-morbid-podcast.opus"
     ]
     fake.get_metadata = lambda bucket, key: None
-    monkeypatch.setattr("src.files.s3._default_s3_service", fake)
-    from src.orchestration import download_service
-
-    download_service._existing_media_sources.cache_clear()
-
-    assert episode_exists_on_s3(episode, config) is True
+    assert episode_exists_on_s3(episode, config, _ctx_with_s3(fake)) is True
 
 
 def test_process_in_tmpdir_reports_upload_progress(
@@ -259,9 +256,7 @@ def test_process_in_tmpdir_reports_upload_progress(
     fake.upload_file = lambda bucket_key, file_path, options: _upload_file(
         bucket_key[0], bucket_key[1], file_path, options
     )
-    monkeypatch.setattr("src.files.s3._default_s3_service", fake)
-
-    ctx = _ctx()
+    ctx = _ctx_with_s3(fake)
     ctx.event_bus.subscribe(OperationStarted, lambda event: operations.append(event.label))
     ctx.event_bus.subscribe(
         ProgressUpdated,

@@ -46,8 +46,8 @@ def test_download_episodes_skips_existing_and_counts_new_uploads() -> None:
     ]
     uploaded_titles: list[str] = []
 
-    def _build_download_queue(episodes: Any, cfg: Any) -> list[Any]:
-        del episodes, cfg
+    def _build_download_queue(episodes: Any, cfg: Any, ctx: Any) -> list[Any]:
+        del episodes, cfg, ctx
         return queue
 
     def _download_and_upload(download_episode: Any, cfg: Any, ctx: Any) -> bool:
@@ -126,8 +126,8 @@ def test_download_episodes_reports_nonfatal_errors_and_continues() -> None:
         _queue_item(False, "Working"),
     ]
 
-    def _build_download_queue(episodes: Any, cfg: Any) -> list[Any]:
-        del episodes, cfg
+    def _build_download_queue(episodes: Any, cfg: Any, ctx: Any) -> list[Any]:
+        del episodes, cfg, ctx
         return queue
 
     def _download_and_upload(download_episode: Any, cfg: Any, ctx: Any) -> bool:

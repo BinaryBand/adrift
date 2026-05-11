@@ -1,13 +1,18 @@
 """RSS feed regeneration for downloaded podcasts."""
 
+from __future__ import annotations
+
 from pathlib import Path
+from typing import TYPE_CHECKING, Any, cast
 
 from src.catalog import match, process_feeds
 from src.files.audio import is_audio
-from src.files.s3 import get_s3_files, upload_file
 from src.models import PodcastConfig, RssChannel, RssEpisode
 from src.orchestration.download_client import s3_prefix
 from src.web.rss import podcast_to_rss
+
+if TYPE_CHECKING:
+    from src.application.context import AppContext
 
 
 def _build_channel(config: PodcastConfig) -> RssChannel:
@@ -55,9 +60,13 @@ def _apply_pairs(
 
 
 def _match_to_s3(
-    config: PodcastConfig, episodes: list[RssEpisode], bucket: str, prefix: str
+    config: PodcastConfig,
+    episodes: list[RssEpisode],
+    ctx: AppContext,
 ) -> list[RssEpisode]:
-    files = _audio_files(get_s3_files(bucket, prefix))
+    bucket, prefix = s3_prefix(config)
+    s3 = cast(Any, ctx.s3)
+    files = _audio_files(s3.get_s3_files(bucket, prefix))
     if not files:
         return []
 
@@ -67,25 +76,25 @@ def _match_to_s3(
     return _apply_pairs(files, episodes, pairs)
 
 
-def _upload_rss(bucket: str, prefix: str, rss_xml: str) -> None:
+def _upload_rss(bucket: str, prefix: str, rss_xml: str, ctx: AppContext) -> None:
     import tempfile as _tempfile
 
     with _tempfile.NamedTemporaryFile(suffix=".rss", delete=False) as f:
         f.write(rss_xml.encode())
         tmp_path = Path(f.name)
     try:
-        upload_file(bucket, f"{prefix}/feed.rss", tmp_path)
+        cast(Any, ctx.s3).upload_file((bucket, f"{prefix}/feed.rss"), tmp_path)
     finally:
         tmp_path.unlink(missing_ok=True)
 
 
-def update_rss(config: PodcastConfig) -> None:
+def update_rss(config: PodcastConfig, ctx: AppContext) -> None:
     bucket, prefix = s3_prefix(config)
     channel = _build_channel(config)
     ref_episodes = process_feeds(config)
-    matched = _match_to_s3(config, ref_episodes, bucket, prefix)
+    matched = _match_to_s3(config, ref_episodes, ctx)
     rss_xml = podcast_to_rss(channel, matched)
-    _upload_rss(bucket, prefix, rss_xml)
+    _upload_rss(bucket, prefix, rss_xml, ctx)
 
 
 __all__ = ["update_rss"]

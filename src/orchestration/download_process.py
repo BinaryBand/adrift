@@ -6,7 +6,7 @@ import tempfile
 from dataclasses import dataclass
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any, cast
 
 from src.application.events import (
     DownloadCompleted,
@@ -15,7 +15,6 @@ from src.application.events import (
     ProgressUpdated,
 )
 from src.files.audio import convert_to_opus, cut_segments, get_duration
-from src.files.s3 import exists
 from src.models import DownloadEpisode, MediaMetadata, PodcastConfig
 from src.orchestration.download_cache import _existing_media_sources
 from src.orchestration.download_client import s3_prefix
@@ -42,20 +41,27 @@ def _episode_slug(config: PodcastConfig, ep: DownloadEpisode) -> str:
     return normalize_title(config.name, ep.episode.title)
 
 
-def episode_exists_on_s3(ep: DownloadEpisode, config: PodcastConfig) -> bool:
+def _s3_service(ctx: AppContext) -> Any:
+    return cast(Any, ctx.s3)
+
+
+def episode_exists_on_s3(ep: DownloadEpisode, config: PodcastConfig, ctx: AppContext) -> bool:
     bucket, prefix = s3_prefix(config)
     cleaned_slug = _episode_slug(config, ep)
     key_prefix = f"{prefix}/{cleaned_slug}"
-    if exists(bucket, key_prefix) is not None:
+    if _s3_service(ctx).exists(bucket, key_prefix) is not None:
         return True
-    return _existing_media_sources(bucket, prefix, config.name).matches(ep, cleaned_slug)
+    return _existing_media_sources(ctx, bucket, prefix, config.name).matches(ep, cleaned_slug)
 
 
 def build_download_queue(
-    episodes: list[DownloadEpisode], config: PodcastConfig
+    episodes: list[DownloadEpisode], config: PodcastConfig, ctx: AppContext
 ) -> list[DownloadQueueItem]:
     queue = [
-        DownloadQueueItem(episode=episode, exists_on_s3=episode_exists_on_s3(episode, config))
+        DownloadQueueItem(
+            episode=episode,
+            exists_on_s3=episode_exists_on_s3(episode, config, ctx),
+        )
         for episode in episodes
     ]
     return sorted(queue, key=_download_queue_sort_key)
@@ -89,7 +95,7 @@ def download_and_upload(
     """
     bucket, prefix = s3_prefix(config)
     key_prefix = f"{prefix}/{_episode_slug(config, ep)}"
-    if exists(bucket, key_prefix):
+    if _s3_service(ctx).exists(bucket, key_prefix):
         return False
     with tempfile.TemporaryDirectory() as tmp:
         return process_in_tmpdir(ep, config, Path(tmp), ctx)
@@ -130,7 +136,7 @@ def _upload_and_publish_completion(
     ctx: AppContext,
 ) -> bool:
     ctx.event_bus.publish(OperationStarted(label=f"upload opus: {ep.episode.title}"))
-    _upload_episode_audio(upload_request, callback=_progress_callback(ctx))
+    _upload_episode_audio(upload_request, ctx, callback=_progress_callback(ctx))
     ctx.event_bus.publish(
         DownloadCompleted(
             episode=ep.episode,

@@ -67,13 +67,16 @@ def _download_episodes(
     downloaded_total: int,
     max_downloads: int,
     ui: _DownloadUiPort,
-    build_download_queue: Callable[[list[DownloadEpisode], PodcastConfig], list[DownloadQueueItem]],
+    build_download_queue: Callable[
+        [list[DownloadEpisode], PodcastConfig, AppContext],
+        list[DownloadQueueItem],
+    ],
     download_and_upload: _DownloadAndUploadPort,
     bot_detection_error: type[BaseException],
     ctx: AppContext,
 ) -> int:
     additional_downloads = 0
-    for queue_item in build_download_queue(episodes, config):
+    for queue_item in build_download_queue(episodes, config, ctx):
         if downloaded_total + additional_downloads >= max_downloads:
             break
         if queue_item.exists_on_s3:
@@ -186,7 +189,7 @@ def _run(
 
                 if not skip_update:
                     ui.set_stage("rss")
-                    update_rss(config)
+                    update_rss(config, ctx)
 
                 ui.set_stage("done")
                 ui.advance()

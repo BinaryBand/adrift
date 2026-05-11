@@ -1,13 +1,18 @@
 """Cached helpers for download orchestration (existing media sources)."""
 
-from dataclasses import dataclass
-from functools import lru_cache
-from pathlib import Path
+from __future__ import annotations
 
-from src.files.s3 import get_file_list, get_metadata
+from dataclasses import dataclass
+from pathlib import Path
+from typing import TYPE_CHECKING, Any, cast
+
+from src.models import MediaMetadata
 from src.orchestration.download_client import prefixed_s3_key
 from src.utils.regex import YOUTUBE_VIDEO_REGEX
 from src.utils.title_normalization import normalize_title
+
+if TYPE_CHECKING:
+    from src.application.context import AppContext
 
 
 @dataclass(frozen=True)
@@ -26,15 +31,24 @@ class _ExistingMediaSources:
         return video_id is not None and video_id in self.youtube_video_ids
 
 
-@lru_cache(maxsize=128)
-def _existing_media_sources(bucket: str, prefix: str, show: str) -> _ExistingMediaSources:
+def _s3_service(ctx: AppContext) -> Any:
+    return cast(Any, ctx.s3)
+
+
+def _existing_media_sources(
+    ctx: AppContext, bucket: str, prefix: str, show: str
+) -> _ExistingMediaSources:
     cleaned_slugs: set[str] = set()
     source_urls: set[str] = set()
     youtube_video_ids: set[str] = set()
 
-    for name in get_file_list(bucket, prefix, False):
+    s3 = _s3_service(ctx)
+    for name in s3.get_file_list(bucket, prefix, False):
         cleaned_slugs.add(normalize_title(show, Path(name).stem))
-        metadata = get_metadata(bucket, prefixed_s3_key(prefix, name))
+        metadata = cast(
+            MediaMetadata | None,
+            s3.get_metadata(bucket, prefixed_s3_key(prefix, name)),
+        )
         if metadata is None:
             continue
         source = getattr(metadata, "source", None)
