@@ -1,7 +1,12 @@
 from types import SimpleNamespace
 from typing import Any, cast
 
-from runbook.download import _download_episodes
+from src.application.download import (
+    DownloadPipeline,
+    DownloadPipelineDeps,
+    DownloadPipelineRuntime,
+    DownloadRunOptions,
+)
 from src.models import PodcastConfig
 
 
@@ -67,17 +72,13 @@ def test_download_episodes_skips_existing_and_counts_new_uploads() -> None:
 
     ctx = SimpleNamespace(event_bus=_EventBus())
 
-    added = _download_episodes(
-        [],
-        config,
-        downloaded_total=0,
-        max_downloads=2,
+    added = _make_pipeline(
         ui=ui,
+        ctx=ctx,
+        max_downloads=2,
         build_download_queue=_build_download_queue,
         download_and_upload=_download_and_upload,
-        bot_detection_error=RuntimeError,
-        ctx=ctx,
-    )
+    )._download_episodes([], config, downloaded_total=0)
 
     assert added == 2
     assert uploaded_titles == ["New 1", "New 2"]
@@ -139,17 +140,13 @@ def test_download_episodes_reports_nonfatal_errors_and_continues() -> None:
 
     ctx = SimpleNamespace(event_bus=SimpleNamespace(publish=lambda event: None))
 
-    added = _download_episodes(
-        [],
-        config,
-        downloaded_total=0,
-        max_downloads=1,
+    added = _make_pipeline(
         ui=ui,
+        ctx=ctx,
+        max_downloads=1,
         build_download_queue=_build_download_queue,
         download_and_upload=_download_and_upload,
-        bot_detection_error=RuntimeError,
-        ctx=ctx,
-    )
+    )._download_episodes([], config, downloaded_total=0)
 
     assert added == 1
     assert emitted == [("error", "CreepCast — Broken: boom")]
@@ -160,3 +157,32 @@ def _queue_item(exists_on_s3: bool, title: str) -> SimpleNamespace:
         exists_on_s3=exists_on_s3,
         episode=SimpleNamespace(episode=SimpleNamespace(title=title)),
     )
+
+
+def _make_pipeline(
+    *,
+    ui: Any,
+    ctx: Any,
+    max_downloads: int,
+    build_download_queue: Any,
+    download_and_upload: Any,
+) -> DownloadPipeline:
+    runtime = DownloadPipelineRuntime(
+        ctx=ctx,
+        ui=ui,
+        options=DownloadRunOptions(max_downloads=max_downloads),
+    )
+    deps = DownloadPipelineDeps(
+        merge_config=lambda config, options: cast(Any, None),
+        merge_options_factory=lambda refresh, on_stage, callback: cast(Any, None),
+        enrich_with_sponsors=lambda _merge_result: cast(Any, []),
+        build_download_queue=build_download_queue,
+        download_and_upload=download_and_upload,
+        update_rss=lambda _config, _app_ctx: None,
+        build_merge_callbacks=lambda _run_ui: (
+            lambda _stage: None,
+            lambda _current, _total: None,
+        ),
+        bot_detection_error=RuntimeError,
+    )
+    return DownloadPipeline(runtime, deps)

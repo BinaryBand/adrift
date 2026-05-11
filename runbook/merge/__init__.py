@@ -7,13 +7,14 @@ from typing import TYPE_CHECKING
 
 import dotenv
 
+from src.application.merge import MergeUseCase
+
 if TYPE_CHECKING:
     from src.models import MergeResult, PodcastConfig
 
 from src.orchestration.merge_service import (
     MergeRunOptions,
     MergeWriters,
-    merge_configs,
 )
 from src.orchestration.merge_service import (
     format_duration as _format_duration,
@@ -184,7 +185,24 @@ def main() -> None:
         write_report_file=_write_report_file,
     )
     with create_run_ui(len(configs), "Matching") as ui, ui.output_context():
-        output = merge_configs(configs, options, ui, writers=writers)
+        merge_result = MergeUseCase(writers=writers).run(configs, options, ui)
+
+    output = [
+        {
+            "name": merged.config.name,
+            "merged_count": len(merged.episodes),
+            **(
+                {
+                    "references_count": len(merged.references),
+                    "downloads_count": len(merged.downloads),
+                }
+                if args.include_counts
+                else {}
+            ),
+            "episodes": [episode.model_dump(mode="json") for episode in merged.episodes],
+        }
+        for merged in merge_result.value
+    ]
 
     json.dump(output, sys.stdout, indent=2 if args.pretty else None)
     sys.stdout.write("\n")

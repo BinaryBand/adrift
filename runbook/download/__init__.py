@@ -1,96 +1,23 @@
 import random
 import sys
 import time
-from collections.abc import Callable
-from typing import Annotated, Any, Protocol
+from typing import Annotated
 
 import dotenv
 import typer
 
 from src.application.context import AppContext
-from src.application.events import (
-    DownloadCompleted,
-    DownloadFailed,
-    OperationStarted,
-    ProgressUpdated,
+from src.application.download import (
+    DownloadPipeline,
+    DownloadPipelineDeps,
+    DownloadPipelineRuntime,
+    DownloadRunOptions,
 )
-from src.models import DownloadEpisode, PodcastConfig
-from src.orchestration.download_service import DownloadQueueItem
+from src.models import PodcastConfig
 
 DF_TARGETS = ["config/*.toml"]
 DEFAULT_MAX_DOWNLOADS = 10
 DEFAULT_BOT_COOLDOWN = 60 * 60  # 1 hour
-
-
-class _DownloadUiPort(Protocol):
-    def emit(self, level: Any, message: str) -> None: ...
-
-    def set_operation(self, operation: str) -> None: ...
-
-    def clear_operation(self) -> None: ...
-
-    def operation_callback(self, current: int, total: int | None) -> None: ...
-
-
-class _DownloadAndUploadPort(Protocol):
-    def __call__(
-        self,
-        ep: DownloadEpisode,
-        config: PodcastConfig,
-        ctx: AppContext,
-    ) -> bool: ...
-
-
-def _subscribe_download_events(ui: _DownloadUiPort, ctx: AppContext) -> None:
-    ctx.event_bus.subscribe(
-        OperationStarted,
-        lambda event: ui.set_operation(event.label),
-    )
-    ctx.event_bus.subscribe(
-        ProgressUpdated,
-        lambda event: ui.operation_callback(event.current, event.total),
-    )
-    ctx.event_bus.subscribe(
-        DownloadCompleted,
-        lambda _event: ui.clear_operation(),
-    )
-    ctx.event_bus.subscribe(
-        DownloadFailed,
-        lambda _event: ui.clear_operation(),
-    )
-
-
-def _download_episodes(
-    episodes: list[DownloadEpisode],
-    config: PodcastConfig,
-    *,
-    downloaded_total: int,
-    max_downloads: int,
-    ui: _DownloadUiPort,
-    build_download_queue: Callable[
-        [list[DownloadEpisode], PodcastConfig, AppContext],
-        list[DownloadQueueItem],
-    ],
-    download_and_upload: _DownloadAndUploadPort,
-    bot_detection_error: type[BaseException],
-    ctx: AppContext,
-) -> int:
-    additional_downloads = 0
-    for queue_item in build_download_queue(episodes, config, ctx):
-        if downloaded_total + additional_downloads >= max_downloads:
-            break
-        if queue_item.exists_on_s3:
-            continue
-        try:
-            newly_uploaded = download_and_upload(queue_item.episode, config, ctx)
-            if newly_uploaded:
-                additional_downloads += 1
-        except bot_detection_error:
-            raise
-        except Exception as exc:
-            ui.clear_operation()
-            ui.emit("error", f"{config.name} — {queue_item.episode.episode.title}: {exc}")
-    return additional_downloads
 
 
 def _run(
@@ -151,48 +78,31 @@ def _run(
 
         configs = [c for c in configs if _matches_tag(c)]
 
-    downloaded_total = 0
+    pipeline_options = DownloadRunOptions(
+        skip_download=skip_download,
+        skip_update=skip_update,
+        max_downloads=max_downloads,
+        refresh_sources=refresh_sources,
+    )
 
     try:
         with create_run_ui(len(configs), "Downloading") as ui, ui.output_context():
-            _subscribe_download_events(ui, ctx)
-            on_stage, callback = build_merge_callbacks(ui)
-            for config in configs:
-                ui.set_podcast(config.name)
-
-                ui.set_stage("merge")
-                result = merge_config(
-                    config,
-                    MergeConfigOptions(
-                        refresh_sources=refresh_sources,
-                        on_stage=on_stage,
-                        callback=callback,
-                    ),
-                )
-
-                ui.set_stage("enrich")
-                episodes = enrich_with_sponsors(result)
-
-                if not skip_download:
-                    ui.set_stage("download")
-                    downloaded_total += _download_episodes(
-                        episodes,
-                        config,
-                        downloaded_total=downloaded_total,
-                        max_downloads=max_downloads,
-                        ui=ui,
-                        build_download_queue=build_download_queue,
-                        download_and_upload=download_and_upload,
-                        bot_detection_error=BotDetectionError,
-                        ctx=ctx,
-                    )
-
-                if not skip_update:
-                    ui.set_stage("rss")
-                    update_rss(config, ctx)
-
-                ui.set_stage("done")
-                ui.advance()
+            runtime = DownloadPipelineRuntime(ctx=ctx, ui=ui, options=pipeline_options)
+            deps = DownloadPipelineDeps(
+                merge_config=merge_config,
+                merge_options_factory=lambda refresh, on_stage, callback: MergeConfigOptions(
+                    refresh_sources=refresh,
+                    on_stage=on_stage,
+                    callback=callback,
+                ),
+                enrich_with_sponsors=enrich_with_sponsors,
+                build_download_queue=build_download_queue,
+                download_and_upload=download_and_upload,
+                update_rss=update_rss,
+                build_merge_callbacks=build_merge_callbacks,
+                bot_detection_error=BotDetectionError,
+            )
+            downloaded_total = DownloadPipeline(runtime, deps).run(configs).value
 
     except BotDetectionError:
         sys.stderr.write(f"\nBot detection triggered — cooling down for {bot_cooldown}s\n")
