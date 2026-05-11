@@ -39,10 +39,21 @@ def episode_from_feedparser(entry: FeedParserDict) -> RssEpisode:
         author=author,
         description=description,
         content=content,
-        pub_date=_parse_entry_pub_date(entry),
+        pub_date=entry_pub_date_from_feedparser(entry),
         duration=_parse_entry_duration(entry),
         image=_parse_entry_image(entry),
     )
+
+
+def entry_title_from_feedparser(entry: FeedParserDict) -> str:
+    """Return a normalized title string for feed entry filtering."""
+    title = getattr(entry, "title", "")
+    return str(title) if title is not None else ""
+
+
+def entry_pub_date_from_feedparser(entry: FeedParserDict) -> datetime | None:
+    """Return parsed publication date for schedule filtering."""
+    return _parse_entry_pub_date(entry)
 
 
 def _extract_image_url(channel: FeedParserDict) -> str:
@@ -150,4 +161,6 @@ def _parse_entry_image(entry: FeedParserDict) -> str | None:
 __all__ = [
     "channel_from_feedparser",
     "episode_from_feedparser",
+    "entry_pub_date_from_feedparser",
+    "entry_title_from_feedparser",
 ]

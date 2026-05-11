@@ -4,22 +4,24 @@ import shutil
 import time
 import uuid
 import xml.etree.ElementTree as ET
-from datetime import datetime, timedelta, timezone
+from datetime import datetime, timedelta
 from pathlib import Path
 from typing import cast
 from xml.dom import minidom
 
 import feedparser
 import requests
-from dateutil import parser
 from dateutil.rrule import rrulestr
 from diskcache import Cache
 from feedparser import FeedParserDict
 
-from src.infrastructure.rss import channel_from_feedparser, episode_from_feedparser
+from src.infrastructure.rss import (
+    channel_from_feedparser,
+    entry_pub_date_from_feedparser,
+    entry_title_from_feedparser,
+    episode_from_feedparser,
+)
 from src.models import RssChannel, RssEpisode
-from src.utils.image import extract_image_from_feedparser
-from src.utils.media import AUDIO_EXTENSIONS, parse_duration
 from src.utils.progress import Callback
 from src.utils.regex import LINK_REGEX, re_compile
 
@@ -56,14 +58,6 @@ def _cache_set_with_retry(cache: Cache, key: str, value: str, expire: int | None
             raise
 
 
-def _extract_image_url(channel: FeedParserDict) -> str:
-    """Extract image URL from the 'image' or 'itunes_image' field of a feed channel."""
-    val = extract_image_from_feedparser(cast(object, channel.get("image")))
-    if val:
-        return val
-    return extract_image_from_feedparser(cast(object, channel.get("itunes_image")))
-
-
 def get_rss_channel(rss_url: str) -> RssChannel:
     """Fetch and parse an RSS feed from a URL to extract channel information."""
     feed_str = _fetch_channel_feed_str(rss_url)
@@ -88,94 +82,9 @@ def _fetch_channel_feed_str(rss_url: str) -> str:
     return feed_str
 
 
-def _pick_channel_field(channel: FeedParserDict, *names: str) -> str:
-    for n in names:
-        v = getattr(channel, n, None)
-        if v:
-            return v
-    return ""
-
-
-def _extract_content_url(entry: FeedParserDict) -> str | None:
-    """Extract content URL from entry enclosures or url."""
-    candidates = _collect_enclosure_strings(entry)
-    audio_urls = _filter_audio_urls(candidates)
-    return audio_urls[0] if audio_urls else None
-
-
-def _collect_enclosure_strings(entry: FeedParserDict) -> list[str]:
-    content = getattr(entry, "enclosures", [])
-    if content:
-        return _extract_urls_from_enclosures(content)
-
-    url = getattr(entry, "url", None)
-    if isinstance(url, str) and url:
-        return [url]
-    return []
-
-
-def _extract_urls_from_enclosures(content: object) -> list[str]:
-    urls: list[str] = []
-    enclosures = cast(list[object], content) if isinstance(content, list) else []
-    for enc in enclosures:
-        urls.extend(LINK_REGEX.findall(_enclosure_value(enc)))
-    return urls
-
-
-def _enclosure_value(enc: object) -> str:
-    if isinstance(enc, str):
-        return enc
-
-    get = getattr(enc, "get", None)
-    if not callable(get):
-        return ""
-
-    href = get("href", "")
-    if isinstance(href, str):
-        return href
-    return ""
-
-
-def _filter_audio_urls(urls: list[str]) -> list[str]:
-    return [u for u in urls if any(u.lower().find(ext) != -1 for ext in AUDIO_EXTENSIONS)]
-
-
 def parse_rss_entry(entry: FeedParserDict) -> RssEpisode:
     """Parse a single RSS feed entry to extract episode information."""
     return episode_from_feedparser(entry)
-
-
-def _entry_basic_fields(entry: FeedParserDict) -> tuple[str, str, str, str]:
-    return (
-        getattr(entry, "id", getattr(entry, "guid", "")),
-        getattr(entry, "title", ""),
-        getattr(entry, "author", getattr(entry, "itunes_author", "")),
-        getattr(entry, "description", getattr(entry, "summary", "")),
-    )
-
-
-def _parse_entry_duration(entry: FeedParserDict) -> float | None:
-    duration = getattr(entry, "itunes_duration", None)
-    if duration is not None:
-        return parse_duration(duration)
-    return None
-
-
-def _parse_entry_image(entry: FeedParserDict) -> str | None:
-    image = getattr(entry, "itunes_image", getattr(entry, "image", None))
-    if image is None:
-        return None
-    if isinstance(image, str):
-        return image
-    get = getattr(image, "get", None)
-    if callable(get):
-        href = get("href", None)
-        if isinstance(href, str) and href:
-            return href
-        url = get("url", None)
-        if isinstance(url, str) and url:
-            return url
-    return None
 
 
 def _align_to_tzinfo(dt: datetime, reference: datetime) -> datetime:
@@ -254,7 +163,7 @@ def _apply_title_filter(
     if not filter_value:
         return entries
     regex = re_compile(filter_value)
-    return [entry for entry in entries if regex.search(getattr(entry, "title"))]
+    return [entry for entry in entries if regex.search(entry_title_from_feedparser(entry))]
 
 
 def _apply_r_rules_filter(
@@ -266,21 +175,10 @@ def _apply_r_rules_filter(
 
 
 def _entry_matches_any_r_rule(entry: FeedParserDict, r_rules: list[str]) -> bool:
-    pub_date = _parse_entry_pub_date(entry)
+    pub_date = entry_pub_date_from_feedparser(entry)
     if pub_date is None:
         return False
     return any(_rrule_has_occurrence_on_date(pub_date, rule) for rule in r_rules)
-
-
-def _parse_entry_pub_date(entry: FeedParserDict) -> datetime | None:
-    try:
-        pub_date_str = getattr(entry, "published", getattr(entry, "pubDate", ""))
-        pub_date = parser.parse(pub_date_str)
-        if pub_date.tzinfo is None:
-            return pub_date.replace(tzinfo=timezone.utc)
-        return pub_date
-    except (ValueError, TypeError, AttributeError):
-        return None
 
 
 def _parse_feed_entries(
