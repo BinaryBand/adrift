@@ -2,7 +2,7 @@ import json
 import sys
 from pathlib import Path
 from time import perf_counter
-from typing import TYPE_CHECKING, Annotated, Literal
+from typing import TYPE_CHECKING, Annotated
 
 import dotenv
 import typer
@@ -95,9 +95,6 @@ def _build_run_options(
     output_file: str | None,
     refresh_sources: bool,
     timings: bool,
-    skip_sankey: bool,
-    skip_report: bool,
-    sankey_format: Literal["sankey", "flowchart"],
 ) -> MergeRunOptions:
     return MergeRunOptions(
         include_counts=include_counts,
@@ -106,9 +103,6 @@ def _build_run_options(
         output_file=output_file,
         refresh_sources=refresh_sources,
         timings_enabled=timings,
-        skip_sankey=skip_sankey,
-        skip_report=skip_report,
-        sankey_format=sankey_format,
     )
 
 
@@ -188,18 +182,6 @@ def _run(
         bool,
         typer.Option(help="Emit per-podcast stage timings to stderr."),
     ] = False,
-    skip_sankey: Annotated[
-        bool,
-        typer.Option(help="Skip generating Mermaid sankey diagrams (enabled by default)."),
-    ] = False,
-    skip_report: Annotated[
-        bool,
-        typer.Option(help="Skip generating the per-podcast markdown report (enabled by default)."),
-    ] = False,
-    sankey_format: Annotated[
-        Literal["sankey", "flowchart"],
-        typer.Option(help="Mermaid diagram format to generate (sankey or flowchart)."),
-    ] = "sankey",
 ) -> None:
     dotenv.load_dotenv()
     include, tags, output_dir = _normalize_cli_inputs(include, tags, output_dir)
@@ -211,9 +193,6 @@ def _run(
         output_file,
         refresh_sources,
         timings,
-        skip_sankey,
-        skip_report,
-        sankey_format,
     )
     merge_result = _run_merge(configs, options)
     output = _build_stdout_output(merge_result, include_counts)

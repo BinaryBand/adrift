@@ -31,4 +31,4 @@ rules:
     paths:
       exclude:
         - "tests/**"
-        - '**/tests/**'
+        - "**/tests/**"

@@ -25,9 +25,6 @@ class MergeRunOptions:
     output_file: str | None = None
     refresh_sources: bool = False
     timings_enabled: bool = False
-    skip_sankey: bool = False
-    skip_report: bool = False
-    sankey_format: str = "sankey"
 
 
 def model_payloads(items: Sequence[BaseModel]) -> list[dict[str, object]]:
