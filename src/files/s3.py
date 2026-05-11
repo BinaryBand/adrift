@@ -27,7 +27,6 @@ from src.files.s3_upload import (
 from src.files.s3_utils import (
     _is_endpoint_reachable_with_provider,
     _make_boto_config,
-    retry,
 )
 
 if TYPE_CHECKING:
@@ -43,29 +42,23 @@ from src.ports import SecretProviderPort, require_secrets
 
 _REQUIRED_S3_KEYS = ("S3_USERNAME", "S3_SECRET_KEY", "S3_ENDPOINT", "S3_REGION")
 
-_secret_provider: SecretProviderPort = get_secret_provider_adapter()
-
-S3_ENDPOINT = _secret_provider.get("S3_ENDPOINT", "")
-
 
 # Injectable S3 service ----------------------------------------------------
 class S3Service:
     """Encapsulate S3 client construction and provide an injectable service.
 
     This is intentionally lightweight: it owns a cached boto3 client and the
-    secret provider to use when building clients. Callers may register a
-    different service with `register_s3_service()` for testing or alternate
-    behavior.
+    secret provider to use when building clients.
     """
 
-    def __init__(self, secret_provider: SecretProviderPort | None = None, **kwargs: Any) -> None:
+    def __init__(self, secret_provider: SecretProviderPort, **kwargs: Any) -> None:
         """Construct the service.
 
         Accepts optional keyword args for `session_factory` and `cache` to aid
         testing, but keeps a short explicit signature to satisfy the lizard
         parameter-count gate.
         """
-        self.secret_provider = secret_provider or _secret_provider
+        self.secret_provider = secret_provider
         session_factory = kwargs.get("session_factory")
         cache = kwargs.get("cache")
 
@@ -76,8 +69,8 @@ class S3Service:
         self.cache = cache if cache is not None else _s3_cache()
 
     @classmethod
-    def from_env(cls, provider: SecretProviderPort | None = None, **kwargs: Any) -> "S3Service":
-        return cls(provider or _secret_provider, **kwargs)
+    def from_env(cls, **kwargs: Any) -> "S3Service":
+        return cls(get_secret_provider_adapter(), **kwargs)
 
     def build_client(self) -> S3Client:
         """Construct a fresh boto3 S3 client using this service's secret provider."""
@@ -183,9 +176,8 @@ class S3Service:
         return _metadata_fetch_head_metadata(client, bucket, key)
 
     def public_s3_url(self, bucket: str, key: str) -> str:
-        return urljoin(
-            self.secret_provider.get("S3_ENDPOINT", S3_ENDPOINT), Path(bucket, key).as_posix()
-        )
+        endpoint = self.secret_provider.get("S3_ENDPOINT", "")
+        return urljoin(endpoint, Path(bucket, key).as_posix())
 
     # -- Listing / map helpers -------------------------------------------------
     def build_file_map_from_iterator(
@@ -366,9 +358,8 @@ class S3Service:
         spec, metadata_dict = _prepare_upload_spec(bucket, key, file_path, options)
         self.do_s3_upload(spec)
         self.sync_upload_cache(bucket, key, metadata_dict)
-        return urljoin(
-            self.secret_provider.get("S3_ENDPOINT", S3_ENDPOINT), Path(bucket, key).as_posix()
-        )
+        endpoint = self.secret_provider.get("S3_ENDPOINT", "")
+        return urljoin(endpoint, Path(bucket, key).as_posix())
 
     def upload_cache_file(
         self,
@@ -380,9 +371,8 @@ class S3Service:
         spec, metadata_dict = _prepare_upload_spec(bucket, key, file_path, metadata)
         self.do_s3_upload(spec)
         self.sync_upload_cache(bucket, key, metadata_dict)
-        return urljoin(
-            self.secret_provider.get("S3_ENDPOINT", S3_ENDPOINT), Path(bucket, key).as_posix()
-        )
+        endpoint = self.secret_provider.get("S3_ENDPOINT", "")
+        return urljoin(endpoint, Path(bucket, key).as_posix())
 
     def download_file(self, bucket: str, key: str, download_path: Path) -> None:
         client = self.get_client()
@@ -393,47 +383,8 @@ class S3Service:
                 f.write(chunk)
 
 
-# Global default service registration --------------------------------------
-_default_s3_service: S3Service | None = None
-_default_s3_service_lock = Lock()
-
-
-def register_s3_service(service: S3Service) -> None:
-    """Register a global default `S3Service` instance (thread-safe)."""
-    global _default_s3_service
-    with _default_s3_service_lock:
-        _default_s3_service = service
-
-
-def get_s3_service() -> S3Service:
-    """Return the registered `S3Service`, creating a default one from the
-    environment if none is registered yet.
-    """
-    global _default_s3_service
-    with _default_s3_service_lock:
-        if _default_s3_service is None:
-            _default_s3_service = S3Service.from_env()
-        return _default_s3_service
-
-
-def set_secret_provider(provider: SecretProviderPort) -> None:
-    """Swap the secret provider port implementation used by this module."""
-    global _secret_provider
-    _secret_provider = provider
-    # Re-create the default registered service so the new provider is used.
-    register_s3_service(S3Service.from_env(provider))
-
-
-def reset_secret_provider() -> None:
-    """Restore default environment-backed secret provider."""
-    set_secret_provider(get_secret_provider_adapter("env", enable_prompt_fallback=False))
-
-
-def require_s3_env() -> tuple[str, str, str, str]:
-    values = require_secrets(
-        _secret_provider,
-        _REQUIRED_S3_KEYS,
-    )
+def require_s3_env(provider: SecretProviderPort) -> tuple[str, str, str, str]:
+    values = require_secrets(provider, _REQUIRED_S3_KEYS)
     return (
         values["S3_USERNAME"],
         values["S3_SECRET_KEY"],
@@ -442,181 +393,26 @@ def require_s3_env() -> tuple[str, str, str, str]:
     )
 
 
-def _configured_local_s3_endpoint(
-    provider: SecretProviderPort | None = None,
-) -> str | None:
-    active_provider = provider or _secret_provider
-    endpoint = active_provider.get("LOCAL_S3_ENDPOINT", "").strip()
+def _configured_local_s3_endpoint(provider: SecretProviderPort) -> str | None:
+    endpoint = provider.get("LOCAL_S3_ENDPOINT", "").strip()
     return endpoint or None
 
 
 def validate_s3_provider(
-    provider: SecretProviderPort | None = None,
+    provider: SecretProviderPort,
     *,
     check_endpoint: bool,
 ) -> None:
-    active_provider = provider or _secret_provider
-    values = require_secrets(active_provider, _REQUIRED_S3_KEYS)
+    values = require_secrets(provider, _REQUIRED_S3_KEYS)
     if not check_endpoint:
         return
-    local_endpoint = _configured_local_s3_endpoint(active_provider)
-    if local_endpoint and _is_endpoint_reachable_with_provider(local_endpoint, active_provider):
+    local_endpoint = _configured_local_s3_endpoint(provider)
+    if local_endpoint and _is_endpoint_reachable_with_provider(local_endpoint, provider):
         return
     endpoint = values["S3_ENDPOINT"]
-    if _is_endpoint_reachable_with_provider(endpoint, active_provider):
+    if _is_endpoint_reachable_with_provider(endpoint, provider):
         return
     raise RuntimeError(f"Unable to reach configured S3 endpoint: {endpoint}")
-
-
-def _invalidate_file_map_cache(bucket: str, key: str) -> None:
-    """Invalidate the file-map cache for the directory containing `key`.
-
-    Called after any mutation (upload, rename, delete) so that the next call
-    to `exists()` / `get_file_list()` re-lists the directory from S3 rather
-    than returning a stale cached result.
-    """
-    return get_s3_service().invalidate_file_map_cache(bucket, key)
-
-
-def _sync_upload_cache(bucket: str, key: str, metadata_dict: dict[str, str] | None) -> None:
-    """Update the local S3 metadata cache after an upload."""
-    return get_s3_service().sync_upload_cache(bucket, key, metadata_dict)
-
-
-def get_effective_s3_endpoint() -> str:
-    """Resolve the endpoint boto3 should talk to."""
-    # Delegate to the registered service for endpoint resolution so that any
-    # registered service's provider is consulted.
-    return get_s3_service().get_effective_endpoint()
-
-
-def get_s3_client() -> S3Client:
-    """Get a cached S3 client."""
-    # Use the registered service's client; this allows tests to register a
-    # fake service and ensures a single place to control client construction.
-    return get_s3_service().get_client()
-
-
-@retry(attempts=5, backoff_base=2)
-def download_file(bucket: str, key: str, download_path: Path) -> None:
-    """Download file using authenticated S3 client"""
-    client = get_s3_client()
-    response = client.get_object(Bucket=bucket, Key=key)
-
-    with open(download_path, "wb") as f:
-        for chunk in response["Body"].iter_chunks():
-            f.write(chunk)
-
-
-@retry(attempts=3, backoff_base=2)
-def upload_file(
-    bucket: str,
-    key: str,
-    file_path: Path,
-    options: UploadOptions | MediaMetadata | dict[str, Any] | None = None,
-) -> str | None:
-    """Upload a file to S3.
-
-    The `options` argument may be one of:
-      - `None` (no metadata or callback)
-      - a `MediaMetadata` instance (metadata only)
-      - an `UploadOptions` dict with optional keys `metadata` and `callback`
-    """
-    return get_s3_service().upload_file((bucket, key), file_path, options)
-
-
-@retry(attempts=3, backoff_base=2)
-def upload_cache_file(
-    bucket: str,
-    key: str,
-    file_path: Path,
-    metadata: CacheMetadata | None = None,
-) -> str | None:
-    return get_s3_service().upload_cache_file((bucket, key), file_path, metadata)
-
-
-@retry(attempts=3, backoff_base=2)
-def delete_file(bucket: str, key: str) -> None:
-    return get_s3_service().delete_file(bucket, key)
-
-
-def rename_file(bucket: str, old_key: str, new_key: str) -> None:
-    return get_s3_service().rename_file(bucket, old_key, new_key)
-
-
-@retry(attempts=3, backoff_base=2)
-def copy_file(bucket: str, source_key: str, dest_key: str) -> str | None:
-    """Copy an object within the same bucket and return its public URL.
-
-    Updates the local S3 metadata cache to reflect the copied object when possible.
-    """
-    return get_s3_service().copy_file(bucket, source_key, dest_key)
-
-
-def _sync_copy_cache(bucket: str, source_key: str, dest_key: str) -> None:
-    return get_s3_service().sync_copy_cache(bucket, source_key, dest_key)
-
-
-def _fetch_head_metadata(client: S3Client, bucket: str, key: str) -> dict[str, str] | None:
-    return get_s3_service().fetch_head_metadata(client, bucket, key)
-
-
-def _public_s3_url(bucket: str, key: str) -> str:
-    return get_s3_service().public_s3_url(bucket, key)
-
-
-def get_metadata(bucket: str, key: str) -> MediaMetadata | None:
-    return get_s3_service().get_metadata(bucket, key)
-
-
-def set_metadata(bucket: str, key: str, metadata: MediaMetadata) -> None:
-    return get_s3_service().set_metadata(bucket, key, metadata)
-
-
-def _build_file_map_from_iterator(
-    bucket: str, prefix: str, without_extensions: bool
-) -> dict[str, str]:
-    """Build a file->etag map from the iterator that yields S3 objects.
-
-    Extracted so pagination and mapping logic can be tested or swapped
-    independently of the cache handling in `_get_file_map()`.
-    """
-    return get_s3_service().build_file_map_from_iterator(bucket, prefix, without_extensions)
-
-
-def _get_file_map(bucket: str, prefix: str, without_extensions: bool = True) -> dict[str, str]:
-    # Normalize prefix - add trailing slash for directory listing with delimiter
-    prefix = prefix.lstrip(".")
-    if prefix and not prefix.endswith("/"):
-        prefix += "/"
-
-    return get_s3_service().get_file_map(bucket, prefix, without_extensions)
-
-
-def _iterate_s3_objects(bucket: str, prefix: str) -> Iterator[Any]:
-    """Yield object dicts for all objects under `bucket/prefix`.
-
-    Extracted from `_get_file_map()` so pagination can be tested or swapped
-    independently of the mapping/ETag logic.
-    """
-    yield from get_s3_service().iterate_s3_objects(bucket, prefix)
-
-
-def _remove_file_extensions(file_names: list[str]) -> list[str]:
-    return _listing_remove_file_extensions(file_names)
-
-
-def get_file_list(bucket: str, prefix: str, without_extensions: bool = False) -> list[str]:
-    return get_s3_service().get_file_list(bucket, prefix, without_extensions)
-
-
-def get_s3_files(bucket: str, prefix: str) -> list[str]:
-    return get_s3_service().get_s3_files(bucket, prefix)
-
-
-def exists(bucket: str, prefix: str, extension_agnostic: bool = True) -> str | None:
-    prefix = prefix.lstrip(".").rstrip("/")
-    return get_s3_service().exists(bucket, prefix, extension_agnostic)
 
 
 def _identifier_matches(name: str, identifier: str, extension_agnostic: bool) -> bool:

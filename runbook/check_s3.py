@@ -14,13 +14,16 @@ Exit codes:
 
 import sys
 from pathlib import Path
-from typing import Dict, List, Set, Tuple
+from typing import Any, Dict, List, Set, Tuple, cast
 
 from botocore.exceptions import ClientError
 
 from src.app_common import load_podcasts_config
-from src.files import s3
+from src.application.context import AppContext
 from src.orchestration.download_client import _s3_prefix
+from src.ports import require_secrets
+
+_REQUIRED_S3_KEYS = ("S3_USERNAME", "S3_SECRET_KEY", "S3_ENDPOINT", "S3_REGION")
 
 
 def load_configs() -> List:
@@ -95,13 +98,16 @@ def list_child_names(client, bucket: str, root: str) -> Tuple[Set[str], bool]:
 
 
 def main() -> int:
+    ctx = AppContext.from_env()
+    s3_service = cast(Any, ctx.s3)
+
     try:
-        s3.require_s3_env()
+        require_secrets(ctx.secrets, _REQUIRED_S3_KEYS)
     except Exception as exc:
         print(f"S3 environment not configured: {exc}", file=sys.stderr)
         return 2
 
-    client = s3.get_s3_client()
+    client = s3_service.get_client()
     try:
         client.list_buckets()
     except Exception as exc:
