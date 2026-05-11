@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import logging
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, cast
 
@@ -15,6 +16,10 @@ if TYPE_CHECKING:
     from src.application.context import AppContext
 
 
+logger = logging.getLogger(__name__)
+_CHANNEL_FILL_ERRORS = (OSError, RuntimeError, TypeError, ValueError)
+
+
 def _build_channel(config: PodcastConfig) -> RssChannel:
     from src.adapters import get_episode_source_adapter
 
@@ -24,8 +29,8 @@ def _build_channel(config: PodcastConfig) -> RssChannel:
     for source in config.references:
         try:
             _fill_channel(channel, get_episode_source_adapter(source).fetch_channel(source))
-        except Exception:
-            pass
+        except _CHANNEL_FILL_ERRORS as exc:
+            logger.warning("Unable to fill channel metadata from source %s: %s", source.url, exc)
     return channel
 
 

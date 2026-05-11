@@ -21,6 +21,9 @@ if TYPE_CHECKING:
     from src.utils.run_ui import BaseRunUI
 
 
+_MERGE_OPERATION_ERRORS = (OSError, RuntimeError, ValueError)
+
+
 @dataclass
 class _MergeUseCaseState:
     reports: list[dict[str, object]] = field(default_factory=list)
@@ -104,7 +107,7 @@ class MergeUseCase:
                 on_stage=frame.callbacks.on_stage,
                 callback=frame.callbacks.progress,
             )
-        except Exception as exc:
+        except _MERGE_OPERATION_ERRORS as exc:
             frame.runtime.errors.append(
                 PipelineError(
                     label="merge",

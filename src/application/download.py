@@ -28,6 +28,8 @@ BuildQueueFn = Callable[
     list["DownloadQueueItem"],
 ]
 
+_DOWNLOAD_OPERATION_ERRORS = (OSError, RuntimeError, ValueError)
+
 
 @dataclass(frozen=True)
 class DownloadRunOptions:
@@ -82,7 +84,7 @@ class DownloadPipeline:
                 downloaded_total += self._run_single_config(config, callbacks, downloaded_total)
             except self._deps.bot_detection_error:
                 raise
-            except Exception as exc:
+            except _DOWNLOAD_OPERATION_ERRORS as exc:
                 errors.append(
                     PipelineError(
                         label="download",
@@ -155,7 +157,7 @@ class DownloadPipeline:
                     additional_downloads += 1
             except self._deps.bot_detection_error:
                 raise
-            except Exception as exc:
+            except _DOWNLOAD_OPERATION_ERRORS as exc:
                 self._runtime.ui.clear_operation()
                 self._runtime.ui.emit(
                     "error",

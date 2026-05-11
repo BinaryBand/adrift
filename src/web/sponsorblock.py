@@ -3,6 +3,7 @@ SponsorBlock API integration for fetching and removing sponsored segments.
 """
 
 import logging
+import subprocess
 from pathlib import Path
 from typing import Any, cast
 
@@ -35,7 +36,7 @@ def _fetch_sponsor_segments(video_id: str) -> list[SponsorSegment]:
         return segments
     except requests.RequestException as e:
         logger.warning("Network error fetching segments for %s: %s", video_id, e)
-    except Exception as e:
+    except (TypeError, ValueError, KeyError) as e:
         logger.warning("Error fetching segments for %s: %s", video_id, e)
 
     return []
@@ -93,7 +94,7 @@ def fetch_sponsor_segments(video_id: str) -> list[tuple[float, float]]:
     try:
         segments = _fetch_sponsor_segments(video_id)
         return [seg.segment for seg in segments]
-    except Exception as e:
+    except (requests.RequestException, TypeError, ValueError, KeyError) as e:
         logger.error("Error fetching segments for %s: %s", video_id, e)
         return []
 
@@ -110,6 +111,6 @@ def remove_sponsors(target: Path, video_id: str, callback: Callback | None = Non
         logger.info("Removing %d sponsor segments from %s", len(segments), target)
         cut_segments(target, segments, callback=callback)
         return True
-    except Exception as e:
+    except (OSError, RuntimeError, subprocess.SubprocessError) as e:
         logger.error("Error removing sponsors from %s: %s", target, e)
         return False
