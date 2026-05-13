@@ -365,6 +365,12 @@ class _AlignmentState:
     runtime: _AlignmentRuntime
 
 
+@dataclass(frozen=True)
+class _ScoreContext:
+    runtime: _AlignmentRuntime
+    include_date: bool
+
+
 def _is_sparse_title(s_id: float, has_desc: bool, s_title: float, sparse_title_min: float) -> bool:
     return not s_id and not has_desc and s_title < sparse_title_min
 
@@ -373,19 +379,30 @@ def _score(
     ref: "_AlignmentCandidate",
     dl: "_AlignmentCandidate",
     sims: "_Sims",
-    runtime: _AlignmentRuntime | None = None,
     include_date: bool | None = None,
 ) -> float:
-    resolved_runtime = runtime or _AlignmentRuntime(
+    runtime = _AlignmentRuntime(
         config=_DEFAULT_ALIGNMENT,
         stopwords=_alignment_stopwords(_DEFAULT_ALIGNMENT),
     )
-    resolved_include_date = (
-        include_date if include_date is not None else sims.title < _TITLE_CERTAINTY_MIN
+    context = _ScoreContext(
+        runtime=runtime,
+        include_date=(
+            include_date if include_date is not None else sims.title < _TITLE_CERTAINTY_MIN
+        ),
     )
-    base = _weighted_base_score(ref, dl, sims, resolved_runtime, resolved_include_date)
-    containment = _containment_bonus(ref, dl, resolved_runtime, resolved_include_date)
-    id_bonus = resolved_runtime.config.weights.id * _id_similarity(ref.episode, dl.episode)
+    return _score_with_context(ref, dl, sims, context)
+
+
+def _score_with_context(
+    ref: "_AlignmentCandidate",
+    dl: "_AlignmentCandidate",
+    sims: "_Sims",
+    context: _ScoreContext,
+) -> float:
+    base = _weighted_base_score(ref, dl, sims, context)
+    containment = _containment_bonus(ref, dl, context)
+    id_bonus = context.runtime.config.weights.id * _id_similarity(ref.episode, dl.episode)
     return min(1.0, base + id_bonus + containment)
 
 
@@ -393,16 +410,16 @@ def _weighted_base_score(
     ref: _AlignmentCandidate,
     dl: _AlignmentCandidate,
     sims: _Sims,
-    runtime: _AlignmentRuntime,
-    include_date: bool,
+    context: _ScoreContext,
 ) -> float:
+    runtime = context.runtime
     weights = runtime.config.weights
     weighted_sum = weights.title * sims.title
     total_weight = weights.title
     if _has_description_signal(ref, dl):
         weighted_sum += weights.description * sims.desc
         total_weight += weights.description
-    if include_date and _has_date_signal(ref, dl):
+    if context.include_date and _has_date_signal(ref, dl):
         weighted_sum += weights.date * sim_date(
             ref.episode.pub_date,
             dl.episode.pub_date,
@@ -415,11 +432,10 @@ def _weighted_base_score(
 def _containment_bonus(
     ref: _AlignmentCandidate,
     dl: _AlignmentCandidate,
-    runtime: _AlignmentRuntime,
-    include_date: bool,
+    context: _ScoreContext,
 ) -> float:
-    anchor_tokens = AnchorTokens.from_titles(ref.title, dl.title, runtime.stopwords)
-    has_containment = include_date and anchor_tokens.containment
+    anchor_tokens = AnchorTokens.from_titles(ref.title, dl.title, context.runtime.stopwords)
+    has_containment = context.include_date and anchor_tokens.containment
     return _CONTAINMENT_BONUS if has_containment else 0.0
 
 
@@ -430,24 +446,46 @@ def _alignment_score(
     runtime: _AlignmentRuntime,
 ) -> float:
     """Metadata-aware similarity score with ID as a small bonus."""
-    if _has_structured_number_mismatch(ref.title, dl.title):
+    if _should_reject_alignment(ref, dl, sims, runtime):
         return 0.0
-
-    if _should_reject_weak_anchor_match(ref, dl, sims, runtime):
-        return 0.0
-
     if sims.title >= _TITLE_CERTAINTY_MIN:
-        return _score(ref, dl, sims, runtime, include_date=False)
+        return _score_high_certainty(ref, dl, sims, runtime)
+    return _score_low_certainty(ref, dl, sims, runtime)
 
+
+def _should_reject_alignment(
+    ref: _AlignmentCandidate,
+    dl: _AlignmentCandidate,
+    sims: _Sims,
+    runtime: _AlignmentRuntime,
+) -> bool:
+    if _has_structured_number_mismatch(ref.title, dl.title):
+        return True
+    return _should_reject_weak_anchor_match(ref, dl, sims, runtime)
+
+
+def _score_high_certainty(
+    ref: _AlignmentCandidate,
+    dl: _AlignmentCandidate,
+    sims: _Sims,
+    runtime: _AlignmentRuntime,
+) -> float:
+    return _score_with_context(ref, dl, sims, _ScoreContext(runtime=runtime, include_date=False))
+
+
+def _score_low_certainty(
+    ref: _AlignmentCandidate,
+    dl: _AlignmentCandidate,
+    sims: _Sims,
+    runtime: _AlignmentRuntime,
+) -> float:
     s_id = _id_similarity(ref.episode, dl.episode)
     has_desc = _has_description_signal(ref, dl)
     if _is_sparse_title(s_id, has_desc, sims.title, runtime.config.sparse_title_min):
         return 0.0
-
     if _should_reject_metadata_subset_rescue(ref, dl, sims, runtime):
         return 0.0
-
-    return _score(ref, dl, sims, runtime, include_date=True)
+    return _score_with_context(ref, dl, sims, _ScoreContext(runtime=runtime, include_date=True))
 
 
 def _build_similarity_matrices(

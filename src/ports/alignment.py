@@ -10,7 +10,6 @@ class AlignmentPort(Protocol):
         self,
         references: list[RssEpisode],
         downloads: list[RssEpisode],
-        show: str = "",
         alignment: AlignmentConfig | None = None,
     ) -> list[tuple[int, int]]:
         """Return matched (reference_index, download_index) pairs using alignment config."""
