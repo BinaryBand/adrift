@@ -353,12 +353,12 @@ class S3Service:
     def do_s3_upload(self, spec: _UploadSpec) -> None:
         _upload_with_client(self.get_client(), spec)
 
-    def upload_file(
+    def _upload_and_cache(
         self,
         bucket_key: tuple[str, str],
         file_path: Path,
-        options: UploadOptions | MediaMetadata | dict[str, Any] | None = None,
-    ) -> str | None:
+        options: UploadOptions | MediaMetadata | CacheMetadata | dict[str, Any] | None,
+    ) -> str:
         bucket, key = bucket_key
         spec, metadata_dict = _prepare_upload_spec(bucket, key, file_path, options)
         self.do_s3_upload(spec)
@@ -366,18 +366,21 @@ class S3Service:
         endpoint = self.secret_provider.get("S3_ENDPOINT", "")
         return urljoin(endpoint, Path(bucket, key).as_posix())
 
+    def upload_file(
+        self,
+        bucket_key: tuple[str, str],
+        file_path: Path,
+        options: UploadOptions | MediaMetadata | dict[str, Any] | None = None,
+    ) -> str | None:
+        return self._upload_and_cache(bucket_key, file_path, options)
+
     def upload_cache_file(
         self,
         bucket_key: tuple[str, str],
         file_path: Path,
         metadata: CacheMetadata | None = None,
     ) -> str | None:
-        bucket, key = bucket_key
-        spec, metadata_dict = _prepare_upload_spec(bucket, key, file_path, metadata)
-        self.do_s3_upload(spec)
-        self.sync_upload_cache(bucket, key, metadata_dict)
-        endpoint = self.secret_provider.get("S3_ENDPOINT", "")
-        return urljoin(endpoint, Path(bucket, key).as_posix())
+        return self._upload_and_cache(bucket_key, file_path, metadata)
 
     def download_file(self, bucket: str, key: str, download_path: Path) -> None:
         client = self.get_client()

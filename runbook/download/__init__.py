@@ -3,10 +3,14 @@ import sys
 import time
 from typing import Annotated
 
-import dotenv
 import typer
 
-from runbook import normalize_cli_inputs
+from runbook import (
+    IncludeConfigsOption,
+    SkipScheduleFilterOption,
+    bootstrap_run_configs,
+    make_main,
+)
 from src.application.context import AppContext
 from src.application.download import (
     DownloadPipeline,
@@ -17,20 +21,6 @@ from src.application.download import (
 
 DEFAULT_MAX_DOWNLOADS = 10
 DEFAULT_BOT_COOLDOWN = 60 * 60  # 1 hour
-
-
-def _load_configs(
-    include: list[str],
-    skip_schedule_filter: bool,
-    tags: list[str],
-):
-    from src.app_common import filter_podcasts_by_tags, load_podcasts_config
-
-    configs = load_podcasts_config(
-        include=include,
-        skip_schedule_filter=skip_schedule_filter,
-    )
-    return filter_podcasts_by_tags(configs, tags)
 
 
 def _build_pipeline(
@@ -112,10 +102,8 @@ def _run_with_bot_detection(
 
 
 def _run(
-    include: Annotated[list[str] | None, typer.Option(help="Config files to include")] = None,
-    skip_schedule_filter: Annotated[
-        bool, typer.Option(help="Include configs even when their schedule does not match today.")
-    ] = False,
+    include: IncludeConfigsOption = None,
+    skip_schedule_filter: SkipScheduleFilterOption = False,
     tags: Annotated[
         list[str] | None,
         typer.Option(help="Tag(s) or podcast names to limit downloads to"),
@@ -134,12 +122,8 @@ def _run(
         bool, typer.Option(help="Bypass fresh source caches and refetch source data.")
     ] = False,
 ) -> None:
-    dotenv.load_dotenv()
+    configs, _ = bootstrap_run_configs(include, tags, skip_schedule_filter)
     ctx = AppContext.from_env()
-
-    include, tags, _ = normalize_cli_inputs(include, tags)
-
-    configs = _load_configs(include, skip_schedule_filter, tags)
 
     pipeline_options = _build_pipeline_options(
         skip_download,
@@ -156,9 +140,7 @@ def _run(
 app = typer.Typer(add_completion=False)
 app.command()(_run)
 
-
-def main() -> None:
-    app(standalone_mode=False)
+main = make_main(app)
 
 
 if __name__ == "__main__":

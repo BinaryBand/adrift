@@ -121,9 +121,7 @@ def _fetch_channel_info_raw(url: str, fetch_videos: bool = False) -> dict[str, A
         opts.playlistend = 0  # Don't fetch any video entries
 
     try:
-        with YoutubeDL(cast(Any, _ydl_opts_dict(opts))) as ydl:
-            info = ydl.extract_info(url, download=False)
-            return cast(dict[str, Any], info) if info else None
+        return _extract_info(url, opts)
     except _YTDLP_FETCH_ERRORS as e:
         emit_error(f"Failed to fetch channel info from {url}: {e}")
         return None
@@ -407,6 +405,28 @@ def _recent_episode_check_is_fresh(checked_at: datetime | None) -> bool:
     return _utcnow() - checked_at <= YOUTUBE_RECENT_EPISODE_CHECK_FRESHNESS
 
 
+def _should_use_episode_cache_base(
+    episodes: dict[str, RssEpisode],
+    fetched_at: datetime | None,
+    refresh: bool,
+) -> bool:
+    return bool(episodes) and not refresh and _episode_cache_is_fresh(fetched_at)
+
+
+def _should_handle_recent_youtube_videos(
+    episodes: dict[str, RssEpisode],
+    fetched_at: datetime | None,
+    head_checked_at: datetime | None,
+    refresh: bool,
+    *,
+    require_recent_check_fresh: bool,
+) -> bool:
+    if not _should_use_episode_cache_base(episodes, fetched_at, refresh):
+        return False
+    is_recent_check_fresh = _recent_episode_check_is_fresh(head_checked_at)
+    return is_recent_check_fresh is require_recent_check_fresh
+
+
 def _fetch_video_batch(
     url: str,
     author: str,
@@ -483,20 +503,6 @@ def _use_cached_youtube_videos(
     return list(episodes.values())
 
 
-def _should_use_cached_youtube_videos(
-    episodes: dict[str, RssEpisode],
-    fetched_at: datetime | None,
-    head_checked_at: datetime | None,
-    refresh: bool,
-) -> bool:
-    return (
-        bool(episodes)
-        and not refresh
-        and _episode_cache_is_fresh(fetched_at)
-        and _recent_episode_check_is_fresh(head_checked_at)
-    )
-
-
 def _refresh_recent_youtube_videos(
     url: str,
     author: str,
@@ -508,20 +514,6 @@ def _refresh_recent_youtube_videos(
     _add_new_public_episodes(video_entries, author, episodes)
     _report_video_fetch_progress(callback, batch0, len(episodes))
     return list(episodes.values())
-
-
-def _should_probe_recent_youtube_videos(
-    episodes: dict[str, RssEpisode],
-    fetched_at: datetime | None,
-    head_checked_at: datetime | None,
-    refresh: bool,
-) -> bool:
-    return (
-        bool(episodes)
-        and not refresh
-        and _episode_cache_is_fresh(fetched_at)
-        and not _recent_episode_check_is_fresh(head_checked_at)
-    )
 
 
 def _refresh_youtube_videos(
@@ -575,11 +567,12 @@ def _probe_recent_or_refresh_youtube_videos(
     state: _EpisodeBundleState,
     request: _EpisodeFetchRequest,
 ) -> list[RssEpisode]:
-    if _should_probe_recent_youtube_videos(
+    if _should_handle_recent_youtube_videos(
         state.episodes,
         state.fetched_at,
         state.head_checked_at,
         request.refresh,
+        require_recent_check_fresh=False,
     ):
         episodes = _refresh_recent_youtube_videos(
             request.url, request.author, request.callback, state.episodes
@@ -603,11 +596,12 @@ def get_youtube_videos(
     cache_key = f"get_youtube_videos:{url}:{author}"
     state = _load_episode_bundle_state(cache_key)
 
-    if _should_use_cached_youtube_videos(
+    if _should_handle_recent_youtube_videos(
         state.episodes,
         state.fetched_at,
         state.head_checked_at,
         refresh,
+        require_recent_check_fresh=True,
     ):
         return _use_cached_youtube_videos(state.episodes, author, callback)
     request = _EpisodeFetchRequest(url, author, callback, refresh)

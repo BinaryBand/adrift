@@ -4,10 +4,14 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Annotated
 
-import dotenv
 import typer
 
-from runbook import normalize_cli_inputs
+from runbook import (
+    IncludeConfigsOption,
+    SkipScheduleFilterOption,
+    bootstrap_run_configs,
+    make_main,
+)
 from src.catalog.alignment import _build_alignment_scores, _has_structured_number_mismatch
 from src.catalog.merge import MergeConfigOptions, merge_config
 from src.models import MergeResult, PodcastConfig, RssEpisode
@@ -44,20 +48,6 @@ class _AuditFrame:
     matched_pairs: set[tuple[int, int]]
     match_tolerance: float
     borderline_min: float
-
-
-def _load_configs(
-    include: list[str],
-    skip_schedule_filter: bool,
-    tags: list[str],
-) -> list[PodcastConfig]:
-    from src.app_common import filter_podcasts_by_tags, load_podcasts_config
-
-    configs = load_podcasts_config(
-        include=include,
-        skip_schedule_filter=skip_schedule_filter,
-    )
-    return filter_podcasts_by_tags(configs, tags)
 
 
 def _collect_merge_result(config: PodcastConfig, refresh_sources: bool) -> MergeResult:
@@ -207,23 +197,25 @@ def _gold_benchmark_path(slug: str) -> Path:
     return Path("tests") / "resources" / "alignment" / f"{slug}_benchmark.csv"
 
 
+def _audit_row_as_dict(row: AuditRow) -> dict[str, str]:
+    return {
+        "ref_id": row.ref_id,
+        "ref_title": row.ref_title,
+        "best_dl_id": row.best_dl_id,
+        "best_dl_title": row.best_dl_title,
+        "score": _render_score(row.score),
+        "category": row.category,
+        "notes": row.notes,
+    }
+
+
 def _write_audit_csv(path: Path, rows: list[AuditRow]) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     with path.open("w", encoding="utf-8", newline="") as fh:
         writer = csv.DictWriter(fh, fieldnames=_CSV_FIELDS)
         writer.writeheader()
         for row in rows:
-            writer.writerow(
-                {
-                    "ref_id": row.ref_id,
-                    "ref_title": row.ref_title,
-                    "best_dl_id": row.best_dl_id,
-                    "best_dl_title": row.best_dl_title,
-                    "score": _render_score(row.score),
-                    "category": row.category,
-                    "notes": row.notes,
-                }
-            )
+            writer.writerow(_audit_row_as_dict(row))
 
 
 def _read_csv_rows(path: Path) -> list[dict[str, str]]:
@@ -235,18 +227,7 @@ def _read_csv_rows(path: Path) -> list[dict[str, str]]:
 
 
 def _audit_rows_as_dicts(rows: list[AuditRow]) -> list[dict[str, str]]:
-    return [
-        {
-            "ref_id": row.ref_id,
-            "ref_title": row.ref_title,
-            "best_dl_id": row.best_dl_id,
-            "best_dl_title": row.best_dl_title,
-            "score": _render_score(row.score),
-            "category": row.category,
-            "notes": row.notes,
-        }
-        for row in rows
-    ]
+    return [_audit_row_as_dict(row) for row in rows]
 
 
 def _diff_summary(actual: list[dict[str, str]], expected: list[dict[str, str]]) -> str:
@@ -309,11 +290,8 @@ def _promote_benchmark(slug: str, rows: list[AuditRow]) -> int:
 
 
 def _run(
-    include: Annotated[list[str] | None, typer.Option(help="Config files to include")] = None,
-    skip_schedule_filter: Annotated[
-        bool,
-        typer.Option(help="Include podcast configs even when their schedule does not match today."),
-    ] = False,
+    include: IncludeConfigsOption = None,
+    skip_schedule_filter: SkipScheduleFilterOption = False,
     tags: Annotated[
         list[str] | None,
         typer.Option(help="Tag(s) or podcast names to limit audits to"),
@@ -345,9 +323,7 @@ def _run(
         typer.Option(help="Lower bound for BORDERLINE classification (default: 0.60)."),
     ] = DEFAULT_BORDERLINE_MIN,
 ) -> None:
-    dotenv.load_dotenv()
-    include, tags, output_dir = normalize_cli_inputs(include, tags, output_dir)
-    configs = _load_configs(include, skip_schedule_filter, tags)
+    configs, output_dir = bootstrap_run_configs(include, tags, skip_schedule_filter, output_dir)
 
     has_diff_failure = False
     for config in configs:
@@ -379,9 +355,7 @@ def _run(
 app = typer.Typer(add_completion=False)
 app.command()(_run)
 
-
-def main() -> None:
-    app(standalone_mode=False)
+main = make_main(app)
 
 
 if __name__ == "__main__":

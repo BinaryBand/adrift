@@ -3,10 +3,14 @@ import sys
 from time import perf_counter
 from typing import Annotated
 
-import dotenv
 import typer
 
-from runbook import normalize_cli_inputs
+from runbook import (
+    IncludeConfigsOption,
+    SkipScheduleFilterOption,
+    bootstrap_run_configs,
+    make_main,
+)
 from src.application.merge import MergeUseCase
 from src.application.services.merge_service import (
     MergeRunOptions,
@@ -52,25 +56,6 @@ def _write_output_bundle(
 
 def _write_report_file(output_file: str, reports: list[dict[str, object]]) -> None:
     service_write_report_file(output_file, reports, write_json_func=_write_json)
-
-
-def _load_configs(
-    include: list[str],
-    skip_schedule_filter: bool,
-    tags: list[str],
-    timings: bool,
-) -> list[object]:
-    from src.app_common import filter_podcasts_by_tags, load_podcasts_config
-
-    load_start = perf_counter()
-    configs = load_podcasts_config(
-        include=include,
-        skip_schedule_filter=skip_schedule_filter,
-    )
-    load_duration = perf_counter() - load_start
-    if timings:
-        sys.stderr.write(f"TIMING load_configs: {_format_duration(load_duration)}\n")
-    return filter_podcasts_by_tags(configs, tags)
 
 
 def _build_run_options(
@@ -124,14 +109,8 @@ def _build_stdout_output(merge_result, include_counts: bool) -> list[dict[str, o
 
 
 def _run(
-    include: Annotated[
-        list[str] | None,
-        typer.Option(help="Config files to include"),
-    ] = None,
-    skip_schedule_filter: Annotated[
-        bool,
-        typer.Option(help="Include podcast configs even when their schedule does not match today."),
-    ] = False,
+    include: IncludeConfigsOption = None,
+    skip_schedule_filter: SkipScheduleFilterOption = False,
     tags: Annotated[
         list[str] | None,
         typer.Option(help="Tag(s) or podcast names to limit merges to"),
@@ -168,9 +147,11 @@ def _run(
         typer.Option(help="Emit per-podcast stage timings to stderr."),
     ] = False,
 ) -> None:
-    dotenv.load_dotenv()
-    include, tags, output_dir = normalize_cli_inputs(include, tags, output_dir)
-    configs = _load_configs(include, skip_schedule_filter, tags, timings)
+    load_start = perf_counter()
+    configs, output_dir = bootstrap_run_configs(include, tags, skip_schedule_filter, output_dir)
+    load_duration = perf_counter() - load_start
+    if timings:
+        sys.stderr.write(f"TIMING load_configs: {_format_duration(load_duration)}\n")
     options = _build_run_options(
         include_counts,
         pretty,
@@ -188,9 +169,7 @@ def _run(
 app = typer.Typer(add_completion=False)
 app.command()(_run)
 
-
-def main() -> None:
-    app(standalone_mode=False)
+main = make_main(app)
 
 
 if __name__ == "__main__":
