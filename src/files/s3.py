@@ -27,6 +27,7 @@ from src.files.s3_upload import (
     _prepare_upload_spec,
 )
 from src.files.s3_utils import (
+    _build_s3_probe_client,
     _is_endpoint_reachable_with_provider,
     _make_boto_config,
 )
@@ -127,17 +128,7 @@ class S3Service:
 
     # -- Probe / client helpers ------------------------------------------------
     def build_probe_client(self, url: str, timeout: float) -> S3Client:
-        values = require_secrets(self.secret_provider, _REQUIRED_S3_KEYS)
-        cfg = _make_boto_config(connect_timeout=timeout, read_timeout=timeout, max_attempts=1)
-        boto3_factory: Callable[..., Any] = boto3.client  # pyright: ignore[reportUnknownVariableType]
-        return boto3_factory(
-            "s3",
-            aws_access_key_id=values["S3_USERNAME"],
-            aws_secret_access_key=values["S3_SECRET_KEY"],
-            endpoint_url=url,
-            config=cfg,
-            region_name=values["S3_REGION"],
-        )
+        return _build_s3_probe_client(url, self.secret_provider, timeout)
 
     def is_endpoint_reachable(self, url: str, timeout: float = 2.0) -> bool:
         try:

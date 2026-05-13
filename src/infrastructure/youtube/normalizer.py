@@ -5,7 +5,11 @@ from __future__ import annotations
 from datetime import datetime, timezone
 from typing import TYPE_CHECKING, Any
 
+from src.utils.image import extract_image_from_ytdlp, extract_image_from_ytdlp_list
 from src.utils.progress import Callback
+
+extract_image_url = extract_image_from_ytdlp
+extract_image_from_list = extract_image_from_ytdlp_list
 
 if TYPE_CHECKING:
     from src.models import YtDlpVideo
@@ -74,30 +78,6 @@ def ensure_ytdlp_model(data: YtDlpVideo | dict[str, Any]) -> YtDlpVideo:
     if isinstance(data, YtDlpVideoModel):
         return data
     return YtDlpVideoModel.model_validate(data)
-
-
-# ============================================================================
-# Image Extraction (from utils/image.py and metadata.py)
-# ============================================================================
-
-
-def extract_image_url(value: Any) -> str:
-    """Extract an image URL from a YtDlpImage model or raw dict."""
-    from src.models import YtDlpImage as YtDlpImageModel
-
-    if isinstance(value, YtDlpImageModel):
-        return value.url or ""
-    if isinstance(value, dict):
-        url_value = value.get("url")
-        return url_value if isinstance(url_value, str) else ""
-    return ""
-
-
-def extract_image_from_list(data: list[Any]) -> str:
-    """Extract an image URL from the last entry in a yt-dlp thumbnail list."""
-    if not data:
-        return ""
-    return extract_image_url(data[-1])
 
 
 # ============================================================================
