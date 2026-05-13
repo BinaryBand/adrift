@@ -26,6 +26,25 @@ def run_resolved(cmd: Iterable[str], /, **kwargs: Any) -> subprocess.CompletedPr
     return subprocess.run(argv, cwd=ROOT, check=False, **kwargs)  # type: ignore
 
 
+# class TestCpd:
+#     """Ensure the codebase passes copy-paste detection checks."""
+
+#     pytestmark = pytest.mark.slow
+
+#     @pytest.mark.parametrize(
+#         "config,path",
+#         [("jscpd.json", ".")],
+#     )
+#     def test_cpd(self, config, path):
+#         """Fail if jscpd reports any copy-paste duplication."""
+#         result = run_resolved(
+#             ["npx", "jscpd", "--config", config, path],
+#             capture_output=True,
+#             text=True,
+#         )
+#         assert result.returncode == 0, result.stdout + result.stderr
+
+
 class TestRuff:
     """Ensure the codebase passes ruff linting and formatting checks."""
 

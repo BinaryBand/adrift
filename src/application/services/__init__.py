@@ -4,9 +4,8 @@ These modules replace the legacy src.orchestration package as the primary
 home for app-level coordination code.
 """
 
-from .download_cache import _existing_media_sources, _ExistingMediaSources
 from .download_client import prefixed_s3_key, s3_prefix
-from .download_enrich import _extract_video_id, enrich_with_sponsors
+from .download_enrich import enrich_with_sponsors
 from .download_process import (
     DownloadQueueItem,
     build_download_queue,
@@ -15,7 +14,6 @@ from .download_process import (
     process_in_tmpdir,
 )
 from .download_rss import update_rss
-from .download_upload import _build_upload_request, _upload_episode_audio, _UploadRequest
 from .merge_service import (
     MergeRunOptions,
     MergeWriters,
@@ -50,12 +48,6 @@ __all__ = [
     "ManagedSecretState",
     "MergeRunOptions",
     "MergeWriters",
-    "_ExistingMediaSources",
-    "_UploadRequest",
-    "_build_upload_request",
-    "_existing_media_sources",
-    "_extract_video_id",
-    "_upload_episode_audio",
     "build_download_queue",
     "collect_secret_states",
     "delete_secret_value",

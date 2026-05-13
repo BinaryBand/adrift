@@ -11,12 +11,12 @@ os.environ.setdefault("S3_ENDPOINT", "http://localhost")
 os.environ.setdefault("S3_REGION", "us-east-1")
 
 from src.catalog import (
-    _best_thumbnail,
     align_episodes,
     align_episodes_impl,
     merge_episode,
     sim_date,
 )
+from src.catalog.alignment import _best_thumbnail
 from src.models import AlignmentConfig, RssEpisode
 
 _MORBID_ALIGNMENT = AlignmentConfig(extra_stopwords=["morbid"])

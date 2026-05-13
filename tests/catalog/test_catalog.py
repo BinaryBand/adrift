@@ -21,12 +21,12 @@ os.environ.setdefault("S3_REGION", "us-east-1")
 
 from src.catalog import (
     EpisodeFetchContext,
-    _collect_episodes,
     align_episodes,
     merge_config,
     process_feeds,
     process_sources,
 )
+from src.catalog.collection import _collect_episodes
 from src.models import FeedSource, PodcastConfig, RssEpisode, SourceFilter
 
 
