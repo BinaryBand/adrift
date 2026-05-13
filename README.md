@@ -112,13 +112,9 @@ Note: the per-feed `references.json` and `downloads.json` files are no longer wr
 
 ## Secret Management
 
-Use the secret-management TUI to inspect and update the required S3 settings stored in `.env`.
+Secrets are managed directly through `.env`.
 
-```bash
-poetry run adrift-secrets
-```
-
-The first version manages these keys:
+Required keys:
 
 - `S3_USERNAME`
 - `S3_SECRET_KEY`
@@ -127,11 +123,7 @@ The first version manages these keys:
 
 Notes:
 
-- Values written through the TUI are persisted to `.env`.
-- The table masks sensitive values such as `S3_SECRET_KEY`.
-- Validation can check either that required keys are present or that the configured S3 endpoint is reachable.
 - Runtime secret-provider selection still uses `ADRIFT_SECRETS_PROVIDER`.
-- The env-backed provider is writable through the TUI; non-env backends such as `docker` are inspect-only in the runbook today.
 - Set `ADRIFT_SECRETS_PROMPT_FALLBACK=1` to let runtime reads prompt interactively for missing managed S3 keys instead of failing immediately. Leave it unset for automation and non-interactive runs.
 
 ## Running the download pipeline locally

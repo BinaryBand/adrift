@@ -9,7 +9,6 @@ packages = [{ include = "src" }, { include = "runbook" }]
 [tool.poetry.scripts]
 adrift-download = "runbook.download:main"
 adrift-merge = "runbook.merge:main"
-adrift-secrets = "runbook.secrets:main"
 
 [tool.poetry.dependencies]
 python = ">=3.11,<4.0"
