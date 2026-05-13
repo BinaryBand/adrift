@@ -266,24 +266,6 @@ def _ensure_audio_stream(check_file: Path) -> str:
     return ffprobe_out
 
 
-def run_ffprobe_json(check_file: Path) -> dict[str, Any]:
-    """Public helper: run ffprobe and return parsed JSON as a dict.
-
-    Raises RuntimeError if ffprobe fails or no audio stream is present.
-    """
-    ffprobe_out = _run_ffprobe(check_file)
-    raw = _parse_ffprobe_json(ffprobe_out)
-    if not isinstance(raw, dict):
-        msg = "ffprobe did not return JSON dict for " + str(check_file)
-        raise RuntimeError(msg)
-    data: dict[str, Any] = raw
-    streams = _normalize_streams(data)
-    audio_stream = _find_audio_stream(streams)
-    if audio_stream is None:
-        raise RuntimeError(f"No audio stream found in {check_file}")
-    return data
-
-
 def _run_ffmpeg_convert(cmd: list[str], file: Path, ffprobe_out: str) -> None:
     """Run ffmpeg conversion command and raise a RuntimeError with stderr on failure."""
     try:

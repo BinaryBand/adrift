@@ -382,16 +382,6 @@ class S3Service:
                 f.write(chunk)
 
 
-def require_s3_env(provider: SecretProviderPort) -> tuple[str, str, str, str]:
-    values = require_secrets(provider, _REQUIRED_S3_KEYS)
-    return (
-        values["S3_USERNAME"],
-        values["S3_SECRET_KEY"],
-        values["S3_ENDPOINT"],
-        values["S3_REGION"],
-    )
-
-
 def _configured_local_s3_endpoint(provider: SecretProviderPort) -> str | None:
     endpoint = provider.get("LOCAL_S3_ENDPOINT", "").strip()
     return endpoint or None

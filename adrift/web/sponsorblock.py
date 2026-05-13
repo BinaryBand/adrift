@@ -3,17 +3,13 @@ SponsorBlock API integration for fetching and removing sponsored segments.
 """
 
 import logging
-import subprocess
-from pathlib import Path
 from typing import Any, cast
 
 import requests
 
-from adrift.files.audio import cut_segments
 from adrift.models import SponsorSegment
 from adrift.ports.cache import DiskCacheAdapter
 from adrift.utils.crypto import sha256
-from adrift.utils.progress import Callback
 
 logger = logging.getLogger(__name__)
 
@@ -97,20 +93,3 @@ def fetch_sponsor_segments(video_id: str) -> list[tuple[float, float]]:
     except (requests.RequestException, TypeError, ValueError, KeyError) as e:
         logger.error("Error fetching segments for %s: %s", video_id, e)
         return []
-
-
-def remove_sponsors(target: Path, video_id: str, callback: Callback | None = None) -> bool:
-    """Remove sponsor segments from an audio file."""
-    segments = fetch_sponsor_segments(video_id)
-    if not segments:
-        return False
-    elif callback:
-        callback(0, len(segments))
-
-    try:
-        logger.info("Removing %d sponsor segments from %s", len(segments), target)
-        cut_segments(target, segments, callback=callback)
-        return True
-    except (OSError, RuntimeError, subprocess.SubprocessError) as e:
-        logger.error("Error removing sponsors from %s: %s", target, e)
-        return False

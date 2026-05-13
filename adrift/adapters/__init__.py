@@ -12,9 +12,7 @@ from collections.abc import Callable
 from adrift.models import FeedSource
 from adrift.ports import (
     EpisodeSourcePort,
-    ReadOnlySecretStorePort,
     SecretProviderPort,
-    SecretStorePort,
 )
 from adrift.utils.text import is_youtube_channel
 
@@ -111,26 +109,3 @@ def get_secret_provider_adapter(
     if prompt_callback is None:
         return PromptFallbackProvider(provider)
     return PromptFallbackProvider(provider, prompt_callback=prompt_callback)
-
-
-def get_secret_store_adapter(
-    provider_name: str | None = None,
-    *,
-    env_file: str = ".env",
-) -> ReadOnlySecretStorePort | SecretStorePort:
-    """Return a store-like adapter for the selected provider.
-
-    Providers that expose ``writable = True`` (currently only 'env') get a
-    full ``SecretStorePort``; all others are wrapped in a read-only view.
-    """
-    _selected, provider = _build_selected_provider(provider_name)
-
-    if getattr(provider, "writable", False):
-        from adrift.adapters.secrets.env_secrets import EnvironmentSecretStore
-
-        return EnvironmentSecretStore(env_file=env_file)
-
-    from adrift.adapters.secrets.read_only_store import ReadOnlySecretStore
-    from adrift.application.services.secret_service import MANAGED_S3_KEYS
-
-    return ReadOnlySecretStore(provider, known_keys=MANAGED_S3_KEYS)
