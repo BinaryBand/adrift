@@ -6,6 +6,7 @@ from typing import Annotated
 import dotenv
 import typer
 
+from runbook import normalize_cli_inputs
 from src.application.merge import MergeUseCase
 from src.application.services.merge_service import (
     MergeRunOptions,
@@ -26,9 +27,6 @@ from src.application.services.merge_service import (
 from src.application.services.merge_service import (
     write_series_outputs as service_write_series_outputs,
 )
-
-DF_TARGETS = ["config/*.toml"]
-DEFAULT_OUTPUT_DIR = "downloads"
 
 
 def _write_json(path, payload: object) -> None:
@@ -54,14 +52,6 @@ def _write_output_bundle(
 
 def _write_report_file(output_file: str, reports: list[dict[str, object]]) -> None:
     service_write_report_file(output_file, reports, write_json_func=_write_json)
-
-
-def _normalize_cli_inputs(
-    include: list[str] | None,
-    tags: list[str] | None,
-    output_dir: str,
-) -> tuple[list[str], list[str], str]:
-    return (include or DF_TARGETS, tags or [], output_dir or DEFAULT_OUTPUT_DIR)
 
 
 def _load_configs(
@@ -179,7 +169,7 @@ def _run(
     ] = False,
 ) -> None:
     dotenv.load_dotenv()
-    include, tags, output_dir = _normalize_cli_inputs(include, tags, output_dir)
+    include, tags, output_dir = normalize_cli_inputs(include, tags, output_dir)
     configs = _load_configs(include, skip_schedule_filter, tags, timings)
     options = _build_run_options(
         include_counts,

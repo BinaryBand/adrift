@@ -7,12 +7,11 @@ from typing import Annotated
 import dotenv
 import typer
 
+from runbook import normalize_cli_inputs
 from src.catalog.alignment import _build_alignment_scores, _has_structured_number_mismatch
 from src.catalog.merge import MergeConfigOptions, merge_config
 from src.models import MergeResult, PodcastConfig, RssEpisode
 
-DF_TARGETS = ["config/*.toml"]
-DEFAULT_OUTPUT_DIR = "downloads"
 DEFAULT_BORDERLINE_MIN = 0.60
 
 _CSV_FIELDS = (
@@ -45,14 +44,6 @@ class _AuditFrame:
     matched_pairs: set[tuple[int, int]]
     match_tolerance: float
     borderline_min: float
-
-
-def _normalize_cli_inputs(
-    include: list[str] | None,
-    tags: list[str] | None,
-    output_dir: str,
-) -> tuple[list[str], list[str], str]:
-    return (include or DF_TARGETS, tags or [], output_dir or DEFAULT_OUTPUT_DIR)
 
 
 def _load_configs(
@@ -355,7 +346,7 @@ def _run(
     ] = DEFAULT_BORDERLINE_MIN,
 ) -> None:
     dotenv.load_dotenv()
-    include, tags, output_dir = _normalize_cli_inputs(include, tags, output_dir)
+    include, tags, output_dir = normalize_cli_inputs(include, tags, output_dir)
     configs = _load_configs(include, skip_schedule_filter, tags)
 
     has_diff_failure = False

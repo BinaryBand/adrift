@@ -6,6 +6,7 @@ from typing import Annotated
 import dotenv
 import typer
 
+from runbook import normalize_cli_inputs
 from src.application.context import AppContext
 from src.application.download import (
     DownloadPipeline,
@@ -14,16 +15,8 @@ from src.application.download import (
     DownloadRunOptions,
 )
 
-DF_TARGETS = ["config/*.toml"]
 DEFAULT_MAX_DOWNLOADS = 10
 DEFAULT_BOT_COOLDOWN = 60 * 60  # 1 hour
-
-
-def _normalize_cli_inputs(
-    include: list[str] | None,
-    tags: list[str] | None,
-) -> tuple[list[str], list[str]]:
-    return (include or DF_TARGETS, tags or [])
 
 
 def _load_configs(
@@ -144,7 +137,7 @@ def _run(
     dotenv.load_dotenv()
     ctx = AppContext.from_env()
 
-    include, tags = _normalize_cli_inputs(include, tags)
+    include, tags, _ = normalize_cli_inputs(include, tags)
 
     configs = _load_configs(include, skip_schedule_filter, tags)
 

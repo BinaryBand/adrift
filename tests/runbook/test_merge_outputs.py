@@ -204,10 +204,12 @@ def test_main_defaults_output_dir_to_downloads(tmp_path: Path, capsys) -> None:
         "config/youtube.toml",
     ]
 
+    import runbook
+
     with (
         patch("src.app_common.load_podcasts_config", return_value=[config]),
         patch("src.catalog.merge_config", return_value=result),
-        patch.object(merge_mod, "DEFAULT_OUTPUT_DIR", downloads_root.as_posix()),
+        patch.object(runbook, "DEFAULT_OUTPUT_DIR", downloads_root.as_posix()),
         patch.object(sys, "argv", argv),
     ):
         merge_mod.main()
