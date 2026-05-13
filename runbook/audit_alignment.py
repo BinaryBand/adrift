@@ -9,8 +9,9 @@ import typer
 from runbook import (
     IncludeConfigsOption,
     SkipScheduleFilterOption,
+    TagsOption,
     bootstrap_run_configs,
-    make_main,
+    build_cli,
 )
 from src.catalog.alignment import _build_alignment_scores, _has_structured_number_mismatch
 from src.catalog.merge import MergeConfigOptions, merge_config
@@ -292,10 +293,7 @@ def _promote_benchmark(slug: str, rows: list[AuditRow]) -> int:
 def _run(
     include: IncludeConfigsOption = None,
     skip_schedule_filter: SkipScheduleFilterOption = False,
-    tags: Annotated[
-        list[str] | None,
-        typer.Option(help="Tag(s) or podcast names to limit audits to"),
-    ] = None,
+    tags: TagsOption = None,
     output_dir: Annotated[
         str,
         typer.Option(help="Output root for alignment_audit.csv files (default: downloads)."),
@@ -352,10 +350,7 @@ def _run(
         raise typer.Exit(code=1)
 
 
-app = typer.Typer(add_completion=False)
-app.command()(_run)
-
-main = make_main(app)
+app, main = build_cli(_run)
 
 
 if __name__ == "__main__":

@@ -8,8 +8,9 @@ import typer
 from runbook import (
     IncludeConfigsOption,
     SkipScheduleFilterOption,
+    TagsOption,
     bootstrap_run_configs,
-    make_main,
+    build_cli,
 )
 from src.application.context import AppContext
 from src.application.download import (
@@ -104,10 +105,7 @@ def _run_with_bot_detection(
 def _run(
     include: IncludeConfigsOption = None,
     skip_schedule_filter: SkipScheduleFilterOption = False,
-    tags: Annotated[
-        list[str] | None,
-        typer.Option(help="Tag(s) or podcast names to limit downloads to"),
-    ] = None,
+    tags: TagsOption = None,
     skip_download: Annotated[
         bool, typer.Option(help="Skip download/upload stage (only enrich and update RSS).")
     ] = False,
@@ -137,10 +135,7 @@ def _run(
     sys.stderr.write(f"\nDownloaded {downloaded_total} new episode(s).\n")
 
 
-app = typer.Typer(add_completion=False)
-app.command()(_run)
-
-main = make_main(app)
+app, main = build_cli(_run)
 
 
 if __name__ == "__main__":

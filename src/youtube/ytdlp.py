@@ -503,19 +503,6 @@ def _use_cached_youtube_videos(
     return list(episodes.values())
 
 
-def _refresh_recent_youtube_videos(
-    url: str,
-    author: str,
-    callback: Callback | None,
-    episodes: dict[str, RssEpisode],
-) -> list[RssEpisode]:
-    batch0 = BATCHES[0]
-    video_entries = _fetch_video_batch(url, author, 1, batch0)
-    _add_new_public_episodes(video_entries, author, episodes)
-    _report_video_fetch_progress(callback, batch0, len(episodes))
-    return list(episodes.values())
-
-
 def _refresh_youtube_videos(
     url: str,
     author: str,
@@ -574,9 +561,11 @@ def _probe_recent_or_refresh_youtube_videos(
         request.refresh,
         require_recent_check_fresh=False,
     ):
-        episodes = _refresh_recent_youtube_videos(
-            request.url, request.author, request.callback, state.episodes
-        )
+        batch0 = BATCHES[0]
+        video_entries = _fetch_video_batch(request.url, request.author, 1, batch0)
+        _add_new_public_episodes(video_entries, request.author, state.episodes)
+        _report_video_fetch_progress(request.callback, batch0, len(state.episodes))
+        episodes = list(state.episodes.values())
         _cache_recent_probe_result(state)
         return episodes
 

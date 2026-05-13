@@ -7,6 +7,12 @@ from typing import Iterator, Literal, Protocol
 
 Level = Literal["info", "warning", "error"]
 
+_LEVEL_PREFIX: dict[Level, str] = {
+    "info": "",
+    "warning": "WARNING: ",
+    "error": "ERROR: ",
+}
+
 
 class TerminalEmitter(Protocol):
     def __call__(self, level: Level, message: str) -> None: ...
@@ -16,12 +22,11 @@ _EMITTER: ContextVar[TerminalEmitter | None] = ContextVar("terminal_emitter", de
 
 
 def _default_emit(level: Level, message: str) -> None:
-    prefix = {
-        "info": "",
-        "warning": "WARNING: ",
-        "error": "ERROR: ",
-    }[level]
-    print(f"{prefix}{message}", file=sys.stderr)
+    print(format_terminal_message(level, message), file=sys.stderr)
+
+
+def format_terminal_message(level: Level, message: str) -> str:
+    return f"{_LEVEL_PREFIX[level]}{message}"
 
 
 def emit(level: Level, message: str) -> None:

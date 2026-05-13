@@ -1,6 +1,6 @@
 {
   "format": "python",
-  "minTokens": 35,
+  "minTokens": 30,
   "threshold": 0,
   "languages": ["python"],
   "reporters": ["console"],

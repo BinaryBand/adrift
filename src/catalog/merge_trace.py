@@ -140,22 +140,18 @@ def _empty_match_traces(references: list[RssEpisode]) -> list[ReferenceMatchTrac
     return [ReferenceMatchTrace(reference_index=index) for index, _ in enumerate(references)]
 
 
-def _match_trace_context(
-    references: list[RssEpisode],
-    downloads: list[RssEpisode],
+def _match_index(
     pairs: list[tuple[int, int]],
-    show: str,
-) -> _MatchTraceContext:
-    return _MatchTraceContext(
-        scores=_build_alignment_scores(references, downloads, show),
-        matched_by_reference={
-            reference_index: download_index for reference_index, download_index in pairs
-        },
-        matched_by_download={
-            download_index: reference_index for reference_index, download_index in pairs
-        },
-        pair_set=set(pairs),
-    )
+    *,
+    invert: bool,
+) -> dict[int, int]:
+    def _pair_entry(pair: tuple[int, int]) -> tuple[int, int]:
+        reference_index, download_index = pair
+        if invert:
+            return download_index, reference_index
+        return reference_index, download_index
+
+    return dict(_pair_entry(pair) for pair in pairs)
 
 
 def _build_match_traces(
@@ -169,7 +165,12 @@ def _build_match_traces(
     if not downloads:
         return _empty_match_traces(references)
 
-    context = _match_trace_context(references, downloads, pairs, show)
+    context = _MatchTraceContext(
+        scores=_build_alignment_scores(references, downloads, show),
+        matched_by_reference=_match_index(pairs, invert=False),
+        matched_by_download=_match_index(pairs, invert=True),
+        pair_set=set(pairs),
+    )
     return [
         _reference_match_trace(reference_index, len(downloads), context)
         for reference_index, _ in enumerate(references)

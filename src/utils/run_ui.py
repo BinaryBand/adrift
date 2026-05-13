@@ -8,7 +8,7 @@ from typing import Any, Callable
 from tqdm import tqdm
 
 from src.utils.progress import Callback
-from src.utils.terminal import Level, using_terminal_emitter
+from src.utils.terminal import Level, format_terminal_message, using_terminal_emitter
 
 _PROGRESS_META_WIDTH = 38
 
@@ -103,12 +103,7 @@ class TqdmRunUI(BaseRunUI):
         self._bar.set_postfix_str(self.current_stage or "")
 
     def emit(self, level: Level, message: str) -> None:
-        prefix = {
-            "info": "",
-            "warning": "WARNING: ",
-            "error": "ERROR: ",
-        }[level]
-        self._bar.write(f"{prefix}{message}")
+        self._bar.write(format_terminal_message(level, message))
 
     def advance(self) -> None:
         self._bar.update(1)

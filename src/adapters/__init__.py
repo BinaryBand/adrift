@@ -82,6 +82,14 @@ def _selected_provider_name(provider_name: str | None) -> str:
     return (provider_name or os.getenv("ADRIFT_SECRETS_PROVIDER") or "env").lower()
 
 
+def _build_selected_provider(provider_name: str | None) -> tuple[str, SecretProviderPort]:
+    selected = _selected_provider_name(provider_name)
+    factory = _SECRET_PROVIDER_REGISTRY.get(selected)
+    if factory is None:
+        raise ValueError(f"Unsupported secret provider: {selected}")
+    return selected, factory()
+
+
 def get_secret_provider_adapter(
     provider_name: str | None = None,
     *,
@@ -89,11 +97,7 @@ def get_secret_provider_adapter(
     prompt_callback: Callable[[str, str, bool], str] | None = None,
 ) -> SecretProviderPort:
     """Return the configured secret provider adapter instance."""
-    selected = _selected_provider_name(provider_name)
-    factory = _SECRET_PROVIDER_REGISTRY.get(selected)
-    if factory is None:
-        raise ValueError(f"Unsupported secret provider: {selected}")
-    provider = factory()
+    _selected, provider = _build_selected_provider(provider_name)
 
     if enable_prompt_fallback is None:
         raw = os.getenv("ADRIFT_SECRETS_PROMPT_FALLBACK", "").strip().lower()
@@ -119,11 +123,7 @@ def get_secret_store_adapter(
     Providers that expose ``writable = True`` (currently only 'env') get a
     full ``SecretStorePort``; all others are wrapped in a read-only view.
     """
-    selected = _selected_provider_name(provider_name)
-    factory = _SECRET_PROVIDER_REGISTRY.get(selected)
-    if factory is None:
-        raise ValueError(f"Unsupported secret provider: {selected}")
-    provider = factory()
+    _selected, provider = _build_selected_provider(provider_name)
 
     if getattr(provider, "writable", False):
         from src.adapters.secrets.env_secrets import EnvironmentSecretStore

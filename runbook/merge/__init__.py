@@ -8,8 +8,9 @@ import typer
 from runbook import (
     IncludeConfigsOption,
     SkipScheduleFilterOption,
+    TagsOption,
     bootstrap_run_configs,
-    make_main,
+    build_cli,
 )
 from src.application.merge import MergeUseCase
 from src.application.services.merge_service import (
@@ -111,10 +112,7 @@ def _build_stdout_output(merge_result, include_counts: bool) -> list[dict[str, o
 def _run(
     include: IncludeConfigsOption = None,
     skip_schedule_filter: SkipScheduleFilterOption = False,
-    tags: Annotated[
-        list[str] | None,
-        typer.Option(help="Tag(s) or podcast names to limit merges to"),
-    ] = None,
+    tags: TagsOption = None,
     include_counts: Annotated[
         bool,
         typer.Option(help="Include reference/download counts in the JSON report."),
@@ -166,10 +164,7 @@ def _run(
     sys.stdout.write("\n")
 
 
-app = typer.Typer(add_completion=False)
-app.command()(_run)
-
-main = make_main(app)
+app, main = build_cli(_run)
 
 
 if __name__ == "__main__":

@@ -16,6 +16,10 @@ SkipScheduleFilterOption = Annotated[
     bool,
     typer.Option(help="Include podcast configs even when their schedule does not match today."),
 ]
+TagsOption = Annotated[
+    list[str] | None,
+    typer.Option(help="Tag(s) or podcast names to limit scope"),
+]
 
 
 def normalize_cli_inputs(
@@ -66,3 +70,9 @@ def make_main(app: typer.Typer) -> Callable[[], None]:
         app(standalone_mode=False)
 
     return _main
+
+
+def build_cli(run_handler: Callable[..., None]) -> tuple[typer.Typer, Callable[[], None]]:
+    app = typer.Typer(add_completion=False)
+    app.command()(run_handler)
+    return app, make_main(app)
