@@ -1,6 +1,6 @@
 from typing import Protocol
 
-from src.models import AlignmentConfig, RssEpisode
+from adrift.models import AlignmentConfig, RssEpisode
 
 
 class AlignmentPort(Protocol):

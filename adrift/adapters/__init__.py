@@ -9,14 +9,14 @@ or source type, add one entry here without touching any function body.
 import os
 from collections.abc import Callable
 
-from src.models import FeedSource
-from src.ports import (
+from adrift.models import FeedSource
+from adrift.ports import (
     EpisodeSourcePort,
     ReadOnlySecretStorePort,
     SecretProviderPort,
     SecretStorePort,
 )
-from src.utils.text import is_youtube_channel
+from adrift.utils.text import is_youtube_channel
 
 
 def _require_source_url(source: FeedSource) -> str:
@@ -32,13 +32,13 @@ def _require_source_url(source: FeedSource) -> str:
 
 
 def _make_youtube_source() -> EpisodeSourcePort:
-    from src.adapters.episode_sources.episode_source_youtube import YouTubeEpisodeSourceAdapter
+    from adrift.adapters.episode_sources.episode_source_youtube import YouTubeEpisodeSourceAdapter
 
     return YouTubeEpisodeSourceAdapter()
 
 
 def _make_rss_source() -> EpisodeSourcePort:
-    from src.adapters.episode_sources.episode_source_rss import RssEpisodeSourceAdapter
+    from adrift.adapters.episode_sources.episode_source_rss import RssEpisodeSourceAdapter
 
     return RssEpisodeSourceAdapter()
 
@@ -68,7 +68,7 @@ def get_episode_source_adapter(source: FeedSource) -> EpisodeSourcePort:
 
 
 def _make_env_provider() -> SecretProviderPort:
-    from src.adapters.secrets.env_secrets import EnvironmentSecretProvider
+    from adrift.adapters.secrets.env_secrets import EnvironmentSecretProvider
 
     return EnvironmentSecretProvider()
 
@@ -106,7 +106,7 @@ def get_secret_provider_adapter(
     if not enable_prompt_fallback:
         return provider
 
-    from src.adapters.secrets.prompt_fallback import PromptFallbackProvider
+    from adrift.adapters.secrets.prompt_fallback import PromptFallbackProvider
 
     if prompt_callback is None:
         return PromptFallbackProvider(provider)
@@ -126,11 +126,11 @@ def get_secret_store_adapter(
     _selected, provider = _build_selected_provider(provider_name)
 
     if getattr(provider, "writable", False):
-        from src.adapters.secrets.env_secrets import EnvironmentSecretStore
+        from adrift.adapters.secrets.env_secrets import EnvironmentSecretStore
 
         return EnvironmentSecretStore(env_file=env_file)
 
-    from src.adapters.secrets.read_only_store import ReadOnlySecretStore
-    from src.application.services.secret_service import MANAGED_S3_KEYS
+    from adrift.adapters.secrets.read_only_store import ReadOnlySecretStore
+    from adrift.application.services.secret_service import MANAGED_S3_KEYS
 
     return ReadOnlySecretStore(provider, known_keys=MANAGED_S3_KEYS)

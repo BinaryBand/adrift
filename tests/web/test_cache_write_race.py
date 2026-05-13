@@ -2,7 +2,7 @@ import shutil
 from pathlib import Path
 from types import SimpleNamespace
 
-import src.web.rss as rss
+import adrift.web.rss as rss
 
 
 def test_cache_set_with_retry_retries_and_recreates_dir(tmp_path):

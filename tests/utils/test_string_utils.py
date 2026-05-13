@@ -1,6 +1,6 @@
 import unittest
 
-from src.utils.text import create_slug, is_slug, normalize_text, remove_file_extension
+from adrift.utils.text import create_slug, is_slug, normalize_text, remove_file_extension
 
 
 class TestCreateSlug(unittest.TestCase):

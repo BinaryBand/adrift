@@ -3,7 +3,7 @@
 import tempfile
 import unittest
 
-from src.ports.cache import DiskCacheAdapter
+from adrift.ports.cache import DiskCacheAdapter
 
 
 class TestDiskCacheAdapter(unittest.TestCase):

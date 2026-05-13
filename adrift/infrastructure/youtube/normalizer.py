@@ -5,14 +5,14 @@ from __future__ import annotations
 from datetime import datetime, timezone
 from typing import TYPE_CHECKING, Any
 
-from src.utils.image import extract_image_from_ytdlp, extract_image_from_ytdlp_list
-from src.utils.progress import Callback
+from adrift.utils.image import extract_image_from_ytdlp, extract_image_from_ytdlp_list
+from adrift.utils.progress import Callback
 
 extract_image_url = extract_image_from_ytdlp
 extract_image_from_list = extract_image_from_ytdlp_list
 
 if TYPE_CHECKING:
-    from src.models import YtDlpVideo
+    from adrift.models import YtDlpVideo
 
 _PROGRESS_HOOK_ERRORS = (OSError, RuntimeError, TypeError, ValueError)
 
@@ -57,7 +57,7 @@ def ytdlp_pub_date(data: YtDlpVideo | dict[str, Any]) -> datetime | None:
     Accepts either a validated YtDlpVideo model or a raw dict; attempts
     to parse timestamp, release_timestamp, or upload_date in that order.
     """
-    from src.models import YtDlpVideo as YtDlpVideoModel
+    from adrift.models import YtDlpVideo as YtDlpVideoModel
 
     mapping: dict[str, Any]
     if isinstance(data, YtDlpVideoModel):
@@ -73,7 +73,7 @@ def ytdlp_pub_date(data: YtDlpVideo | dict[str, Any]) -> datetime | None:
 
 def ensure_ytdlp_model(data: YtDlpVideo | dict[str, Any]) -> YtDlpVideo:
     """Ensure data is a YtDlpVideo model; convert dict if needed."""
-    from src.models import YtDlpVideo as YtDlpVideoModel
+    from adrift.models import YtDlpVideo as YtDlpVideoModel
 
     if isinstance(data, YtDlpVideoModel):
         return data

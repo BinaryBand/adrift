@@ -1,4 +1,4 @@
-"""S3 cache factory extracted from src/files/s3.py.
+"""S3 cache factory extracted from adrift/files/s3.py.
 
 Provides a small, import-safe factory so other S3 modules can import the
 cache without importing the large `src.files.s3` module and risking

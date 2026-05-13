@@ -2,7 +2,7 @@ from pathlib import Path
 
 import pytest
 
-from src.adapters.secrets.env_secrets import EnvironmentSecretStore
+from adrift.adapters.secrets.env_secrets import EnvironmentSecretStore
 
 
 def test_environment_secret_store_persists_and_deletes_keys(tmp_path: Path) -> None:

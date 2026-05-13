@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
-from src.models import RssEpisode
+from adrift.models import RssEpisode
 
 
 @dataclass(frozen=True)

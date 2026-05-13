@@ -7,8 +7,8 @@ from typing import Any, Callable
 
 from tqdm import tqdm
 
-from src.utils.progress import Callback
-from src.utils.terminal import Level, format_terminal_message, using_terminal_emitter
+from adrift.utils.progress import Callback
+from adrift.utils.terminal import Level, format_terminal_message, using_terminal_emitter
 
 _PROGRESS_META_WIDTH = 38
 

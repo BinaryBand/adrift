@@ -1,8 +1,8 @@
 """Enrichment helpers for the download pipeline."""
 
-from src.models import DownloadEpisode, MergeResult
-from src.utils.regex import YOUTUBE_VIDEO_REGEX
-from src.web.sponsorblock import fetch_sponsor_segments
+from adrift.models import DownloadEpisode, MergeResult
+from adrift.utils.regex import YOUTUBE_VIDEO_REGEX
+from adrift.web.sponsorblock import fetch_sponsor_segments
 
 
 def _extract_video_id(content: str) -> str | None:

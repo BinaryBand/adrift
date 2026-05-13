@@ -1,17 +1,17 @@
 from dataclasses import dataclass, field
 from urllib.parse import urljoin
 
-from src.models import RssChannel, RssEpisode
-from src.utils.progress import Callback
-from src.utils.regex import (
+from adrift.models import RssChannel, RssEpisode
+from adrift.utils.progress import Callback
+from adrift.utils.regex import (
     YOUTUBE_PLAYLIST_SHORTHAND_REGEX,
     YOUTUBE_PLAYLIST_URL,
     YT_CHANNEL,
     YT_CHANNEL_SHORTHAND,
     re_compile,
 )
-from src.utils.terminal import emit_info, emit_warning
-from src.youtube import ytdlp
+from adrift.utils.terminal import emit_info, emit_warning
+from adrift.youtube import ytdlp
 
 _EPISODE_METADATA_ERRORS = (AttributeError, TypeError, ValueError)
 _VIDEO_INFO_FETCH_ERRORS = (OSError, RuntimeError, ValueError)

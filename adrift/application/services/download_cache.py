@@ -6,13 +6,13 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, cast
 
-from src.application.services.download_client import prefixed_s3_key
-from src.models import MediaMetadata
-from src.utils.regex import YOUTUBE_VIDEO_REGEX
-from src.utils.title_normalization import normalize_title
+from adrift.application.services.download_client import prefixed_s3_key
+from adrift.models import MediaMetadata
+from adrift.utils.regex import YOUTUBE_VIDEO_REGEX
+from adrift.utils.title_normalization import normalize_title
 
 if TYPE_CHECKING:
-    from src.application.context import AppContext
+    from adrift.application.context import AppContext
 
 
 @dataclass(frozen=True)

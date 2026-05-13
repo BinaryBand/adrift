@@ -2,7 +2,7 @@ from typing import Any, TypeVar, cast
 
 from pydantic import BaseModel, ConfigDict, Field, computed_field
 
-from src.utils.text import create_slug
+from adrift.utils.text import create_slug
 
 _ModelT = TypeVar("_ModelT", bound=BaseModel)
 

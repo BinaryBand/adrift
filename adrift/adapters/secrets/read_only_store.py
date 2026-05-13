@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from collections.abc import Iterable, Mapping
 
-from src.ports import ReadOnlySecretStorePort, SecretProviderPort
+from adrift.ports import ReadOnlySecretStorePort, SecretProviderPort
 
 
 class ReadOnlySecretStore(ReadOnlySecretStorePort):

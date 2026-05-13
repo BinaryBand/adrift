@@ -7,10 +7,10 @@ from typing import TYPE_CHECKING, Any, Callable
 from boto3.s3.transfer import TransferConfig
 from pydantic import ValidationError
 
-from src.files.s3_types import UploadOptions, _UploadSpec
-from src.files.s3_utils import _build_upload_extra_args, _make_upload_callback
-from src.models import CacheMetadata, MediaMetadata, S3Metadata
-from src.utils.progress import Callback
+from adrift.files.s3_types import UploadOptions, _UploadSpec
+from adrift.files.s3_utils import _build_upload_extra_args, _make_upload_callback
+from adrift.models import CacheMetadata, MediaMetadata, S3Metadata
+from adrift.utils.progress import Callback
 
 if TYPE_CHECKING:
     from mypy_boto3_s3 import S3Client

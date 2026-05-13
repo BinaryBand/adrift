@@ -8,8 +8,8 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, TypedDict, Unpack, cast
 
-from src.utils.media import AUDIO_EXTENSIONS
-from src.utils.progress import Callback
+from adrift.utils.media import AUDIO_EXTENSIONS
+from adrift.utils.progress import Callback
 
 logger = logging.getLogger(__name__)
 

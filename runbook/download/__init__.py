@@ -5,19 +5,19 @@ from typing import Annotated
 
 import typer
 
+from adrift.application.context import AppContext
+from adrift.application.download import (
+    DownloadPipeline,
+    DownloadPipelineDeps,
+    DownloadPipelineRuntime,
+    DownloadRunOptions,
+)
 from runbook import (
     IncludeConfigsOption,
     SkipScheduleFilterOption,
     TagsOption,
     bootstrap_run_configs,
     build_cli,
-)
-from src.application.context import AppContext
-from src.application.download import (
-    DownloadPipeline,
-    DownloadPipelineDeps,
-    DownloadPipelineRuntime,
-    DownloadRunOptions,
 )
 
 DEFAULT_MAX_DOWNLOADS = 10
@@ -29,12 +29,15 @@ def _build_pipeline(
     ui,
     pipeline_options: DownloadRunOptions,
 ) -> DownloadPipeline:
-    from src.application.services.download_enrich import enrich_with_sponsors
-    from src.application.services.download_process import build_download_queue, download_and_upload
-    from src.application.services.download_rss import update_rss
-    from src.catalog import MergeConfigOptions, merge_config
-    from src.utils.run_ui import build_merge_callbacks
-    from src.youtube.downloader import BotDetectionError
+    from adrift.application.services.download_enrich import enrich_with_sponsors
+    from adrift.application.services.download_process import (
+        build_download_queue,
+        download_and_upload,
+    )
+    from adrift.application.services.download_rss import update_rss
+    from adrift.catalog import MergeConfigOptions, merge_config
+    from adrift.utils.run_ui import build_merge_callbacks
+    from adrift.youtube.downloader import BotDetectionError
 
     runtime = DownloadPipelineRuntime(ctx=ctx, ui=ui, options=pipeline_options)
     deps = DownloadPipelineDeps(
@@ -59,7 +62,7 @@ def _run_pipeline(
     ctx: AppContext,
     pipeline_options: DownloadRunOptions,
 ) -> int:
-    from src.utils.run_ui import create_run_ui
+    from adrift.utils.run_ui import create_run_ui
 
     with create_run_ui(len(configs), "Downloading") as ui, ui.output_context():
         pipeline = _build_pipeline(ctx, ui, pipeline_options)
@@ -93,7 +96,7 @@ def _run_with_bot_detection(
     pipeline_options: DownloadRunOptions,
     bot_cooldown: int,
 ) -> int:
-    from src.youtube.downloader import BotDetectionError
+    from adrift.youtube.downloader import BotDetectionError
 
     try:
         return _run_pipeline(configs, ctx, pipeline_options)

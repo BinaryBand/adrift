@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
-from src.ports import (
+from adrift.ports import (
     ReadOnlySecretStorePort,
     SecretProviderPort,
     SecretStorePort,
@@ -124,6 +124,6 @@ def validate_required_secret_values(provider: SecretProviderPort) -> dict[str, s
 
 
 def validate_s3_connection(provider: SecretProviderPort) -> None:
-    from src.files.s3 import validate_s3_provider
+    from adrift.files.s3 import validate_s3_provider
 
     validate_s3_provider(provider, check_endpoint=True)

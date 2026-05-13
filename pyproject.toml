@@ -4,7 +4,7 @@ version = "0.1.0"
 description = "Podcast source aggregation and reference alignment"
 authors = []
 package-mode = true
-packages = [{ include = "src" }, { include = "runbook" }]
+packages = [{ include = "adrift" }, { include = "runbook" }]
 
 [tool.poetry.scripts]
 adrift-download = "runbook.download:main"
@@ -75,7 +75,7 @@ extra-paths = []
 root = ["."]
 
 [tool.ty.src]
-include = ["src"]
+include = ["adrift"]
 
 [tool.ty.analysis]
 respect-type-ignore-comments = true

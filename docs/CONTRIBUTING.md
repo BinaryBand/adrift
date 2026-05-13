@@ -45,7 +45,7 @@ select = ["E", "F", "I"]
 [tool.pyright]
 venvPath = "."
 venv = ".venv"
-include = ["src", "runbook", "tests", "typings"]
+include = ["adrift", "runbook", "tests", "typings"]
 exclude = ["runbook/analysis"]
 
 [tool.pytest.ini_options]
@@ -57,13 +57,13 @@ addopts = "-m 'not slow'"
 ```json
 {
   "typeCheckingMode": "strict",
-  "include": ["src", "runbook", "tests", "typings"],
+  "include": ["adrift", "runbook", "tests", "typings"],
   "exclude": ["runbook/analysis", "**/node_modules", "**/__pycache__", "**/.*", ".venv"]
 }
 ```
 
 Note: earlier versions of these docs referenced import-linter and local wrapper scripts
-(`src.utils.validate_contract`, `src.utils.validate_no_duplicates`). Those files are not
+(`adrift.utils.validate_contract`, `adrift.utils.validate_no_duplicates`). Those files are not
 included in this repository.
 
 ### VS Code
@@ -97,19 +97,19 @@ included in this repository.
       "label": "Ruff: Check",
       "type": "shell",
       "command": "${config:python.defaultInterpreterPath}",
-      "args": ["-m", "ruff", "check", "src", "runbook", "tests", "typings"]
+      "args": ["-m", "ruff", "check", "adrift", "runbook", "tests", "typings"]
     },
     {
       "label": "Ruff: Format Check",
       "type": "shell",
       "command": "${config:python.defaultInterpreterPath}",
-      "args": ["-m", "ruff", "format", "--check", "src", "runbook", "tests", "typings"]
+      "args": ["-m", "ruff", "format", "--check", "adrift", "runbook", "tests", "typings"]
     },
     {
       "label": "Complexity: Lizard Check",
       "type": "shell",
       "command": "${config:python.defaultInterpreterPath}",
-      "args": ["-m", "runbook.quality.check_complexity", "src", "--ccn", "8", "--length", "30", "--params", "4"]
+      "args": ["-m", "runbook.quality.check_complexity", "adrift", "--ccn", "8", "--length", "30", "--params", "4"]
     }
   ]
 }

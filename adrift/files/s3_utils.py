@@ -11,8 +11,8 @@ import boto3
 from botocore.client import Config
 from botocore.exceptions import BotoCoreError, ClientError
 
-from src.ports import SecretProviderPort, require_secrets
-from src.utils.progress import Callback
+from adrift.ports import SecretProviderPort, require_secrets
+from adrift.utils.progress import Callback
 
 if TYPE_CHECKING:
     from mypy_boto3_s3 import S3Client

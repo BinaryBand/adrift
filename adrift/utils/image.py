@@ -36,7 +36,7 @@ def extract_image_from_feedparser(obj: object) -> str:
 def extract_image_from_ytdlp(value: Any) -> str:
     """Extract an image URL from a YtDlpImage model or raw dict."""
     # Import here to avoid a hard dependency on models at utils import time
-    from src.models import YtDlpImage
+    from adrift.models import YtDlpImage
 
     if isinstance(value, YtDlpImage):
         return value.url or ""

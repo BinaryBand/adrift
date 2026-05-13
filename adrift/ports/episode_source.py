@@ -1,8 +1,8 @@
 from dataclasses import dataclass
 from typing import Protocol
 
-from src.models import FeedSource, RssChannel, RssEpisode
-from src.utils.progress import Callback
+from adrift.models import FeedSource, RssChannel, RssEpisode
+from adrift.utils.progress import Callback
 
 
 @dataclass(frozen=True)

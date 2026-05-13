@@ -1,5 +1,5 @@
-from src.models import FeedSource, RssChannel, RssEpisode
-from src.ports import EpisodeSourceFetchContext, EpisodeSourcePort
+from adrift.models import FeedSource, RssChannel, RssEpisode
+from adrift.ports import EpisodeSourceFetchContext, EpisodeSourcePort
 
 
 class YouTubeEpisodeSourceAdapter(EpisodeSourcePort):
@@ -11,7 +11,7 @@ class YouTubeEpisodeSourceAdapter(EpisodeSourcePort):
         context: EpisodeSourceFetchContext | None = None,
     ) -> list[RssEpisode]:
         """Fetch episodes from a YouTube channel."""
-        from src.youtube.metadata import YtFetchOptions, get_youtube_episodes
+        from adrift.youtube.metadata import YtFetchOptions, get_youtube_episodes
 
         resolved_context = context or EpisodeSourceFetchContext()
         url = source.url
@@ -30,7 +30,7 @@ class YouTubeEpisodeSourceAdapter(EpisodeSourcePort):
 
     def fetch_channel(self, source: FeedSource) -> RssChannel:
         """Fetch channel metadata from a YouTube channel."""
-        from src.youtube.metadata import get_youtube_channel
+        from adrift.youtube.metadata import get_youtube_channel
 
         url = source.url
         if not url:

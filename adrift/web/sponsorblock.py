@@ -9,11 +9,11 @@ from typing import Any, cast
 
 import requests
 
-from src.files.audio import cut_segments
-from src.models import SponsorSegment
-from src.ports.cache import DiskCacheAdapter
-from src.utils.crypto import sha256
-from src.utils.progress import Callback
+from adrift.files.audio import cut_segments
+from adrift.models import SponsorSegment
+from adrift.ports.cache import DiskCacheAdapter
+from adrift.utils.crypto import sha256
+from adrift.utils.progress import Callback
 
 logger = logging.getLogger(__name__)
 

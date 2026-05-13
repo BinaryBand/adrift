@@ -10,7 +10,7 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from typing import Callable, Generic, TypeVar
 
-from src.domain.errors import PipelineError
+from adrift.domain.errors import PipelineError
 
 T = TypeVar("T")
 U = TypeVar("U")

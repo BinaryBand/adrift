@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from typing import Any
 
-from src.files.s3 import S3Service
+from adrift.files.s3 import S3Service
 
 
 class _FakeProvider:

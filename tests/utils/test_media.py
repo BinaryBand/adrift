@@ -3,7 +3,7 @@
 import logging
 import unittest
 
-from src.utils.media import AUDIO_EXTENSIONS, parse_duration
+from adrift.utils.media import AUDIO_EXTENSIONS, parse_duration
 
 
 class TestParseDuration(unittest.TestCase):
@@ -29,7 +29,7 @@ class TestParseDuration(unittest.TestCase):
         self.assertAlmostEqual(parse_duration("0:00"), 0.0)
 
     def test_unrecognised_format_returns_none_and_warns(self):
-        with self.assertLogs("src.utils.media", level=logging.WARNING) as ctx:
+        with self.assertLogs("adrift.utils.media", level=logging.WARNING) as ctx:
             result = parse_duration("1:02:03:04")
         self.assertIsNone(result)
         self.assertTrue(any("1:02:03:04" in line for line in ctx.output))

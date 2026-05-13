@@ -1,9 +1,9 @@
 from dataclasses import dataclass
 from typing import Any, Literal
 
-from src.models import FeedSource, PodcastConfig, RssEpisode, SourceTrace, ensure_feed_source
-from src.utils.progress import Callback
-from src.utils.text import is_youtube_channel
+from adrift.models import FeedSource, PodcastConfig, RssEpisode, SourceTrace, ensure_feed_source
+from adrift.utils.progress import Callback
+from adrift.utils.text import is_youtube_channel
 
 from .alignment import align_episodes
 
@@ -75,8 +75,8 @@ def _fetch_source_episodes(
     source: FeedSource | dict[str, Any],
     context: EpisodeFetchContext,
 ) -> list[RssEpisode]:
-    from src.adapters import get_episode_source_adapter
-    from src.ports import EpisodeSourceFetchContext
+    from adrift.adapters import get_episode_source_adapter
+    from adrift.ports import EpisodeSourceFetchContext
 
     resolved = ensure_feed_source(source)
     return get_episode_source_adapter(resolved).fetch_episodes(

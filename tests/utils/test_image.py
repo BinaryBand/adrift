@@ -8,8 +8,8 @@ os.environ.setdefault("S3_SECRET_KEY", "_test")
 os.environ.setdefault("S3_ENDPOINT", "http://localhost")
 os.environ.setdefault("S3_REGION", "us-east-1")
 
-from src.models import YtDlpImage
-from src.utils.image import (
+from adrift.models import YtDlpImage
+from adrift.utils.image import (
     extract_image_from_feedparser,
     extract_image_from_ytdlp,
     extract_image_from_ytdlp_list,

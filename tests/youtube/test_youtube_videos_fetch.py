@@ -3,15 +3,15 @@
 import unittest
 from unittest.mock import MagicMock, patch
 
-from src.models import RssEpisode
-from src.youtube.metadata import YtFetchOptions, get_youtube_episodes
+from adrift.models import RssEpisode
+from adrift.youtube.metadata import YtFetchOptions, get_youtube_episodes
 
 
 class TestGetYoutubeVideosCache(unittest.TestCase):
     """Test caching behavior of get_youtube_episodes."""
 
-    @patch("src.youtube.metadata._normalize_youtube_link")
-    @patch("src.youtube.ytdlp.get_youtube_videos")
+    @patch("adrift.youtube.metadata._normalize_youtube_link")
+    @patch("adrift.youtube.ytdlp.get_youtube_videos")
     def test_returns_episodes_from_ytdlp(
         self, mock_get_videos: MagicMock, mock_normalize: MagicMock
     ):
@@ -45,8 +45,8 @@ class TestGetYoutubeVideosCache(unittest.TestCase):
         self.assertEqual(result[0].id, "dQw4w9WgXcQ")
         self.assertEqual(result[1].id, "XqZsoesa55w")
 
-    @patch("src.youtube.metadata._normalize_youtube_link")
-    @patch("src.youtube.ytdlp.get_youtube_videos")
+    @patch("adrift.youtube.metadata._normalize_youtube_link")
+    @patch("adrift.youtube.ytdlp.get_youtube_videos")
     def test_cache_key_format(self, mock_get_videos: MagicMock, mock_normalize: MagicMock):
         """Test that get_youtube_videos is called with correct parameters."""
         normalized_url = "https://youtube.com/@test/videos"
@@ -61,8 +61,8 @@ class TestGetYoutubeVideosCache(unittest.TestCase):
         self.assertEqual(call_args[0][0], normalized_url)
         self.assertEqual(call_args[0][1], "test_author")
 
-    @patch("src.youtube.metadata._normalize_youtube_link")
-    @patch("src.youtube.ytdlp.get_youtube_videos")
+    @patch("adrift.youtube.metadata._normalize_youtube_link")
+    @patch("adrift.youtube.ytdlp.get_youtube_videos")
     def test_forwards_refresh_option(self, mock_get_videos: MagicMock, mock_normalize: MagicMock):
         """Test that refresh is forwarded to the yt-dlp layer."""
         mock_normalize.return_value = "https://youtube.com/@test/videos"
@@ -80,8 +80,8 @@ class TestGetYoutubeVideosCache(unittest.TestCase):
 class TestGetYoutubeVideosEarlyTermination(unittest.TestCase):
     """Test early termination logic in get_youtube_episodes."""
 
-    @patch("src.youtube.metadata._normalize_youtube_link")
-    @patch("src.youtube.ytdlp.get_youtube_videos")
+    @patch("adrift.youtube.metadata._normalize_youtube_link")
+    @patch("adrift.youtube.ytdlp.get_youtube_videos")
     def test_returns_empty_when_no_videos(
         self, mock_get_videos: MagicMock, mock_normalize: MagicMock
     ):
@@ -98,8 +98,8 @@ class TestGetYoutubeVideosEarlyTermination(unittest.TestCase):
         # Should return empty list
         self.assertEqual(result, [])
 
-    @patch("src.youtube.metadata._normalize_youtube_link")
-    @patch("src.youtube.ytdlp.get_youtube_videos")
+    @patch("adrift.youtube.metadata._normalize_youtube_link")
+    @patch("adrift.youtube.ytdlp.get_youtube_videos")
     def test_handles_single_video(self, mock_get_videos: MagicMock, mock_normalize: MagicMock):
         """Test handles single video case."""
         mock_normalize.return_value = "https://www.youtube.com/playlist?list=PL12345"
@@ -127,8 +127,8 @@ class TestGetYoutubeVideosEarlyTermination(unittest.TestCase):
 class TestGetYoutubeVideosCompleteness(unittest.TestCase):
     """Test completeness - ensures all new videos are fetched."""
 
-    @patch("src.youtube.metadata._normalize_youtube_link")
-    @patch("src.youtube.ytdlp.get_youtube_videos")
+    @patch("adrift.youtube.metadata._normalize_youtube_link")
+    @patch("adrift.youtube.ytdlp.get_youtube_videos")
     def test_fetches_multiple_videos(self, mock_get_videos: MagicMock, mock_normalize: MagicMock):
         """Test that multiple videos are processed."""
         mock_normalize.return_value = "https://www.youtube.com/playlist?list=PL12345"
@@ -174,9 +174,9 @@ class TestGetYoutubeVideosCompleteness(unittest.TestCase):
 class TestGetYoutubeVideosFilter(unittest.TestCase):
     """Test filtering functionality."""
 
-    @patch("src.youtube.metadata._normalize_youtube_link")
-    @patch("src.youtube.ytdlp.get_youtube_videos")
-    @patch("src.youtube.metadata.re_compile")
+    @patch("adrift.youtube.metadata._normalize_youtube_link")
+    @patch("adrift.youtube.ytdlp.get_youtube_videos")
+    @patch("adrift.youtube.metadata.re_compile")
     def test_filters_videos_by_pattern(
         self, mock_re_compile: MagicMock, mock_get_videos: MagicMock, mock_normalize: MagicMock
     ):
@@ -229,9 +229,9 @@ class TestGetYoutubeVideosFilter(unittest.TestCase):
 class TestGetYoutubeVideosDetailed(unittest.TestCase):
     """Test detailed metadata functionality."""
 
-    @patch("src.youtube.metadata._normalize_youtube_link")
-    @patch("src.youtube.ytdlp.get_youtube_videos")
-    @patch("src.youtube.metadata._add_episode_metadata")
+    @patch("adrift.youtube.metadata._normalize_youtube_link")
+    @patch("adrift.youtube.ytdlp.get_youtube_videos")
+    @patch("adrift.youtube.metadata._add_episode_metadata")
     def test_adds_detailed_metadata(
         self, mock_add_metadata: MagicMock, mock_get_videos: MagicMock, mock_normalize: MagicMock
     ):
@@ -257,8 +257,8 @@ class TestGetYoutubeVideosDetailed(unittest.TestCase):
         self.assertEqual(len(result), 1)
         mock_add_metadata.assert_called_once_with(mock_episode, "test_author")
 
-    @patch("src.youtube.metadata._normalize_youtube_link")
-    @patch("src.youtube.ytdlp.get_youtube_videos")
+    @patch("adrift.youtube.metadata._normalize_youtube_link")
+    @patch("adrift.youtube.ytdlp.get_youtube_videos")
     def test_skips_detailed_metadata(self, mock_get_videos: MagicMock, mock_normalize: MagicMock):
         """Test that detailed metadata is skipped when detailed=False."""
         mock_normalize.return_value = "https://www.youtube.com/playlist?list=PL12345"
@@ -283,8 +283,8 @@ class TestGetYoutubeVideosDetailed(unittest.TestCase):
 class TestGetYoutubeVideosEdgeCases(unittest.TestCase):
     """Test edge cases and error scenarios."""
 
-    @patch("src.youtube.metadata._normalize_youtube_link")
-    @patch("src.youtube.ytdlp.get_youtube_videos")
+    @patch("adrift.youtube.metadata._normalize_youtube_link")
+    @patch("adrift.youtube.ytdlp.get_youtube_videos")
     def test_returns_empty_when_no_entries(
         self, mock_get_videos: MagicMock, mock_normalize: MagicMock
     ):
@@ -296,8 +296,8 @@ class TestGetYoutubeVideosEdgeCases(unittest.TestCase):
 
         self.assertEqual(result, [])
 
-    @patch("src.youtube.metadata._normalize_youtube_link")
-    @patch("src.youtube.ytdlp.get_youtube_videos")
+    @patch("adrift.youtube.metadata._normalize_youtube_link")
+    @patch("adrift.youtube.ytdlp.get_youtube_videos")
     def test_raises_exception_on_network_error(
         self, mock_get_videos: MagicMock, mock_normalize: MagicMock
     ):

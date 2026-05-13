@@ -12,17 +12,17 @@ import requests
 from diskcache import Cache
 from feedparser import FeedParserDict
 
-from src.adapters.cache_retry import RaceAwareCacheWrapper
-from src.infrastructure.rss import (
+from adrift.adapters.cache_retry import RaceAwareCacheWrapper
+from adrift.infrastructure.rss import (
     channel_from_feedparser,
     entry_pub_date_from_feedparser,
     entry_title_from_feedparser,
     episode_from_feedparser,
 )
-from src.models import RssChannel, RssEpisode
-from src.utils.progress import Callback
-from src.utils.regex import LINK_REGEX, re_compile
-from src.utils.schedule import rrule_occurrence_exists
+from adrift.models import RssChannel, RssEpisode
+from adrift.utils.progress import Callback
+from adrift.utils.regex import LINK_REGEX, re_compile
+from adrift.utils.schedule import rrule_occurrence_exists
 
 _CONTROL_CHARS_RE = re_compile(r"[\x00-\x08\x0B\x0C\x0E-\x1F\x7F]")
 

@@ -79,7 +79,7 @@ poetry show --outdated
 ## Project Structure
 
 - `runbook/` - Main scripts (`merge.py`, `download.py`, and operational runbooks)
-- `src/` - Core source code
+- `adrift/` - Core source code
   - `adapters/` - Source adapters for RSS and YouTube
   - `web/` - RSS feed parsing and serialization
   - `youtube/` - YouTube metadata extraction

@@ -65,8 +65,8 @@ Shared owner → note it. Blank owner → fix it.
 
 | Concern | Owner |
 | --- | --- |
-| Domain Model | `src/domain` — `SignupContext` type + validation rules |
-| Pipeline Declaration | `src/pipeline.ts` — wires stages in order |
+| Domain Model | `adrift/domain` — `SignupContext` type + validation rules |
+| Pipeline Declaration | `adrift/pipeline.ts` — wires stages in order |
 | Stage Adapters | `ValidateAdapter`, `HashPasswordAdapter`, `SaveUserAdapter`, `SendWelcomeEmailAdapter` |
 | State & Secrets | Environment variables via `SecretReader` port |
 | Config | `config.toml` — token expiry, email sender address |

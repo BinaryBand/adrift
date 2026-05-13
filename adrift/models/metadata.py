@@ -6,7 +6,7 @@ from typing import Any, Callable
 import pydantic
 from pydantic import BaseModel, ConfigDict
 
-from src.infrastructure.youtube.normalizer import (
+from adrift.infrastructure.youtube.normalizer import (
     coerce_str,
     ensure_ytdlp_model,
     extract_image_from_list,
@@ -116,7 +116,7 @@ try:
 except (ImportError, ModuleNotFoundError):
     # When executed as a script the package-relative import may fail;
     # fall back to absolute import using the `src` package on sys.path.
-    from src.models import YtDlpImage, YtDlpVideo
+    from adrift.models import YtDlpImage, YtDlpVideo
 
 
 def _parse_ytdlp_pub_date(data: YtDlpVideo | dict[str, Any]) -> datetime | None:

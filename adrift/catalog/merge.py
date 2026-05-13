@@ -4,7 +4,7 @@ from dataclasses import dataclass
 from time import perf_counter
 from typing import TypedDict, TypeVar, Unpack
 
-from src.models import (
+from adrift.models import (
     EpisodeData,
     MergeResult,
     PodcastConfig,
@@ -12,7 +12,7 @@ from src.models import (
     RssEpisode,
     SourceTrace,
 )
-from src.utils.progress import Callback
+from adrift.utils.progress import Callback
 
 from .alignment import align_episodes_impl, merge_episode
 from .collection import EpisodeFetchContext, _collect_episodes_with_traces

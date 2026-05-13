@@ -2,8 +2,8 @@ from functools import lru_cache
 
 from unidecode import unidecode
 
-# from src.app_common import load_static_config
-from src.utils.regex import (
+# from adrift.app_common import load_static_config
+from adrift.utils.regex import (
     YOUTUBE_PLAYLIST_SHORTHAND_REGEX,
     YOUTUBE_PLAYLIST_URL,
     YT_CHANNEL,

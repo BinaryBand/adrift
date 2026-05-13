@@ -4,8 +4,8 @@ import unittest
 from datetime import datetime, timedelta, timezone
 from unittest.mock import MagicMock, patch
 
-from src.models import RssEpisode, YtDlpImage, YtDlpParams
-from src.youtube.ytdlp import (
+from adrift.models import RssEpisode, YtDlpImage, YtDlpParams
+from adrift.youtube.ytdlp import (
     YOUTUBE_EPISODE_CACHE_FRESHNESS,
     YOUTUBE_RECENT_EPISODE_CHECK_FRESHNESS,
     ChannelInfo,
@@ -132,9 +132,9 @@ class TestCachePayloadTrimming(unittest.TestCase):
 class TestFetchVideoInfoRaw(unittest.TestCase):
     """Test _fetch_video_info_raw with auth fallback logic."""
 
-    @patch("src.youtube.ytdlp.YoutubeDL")
-    @patch("src.youtube.ytdlp.get_auth_ydl_opts")
-    @patch("src.youtube.ytdlp.get_ydl_opts")
+    @patch("adrift.youtube.ytdlp.YoutubeDL")
+    @patch("adrift.youtube.ytdlp.get_auth_ydl_opts")
+    @patch("adrift.youtube.ytdlp.get_ydl_opts")
     def test_successful_unauthenticated_fetch(
         self,
         mock_get_opts: MagicMock,
@@ -159,9 +159,9 @@ class TestFetchVideoInfoRaw(unittest.TestCase):
         mock_get_opts.assert_called_once()
         mock_get_auth_opts.assert_not_called()
 
-    @patch("src.youtube.ytdlp.YoutubeDL")
-    @patch("src.youtube.ytdlp.get_auth_ydl_opts")
-    @patch("src.youtube.ytdlp.get_ydl_opts")
+    @patch("adrift.youtube.ytdlp.YoutubeDL")
+    @patch("adrift.youtube.ytdlp.get_auth_ydl_opts")
+    @patch("adrift.youtube.ytdlp.get_ydl_opts")
     def test_fallback_to_authenticated(
         self,
         mock_get_opts: MagicMock,
@@ -191,9 +191,9 @@ class TestFetchVideoInfoRaw(unittest.TestCase):
         # Should have called extract_info twice
         self.assertEqual(mock_ydl.__enter__.return_value.extract_info.call_count, 2)
 
-    @patch("src.youtube.ytdlp.YoutubeDL")
-    @patch("src.youtube.ytdlp.get_auth_ydl_opts")
-    @patch("src.youtube.ytdlp.get_ydl_opts")
+    @patch("adrift.youtube.ytdlp.YoutubeDL")
+    @patch("adrift.youtube.ytdlp.get_auth_ydl_opts")
+    @patch("adrift.youtube.ytdlp.get_ydl_opts")
     def test_both_attempts_fail(
         self,
         mock_get_opts: MagicMock,
@@ -212,10 +212,10 @@ class TestFetchVideoInfoRaw(unittest.TestCase):
 
         self.assertIsNone(result)
 
-    @patch("src.youtube.ytdlp.YoutubeDL")
-    @patch("src.youtube.ytdlp.get_auth_ydl_opts")
-    @patch("src.youtube.ytdlp.get_ydl_opts")
-    @patch("src.youtube.ytdlp._CACHE")
+    @patch("adrift.youtube.ytdlp.YoutubeDL")
+    @patch("adrift.youtube.ytdlp.get_auth_ydl_opts")
+    @patch("adrift.youtube.ytdlp.get_ydl_opts")
+    @patch("adrift.youtube.ytdlp._CACHE")
     def test_terminal_members_only_failure_skips_authenticated_retry(
         self,
         mock_cache: MagicMock,
@@ -240,10 +240,10 @@ class TestFetchVideoInfoRaw(unittest.TestCase):
         self.assertEqual(mock_ydl.__enter__.return_value.extract_info.call_count, 1)
         mock_cache.set.assert_called_once()
 
-    @patch("src.youtube.ytdlp.YoutubeDL")
-    @patch("src.youtube.ytdlp.get_auth_ydl_opts")
-    @patch("src.youtube.ytdlp.get_ydl_opts")
-    @patch("src.youtube.ytdlp._CACHE")
+    @patch("adrift.youtube.ytdlp.YoutubeDL")
+    @patch("adrift.youtube.ytdlp.get_auth_ydl_opts")
+    @patch("adrift.youtube.ytdlp.get_ydl_opts")
+    @patch("adrift.youtube.ytdlp._CACHE")
     def test_terminal_members_only_non_runtime_error_skips_retry(
         self,
         mock_cache: MagicMock,
@@ -276,8 +276,8 @@ class TestFetchVideoInfoRaw(unittest.TestCase):
 class TestYtDlpOptsCompatibility(unittest.TestCase):
     """Regression tests for passing typed yt-dlp opts into YoutubeDL."""
 
-    @patch("src.youtube.ytdlp.YoutubeDL")
-    @patch("src.youtube.ytdlp.get_ydl_opts")
+    @patch("adrift.youtube.ytdlp.YoutubeDL")
+    @patch("adrift.youtube.ytdlp.get_ydl_opts")
     def test_channel_video_fetch_passes_plain_dict_to_youtubedl(
         self, mock_get_opts: MagicMock, mock_ydl_cls: MagicMock
     ):
@@ -298,8 +298,8 @@ class TestYtDlpOptsCompatibility(unittest.TestCase):
 class TestFetchVideoInfo(unittest.TestCase):
     """Test get_video_info caching wrapper."""
 
-    @patch("src.youtube.ytdlp._fetch_video_info_raw")
-    @patch("src.youtube.ytdlp._CACHE")
+    @patch("adrift.youtube.ytdlp._fetch_video_info_raw")
+    @patch("adrift.youtube.ytdlp._CACHE")
     def test_returns_cached_when_available(self, mock_cache: MagicMock, mock_fetch_raw: MagicMock):
         """Test returns cached data when available."""
         cached_data = {"id": "vid123", "title": "Cached Video"}
@@ -322,8 +322,8 @@ class TestFetchVideoInfo(unittest.TestCase):
         self.assertEqual(mock_cache.get.call_args_list[1].args[0], "get_video_info:vid123")
         mock_fetch_raw.assert_not_called()
 
-    @patch("src.youtube.ytdlp._fetch_video_info_raw")
-    @patch("src.youtube.ytdlp._CACHE")
+    @patch("adrift.youtube.ytdlp._fetch_video_info_raw")
+    @patch("adrift.youtube.ytdlp._CACHE")
     def test_skips_fetch_for_locked_video(self, mock_cache: MagicMock, mock_fetch_raw: MagicMock):
         """Locked videos should short-circuit before fetch attempts."""
 
@@ -339,8 +339,8 @@ class TestFetchVideoInfo(unittest.TestCase):
         self.assertIsNone(result)
         mock_fetch_raw.assert_not_called()
 
-    @patch("src.youtube.ytdlp._fetch_video_info_raw")
-    @patch("src.youtube.ytdlp._CACHE")
+    @patch("adrift.youtube.ytdlp._fetch_video_info_raw")
+    @patch("adrift.youtube.ytdlp._CACHE")
     def test_fetches_and_caches_when_not_cached(
         self, mock_cache: MagicMock, mock_fetch_raw: MagicMock
     ):
@@ -370,8 +370,8 @@ class TestFetchVideoInfo(unittest.TestCase):
             },
         )
 
-    @patch("src.youtube.ytdlp._fetch_video_info_raw")
-    @patch("src.youtube.ytdlp._CACHE")
+    @patch("adrift.youtube.ytdlp._fetch_video_info_raw")
+    @patch("adrift.youtube.ytdlp._CACHE")
     def test_returns_none_when_fetch_fails(self, mock_cache: MagicMock, mock_fetch_raw: MagicMock):
         """Test returns None when fetch fails."""
         mock_cache.get.return_value = None
@@ -386,8 +386,8 @@ class TestFetchVideoInfo(unittest.TestCase):
 class TestFetchChannelInfoRaw(unittest.TestCase):
     """Test _fetch_channel_info_raw function."""
 
-    @patch("src.youtube.ytdlp.YoutubeDL")
-    @patch("src.youtube.ytdlp.get_ydl_opts")
+    @patch("adrift.youtube.ytdlp.YoutubeDL")
+    @patch("adrift.youtube.ytdlp.get_ydl_opts")
     def test_fetch_channel_without_videos(
         self, mock_get_opts: MagicMock, mock_ydl_class: MagicMock
     ):
@@ -410,8 +410,8 @@ class TestFetchChannelInfoRaw(unittest.TestCase):
         self.assertEqual(opts.extract_flat, True)
         self.assertEqual(opts.playlistend, 0)
 
-    @patch("src.youtube.ytdlp.YoutubeDL")
-    @patch("src.youtube.ytdlp.get_ydl_opts")
+    @patch("adrift.youtube.ytdlp.YoutubeDL")
+    @patch("adrift.youtube.ytdlp.get_ydl_opts")
     def test_fetch_channel_with_videos(self, mock_get_opts: MagicMock, mock_ydl_class: MagicMock):
         """Test fetching channel with video entries."""
         mock_get_opts.return_value = YtDlpParams()
@@ -430,8 +430,8 @@ class TestFetchChannelInfoRaw(unittest.TestCase):
         opts = mock_get_opts.return_value
         self.assertIsNone(opts.playlistend)
 
-    @patch("src.youtube.ytdlp.YoutubeDL")
-    @patch("src.youtube.ytdlp.get_ydl_opts")
+    @patch("adrift.youtube.ytdlp.YoutubeDL")
+    @patch("adrift.youtube.ytdlp.get_ydl_opts")
     def test_returns_none_on_error(self, mock_get_opts: MagicMock, mock_ydl_class: MagicMock):
         """Test returns None when fetch fails."""
         mock_get_opts.return_value = YtDlpParams()
@@ -448,8 +448,8 @@ class TestFetchChannelInfoRaw(unittest.TestCase):
 class TestFetchChannelVideosRaw(unittest.TestCase):
     """Test _fetch_channel_videos_raw function."""
 
-    @patch("src.youtube.ytdlp.YoutubeDL")
-    @patch("src.youtube.ytdlp.get_ydl_opts")
+    @patch("adrift.youtube.ytdlp.YoutubeDL")
+    @patch("adrift.youtube.ytdlp.get_ydl_opts")
     def test_fetch_with_default_params(self, mock_get_opts: MagicMock, mock_ydl_class: MagicMock):
         """Test fetching with default parameters."""
         mock_get_opts.return_value = YtDlpParams()
@@ -474,8 +474,8 @@ class TestFetchChannelVideosRaw(unittest.TestCase):
         self.assertEqual(opts.playliststart, 1)
         self.assertIsNone(opts.playlistend)
 
-    @patch("src.youtube.ytdlp.YoutubeDL")
-    @patch("src.youtube.ytdlp.get_ydl_opts")
+    @patch("adrift.youtube.ytdlp.YoutubeDL")
+    @patch("adrift.youtube.ytdlp.get_ydl_opts")
     def test_fetch_with_custom_range(self, mock_get_opts: MagicMock, mock_ydl_class: MagicMock):
         """Test fetching with custom start/end range."""
         mock_get_opts.return_value = YtDlpParams()
@@ -491,8 +491,8 @@ class TestFetchChannelVideosRaw(unittest.TestCase):
         self.assertEqual(opts.playlistend, 25)
         self.assertEqual(opts.playlistreverse, True)
 
-    @patch("src.youtube.ytdlp.YoutubeDL")
-    @patch("src.youtube.ytdlp.get_ydl_opts")
+    @patch("adrift.youtube.ytdlp.YoutubeDL")
+    @patch("adrift.youtube.ytdlp.get_ydl_opts")
     def test_returns_empty_list_on_error(self, mock_get_opts: MagicMock, mock_ydl_class: MagicMock):
         """Test returns empty list when fetch fails."""
         mock_get_opts.return_value = YtDlpParams()
@@ -505,8 +505,8 @@ class TestFetchChannelVideosRaw(unittest.TestCase):
 
         self.assertEqual(result, [])
 
-    @patch("src.youtube.ytdlp.YoutubeDL")
-    @patch("src.youtube.ytdlp.get_ydl_opts")
+    @patch("adrift.youtube.ytdlp.YoutubeDL")
+    @patch("adrift.youtube.ytdlp.get_ydl_opts")
     def test_handles_none_response(self, mock_get_opts: MagicMock, mock_ydl_class: MagicMock):
         """Test handles None response from yt-dlp."""
         mock_get_opts.return_value = YtDlpParams()
@@ -523,8 +523,8 @@ class TestFetchChannelVideosRaw(unittest.TestCase):
 class TestGetCachedChannelInfo(unittest.TestCase):
     """Test get_channel_info with cache expiry."""
 
-    @patch("src.youtube.ytdlp._fetch_channel_info_raw")
-    @patch("src.youtube.ytdlp._CACHE")
+    @patch("adrift.youtube.ytdlp._fetch_channel_info_raw")
+    @patch("adrift.youtube.ytdlp._CACHE")
     def test_returns_cached_data(self, mock_cache: MagicMock, mock_fetch_raw: MagicMock):
         """Test returns cached data when available."""
         cached_data = {"title": "Cached Channel"}
@@ -538,9 +538,9 @@ class TestGetCachedChannelInfo(unittest.TestCase):
         mock_cache.get.assert_called_once_with("get_youtube_channel:https://youtube.com/@test")
         mock_fetch_raw.assert_not_called()
 
-    @patch("src.youtube.ytdlp.random")
-    @patch("src.youtube.ytdlp._fetch_channel_info_raw")
-    @patch("src.youtube.ytdlp._CACHE")
+    @patch("adrift.youtube.ytdlp.random")
+    @patch("adrift.youtube.ytdlp._fetch_channel_info_raw")
+    @patch("adrift.youtube.ytdlp._CACHE")
     def test_fetches_and_caches_with_expiry(
         self, mock_cache: MagicMock, mock_fetch_raw: MagicMock, mock_random: MagicMock
     ):
@@ -568,8 +568,8 @@ class TestGetCachedChannelInfo(unittest.TestCase):
             expire=expected_expire,
         )
 
-    @patch("src.youtube.ytdlp._fetch_channel_info_raw")
-    @patch("src.youtube.ytdlp._CACHE")
+    @patch("adrift.youtube.ytdlp._fetch_channel_info_raw")
+    @patch("adrift.youtube.ytdlp._CACHE")
     def test_returns_none_when_fetch_fails(self, mock_cache: MagicMock, mock_fetch_raw: MagicMock):
         """Test returns None when fetch fails."""
         mock_cache.get.return_value = None
@@ -583,8 +583,8 @@ class TestGetCachedChannelInfo(unittest.TestCase):
 class TestGetYoutubeVideos(unittest.TestCase):
     """Test episode-list caching and refresh behavior."""
 
-    @patch("src.youtube.ytdlp._fetch_video_batch")
-    @patch("src.youtube.ytdlp._CACHE")
+    @patch("adrift.youtube.ytdlp._fetch_video_batch")
+    @patch("adrift.youtube.ytdlp._CACHE")
     def test_returns_fresh_cached_episode_bundle_without_fetching(
         self, mock_cache: MagicMock, mock_fetch_batch: MagicMock
     ):
@@ -606,8 +606,8 @@ class TestGetYoutubeVideos(unittest.TestCase):
         mock_fetch_batch.assert_not_called()
         mock_cache.set.assert_not_called()
 
-    @patch("src.youtube.ytdlp._fetch_video_batch")
-    @patch("src.youtube.ytdlp._CACHE")
+    @patch("adrift.youtube.ytdlp._fetch_video_batch")
+    @patch("adrift.youtube.ytdlp._CACHE")
     def test_refresh_bypasses_fresh_episode_bundle(
         self, mock_cache: MagicMock, mock_fetch_batch: MagicMock
     ):
@@ -639,8 +639,8 @@ class TestGetYoutubeVideos(unittest.TestCase):
         )
         mock_cache.set.assert_called_once()
 
-    @patch("src.youtube.ytdlp._fetch_video_batch")
-    @patch("src.youtube.ytdlp._CACHE")
+    @patch("adrift.youtube.ytdlp._fetch_video_batch")
+    @patch("adrift.youtube.ytdlp._CACHE")
     def test_legacy_cached_episode_map_is_treated_as_stale(
         self, mock_cache: MagicMock, mock_fetch_batch: MagicMock
     ):
@@ -662,9 +662,9 @@ class TestGetYoutubeVideos(unittest.TestCase):
         self.assertIn("fetched_at", cached_payload)
         self.assertIn("head_checked_at", cached_payload)
 
-    @patch("src.youtube.ytdlp._fetch_video_batch")
-    @patch("src.youtube.ytdlp._CACHE")
-    @patch("src.youtube.ytdlp._utcnow")
+    @patch("adrift.youtube.ytdlp._fetch_video_batch")
+    @patch("adrift.youtube.ytdlp._CACHE")
+    @patch("adrift.youtube.ytdlp._utcnow")
     def test_stale_episode_bundle_triggers_refresh(
         self, mock_utcnow: MagicMock, mock_cache: MagicMock, mock_fetch_batch: MagicMock
     ):
@@ -688,9 +688,9 @@ class TestGetYoutubeVideos(unittest.TestCase):
 
         mock_fetch_batch.assert_called_once()
 
-    @patch("src.youtube.ytdlp._fetch_video_batch")
-    @patch("src.youtube.ytdlp._CACHE")
-    @patch("src.youtube.ytdlp._utcnow")
+    @patch("adrift.youtube.ytdlp._fetch_video_batch")
+    @patch("adrift.youtube.ytdlp._CACHE")
+    @patch("adrift.youtube.ytdlp._utcnow")
     def test_recent_probe_refreshes_first_batch_without_full_refresh(
         self, mock_utcnow: MagicMock, mock_cache: MagicMock, mock_fetch_batch: MagicMock
     ):
@@ -724,9 +724,9 @@ class TestGetYoutubeVideos(unittest.TestCase):
         self.assertEqual(cached_payload["fetched_at"], fetched_at.isoformat())
         self.assertEqual(cached_payload["head_checked_at"], now.isoformat())
 
-    @patch("src.youtube.ytdlp._fetch_video_batch")
-    @patch("src.youtube.ytdlp._CACHE")
-    @patch("src.youtube.ytdlp._utcnow")
+    @patch("adrift.youtube.ytdlp._fetch_video_batch")
+    @patch("adrift.youtube.ytdlp._CACHE")
+    @patch("adrift.youtube.ytdlp._utcnow")
     def test_recent_probe_is_skipped_when_head_check_is_fresh(
         self, mock_utcnow: MagicMock, mock_cache: MagicMock, mock_fetch_batch: MagicMock
     ):

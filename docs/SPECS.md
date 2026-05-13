@@ -199,7 +199,7 @@ Field-level precedence when resolving a matched pair into `EpisodeData`:
 | `thumbnail` | Prefer highest-resolution or most complete URL |
 | `source` | Union of all source URLs in the pair |
 
-`merge_episode` (implemented in `src/catalog.py`) performs this resolution; its behaviour is covered by unit tests (`tests/catalog/*`). Integration into the Phase 2 emitter remains pending.
+`merge_episode` (implemented in `adrift/catalog.py`) performs this resolution; its behaviour is covered by unit tests (`tests/catalog/*`). Integration into the Phase 2 emitter remains pending.
 
 ---
 

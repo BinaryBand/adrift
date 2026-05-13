@@ -8,7 +8,7 @@ from typing import cast
 
 import tomllib
 
-from src.models import (
+from adrift.models import (
     FeedSource,
     PodcastConfig,
     SourceFilter,
@@ -17,7 +17,7 @@ from src.models import (
     ensure_source_filter,
     parse_podcasts_raw,
 )
-from src.utils.schedule import align_to_tzinfo, next_occurrence_in_window
+from adrift.utils.schedule import align_to_tzinfo, next_occurrence_in_window
 
 __all__ = [
     "SourceFilter",

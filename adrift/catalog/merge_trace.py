@@ -2,7 +2,7 @@
 from dataclasses import dataclass
 from typing import Literal
 
-from src.models import AlignmentConfig, MatchCandidateTrace, ReferenceMatchTrace, RssEpisode
+from adrift.models import AlignmentConfig, MatchCandidateTrace, ReferenceMatchTrace, RssEpisode
 
 from .alignment import _build_alignment_scores
 

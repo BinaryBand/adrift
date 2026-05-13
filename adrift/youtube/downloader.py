@@ -4,15 +4,15 @@ from typing import Any, Literal, cast
 
 import yt_dlp
 
-from src.infrastructure.youtube.normalizer import (
+from adrift.infrastructure.youtube.normalizer import (
     extract_progress_update,
     make_progress_hook,
 )
-from src.utils.progress import Callback
-from src.utils.regex import YOUTUBE_VIDEO_REGEX
-from src.utils.terminal import emit_info, emit_warning
-from src.youtube.auth import YtDlpParams, get_auth_ydl_opts, get_ydl_opts
-from src.youtube.error_utils import yt_dlp_retry_reason
+from adrift.utils.progress import Callback
+from adrift.utils.regex import YOUTUBE_VIDEO_REGEX
+from adrift.utils.terminal import emit_info, emit_warning
+from adrift.youtube.auth import YtDlpParams, get_auth_ydl_opts, get_ydl_opts
+from adrift.youtube.error_utils import yt_dlp_retry_reason
 
 
 class BotDetectionError(Exception):

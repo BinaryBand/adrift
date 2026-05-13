@@ -2,7 +2,7 @@
 
 from pathlib import Path
 
-from src.models import PodcastConfig
+from adrift.models import PodcastConfig
 
 
 def s3_prefix(config: PodcastConfig) -> tuple[str, str]:

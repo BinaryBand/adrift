@@ -46,12 +46,12 @@ class TestCpd:
 class TestRuff:
     """Ensure the codebase passes ruff linting and formatting checks."""
 
-    PATHS = ["src", "runbook", "tests", "typings"]
+    PATHS = ["adrift", "runbook", "tests", "typings"]
 
     def test_ruff_check(self):
         """Fail if ruff reports any lint violations."""
         result = run_resolved(
-            ["python", "-m", "ruff", "check", *self.PATHS],
+            ["python", "-m", "ruff", "check", "adrift", "runbook", "tests", "typings"],
             capture_output=True,
             text=True,
         )
@@ -93,7 +93,7 @@ class TestLizard:
     def test_lizard(self):
         """Fail once the repo is expected to satisfy the configured Lizard thresholds."""
         result = run_resolved(
-            ["python", "-m", "lizard", "src", "-C", "8", "-L", "30", "-a", "5"],
+            ["python", "-m", "lizard", "adrift", "-C", "8", "-L", "30", "-a", "5"],
             capture_output=True,
             text=True,
         )
@@ -122,12 +122,12 @@ class TestSemgrep:
 class TestVulture:
     """Ensure the codebase passes the current Vulture dead-code gate."""
 
-    PATHS = ["src", "tests"]
+    PATHS = ["adrift", "tests"]
 
     def test_vulture(self):
         """Fail if Vulture reports unused code at or above 80% confidence."""
         result = run_resolved(
-            ["python", "-m", "vulture", *self.PATHS, "--min-confidence", "80"],
+            ["python", "-m", "vulture", "adrift", "tests", "--min-confidence", "80"],
             capture_output=True,
             text=True,
         )

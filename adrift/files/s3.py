@@ -11,22 +11,22 @@ import boto3
 from botocore.exceptions import BotoCoreError, ClientError
 from pydantic import ValidationError
 
-from src.files.s3_cache import _s3_cache
-from src.files.s3_listing import (
+from adrift.files.s3_cache import _s3_cache
+from adrift.files.s3_listing import (
     _identifier_matches as _listing_identifier_matches,
 )
-from src.files.s3_listing import (
+from adrift.files.s3_listing import (
     _remove_file_extensions as _listing_remove_file_extensions,
 )
-from src.files.s3_metadata import _fetch_head_metadata as _metadata_fetch_head_metadata
-from src.files.s3_types import UploadOptions, _UploadSpec
-from src.files.s3_upload import (
+from adrift.files.s3_metadata import _fetch_head_metadata as _metadata_fetch_head_metadata
+from adrift.files.s3_types import UploadOptions, _UploadSpec
+from adrift.files.s3_upload import (
     _do_s3_upload as _upload_with_client,
 )
-from src.files.s3_upload import (
+from adrift.files.s3_upload import (
     _prepare_upload_spec,
 )
-from src.files.s3_utils import (
+from adrift.files.s3_utils import (
     _build_s3_probe_client,
     _is_endpoint_reachable_with_provider,
     _make_boto_config,
@@ -39,9 +39,9 @@ else:
     S3Client = Any
     CopySourceTypeDef = dict[str, Any]
 
-from src.adapters import get_secret_provider_adapter
-from src.models import CacheMetadata, MediaMetadata
-from src.ports import SecretProviderPort, require_secrets
+from adrift.adapters import get_secret_provider_adapter
+from adrift.models import CacheMetadata, MediaMetadata
+from adrift.ports import SecretProviderPort, require_secrets
 
 _REQUIRED_S3_KEYS = ("S3_USERNAME", "S3_SECRET_KEY", "S3_ENDPOINT", "S3_REGION")
 
@@ -233,7 +233,7 @@ class S3Service:
         return file_list
 
     def get_s3_files(self, bucket: str, prefix: str) -> list[str]:
-        from src.config import RSS_BASE_URL
+        from adrift.config import RSS_BASE_URL
 
         file_list = self.get_file_list(bucket, prefix)
         root_path = Path(bucket) / prefix

@@ -6,12 +6,12 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, cast
 
-from src.files.s3 import UploadOptions
-from src.models import MediaMetadata
-from src.utils.progress import Callback
+from adrift.files.s3 import UploadOptions
+from adrift.models import MediaMetadata
+from adrift.utils.progress import Callback
 
 if TYPE_CHECKING:
-    from src.application.context import AppContext
+    from adrift.application.context import AppContext
 
 
 @dataclass(frozen=True)

@@ -13,9 +13,9 @@ from dataclasses import dataclass, field
 from typing import TYPE_CHECKING, Any, Callable
 
 if TYPE_CHECKING:
-    from src.ports.cache import CachePort
-    from src.ports.secrets import SecretProviderPort
-    from src.ports.storage import StoragePort
+    from adrift.ports.cache import CachePort
+    from adrift.ports.secrets import SecretProviderPort
+    from adrift.ports.storage import StoragePort
 
 
 @dataclass
@@ -75,9 +75,9 @@ class AppContext:
         """
         # Import here to avoid circular imports
 
-        from src.adapters import get_secret_provider_adapter
-        from src.files.s3 import S3Service
-        from src.ports.cache import DiskCacheAdapter
+        from adrift.adapters import get_secret_provider_adapter
+        from adrift.files.s3 import S3Service
+        from adrift.ports.cache import DiskCacheAdapter
 
         secrets = get_secret_provider_adapter()
         return cls(

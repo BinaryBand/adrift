@@ -11,7 +11,7 @@ from typing import TYPE_CHECKING, cast
 from pydantic import BaseModel
 
 if TYPE_CHECKING:
-    from src.models import MergeResult
+    from adrift.models import MergeResult
 
 
 JsonWriter = Callable[[Path, object], None]

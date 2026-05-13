@@ -7,7 +7,7 @@ os.environ.setdefault("S3_SECRET_KEY", "_test")
 os.environ.setdefault("S3_ENDPOINT", "http://localhost")
 os.environ.setdefault("S3_REGION", "us-east-1")
 
-from src.models import RssEpisode, YtDlpImage, YtDlpVideo
+from adrift.models import RssEpisode, YtDlpImage, YtDlpVideo
 
 
 class TestRssEpisodeFromYtdlp(unittest.TestCase):

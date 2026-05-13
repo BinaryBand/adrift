@@ -1,6 +1,6 @@
 import pytest
 
-from src.models import (
+from adrift.models import (
     FeedSource,
     PodcastConfig,
     SourceFilter,

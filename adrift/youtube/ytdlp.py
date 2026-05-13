@@ -15,12 +15,12 @@ from dateutil import parser
 from pydantic import BaseModel, ValidationError, field_validator
 from yt_dlp import YoutubeDL
 
-from src.models import RssEpisode, YtDlpImage, YtDlpParams
-from src.ports.cache import DiskCacheAdapter
-from src.utils.progress import Callback
-from src.utils.terminal import emit_error, emit_info, emit_warning
-from src.youtube.auth import get_auth_ydl_opts, get_ydl_opts
-from src.youtube.error_utils import yt_dlp_retry_reason
+from adrift.models import RssEpisode, YtDlpImage, YtDlpParams
+from adrift.ports.cache import DiskCacheAdapter
+from adrift.utils.progress import Callback
+from adrift.utils.terminal import emit_error, emit_info, emit_warning
+from adrift.youtube.auth import get_auth_ydl_opts, get_ydl_opts
+from adrift.youtube.error_utils import yt_dlp_retry_reason
 
 # Constants
 _CACHE = DiskCacheAdapter(".cache/yt-dlp")

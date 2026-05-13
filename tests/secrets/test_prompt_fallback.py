@@ -1,6 +1,6 @@
 from unittest.mock import Mock
 
-from src.adapters.secrets.prompt_fallback import PromptFallbackProvider
+from adrift.adapters.secrets.prompt_fallback import PromptFallbackProvider
 
 
 def test_prompt_fallback_uses_base_provider_value() -> None:

@@ -7,14 +7,14 @@ import unittest
 from datetime import datetime
 
 # Provide placeholder S3 credentials so importing src.app_common does not
-# fail the module-level assertions in src/files/s3.py.  setdefault leaves
+# fail the module-level assertions in adrift/files/s3.py.  setdefault leaves
 # real credentials untouched when running in a fully configured environment.
 os.environ.setdefault("S3_USERNAME", "_test")
 os.environ.setdefault("S3_SECRET_KEY", "_test")
 os.environ.setdefault("S3_ENDPOINT", "http://localhost")
 os.environ.setdefault("S3_REGION", "us-east-1")
 
-app_common = importlib.import_module("src.app_common")
+app_common = importlib.import_module("adrift.app_common")
 SourceFilter = app_common.SourceFilter
 _schedule_matches_today = app_common._schedule_matches_today
 

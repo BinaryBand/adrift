@@ -7,10 +7,10 @@ from typing import Any, NamedTuple, cast
 
 from rapidfuzz import fuzz
 
-from src.models import AlignmentConfig, EpisodeData, RssEpisode
-from src.utils.progress import Callback
-from src.utils.text import normalize_text
-from src.utils.title_normalization import normalize_title
+from adrift.models import AlignmentConfig, EpisodeData, RssEpisode
+from adrift.utils.progress import Callback
+from adrift.utils.text import normalize_text
+from adrift.utils.title_normalization import normalize_title
 
 StringSimilarityFn = Callable[[list[str], list[str]], list[list[float]]]
 

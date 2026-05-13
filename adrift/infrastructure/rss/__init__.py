@@ -1,6 +1,6 @@
 """RSS infrastructure boundary helpers."""
 
-from src.infrastructure.rss.normalizer import (
+from adrift.infrastructure.rss.normalizer import (
     channel_from_feedparser,
     entry_pub_date_from_feedparser,
     entry_title_from_feedparser,

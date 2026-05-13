@@ -6,7 +6,7 @@ from typing import Annotated
 import dotenv
 import typer
 
-from src.models import PodcastConfig
+from adrift.models import PodcastConfig
 
 DF_TARGETS = ["config/*.toml"]
 DEFAULT_OUTPUT_DIR = "downloads"
@@ -40,7 +40,7 @@ def load_podcast_configs(
     skip_schedule_filter: bool,
     tags: list[str],
 ) -> list[PodcastConfig]:
-    from src.app_common import filter_podcasts_by_tags, load_podcasts_config
+    from adrift.app_common import filter_podcasts_by_tags, load_podcasts_config
 
     configs = load_podcasts_config(
         include=include,

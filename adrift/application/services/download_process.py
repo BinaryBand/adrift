@@ -8,27 +8,27 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, cast
 
-from src.application.events import (
+from adrift.application.events import (
     DownloadCompleted,
     DownloadFailed,
     OperationStarted,
     ProgressUpdated,
 )
-from src.application.services.download_cache import _existing_media_sources
-from src.application.services.download_client import s3_prefix
-from src.application.services.download_upload import (
+from adrift.application.services.download_cache import _existing_media_sources
+from adrift.application.services.download_client import s3_prefix
+from adrift.application.services.download_upload import (
     _build_upload_request,
     _upload_episode_audio,
     _UploadRequest,
 )
-from src.files.audio import convert_to_opus, cut_segments, get_duration
-from src.models import DownloadEpisode, MediaMetadata, PodcastConfig
-from src.utils.title_normalization import normalize_title
-from src.web.rss import download_direct
-from src.youtube.downloader import download_video
+from adrift.files.audio import convert_to_opus, cut_segments, get_duration
+from adrift.models import DownloadEpisode, MediaMetadata, PodcastConfig
+from adrift.utils.title_normalization import normalize_title
+from adrift.web.rss import download_direct
+from adrift.youtube.downloader import download_video
 
 if TYPE_CHECKING:
-    from src.application.context import AppContext
+    from adrift.application.context import AppContext
 
 
 @dataclass(frozen=True)

@@ -5,23 +5,23 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import TYPE_CHECKING, Callable
 
-from src.application.events import (
+from adrift.application.events import (
     DownloadCompleted,
     DownloadFailed,
     OperationStarted,
     ProgressUpdated,
 )
-from src.domain.errors import PipelineError
-from src.domain.pipeline import StageResult
-from src.models import DownloadEpisode, PodcastConfig
+from adrift.domain.errors import PipelineError
+from adrift.domain.pipeline import StageResult
+from adrift.models import DownloadEpisode, PodcastConfig
 
 if TYPE_CHECKING:
-    from src.application.context import AppContext
-    from src.application.services.download_process import DownloadQueueItem
-    from src.catalog.merge import MergeConfigOptions
-    from src.models import MergeResult
-    from src.utils.progress import Callback
-    from src.utils.run_ui import BaseRunUI
+    from adrift.application.context import AppContext
+    from adrift.application.services.download_process import DownloadQueueItem
+    from adrift.catalog.merge import MergeConfigOptions
+    from adrift.models import MergeResult
+    from adrift.utils.progress import Callback
+    from adrift.utils.run_ui import BaseRunUI
 
 BuildQueueFn = Callable[
     [list[DownloadEpisode], PodcastConfig, "AppContext"],

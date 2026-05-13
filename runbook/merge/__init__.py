@@ -5,32 +5,32 @@ from typing import Annotated
 
 import typer
 
+from adrift.application.merge import MergeUseCase
+from adrift.application.services.merge_service import (
+    MergeRunOptions,
+    MergeWriters,
+)
+from adrift.application.services.merge_service import (
+    format_duration as _format_duration,
+)
+from adrift.application.services.merge_service import (
+    write_json as service_write_json,
+)
+from adrift.application.services.merge_service import (
+    write_output_bundle as service_write_output_bundle,
+)
+from adrift.application.services.merge_service import (
+    write_report_file as service_write_report_file,
+)
+from adrift.application.services.merge_service import (
+    write_series_outputs as service_write_series_outputs,
+)
 from runbook import (
     IncludeConfigsOption,
     SkipScheduleFilterOption,
     TagsOption,
     bootstrap_run_configs,
     build_cli,
-)
-from src.application.merge import MergeUseCase
-from src.application.services.merge_service import (
-    MergeRunOptions,
-    MergeWriters,
-)
-from src.application.services.merge_service import (
-    format_duration as _format_duration,
-)
-from src.application.services.merge_service import (
-    write_json as service_write_json,
-)
-from src.application.services.merge_service import (
-    write_output_bundle as service_write_output_bundle,
-)
-from src.application.services.merge_service import (
-    write_report_file as service_write_report_file,
-)
-from src.application.services.merge_service import (
-    write_series_outputs as service_write_series_outputs,
 )
 
 
@@ -78,7 +78,7 @@ def _build_run_options(
 
 
 def _run_merge(configs: list[object], options: MergeRunOptions):
-    from src.utils.run_ui import create_run_ui
+    from adrift.utils.run_ui import create_run_ui
 
     writers = MergeWriters(
         write_json=_write_json,

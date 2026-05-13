@@ -5,8 +5,8 @@ from typing import Any, Callable
 
 from cachetools import LRUCache, cached
 
-from src.utils.regex import re_compile
-from src.utils.text import create_slug, remove_control_chars
+from adrift.utils.regex import re_compile
+from adrift.utils.text import create_slug, remove_control_chars
 
 _TITLE_CACHE: LRUCache[Any, Any] = LRUCache(2048)
 

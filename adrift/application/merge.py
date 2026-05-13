@@ -6,19 +6,19 @@ from dataclasses import dataclass, field
 from time import perf_counter
 from typing import TYPE_CHECKING, Callable
 
-from src import catalog
-from src.application.services.merge_service import (
+from adrift import catalog
+from adrift.application.services.merge_service import (
     MergeRunOptions,
     MergeWriters,
     emit_timings,
     model_payloads,
 )
-from src.domain.errors import PipelineError
-from src.domain.pipeline import StageResult
+from adrift.domain.errors import PipelineError
+from adrift.domain.pipeline import StageResult
 
 if TYPE_CHECKING:
-    from src.models import MergeResult, PodcastConfig
-    from src.utils.run_ui import BaseRunUI
+    from adrift.models import MergeResult, PodcastConfig
+    from adrift.utils.run_ui import BaseRunUI
 
 
 _MERGE_OPERATION_ERRORS = (OSError, RuntimeError, ValueError)
@@ -66,7 +66,7 @@ class MergeUseCase:
         options: MergeRunOptions,
         ui: BaseRunUI,
     ) -> StageResult[list[MergeResult]]:
-        from src.utils.run_ui import build_merge_callbacks
+        from adrift.utils.run_ui import build_merge_callbacks
 
         state = _MergeUseCaseState()
         on_stage, callback = build_merge_callbacks(ui)

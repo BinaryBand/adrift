@@ -2,7 +2,7 @@
 
 import unittest
 
-from src.utils.title_normalization import normalize_title
+from adrift.utils.title_normalization import normalize_title
 
 
 class TestNormalizeTitleUnknownShow(unittest.TestCase):

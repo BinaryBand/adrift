@@ -5,8 +5,8 @@ from typing import Any, Callable
 
 from pydantic import BaseModel, ConfigDict
 
-from src.models import S3Metadata
-from src.utils.progress import Callback
+from adrift.models import S3Metadata
+from adrift.utils.progress import Callback
 
 
 @dataclass

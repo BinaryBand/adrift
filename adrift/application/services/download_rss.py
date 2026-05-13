@@ -6,14 +6,14 @@ import logging
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, cast
 
-from src.application.services.download_client import s3_prefix
-from src.catalog import match, process_feeds
-from src.files.audio import is_audio
-from src.models import PodcastConfig, RssChannel, RssEpisode
-from src.web.rss import podcast_to_rss
+from adrift.application.services.download_client import s3_prefix
+from adrift.catalog import match, process_feeds
+from adrift.files.audio import is_audio
+from adrift.models import PodcastConfig, RssChannel, RssEpisode
+from adrift.web.rss import podcast_to_rss
 
 if TYPE_CHECKING:
-    from src.application.context import AppContext
+    from adrift.application.context import AppContext
 
 
 logger = logging.getLogger(__name__)
@@ -21,7 +21,7 @@ _CHANNEL_FILL_ERRORS = (OSError, RuntimeError, TypeError, ValueError)
 
 
 def _build_channel(config: PodcastConfig) -> RssChannel:
-    from src.adapters import get_episode_source_adapter
+    from adrift.adapters import get_episode_source_adapter
 
     channel = RssChannel(
         title=config.name, author="", subtitle="", url="", description="", image=""
