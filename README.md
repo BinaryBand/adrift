@@ -54,7 +54,7 @@ poetry install --with dev
 .venv\Scripts\activate
 
 # Or run a command directly without activating
-poetry run python -m runbook.merge --pretty
+poetry run python -m adrift.cli.merge --pretty
 
 # When done, deactivate
 deactivate
@@ -78,7 +78,7 @@ poetry show --outdated
 
 ## Project Structure
 
-- `runbook/` - Main scripts (`merge.py`, `download.py`, and operational runbooks)
+- `adrift/cli/` - Command-line entry points for merge and download workflows
 - `adrift/` - Core source code
   - `adapters/` - Source adapters for RSS and YouTube
   - `web/` - RSS feed parsing and serialization
@@ -92,7 +92,7 @@ poetry show --outdated
 Run the merge pipeline across one or more config files:
 
 ```bash
-poetry run python -m runbook.merge --include config/*.toml --pretty
+poetry run python -m adrift.cli.merge --include config/*.toml --pretty
 ```
 
 Useful options:
@@ -128,7 +128,7 @@ Notes:
 
 ## Running the download pipeline locally
 
-The project no longer maintains a Docker-based workflow. Run the download and related runbook tasks locally using the Makefile targets which invoke the runbook modules in this repository.
+The project no longer maintains a Docker-based workflow. Run the download pipeline locally using the CLI modules in this repository.
 
 Prerequisites:
 
@@ -138,10 +138,10 @@ Prerequisites:
 Run:
 
 ```bash
-make download ARGS="--skip-download"
+poetry run python -m adrift.cli.download --skip-download
 ```
 
-You can pass any `runbook/download.py` CLI flags through `ARGS`, for example `make download ARGS="--include config/youtube.toml --max-downloads 3"`.
+You can pass the same flags directly to `adrift.cli.download`, for example `poetry run python -m adrift.cli.download --include config/youtube.toml --max-downloads 3`.
 
 ## Configuration
 

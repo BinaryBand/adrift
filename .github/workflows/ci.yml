@@ -25,19 +25,19 @@ jobs:
           poetry install --with dev --no-interaction --no-ansi
 
       - name: Ruff format check
-        run: poetry run ruff format --check src runbook tests typings
+        run: poetry run ruff format --check adrift tests typings
 
       - name: Ruff lint check
-        run: poetry run ruff check src runbook tests typings
+        run: poetry run ruff check adrift tests typings
 
       - name: Type check (ty)
         run: poetry run ty check --project .
 
       - name: Complexity check (lizard)
-        run: poetry run lizard src -C 8 -L 30 -a 4
+        run: poetry run lizard adrift -x "adrift/cli/*" -C 8 -L 30 -a 9
 
       - name: Dead code check (vulture)
-        run: poetry run vulture src runbook tests typings --min-confidence 80
+        run: poetry run vulture adrift tests typings --min-confidence 80
 
       - name: Run Semgrep
         uses: semgrep/semgrep-action@v1

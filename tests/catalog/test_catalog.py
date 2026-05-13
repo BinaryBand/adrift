@@ -2,7 +2,7 @@
 
 Covers the orchestration layer: _collect_episodes, _merge_episode_album,
 process_feeds, process_sources, and the full pipeline that mirrors
-_download_series in runbook/download.py.
+_download_series in adrift/cli/download.py.
 
 External I/O is patched at the source-fetch boundary:
   - src.catalog.get_rss_episodes

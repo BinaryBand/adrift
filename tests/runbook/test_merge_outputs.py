@@ -4,8 +4,9 @@ from datetime import datetime, timezone
 from pathlib import Path
 from unittest.mock import patch
 
+import adrift.cli as cli_mod
+from adrift.cli import merge as merge_mod
 from adrift.models import EpisodeData, FeedSource, MergeResult, PodcastConfig, RssEpisode
-from runbook import merge as merge_mod
 
 
 def _config() -> PodcastConfig:
@@ -204,12 +205,10 @@ def test_main_defaults_output_dir_to_downloads(tmp_path: Path, capsys) -> None:
         "config/youtube.toml",
     ]
 
-    import runbook
-
     with (
         patch("adrift.app_common.load_podcasts_config", return_value=[config]),
         patch("adrift.catalog.merge_config", return_value=result),
-        patch.object(runbook, "DEFAULT_OUTPUT_DIR", downloads_root.as_posix()),
+        patch.object(cli_mod, "DEFAULT_OUTPUT_DIR", downloads_root.as_posix()),
         patch.object(sys, "argv", argv),
     ):
         merge_mod.main()

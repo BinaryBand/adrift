@@ -15,12 +15,11 @@ poetry install
 # Optional: create/activate a virtual environment with `poetry shell` or a `.venv`.
 # This repository does not include a `.pre-commit-config.yaml` by default.
 # Run quality checks manually (examples):
-#   .venv/bin/ruff check src runbook tests typings
-#   .venv/bin/ruff format --check src runbook tests typings
-#   .venv/bin/python -m runbook.quality.check_static src runbook tests typings
-#   .venv/bin/python -m runbook.quality.check_dead_code src
-#   .venv/bin/python -m runbook.quality.check_complexity src --ccn 8 --length 30 --params 4
-#   .venv/bin/python -m runbook.quality.validate_configs --problems config/*.toml
+#   .venv/bin/ruff check adrift tests typings
+#   .venv/bin/ruff format --check adrift tests typings
+#   .venv/bin/ty check --project .
+#   .venv/bin/python -m vulture adrift tests typings --min-confidence 80
+#   .venv/bin/python -m lizard adrift -C 8 -L 30 -a 4
 ```
 
 Open in VS Code from inside WSL:
@@ -45,8 +44,8 @@ select = ["E", "F", "I"]
 [tool.pyright]
 venvPath = "."
 venv = ".venv"
-include = ["adrift", "runbook", "tests", "typings"]
-exclude = ["runbook/analysis"]
+include = ["adrift", "tests", "typings"]
+exclude = ["**/node_modules", "**/__pycache__", "**/.*", ".venv"]
 
 [tool.pytest.ini_options]
 addopts = "-m 'not slow'"
@@ -57,8 +56,8 @@ addopts = "-m 'not slow'"
 ```json
 {
   "typeCheckingMode": "strict",
-  "include": ["adrift", "runbook", "tests", "typings"],
-  "exclude": ["runbook/analysis", "**/node_modules", "**/__pycache__", "**/.*", ".venv"]
+  "include": ["adrift", "tests", "typings"],
+  "exclude": ["**/node_modules", "**/__pycache__", "**/.*", ".venv"]
 }
 ```
 
@@ -97,19 +96,19 @@ included in this repository.
       "label": "Ruff: Check",
       "type": "shell",
       "command": "${config:python.defaultInterpreterPath}",
-      "args": ["-m", "ruff", "check", "adrift", "runbook", "tests", "typings"]
+      "args": ["-m", "ruff", "check", "adrift", "tests", "typings"]
     },
     {
       "label": "Ruff: Format Check",
       "type": "shell",
       "command": "${config:python.defaultInterpreterPath}",
-      "args": ["-m", "ruff", "format", "--check", "adrift", "runbook", "tests", "typings"]
+      "args": ["-m", "ruff", "format", "--check", "adrift", "tests", "typings"]
     },
     {
       "label": "Complexity: Lizard Check",
       "type": "shell",
       "command": "${config:python.defaultInterpreterPath}",
-      "args": ["-m", "runbook.quality.check_complexity", "adrift", "--ccn", "8", "--length", "30", "--params", "4"]
+      "args": ["-m", "lizard", "adrift", "-C", "8", "-L", "30", "-a", "4"]
     }
   ]
 }
@@ -123,13 +122,13 @@ Every rule is paired with its enforcement tier. Rules marked **review** have no 
 
 | Rule | Tier | Mechanism |
 | --- | --- | --- |
-| Function length ≤ 30 lines | Automated | Lizard via `runbook/quality/check_complexity.py` |
+| Function length ≤ 30 lines | Automated | Lizard |
 | Cyclomatic complexity ≤ 8 | Automated | Lizard |
 | Nesting depth ≤ 3 | Review | — |
-| Parameters per function ≤ 4 | Automated | Lizard via `runbook/quality/check_complexity.py` |
+| Parameters per function ≤ 4 | Automated | Lizard |
 | No type errors | Advisory | Pyright strict config in `pyrightconfig.json`; run via `check_static.py` |
 | No lint violations | Automated | Ruff |
-| Dead code confidence floor (80%+) | Automated | Vulture via `runbook/quality/check_dead_code.py` |
+| Dead code confidence floor (80%+) | Automated | Vulture |
 | No mutable globals | Review | Pyright can detect some cases when run |
 | No silent exception swallowing | Review | Not currently selected in Ruff rules |
 | No vars, secrets, or paths outside Ansible | Review | — |
@@ -145,14 +144,13 @@ Prefer early returns over nested conditionals. If a function needs more than 30 
 ```text
 0. After cloning:              poetry install
 1. Branch from main
-2. Run quality checks:         run the runbook quality scripts or use the VS Code tasks
+2. Run quality checks:         run the direct tooling commands or use the VS Code tasks
                               (see `.vscode/tasks.json`). Example:
-                              `.venv/bin/ruff format --check src runbook tests typings`
-                              `.venv/bin/ruff check src runbook tests typings`
-                              `.venv/bin/python -m runbook.quality.check_complexity src --ccn 8 --length 30 --params 4`
-                              `.venv/bin/python -m runbook.quality.check_dead_code src`
-                              `.venv/bin/python -m runbook.quality.validate_configs --problems config/*.toml`
-                              `.venv/bin/python -m runbook.quality.check_static src runbook tests typings`
+                              `.venv/bin/ruff format --check adrift tests typings`
+                              `.venv/bin/ruff check adrift tests typings`
+                              `.venv/bin/python -m lizard adrift -C 8 -L 30 -a 4`
+                              `.venv/bin/python -m vulture adrift tests typings --min-confidence 80`
+                              `.venv/bin/ty check --project .`
 3. Run tests:                  pytest
 4. Push
 5. Open PR — check checklist

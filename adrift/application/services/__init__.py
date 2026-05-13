@@ -1,4 +1,4 @@
-"""Application service helpers used by use-cases and runbooks.
+"""Application service helpers used by use-cases and CLI entrypoints.
 
 These modules replace the legacy src.orchestration package as the primary
 home for app-level coordination code.

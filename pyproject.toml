@@ -4,11 +4,11 @@ version = "0.1.0"
 description = "Podcast source aggregation and reference alignment"
 authors = []
 package-mode = true
-packages = [{ include = "adrift" }, { include = "runbook" }]
+packages = [{ include = "adrift" }]
 
 [tool.poetry.scripts]
-adrift-download = "runbook.download:main"
-adrift-merge = "runbook.merge:main"
+adrift-download = "adrift.cli.download:main"
+adrift-merge = "adrift.cli.merge:main"
 
 [tool.poetry.dependencies]
 python = ">=3.11,<4.0"

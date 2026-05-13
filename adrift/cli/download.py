@@ -12,7 +12,7 @@ from adrift.application.download import (
     DownloadPipelineRuntime,
     DownloadRunOptions,
 )
-from runbook import (
+from adrift.cli import (
     IncludeConfigsOption,
     SkipScheduleFilterOption,
     TagsOption,
@@ -70,7 +70,7 @@ def _run_pipeline(
 
 
 def _sleep_on_bot_detection(bot_cooldown: int) -> None:
-    sys.stderr.write(f"\nBot detection triggered — cooling down for {bot_cooldown}s\n")
+    sys.stderr.write(f"\nBot detection triggered - cooling down for {bot_cooldown}s\n")
     jitter = bot_cooldown * 0.1
     wait_seconds = bot_cooldown + int((random.random() - 0.5) * jitter)
     time.sleep(wait_seconds)
@@ -125,7 +125,6 @@ def _run(
 ) -> None:
     configs, _ = bootstrap_run_configs(include, tags, skip_schedule_filter)
     ctx = AppContext.from_env()
-
     pipeline_options = _build_pipeline_options(
         skip_download,
         skip_update,

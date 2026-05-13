@@ -25,13 +25,14 @@ from adrift.application.services.merge_service import (
 from adrift.application.services.merge_service import (
     write_series_outputs as service_write_series_outputs,
 )
-from runbook import (
+from adrift.cli import (
     IncludeConfigsOption,
     SkipScheduleFilterOption,
     TagsOption,
     bootstrap_run_configs,
     build_cli,
 )
+from adrift.models import PodcastConfig
 
 
 def _write_json(path, payload: object) -> None:
@@ -59,25 +60,7 @@ def _write_report_file(output_file: str, reports: list[dict[str, object]]) -> No
     service_write_report_file(output_file, reports, write_json_func=_write_json)
 
 
-def _build_run_options(
-    include_counts: bool,
-    pretty: bool,
-    output_dir: str,
-    output_file: str | None,
-    refresh_sources: bool,
-    timings: bool,
-) -> MergeRunOptions:
-    return MergeRunOptions(
-        include_counts=include_counts,
-        pretty=pretty,
-        output_dir=output_dir,
-        output_file=output_file,
-        refresh_sources=refresh_sources,
-        timings_enabled=timings,
-    )
-
-
-def _run_merge(configs: list[object], options: MergeRunOptions):
+def _run_merge(configs: list[PodcastConfig], options: MergeRunOptions):
     from adrift.utils.run_ui import create_run_ui
 
     writers = MergeWriters(
@@ -123,18 +106,11 @@ def _run(
     ] = False,
     output_dir: Annotated[
         str,
-        typer.Option(
-            help=(
-                "Write per-config output bundles under this directory (defaults to downloads/), "
-                "including config.json, feeds/combined.json, and top-level report.json/index.json."
-            )
-        ),
+        typer.Option(help="Root directory for output bundles (default: downloads/)."),
     ] = "",
     output_file: Annotated[
         str | None,
-        typer.Option(
-            help="Write the cumulative JSON report to this file after each processed podcast."
-        ),
+        typer.Option(help="Write the cumulative JSON report to this file."),
     ] = None,
     refresh_sources: Annotated[
         bool,
@@ -150,13 +126,13 @@ def _run(
     load_duration = perf_counter() - load_start
     if timings:
         sys.stderr.write(f"TIMING load_configs: {_format_duration(load_duration)}\n")
-    options = _build_run_options(
-        include_counts,
-        pretty,
-        output_dir,
-        output_file,
-        refresh_sources,
-        timings,
+    options = MergeRunOptions(
+        include_counts=include_counts,
+        pretty=pretty,
+        output_dir=output_dir,
+        output_file=output_file,
+        refresh_sources=refresh_sources,
+        timings_enabled=timings,
     )
     merge_result = _run_merge(configs, options)
     output = _build_stdout_output(merge_result, include_counts)
