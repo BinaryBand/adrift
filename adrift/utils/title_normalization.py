@@ -30,68 +30,6 @@ def _clean_swindled_title(filename: str) -> str:
     return title.strip()
 
 
-def _clean_behind_the_bastards_title(episode: str) -> str:
-    return _strip_suffix(r"(?i)\| behind the bastards$", episode)
-
-
-def _clean_coffee_break_swedish_title(episode: str) -> str:
-    return _strip_suffix(r"(?i)\| coffee break swedish podcast$", episode)
-
-
-def _clean_creepcast_title(episode: str) -> str:
-    patterns = [r"(?i)\| creep cast$", r"(?i)\| creepcast$", r"(?i)\| creep tv$"]
-    for pattern in patterns:
-        episode = _strip_suffix(pattern, episode)
-    return episode
-
-
-def _clean_financial_audit_title(episode: str) -> str:
-    return _strip_suffix(r"(?i)\| financial audit$", episode)
-
-
-def _clean_morbid_title(episode: str) -> str:
-    prefix_patterns = [
-        r"(?i)^episode \d{1,3}[:\-]?\s*",
-        # YouTube upload prefixes that are not part of the episode title
-        r"(?i)^fan favorite:\s*",
-        r"(?i)^episode revisit:\s*",
-    ]
-    for pattern in prefix_patterns:
-        episode = re_compile(pattern).sub("", episode)
-
-    patterns = [
-        # Morbid branding variants (most specific first to avoid partial matches).
-        r"(?i)\|\s*morbid:\s*a true crime podcast$",
-        r"(?i)\|\s*morbid\s*\|\s*podcast\s*\|\s*video$",
-        r"(?i)\|\s*morbid\s*\|\s*podcast$",
-        r"(?i)\|\s*morbid\|\s*podcast$",
-        r"(?i)\|\s*morbid$",
-        # Inline episode numbers that YouTube embeds in video titles
-        # (e.g. "Title | Episode 355").  Strip ONLY Episode markers here;
-        # "| Part N" is kept so the number-mismatch guard can fire.
-        r"(?i)\|\s*episode\s+\d+\s*$",
-    ]
-    for pattern in patterns:
-        episode = _strip_suffix(pattern, episode)
-    return episode
-
-
-def _clean_revisionist_history_title(episode: str) -> str:
-    return _strip_suffix(r"(?i)\| revisionist history malcolm gladwell$", episode)
-
-
-def _clean_smosh_reads_reddit_stories_title(episode: str) -> str:
-    return _strip_suffix(r"(?i)\| smosh reading reddit stories$", episode)
-
-
-def _clean_stuff_they_dont_want_you_to_know_title(episode: str) -> str:
-    return _strip_suffix(r"(?i)\| stuff they don't want you to know$", episode)
-
-
-def _clean_stuff_you_should_know_title(episode: str) -> str:
-    return _strip_suffix(r"(?i)\| stuff you should know$", episode)
-
-
 @dataclass(frozen=True)
 class _ShowRule:
     prefix_patterns: tuple[str, ...] = ()

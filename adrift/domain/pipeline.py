@@ -13,7 +13,6 @@ from typing import Generic, TypeVar
 from adrift.domain.errors import PipelineError
 
 T = TypeVar("T")
-U = TypeVar("U")
 
 
 @dataclass(frozen=True)

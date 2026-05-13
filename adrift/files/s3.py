@@ -27,7 +27,6 @@ from adrift.files.s3_upload import (
     _prepare_upload_spec,
 )
 from adrift.files.s3_utils import (
-    _build_s3_probe_client,
     _is_endpoint_reachable_with_provider,
     _make_boto_config,
 )
@@ -124,10 +123,6 @@ class S3Service:
         """Public accessor for the effective endpoint used by this service."""
         return self._get_effective_endpoint()
 
-    # -- Probe / client helpers ------------------------------------------------
-    def build_probe_client(self, url: str, timeout: float) -> S3Client:
-        return _build_s3_probe_client(url, self.secret_provider, timeout)
-
     # -- Cache helpers ---------------------------------------------------------
     def invalidate_file_map_cache(self, bucket: str, key: str) -> None:
         parent_dir = Path(key).parent.as_posix()
@@ -149,22 +144,8 @@ class S3Service:
             self.cache.delete(cache_key)
         self.invalidate_file_map_cache(bucket, key)
 
-    def sync_copy_cache(self, bucket: str, source_key: str, dest_key: str) -> None:
-        src_cache_key = f"s3_metadata:{bucket}:{source_key}"
-        dst_cache_key = f"s3_metadata:{bucket}:{dest_key}"
-        metadata = self.cache.get(src_cache_key)
-        if metadata is None:
-            client = self.get_client()
-            metadata = self.fetch_head_metadata(client, bucket, dest_key)
-        if metadata is not None:
-            self.cache.set(dst_cache_key, metadata)
-
     def fetch_head_metadata(self, client: S3Client, bucket: str, key: str) -> dict[str, str] | None:
         return _metadata_fetch_head_metadata(client, bucket, key)
-
-    def public_s3_url(self, bucket: str, key: str) -> str:
-        endpoint = self.secret_provider.get("S3_ENDPOINT", "")
-        return urljoin(endpoint, Path(bucket, key).as_posix())
 
     # -- Listing / map helpers -------------------------------------------------
     def build_file_map_from_iterator(
