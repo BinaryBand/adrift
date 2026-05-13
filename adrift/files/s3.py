@@ -34,10 +34,8 @@ from adrift.files.s3_utils import (
 
 if TYPE_CHECKING:
     from mypy_boto3_s3 import S3Client
-    from mypy_boto3_s3.type_defs import CopySourceTypeDef
 else:
     S3Client = Any
-    CopySourceTypeDef = dict[str, Any]
 
 from adrift.adapters import get_secret_provider_adapter
 from adrift.models import CacheMetadata, MediaMetadata
@@ -129,13 +127,6 @@ class S3Service:
     # -- Probe / client helpers ------------------------------------------------
     def build_probe_client(self, url: str, timeout: float) -> S3Client:
         return _build_s3_probe_client(url, self.secret_provider, timeout)
-
-    def is_endpoint_reachable(self, url: str, timeout: float = 2.0) -> bool:
-        try:
-            self.build_probe_client(url, timeout).list_buckets()
-        except _S3_OPERATION_ERRORS:
-            return False
-        return True
 
     # -- Cache helpers ---------------------------------------------------------
     def invalidate_file_map_cache(self, bucket: str, key: str) -> None:
@@ -284,63 +275,6 @@ class S3Service:
         except _METADATA_VALIDATE_ERRORS:
             return None
 
-    def set_metadata(self, bucket: str, key: str, metadata: MediaMetadata) -> None:
-        key = Path(key).as_posix()
-        metadata_dict = metadata.to_dict()
-
-        client: S3Client = self.get_client()
-        client.copy_object(
-            Bucket=bucket,
-            Key=key,
-            CopySource={"Bucket": bucket, "Key": key},
-            Metadata=metadata_dict,
-            MetadataDirective="REPLACE",
-            ACL="public-read",
-        )
-
-        cache_key = f"s3_metadata:{bucket}:{key}"
-        self.cache.set(cache_key, metadata_dict)
-
-    def delete_file(self, bucket: str, key: str) -> None:
-        client: S3Client = self.get_client()
-        client.delete_object(Bucket=bucket, Key=key)
-
-        cache_key = f"s3_metadata:{bucket}:{key}"
-        self.cache.delete(cache_key)
-        self.invalidate_file_map_cache(bucket, key)
-
-    def rename_file(self, bucket: str, old_key: str, new_key: str) -> None:
-        if old_key == new_key:
-            return
-
-        client: S3Client = self.get_client()
-
-        copy_source: CopySourceTypeDef = {"Bucket": bucket, "Key": old_key}
-        client.copy_object(
-            Bucket=bucket, Key=new_key, CopySource=copy_source, MetadataDirective="COPY"
-        )
-        client.delete_object(Bucket=bucket, Key=old_key)
-
-        old_cache_key = f"s3_metadata:{bucket}:{old_key}"
-        new_cache_key = f"s3_metadata:{bucket}:{new_key}"
-        self.cache.set(new_cache_key, self.cache.get(old_cache_key))
-        self.cache.delete(old_cache_key)
-        self.invalidate_file_map_cache(bucket, old_key)
-        self.invalidate_file_map_cache(bucket, new_key)
-
-    def copy_file(self, bucket: str, source_key: str, dest_key: str) -> str | None:
-        client: S3Client = self.get_client()
-        copy_source: CopySourceTypeDef = {"Bucket": bucket, "Key": source_key}
-        client.copy_object(
-            Bucket=bucket,
-            Key=dest_key,
-            CopySource=copy_source,
-            MetadataDirective="COPY",
-            ACL="public-read",
-        )
-        self.sync_copy_cache(bucket, source_key, dest_key)
-        return self.public_s3_url(bucket, dest_key)
-
     def do_s3_upload(self, spec: _UploadSpec) -> None:
         _upload_with_client(self.get_client(), spec)
 
@@ -365,43 +299,10 @@ class S3Service:
     ) -> str | None:
         return self._upload_and_cache(bucket_key, file_path, options)
 
-    def upload_cache_file(
-        self,
-        bucket_key: tuple[str, str],
-        file_path: Path,
-        metadata: CacheMetadata | None = None,
-    ) -> str | None:
-        return self._upload_and_cache(bucket_key, file_path, metadata)
-
-    def download_file(self, bucket: str, key: str, download_path: Path) -> None:
-        client = self.get_client()
-        response = client.get_object(Bucket=bucket, Key=key)
-
-        with open(download_path, "wb") as f:
-            for chunk in response["Body"].iter_chunks():
-                f.write(chunk)
-
 
 def _configured_local_s3_endpoint(provider: SecretProviderPort) -> str | None:
     endpoint = provider.get("LOCAL_S3_ENDPOINT", "").strip()
     return endpoint or None
-
-
-def validate_s3_provider(
-    provider: SecretProviderPort,
-    *,
-    check_endpoint: bool,
-) -> None:
-    values = require_secrets(provider, _REQUIRED_S3_KEYS)
-    if not check_endpoint:
-        return
-    local_endpoint = _configured_local_s3_endpoint(provider)
-    if local_endpoint and _is_endpoint_reachable_with_provider(local_endpoint, provider):
-        return
-    endpoint = values["S3_ENDPOINT"]
-    if _is_endpoint_reachable_with_provider(endpoint, provider):
-        return
-    raise RuntimeError(f"Unable to reach configured S3 endpoint: {endpoint}")
 
 
 def _identifier_matches(name: str, identifier: str, extension_agnostic: bool) -> bool:

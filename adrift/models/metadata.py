@@ -11,8 +11,6 @@ from adrift.infrastructure.youtube.normalizer import (
     ensure_ytdlp_model,
     extract_image_from_list,
     extract_image_url,
-    parse_upload_date_string,
-    unix_timestamp_to_datetime,
     ytdlp_pub_date,
 )
 
@@ -94,16 +92,6 @@ class YtDlpParams(BaseModel):
     js_runtimes: dict[str, dict[str, Any]] | None = None
 
     model_config = ConfigDict(extra="allow", arbitrary_types_allowed=True)
-
-
-def _from_unix_timestamp(raw: Any) -> datetime | None:
-    """Convert unix timestamp to datetime. Delegates to normalizer."""
-    return unix_timestamp_to_datetime(raw)
-
-
-def _parse_upload_date(raw: Any) -> datetime | None:
-    """Parse YYYYMMDD format to datetime. Delegates to normalizer."""
-    return parse_upload_date_string(raw)
 
 
 def _coalesce_str(*values: Any) -> str:

@@ -11,7 +11,6 @@ class EnvironmentSecretProvider(SecretProviderPort):
     """Default adapter that reads secrets from process environment variables."""
 
     source_name = "env"
-    writable = True  # signals that this backend has a writable EnvironmentSecretStore
 
     def __init__(self, load_dotenv_file: bool = True):
         if load_dotenv_file:
