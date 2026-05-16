@@ -7,6 +7,7 @@ package-mode = true
 packages = [{ include = "adrift" }]
 
 [tool.poetry.scripts]
+adrift = "adrift.cli.root:main"
 adrift-download = "adrift.cli.download:main"
 adrift-merge = "adrift.cli.merge:main"
 

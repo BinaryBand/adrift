@@ -89,10 +89,22 @@ poetry show --outdated
 
 ## Usage
 
+Show top-level help:
+
+```bash
+poetry run adrift help
+```
+
 Run the merge pipeline across one or more config files:
 
 ```bash
-poetry run python -m adrift.cli.merge --include config/*.toml --pretty
+poetry run adrift merge --include config/*.toml --pretty
+```
+
+Run the download pipeline:
+
+```bash
+poetry run adrift download --skip-download
 ```
 
 Useful options:
@@ -137,11 +149,7 @@ Prerequisites:
 
 Run:
 
-```bash
-poetry run python -m adrift.cli.download --skip-download
-```
-
-You can pass the same flags directly to `adrift.cli.download`, for example `poetry run python -m adrift.cli.download --include config/youtube.toml --max-downloads 3`.
+You can pass the same flags directly to `adrift download`, for example `poetry run adrift download --include config/youtube.toml --max-downloads 3`.
 
 ## Configuration
 

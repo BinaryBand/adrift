@@ -3,6 +3,7 @@ from pathlib import Path
 from typing import Any, Literal, cast
 
 import yt_dlp
+from yt_dlp.utils import DownloadError as YtDlpDownloadError
 
 from adrift.infrastructure.youtube.normalizer import (
     extract_progress_update,
@@ -14,9 +15,33 @@ from adrift.utils.terminal import emit_info, emit_warning
 from adrift.youtube.auth import YtDlpParams, get_auth_ydl_opts, get_ydl_opts
 from adrift.youtube.error_utils import yt_dlp_retry_reason
 
+# Terminal error reasons that indicate the video cannot be downloaded and should not be retried
+_TERMINAL_DOWNLOAD_REASONS = frozenset(
+    {
+        "members-only video",
+        "private video",
+        "removed video",
+        "video unavailable",
+        "geo-restricted video",
+        "premiere not yet available",
+        "live event not yet started",
+    }
+)
+
 
 class BotDetectionError(Exception):
     """Raised when YouTube bot-detection or rate-limiting is encountered."""
+
+
+class SkippedDownloadError(Exception):
+    """Raised when a video cannot be downloaded due to a terminal reason.
+
+    E.g., members-only, private, removed, geo-restricted, etc.
+    """
+
+    def __init__(self, reason: str):
+        self.reason = reason
+        super().__init__(reason)
 
 
 # When True the downloader will raise BotDetectionError on detection so
@@ -36,7 +61,7 @@ _BOT_INDICATORS = [
     "bot detection",
 ]
 
-_YTDLP_OPERATION_ERRORS = (OSError, RuntimeError, TypeError, ValueError)
+_YTDLP_OPERATION_ERRORS = (OSError, RuntimeError, TypeError, ValueError, YtDlpDownloadError)
 
 
 def _extract_video_id(url: str) -> str | None:
@@ -48,6 +73,12 @@ def _extract_video_id(url: str) -> str | None:
 def _is_bot_detection_error(error_message: str) -> bool:
     """Check if error indicates bot detection or rate limiting."""
     return any(indicator in error_message for indicator in _BOT_INDICATORS)
+
+
+def _is_terminal_download_reason(error: Exception) -> bool:
+    """Check if error indicates a terminal reason that cannot be fixed by retrying."""
+    reason = yt_dlp_retry_reason(error, "")
+    return reason in _TERMINAL_DOWNLOAD_REASONS
 
 
 _PLAYER_CLIENTS_STUB_FALLBACK = ["tv_embedded", "web"]
@@ -96,6 +127,10 @@ def _ytdlp_download(id: str, dir: Path, callback: Callback | None = None) -> Pat
         try:
             result = _run_download_attempt(id, dir, callback, attempt_config)
         except _YTDLP_OPERATION_ERRORS as e:
+            if _is_terminal_download_reason(e):
+                reason = yt_dlp_retry_reason(e, "terminal")
+                emit_warning(f"Skipping {id}: {reason}")
+                raise SkippedDownloadError(reason)
             if _should_retry_attempt(e, attempt):
                 emit_info(f"Retrying {id} after {label} failed: {_retry_reason(e)}")
                 continue
@@ -167,6 +202,8 @@ def _run_download_attempt(
 
 
 def _should_retry_attempt(error: Exception, attempt_index: int) -> bool:
+    if _is_terminal_download_reason(error):
+        return False
     return _is_unavailable_format_error(error) and attempt_index < len(_DOWNLOAD_ATTEMPTS) - 1
 
 
@@ -314,6 +351,8 @@ def download_video(url: str, dir: Path, callback: Callback | None = None) -> Pat
         return _ytdlp_download(video_id, dir, callback)
     except BotDetectionError:
         raise
+    except SkippedDownloadError:
+        return None
     except _YTDLP_OPERATION_ERRORS as e:
         return _handle_download_failure(url, e)
 
