@@ -8,6 +8,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, cast
 
+from adrift.adapters.youtube.downloader import BotDetectionError, download_video
 from adrift.models import DownloadEpisode, MediaMetadata, PodcastConfig
 from adrift.services.download_cache import _existing_media_sources
 from adrift.services.download_client import s3_prefix
@@ -24,7 +25,6 @@ from adrift.services.events import (
 )
 from adrift.services.files.audio import convert_to_opus, cut_segments, get_duration
 from adrift.services.web.rss import download_direct
-from adrift.services.youtube.downloader import download_video
 from adrift.utils.title_normalization import normalize_title
 
 if TYPE_CHECKING:
@@ -191,6 +191,7 @@ def _build_metadata(
 
 
 __all__ = [
+    "BotDetectionError",
     "DownloadQueueItem",
     "build_download_queue",
     "episode_exists_on_s3",

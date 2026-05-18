@@ -17,7 +17,7 @@ from adrift.services.events import (
 
 if TYPE_CHECKING:
     from adrift.models import MergeResult
-    from adrift.models.catalog.merge import MergeConfigOptions
+    from adrift.services.catalog.merge import MergeConfigOptions
     from adrift.services.context import AppContext
     from adrift.services.download_process import DownloadQueueItem
     from adrift.utils.progress import Callback

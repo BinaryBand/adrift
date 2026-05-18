@@ -5,9 +5,9 @@ from typing import Any, Literal, cast
 import yt_dlp
 from yt_dlp.utils import DownloadError as YtDlpDownloadError
 
-from adrift.services.youtube.auth import YtDlpParams, get_auth_ydl_opts, get_ydl_opts
-from adrift.services.youtube.error_utils import yt_dlp_retry_reason
-from adrift.services.youtube.normalizer import (
+from adrift.adapters.youtube.auth import YtDlpParams, get_auth_ydl_opts, get_ydl_opts
+from adrift.adapters.youtube.error_utils import yt_dlp_retry_reason
+from adrift.adapters.youtube.normalizer import (
     extract_progress_update,
     make_progress_hook,
 )

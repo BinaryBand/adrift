@@ -2,7 +2,7 @@ import csv
 import unittest
 
 from adrift.models import AlignmentConfig
-from adrift.models.catalog import align_episodes_impl
+from adrift.services.catalog import align_episodes_impl
 from tests.unit.models.catalog._fixtures import dt as _dt
 from tests.unit.models.catalog._fixtures import ep as _ep
 

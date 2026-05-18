@@ -7,7 +7,7 @@ from pathlib import Path
 from typing import TYPE_CHECKING, Any, cast
 
 from adrift.models import PodcastConfig, RssChannel, RssEpisode
-from adrift.models.catalog import match, process_feeds
+from adrift.services.catalog import match, process_feeds
 from adrift.services.download_client import s3_prefix
 from adrift.services.files.audio import is_audio
 from adrift.services.web.rss import podcast_to_rss

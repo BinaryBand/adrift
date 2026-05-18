@@ -3,10 +3,10 @@
 from collections.abc import Callable
 from typing import Annotated
 
-import dotenv
 import typer
 
-from adrift.models import PodcastConfig
+from adrift.services.app_common import bootstrap_run_configs as bootstrap_run_configs
+from adrift.services.app_common import load_podcast_configs as load_podcast_configs
 
 DF_TARGETS = ["config/*.toml"]
 DEFAULT_OUTPUT_DIR = "downloads"
@@ -29,36 +29,6 @@ def normalize_cli_inputs(
 ) -> tuple[list[str], list[str], str]:
     """Normalize CLI inputs for adrift commands."""
     return (include or DF_TARGETS, tags or [], output_dir or DEFAULT_OUTPUT_DIR)
-
-
-def load_podcast_configs(
-    include: list[str],
-    skip_schedule_filter: bool,
-    tags: list[str],
-) -> list[PodcastConfig]:
-    from adrift.services.app_common import filter_podcasts_by_tags, load_podcasts_config
-
-    configs = load_podcasts_config(
-        include=include,
-        skip_schedule_filter=skip_schedule_filter,
-    )
-    return filter_podcasts_by_tags(configs, tags)
-
-
-def bootstrap_run_configs(
-    include: list[str] | None,
-    tags: list[str] | None,
-    skip_schedule_filter: bool,
-    output_dir: str | None = None,
-) -> tuple[list[PodcastConfig], str]:
-    dotenv.load_dotenv()
-    normalized_include, normalized_tags, normalized_output_dir = normalize_cli_inputs(
-        include,
-        tags,
-        output_dir,
-    )
-    configs = load_podcast_configs(normalized_include, skip_schedule_filter, normalized_tags)
-    return configs, normalized_output_dir
 
 
 def make_main(app: typer.Typer) -> Callable[[], None]:

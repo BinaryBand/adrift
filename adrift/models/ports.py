@@ -1,12 +1,13 @@
 from __future__ import annotations
 
-from collections.abc import Mapping, Sequence
+from collections.abc import Callable, Mapping, Sequence
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Generic, Protocol, TypeVar, runtime_checkable
 
 from adrift.models import AlignmentConfig, FeedSource, RssChannel, RssEpisode
-from adrift.utils.progress import Callback
+
+Callback = Callable[[int, int | None], None]
 
 T = TypeVar("T")
 

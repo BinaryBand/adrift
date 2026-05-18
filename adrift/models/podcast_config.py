@@ -1,8 +1,22 @@
+import re
+from functools import lru_cache
 from typing import Any, TypeVar, cast
 
 from pydantic import BaseModel, ConfigDict, Field, computed_field
+from unidecode import unidecode
 
-from adrift.utils.text import create_slug
+
+@lru_cache(maxsize=1000)
+def _slug(name: str) -> str:
+    text = re.sub(r"(?i)\.[a-z34]+$", "", name)
+    text = unidecode(text).lower()
+    text = re.sub(r"([a-z]+)_s\b", r"\1's", text)
+    text = re.sub(r"\b([a-z]+)'([a-z]{1,2})\b", r"\1\2", text)
+    text = text.replace(" ", "-").replace("_", "-")
+    text = re.sub(r"[^a-z0-9-]", "", text)
+    text = re.sub(r"-+", "-", text)
+    return text.strip("-")[:100]
+
 
 _ModelT = TypeVar("_ModelT", bound=BaseModel)
 
@@ -93,7 +107,7 @@ class PodcastConfig(BaseModel):
     @computed_field(return_type=str)
     @property
     def slug(self) -> str:
-        return create_slug(self.name)
+        return _slug(self.name)
 
 
 def _ensure_model(value: Any, cls: type[_ModelT], **defaults: Any) -> _ModelT:
@@ -138,7 +152,7 @@ def ensure_podcast_config(podcast: PodcastConfig | dict[str, Any]) -> PodcastCon
     payload["downloads"] = _ensure_sources_list(payload.get("downloads"))
     payload["tags"] = payload.get("tags", [])
     if "path" not in payload:
-        payload["path"] = f"/media/podcasts/{create_slug(payload['name'])}"
+        payload["path"] = f"/media/podcasts/{_slug(payload['name'])}"
     return _ensure_model(payload, PodcastConfig)
 
 

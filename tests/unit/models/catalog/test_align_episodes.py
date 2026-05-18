@@ -5,13 +5,13 @@ from datetime import datetime
 from unittest.mock import patch
 
 from adrift.models import AlignmentConfig
-from adrift.models.catalog import (
+from adrift.services.catalog import (
     align_episodes,
     align_episodes_impl,
     merge_episode,
     sim_date,
 )
-from adrift.models.catalog.alignment import _best_thumbnail
+from adrift.services.catalog.alignment import _best_thumbnail
 from tests.unit.models.catalog._fixtures import dt as _dt
 from tests.unit.models.catalog._fixtures import ep as _ep
 
@@ -118,7 +118,7 @@ class TestAlignEpisodes(unittest.TestCase):
             _ep(id="d3", title="Episode Three", pub_date=_dt(2024, 1, 3)),
         ]
 
-        with patch("adrift.models.catalog.alignment._normalized_alignment_title") as mocked_title:
+        with patch("adrift.services.catalog.alignment._normalized_alignment_title") as mocked_title:
             mocked_title.side_effect = lambda show, episode: episode.title.lower()
             align_episodes(refs, dls, "Example Show")
 

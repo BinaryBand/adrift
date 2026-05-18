@@ -6,7 +6,7 @@ from datetime import datetime
 from pathlib import Path
 
 from adrift.models import RssEpisode
-from adrift.models.catalog import align_episodes
+from adrift.services.catalog import align_episodes
 
 FIXTURE_DIR = Path(__file__).resolve().parents[3] / "resources" / "alignment"
 

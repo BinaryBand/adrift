@@ -6,9 +6,9 @@ from dataclasses import dataclass, field
 from time import perf_counter
 from typing import TYPE_CHECKING, Callable
 
-from adrift.models import catalog
 from adrift.models.errors import PipelineError
 from adrift.models.stage_result import StageResult
+from adrift.services import catalog
 from adrift.services.merge_service import (
     MergeRunOptions,
     MergeWriters,

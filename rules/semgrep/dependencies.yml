@@ -1,0 +1,127 @@
+rules:
+  # Dependency graph:
+  #   User → CLI → Services → Models
+  #                         → Adapters → Utils → (external)
+  #          CLI → Utils
+  #
+  # Each rule below catches a forbidden cross-layer import.
+
+  # ── CLI ──────────────────────────────────────────────────────────────────
+  - id: cli-no-direct-models-import
+    message: >-
+      CLI must not import adrift.models directly. Route through adrift.services
+      so the dependency graph stays CLI → Services → Models.
+    severity: ERROR
+    languages: [python]
+    paths:
+      include:
+        - /adrift/cli/**/*.py
+    patterns:
+      - pattern-either:
+          - pattern: from adrift.models import $X
+          - pattern: from adrift.models.$M import $X
+          - pattern: import adrift.models
+
+  - id: cli-no-direct-adapters-import
+    message: >-
+      CLI must not import adrift.adapters directly. Route through adrift.services
+      so the dependency graph stays CLI → Services → Adapters.
+    severity: ERROR
+    languages: [python]
+    paths:
+      include:
+        - /adrift/cli/**/*.py
+    patterns:
+      - pattern-either:
+          - pattern: from adrift.adapters import $X
+          - pattern: from adrift.adapters.$M import $X
+          - pattern: import adrift.adapters
+
+  # ── Services ─────────────────────────────────────────────────────────────
+  - id: services-no-cli-import
+    message: >-
+      adrift.services must not import from adrift.cli. Services are downstream
+      of CLI; importing upward inverts the dependency graph.
+    severity: ERROR
+    languages: [python]
+    paths:
+      include:
+        - /adrift/services/**/*.py
+    patterns:
+      - pattern-either:
+          - pattern: from adrift.cli import $X
+          - pattern: from adrift.cli.$M import $X
+          - pattern: import adrift.cli
+
+  # ── Adapters ─────────────────────────────────────────────────────────────
+  - id: adapters-no-services-import
+    message: >-
+      adrift.adapters must not import from adrift.services. The graph runs
+      Services → Adapters; importing back creates a cycle.
+    severity: ERROR
+    languages: [python]
+    paths:
+      include:
+        - /adrift/adapters/**/*.py
+    patterns:
+      - pattern-either:
+          - pattern: from adrift.services import $X
+          - pattern: from adrift.services.$M import $X
+          - pattern: import adrift.services
+
+  - id: adapters-no-cli-import
+    message: >-
+      adrift.adapters must not import from adrift.cli. Adapters are a downstream
+      infrastructure layer; importing CLI inverts the dependency graph.
+    severity: ERROR
+    languages: [python]
+    paths:
+      include:
+        - /adrift/adapters/**/*.py
+    patterns:
+      - pattern-either:
+          - pattern: from adrift.cli import $X
+          - pattern: from adrift.cli.$M import $X
+          - pattern: import adrift.cli
+
+  # ── Models ───────────────────────────────────────────────────────────────
+  - id: models-no-internal-imports
+    message: >-
+      adrift.models must not import from any other adrift layer. Models are pure
+      data structures — no behaviour, no side effects, no upward dependencies.
+    severity: ERROR
+    languages: [python]
+    paths:
+      include:
+        - /adrift/models/**/*.py
+    patterns:
+      - pattern-either:
+          - pattern: from adrift.cli import $X
+          - pattern: from adrift.cli.$M import $X
+          - pattern: from adrift.services import $X
+          - pattern: from adrift.services.$M import $X
+          - pattern: from adrift.adapters import $X
+          - pattern: from adrift.adapters.$M import $X
+          - pattern: from adrift.utils import $X
+          - pattern: from adrift.utils.$M import $X
+
+  # ── Utils ─────────────────────────────────────────────────────────────────
+  - id: utils-no-internal-imports
+    message: >-
+      adrift.utils must not import from any other adrift layer. Utils are the
+      foundational leaf layer; importing upward creates cycles.
+    severity: ERROR
+    languages: [python]
+    paths:
+      include:
+        - /adrift/utils/**/*.py
+    patterns:
+      - pattern-either:
+          - pattern: from adrift.cli import $X
+          - pattern: from adrift.cli.$M import $X
+          - pattern: from adrift.services import $X
+          - pattern: from adrift.services.$M import $X
+          - pattern: from adrift.adapters import $X
+          - pattern: from adrift.adapters.$M import $X
+          - pattern: from adrift.models import $X
+          - pattern: from adrift.models.$M import $X

@@ -1,12 +1,13 @@
 import unittest
 from datetime import datetime, timezone
 
-from adrift.models import RssEpisode, YtDlpImage, YtDlpVideo
+from adrift.adapters.youtube.normalizer import rss_episode_from_ytdlp
+from adrift.models import YtDlpImage, YtDlpVideo
 
 
 class TestRssEpisodeFromYtdlp(unittest.TestCase):
     def test_populates_pub_date_from_timestamp(self):
-        episode = RssEpisode.from_ytdlp(
+        episode = rss_episode_from_ytdlp(
             {
                 "id": "abc123",
                 "title": "Sample Title",
@@ -20,7 +21,7 @@ class TestRssEpisodeFromYtdlp(unittest.TestCase):
         )
 
     def test_populates_pub_date_from_upload_date(self):
-        episode = RssEpisode.from_ytdlp(
+        episode = rss_episode_from_ytdlp(
             {
                 "id": "def456",
                 "title": "Sample Title",
@@ -34,7 +35,7 @@ class TestRssEpisodeFromYtdlp(unittest.TestCase):
         )
 
     def test_missing_date_fields_keeps_pub_date_none(self):
-        episode = RssEpisode.from_ytdlp(
+        episode = rss_episode_from_ytdlp(
             {
                 "id": "ghi789",
                 "title": "Sample Title",
@@ -72,7 +73,7 @@ class TestYtDlpNestedModels(unittest.TestCase):
                 "timestamp": 1710806400,
             }
         )
-        episode = RssEpisode.from_ytdlp(model, "tester")
+        episode = rss_episode_from_ytdlp(model, "tester")
         self.assertEqual(episode.id, "typed1")
         self.assertEqual(episode.title, "Typed Video")
 

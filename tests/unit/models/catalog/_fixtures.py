@@ -7,7 +7,7 @@ from pathlib import Path
 from typing import Any
 
 from adrift.models import AlignmentConfig, RssEpisode
-from adrift.models.catalog import align_episodes_impl
+from adrift.services.catalog import align_episodes_impl
 
 
 def dt(year: int, month: int, day: int) -> datetime:

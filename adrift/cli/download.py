@@ -29,11 +29,14 @@ def _build_pipeline(
     ui,
     pipeline_options: DownloadRunOptions,
 ) -> DownloadPipeline:
-    from adrift.models.catalog import MergeConfigOptions, merge_config
+    from adrift.services.catalog import MergeConfigOptions, merge_config
     from adrift.services.download_enrich import enrich_with_sponsors
-    from adrift.services.download_process import build_download_queue, download_and_upload
+    from adrift.services.download_process import (
+        BotDetectionError,
+        build_download_queue,
+        download_and_upload,
+    )
     from adrift.services.download_rss import update_rss
-    from adrift.services.youtube.downloader import BotDetectionError
     from adrift.utils.run_ui import build_merge_callbacks
 
     # greedy one-to-one bipartite matching
@@ -94,7 +97,7 @@ def _run_with_bot_detection(
     pipeline_options: DownloadRunOptions,
     bot_cooldown: int,
 ) -> int:
-    from adrift.services.youtube.downloader import BotDetectionError
+    from adrift.services.download_process import BotDetectionError
 
     try:
         return _run_pipeline(configs, ctx, pipeline_options)

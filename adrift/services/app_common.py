@@ -31,6 +31,8 @@ __all__ = [
     "load_podcasts_config",
     "filter_podcasts_by_tags",
     "schedule_matches_today",
+    "load_podcast_configs",
+    "bootstrap_run_configs",
 ]
 
 
@@ -141,6 +143,35 @@ def filter_podcasts_by_tags(configs: list[PodcastConfig], tags: list[str]) -> li
         return False
 
     return [cfg for cfg in configs if _matches_tag(cfg)]
+
+
+_DF_TARGETS = ["config/*.toml"]
+_DEFAULT_OUTPUT_DIR = "downloads"
+
+
+def load_podcast_configs(
+    include: list[str],
+    skip_schedule_filter: bool,
+    tags: list[str],
+) -> list[PodcastConfig]:
+    configs = load_podcasts_config(include=include, skip_schedule_filter=skip_schedule_filter)
+    return filter_podcasts_by_tags(configs, tags)
+
+
+def bootstrap_run_configs(
+    include: list[str] | None,
+    tags: list[str] | None,
+    skip_schedule_filter: bool,
+    output_dir: str | None = None,
+) -> tuple[list[PodcastConfig], str]:
+    import dotenv
+
+    normalized_include = include or _DF_TARGETS
+    normalized_tags = tags or []
+    normalized_output_dir = output_dir or _DEFAULT_OUTPUT_DIR
+    dotenv.load_dotenv()
+    configs = load_podcast_configs(normalized_include, skip_schedule_filter, normalized_tags)
+    return configs, normalized_output_dir
 
 
 def _expand_include_targets(include: list[str]) -> list[str]:

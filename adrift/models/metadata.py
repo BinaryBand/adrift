@@ -6,14 +6,6 @@ from typing import Any, Callable
 import pydantic
 from pydantic import BaseModel, ConfigDict
 
-from adrift.services.youtube.normalizer import (
-    coerce_str,
-    ensure_ytdlp_model,
-    extract_image_from_list,
-    extract_image_url,
-    ytdlp_pub_date,
-)
-
 DEVICE = os.getenv("DEVICE", "UnknownDevice")
 PROJECT = os.getenv("PROJECT", "UnknownProject")
 
@@ -94,29 +86,6 @@ class YtDlpParams(BaseModel):
     model_config = ConfigDict(extra="allow", arbitrary_types_allowed=True)
 
 
-def _coalesce_str(*values: Any) -> str:
-    """Return the first truthy value as a string. Delegates to normalizer."""
-    return coerce_str(*values)
-
-
-try:
-    from .ytdlp import YtDlpImage, YtDlpVideo
-except (ImportError, ModuleNotFoundError):
-    # When executed as a script the package-relative import may fail;
-    # fall back to absolute import using the `src` package on sys.path.
-    from adrift.models import YtDlpImage, YtDlpVideo
-
-
-def _parse_ytdlp_pub_date(data: YtDlpVideo | dict[str, Any]) -> datetime | None:
-    """Parse publication date from yt-dlp video data. Delegates to normalizer."""
-    return ytdlp_pub_date(data)
-
-
-def _ensure_ytdlp_model(data: YtDlpVideo | dict[str, Any]) -> YtDlpVideo:
-    """Ensure data is a YtDlpVideo model. Delegates to normalizer."""
-    return ensure_ytdlp_model(data)
-
-
 class RssChannel(BaseModel):
     title: str
     author: str
@@ -124,38 +93,6 @@ class RssChannel(BaseModel):
     url: str
     description: str
     image: str
-
-    @classmethod
-    def from_ytdlp(cls, data: YtDlpVideo | dict[str, Any], url: str) -> "RssChannel":
-        """Create RssChannel directly from yt-dlp extract_info response.
-
-        Accepts either a raw dict (validated into `YtDlpVideo`) or an
-        already-validated `YtDlpVideo` instance.
-        """
-        model = _ensure_ytdlp_model(data)
-        return cls._from_model(model, url)
-
-    @classmethod
-    def _from_model(cls, model: YtDlpVideo, url: str) -> "RssChannel":
-        return cls(
-            title=_coalesce_str(model.uploader, model.title),
-            author=_coalesce_str(model.uploader_id, "YouTube"),
-            subtitle="",
-            url=url,
-            description=_coalesce_str(model.description),
-            image=_coalesce_str(
-                cls._extract_image(model.avatar), cls._extract_image(model.thumbnails)
-            ),
-        )
-
-    @staticmethod
-    def _extract_image(data: list[YtDlpImage] | str | None) -> str:
-        """Extract image URL from avatar/thumbnails data (list or string)."""
-        if not data:
-            return ""
-        if isinstance(data, list):
-            return extract_image_from_list(data)
-        return extract_image_url(data)
 
 
 class RssEpisode(BaseModel):
@@ -170,38 +107,6 @@ class RssEpisode(BaseModel):
 
     # Internal field to track availability (not exposed in RSS)
     _availability: str | None = None
-
-    @classmethod
-    def from_ytdlp(cls, data: YtDlpVideo | dict[str, Any], author: str) -> "RssEpisode":
-        """Create RssEpisode from yt-dlp video entry dict or model."""
-        model = _ensure_ytdlp_model(data)
-        return cls._from_model(model, author)
-
-    @classmethod
-    def _from_model(cls, model: YtDlpVideo, author: str) -> "RssEpisode":
-        video_id = _coalesce_str(model.id)
-        title = _coalesce_str(model.title)
-        description = model.description
-        duration = model.duration
-        availability = _coalesce_str(model.availability, "public")
-
-        # Construct YouTube URL
-        url = _coalesce_str(model.url, f"https://youtube.com/watch?v={video_id}")
-
-        episode = cls(
-            id=video_id,
-            title=title,
-            author=author,
-            description=description,
-            content=url,
-            duration=duration,
-            pub_date=_parse_ytdlp_pub_date(model),
-        )
-
-        # Store availability for filtering
-        episode._availability = availability
-
-        return episode
 
     @property
     def is_public(self) -> bool:

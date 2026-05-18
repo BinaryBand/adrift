@@ -1,7 +1,9 @@
+from __future__ import annotations
+
 import json
 import sys
 from time import perf_counter
-from typing import Annotated
+from typing import TYPE_CHECKING, Annotated
 
 import typer
 
@@ -12,8 +14,10 @@ from adrift.cli import (
     bootstrap_run_configs,
     build_cli,
 )
-from adrift.models import PodcastConfig
 from adrift.services.merge import MergeUseCase
+
+if TYPE_CHECKING:
+    from adrift.services.app_common import PodcastConfig
 from adrift.services.merge_service import MergeRunOptions, MergeWriters
 from adrift.services.merge_service import format_duration as _format_duration
 from adrift.services.merge_service import write_json as service_write_json

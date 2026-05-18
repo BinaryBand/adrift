@@ -2,7 +2,7 @@ import shutil
 from pathlib import Path
 from types import SimpleNamespace
 
-import adrift.services.web.rss as rss
+from adrift.adapters.episode_sources import episode_source_rss as rss
 
 
 def test_cache_set_with_retry_retries_and_recreates_dir(tmp_path):
@@ -47,8 +47,9 @@ def test_get_rss_episodes_calls_cache_set(tmp_path, monkeypatch):
 
     dummy = DummyCache()
 
-    # Patch the module-level _rss_cache to return our dummy cache
-    monkeypatch.setattr(rss, "_rss_cache", lambda: dummy)
+    # Patch both cache object and wrapper used by `_cache_set_with_retry`.
+    monkeypatch.setattr(rss, "_RSS_CACHE", dummy)
+    monkeypatch.setattr(rss, "_RSS_CACHE_WRAPPER", rss.RaceAwareCacheWrapper(dummy))
 
     # Patch network/feedparser to avoid external calls
     class MockResponse:

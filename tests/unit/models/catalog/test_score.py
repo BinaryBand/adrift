@@ -10,7 +10,7 @@ import unittest
 from datetime import datetime, timezone
 
 from adrift.models import RssEpisode
-from adrift.models.catalog.alignment import (
+from adrift.services.catalog.alignment import (
     _CONTAINMENT_BONUS,
     _AlignmentCandidate,
     _score,

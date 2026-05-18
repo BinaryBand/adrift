@@ -12,7 +12,7 @@ extract_image_url = extract_image_from_ytdlp
 extract_image_from_list = extract_image_from_ytdlp_list
 
 if TYPE_CHECKING:
-    from adrift.models import YtDlpVideo
+    from adrift.models import RssChannel, RssEpisode, YtDlpVideo
 
 _PROGRESS_HOOK_ERRORS = (OSError, RuntimeError, TypeError, ValueError)
 
@@ -165,3 +165,56 @@ def _finished_progress_update(download: dict[str, Any]) -> tuple[int, int] | Non
     if total is None:
         return None
     return total, total
+
+
+# ============================================================================
+# Model factory functions (moved from models/metadata.py classmethods)
+# ============================================================================
+
+
+def _extract_channel_image(data: Any) -> str:
+    """Extract image URL from avatar/thumbnail data (list or string)."""
+    if not data:
+        return ""
+    if isinstance(data, list):
+        return extract_image_from_list(data)
+    return extract_image_url(data)
+
+
+def rss_channel_from_ytdlp(data: "YtDlpVideo | dict[str, Any]", url: str) -> "RssChannel":
+    """Create RssChannel from a yt-dlp extract_info response or raw dict."""
+    from adrift.models import RssChannel
+
+    model = ensure_ytdlp_model(data)
+    return RssChannel(
+        title=coerce_str(model.uploader, model.title),
+        author=coerce_str(model.uploader_id, "YouTube"),
+        subtitle="",
+        url=url,
+        description=coerce_str(model.description),
+        image=coerce_str(
+            _extract_channel_image(model.avatar),
+            _extract_channel_image(model.thumbnails),
+        ),
+    )
+
+
+def rss_episode_from_ytdlp(data: "YtDlpVideo | dict[str, Any]", author: str) -> "RssEpisode":
+    """Create RssEpisode from a yt-dlp video entry dict or model."""
+    from adrift.models import RssEpisode
+
+    model = ensure_ytdlp_model(data)
+    video_id = coerce_str(model.id)
+    url = coerce_str(model.url, f"https://youtube.com/watch?v={video_id}")
+    availability = coerce_str(model.availability, "public")
+    episode = RssEpisode(
+        id=video_id,
+        title=coerce_str(model.title),
+        author=author,
+        description=model.description,
+        content=url,
+        duration=model.duration,
+        pub_date=ytdlp_pub_date(model),
+    )
+    episode._availability = availability
+    return episode

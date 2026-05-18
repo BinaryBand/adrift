@@ -25,7 +25,8 @@ def test_rss_adapter_fetches_episodes():
         )
     ]
 
-    with patch("adrift.services.web.rss.get_rss_episodes", return_value=mock_episodes):
+    rss_mod = "adrift.adapters.episode_sources.episode_source_rss"
+    with patch(f"{rss_mod}.get_rss_episodes", return_value=mock_episodes):
         result = adapter.fetch_episodes(source)
 
     assert result == mock_episodes
@@ -47,7 +48,8 @@ def test_rss_adapter_fetches_channel():
         image="",
     )
 
-    with patch("adrift.services.web.rss.get_rss_channel", return_value=mock_channel):
+    rss_mod = "adrift.adapters.episode_sources.episode_source_rss"
+    with patch(f"{rss_mod}.get_rss_channel", return_value=mock_channel):
         result = adapter.fetch_channel(source)
 
     assert result == mock_channel
@@ -68,7 +70,7 @@ def test_youtube_adapter_fetches_episodes():
         )
     ]
 
-    with patch("adrift.services.youtube.metadata.get_youtube_episodes", return_value=mock_episodes):
+    with patch("adrift.adapters.youtube.metadata.get_youtube_episodes", return_value=mock_episodes):
         result = adapter.fetch_episodes(source, EpisodeSourceFetchContext(title="Test Channel"))
 
     assert result == mock_episodes
@@ -90,7 +92,7 @@ def test_youtube_adapter_fetches_channel():
         image="",
     )
 
-    with patch("adrift.services.youtube.metadata.get_youtube_channel", return_value=mock_channel):
+    with patch("adrift.adapters.youtube.metadata.get_youtube_channel", return_value=mock_channel):
         result = adapter.fetch_channel(source)
 
     assert result == mock_channel
@@ -128,7 +130,8 @@ def test_rss_adapter_passes_filters_to_rss_episodes():
     source = FeedSource(url="https://example.com/feed.xml", filters={"include": ["test"]})
     adapter = RssEpisodeSourceAdapter()
 
-    with patch("adrift.services.web.rss.get_rss_episodes") as mock_get:
+    rss_mod = "adrift.adapters.episode_sources.episode_source_rss"
+    with patch(f"{rss_mod}.get_rss_episodes") as mock_get:
         mock_get.return_value = []
         adapter.fetch_episodes(source)
 
@@ -144,7 +147,7 @@ def test_youtube_adapter_passes_title_and_options():
     source = FeedSource(url="https://www.youtube.com/@testchannel")
     adapter = YouTubeEpisodeSourceAdapter()
 
-    with patch("adrift.services.youtube.metadata.get_youtube_episodes") as mock_get:
+    with patch("adrift.adapters.youtube.metadata.get_youtube_episodes") as mock_get:
         mock_get.return_value = []
         adapter.fetch_episodes(
             source,
@@ -164,7 +167,7 @@ def test_youtube_adapter_passes_refresh_option():
     source = FeedSource(url="https://www.youtube.com/@testchannel")
     adapter = YouTubeEpisodeSourceAdapter()
 
-    with patch("adrift.services.youtube.metadata.get_youtube_episodes") as mock_get:
+    with patch("adrift.adapters.youtube.metadata.get_youtube_episodes") as mock_get:
         mock_get.return_value = []
         adapter.fetch_episodes(
             source,

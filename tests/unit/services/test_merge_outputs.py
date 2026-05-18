@@ -4,9 +4,9 @@ from datetime import datetime, timezone
 from pathlib import Path
 from unittest.mock import patch
 
-import adrift.cli as cli_mod
 from adrift.cli import merge as merge_mod
 from adrift.models import EpisodeData, FeedSource, MergeResult, PodcastConfig
+from adrift.services import app_common
 from tests.unit._fixtures import (
     _config,
     _make_merge_result,
@@ -65,7 +65,7 @@ def test_main_writes_bundle_and_stdout(tmp_path: Path, capsys) -> None:
 
     with (
         patch("adrift.services.app_common.load_podcasts_config", return_value=[config]),
-        patch("adrift.models.catalog.merge_config", return_value=result) as mock_merge_config,
+        patch("adrift.services.catalog.merge_config", return_value=result) as mock_merge_config,
         patch.object(sys, "argv", argv),
     ):
         merge_mod.main()
@@ -140,7 +140,7 @@ def test_main_updates_output_file_after_each_podcast(tmp_path: Path, capsys) -> 
 
     with (
         patch("adrift.services.app_common.load_podcasts_config", return_value=[first, second]),
-        patch("adrift.models.catalog.merge_config", side_effect=[first_result, second_result]),
+        patch("adrift.services.catalog.merge_config", side_effect=[first_result, second_result]),
         patch.object(merge_mod, "_write_json", side_effect=_capture_report),
         patch.object(sys, "argv", argv),
     ):
@@ -168,8 +168,8 @@ def test_main_defaults_output_dir_to_downloads(tmp_path: Path, capsys) -> None:
 
     with (
         patch("adrift.services.app_common.load_podcasts_config", return_value=[config]),
-        patch("adrift.models.catalog.merge_config", return_value=result),
-        patch.object(cli_mod, "DEFAULT_OUTPUT_DIR", downloads_root.as_posix()),
+        patch("adrift.services.catalog.merge_config", return_value=result),
+        patch.object(app_common, "_DEFAULT_OUTPUT_DIR", downloads_root.as_posix()),
         patch.object(sys, "argv", argv),
     ):
         merge_mod.main()
@@ -209,7 +209,7 @@ def test_main_emits_timings_to_stderr(tmp_path: Path, capsys) -> None:
 
     with (
         patch("adrift.services.app_common.load_podcasts_config", return_value=[config]),
-        patch("adrift.models.catalog.merge_config", side_effect=_merge_config_with_timings),
+        patch("adrift.services.catalog.merge_config", side_effect=_merge_config_with_timings),
         patch.object(sys, "argv", argv),
     ):
         merge_mod.main()

@@ -1,8 +1,9 @@
 from dataclasses import dataclass, field
 from urllib.parse import urljoin
 
+from adrift.adapters.youtube import ytdlp
+from adrift.adapters.youtube.normalizer import rss_channel_from_ytdlp
 from adrift.models import RssChannel, RssEpisode
-from adrift.services.youtube import ytdlp
 from adrift.utils.progress import Callback
 from adrift.utils.regex import (
     YOUTUBE_PLAYLIST_SHORTHAND_REGEX,
@@ -48,8 +49,7 @@ def _normalize_youtube_link(url: str) -> str:
 
 def _channel_to_rss(channel_info: ytdlp.ChannelInfo, url: str) -> RssChannel:
     """Convert ChannelInfo to RssChannel."""
-    channel = RssChannel.from_ytdlp(channel_info.model_dump(), url)
-    return channel
+    return rss_channel_from_ytdlp(channel_info.model_dump(), url)
 
 
 def _get_youtube_channel(url: str) -> RssChannel:

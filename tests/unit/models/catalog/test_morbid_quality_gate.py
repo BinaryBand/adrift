@@ -13,7 +13,7 @@ from pathlib import Path
 import pytest
 
 from adrift.models import AlignmentConfig, RssEpisode
-from adrift.models.catalog import align_episodes_impl
+from adrift.services.catalog import align_episodes_impl
 
 _MORBID_ALIGNMENT = AlignmentConfig(extra_stopwords=["morbid"])
 _HARD_PACK = (
