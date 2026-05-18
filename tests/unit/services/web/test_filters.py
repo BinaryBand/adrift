@@ -3,7 +3,7 @@
 import unittest
 from unittest.mock import Mock, patch
 
-from adrift.adapters.episode_sources.episode_source_rss import get_rss_episodes
+from adrift.adapters.process.episode_sources.episode_source_rss import get_rss_episodes
 
 
 def _create_mock_entry(id: str, title: str, pub_date: str) -> Mock:
@@ -41,9 +41,9 @@ def _setup_feed_mock(
 class TestFeedFilter(unittest.TestCase):
     """Test feed_filter (regex) functionality."""
 
-    @patch("adrift.adapters.episode_sources.episode_source_rss._RSS_CACHE")
-    @patch("adrift.adapters.episode_sources.episode_source_rss.requests.get")
-    @patch("adrift.adapters.episode_sources.episode_source_rss.feedparser.parse")
+    @patch("adrift.adapters.process.episode_sources.episode_source_rss._RSS_CACHE")
+    @patch("adrift.adapters.process.episode_sources.episode_source_rss.requests.get")
+    @patch("adrift.adapters.process.episode_sources.episode_source_rss.feedparser.parse")
     def test_filter_includes_matching_episodes(
         self, mock_parse: Mock, mock_get: Mock, mock_cache_fn: Mock
     ):
@@ -60,9 +60,9 @@ class TestFeedFilter(unittest.TestCase):
         self.assertEqual(result[0].title, "Episode 001: Introduction")
         self.assertEqual(result[1].title, "Episode 002: Deep Dive")
 
-    @patch("adrift.adapters.episode_sources.episode_source_rss._RSS_CACHE")
-    @patch("adrift.adapters.episode_sources.episode_source_rss.requests.get")
-    @patch("adrift.adapters.episode_sources.episode_source_rss.feedparser.parse")
+    @patch("adrift.adapters.process.episode_sources.episode_source_rss._RSS_CACHE")
+    @patch("adrift.adapters.process.episode_sources.episode_source_rss.requests.get")
+    @patch("adrift.adapters.process.episode_sources.episode_source_rss.feedparser.parse")
     def test_filter_excludes_non_matching_episodes(
         self, mock_parse: Mock, mock_get: Mock, mock_cache_fn: Mock
     ):
@@ -80,9 +80,9 @@ class TestFeedFilter(unittest.TestCase):
         self.assertEqual(len(result), 1)
         self.assertEqual(result[0].title, "Regular Episode")
 
-    @patch("adrift.adapters.episode_sources.episode_source_rss._RSS_CACHE")
-    @patch("adrift.adapters.episode_sources.episode_source_rss.requests.get")
-    @patch("adrift.adapters.episode_sources.episode_source_rss.feedparser.parse")
+    @patch("adrift.adapters.process.episode_sources.episode_source_rss._RSS_CACHE")
+    @patch("adrift.adapters.process.episode_sources.episode_source_rss.requests.get")
+    @patch("adrift.adapters.process.episode_sources.episode_source_rss.feedparser.parse")
     def test_filter_case_insensitive(self, mock_parse: Mock, mock_get: Mock, mock_cache_fn: Mock):
         """Test that filter can be case-insensitive with (?i) flag."""
         entry1 = _create_mock_entry("ep1", "SPECIAL EPISODE", "2023-12-18T10:00:00")
@@ -97,9 +97,9 @@ class TestFeedFilter(unittest.TestCase):
         self.assertIn("SPECIAL", result[0].title)
         self.assertIn("special", result[1].title)
 
-    @patch("adrift.adapters.episode_sources.episode_source_rss._RSS_CACHE")
-    @patch("adrift.adapters.episode_sources.episode_source_rss.requests.get")
-    @patch("adrift.adapters.episode_sources.episode_source_rss.feedparser.parse")
+    @patch("adrift.adapters.process.episode_sources.episode_source_rss._RSS_CACHE")
+    @patch("adrift.adapters.process.episode_sources.episode_source_rss.requests.get")
+    @patch("adrift.adapters.process.episode_sources.episode_source_rss.feedparser.parse")
     def test_filter_empty_string_returns_all(
         self, mock_parse: Mock, mock_get: Mock, mock_cache_fn: Mock
     ):
@@ -112,9 +112,9 @@ class TestFeedFilter(unittest.TestCase):
 
         self.assertEqual(len(result), 2)
 
-    @patch("adrift.adapters.episode_sources.episode_source_rss._RSS_CACHE")
-    @patch("adrift.adapters.episode_sources.episode_source_rss.requests.get")
-    @patch("adrift.adapters.episode_sources.episode_source_rss.feedparser.parse")
+    @patch("adrift.adapters.process.episode_sources.episode_source_rss._RSS_CACHE")
+    @patch("adrift.adapters.process.episode_sources.episode_source_rss.requests.get")
+    @patch("adrift.adapters.process.episode_sources.episode_source_rss.feedparser.parse")
     def test_filter_none_returns_all(self, mock_parse: Mock, mock_get: Mock, mock_cache_fn: Mock):
         """Test that None filter returns all episodes."""
         entry1 = _create_mock_entry("ep1", "Episode 1", "2023-12-18T10:00:00")
@@ -129,9 +129,9 @@ class TestFeedFilter(unittest.TestCase):
 class TestDayOfWeekFilter(unittest.TestCase):
     """Test r_rules (RFC 5545) episode date filtering."""
 
-    @patch("adrift.adapters.episode_sources.episode_source_rss._RSS_CACHE")
-    @patch("adrift.adapters.episode_sources.episode_source_rss.requests.get")
-    @patch("adrift.adapters.episode_sources.episode_source_rss.feedparser.parse")
+    @patch("adrift.adapters.process.episode_sources.episode_source_rss._RSS_CACHE")
+    @patch("adrift.adapters.process.episode_sources.episode_source_rss.requests.get")
+    @patch("adrift.adapters.process.episode_sources.episode_source_rss.feedparser.parse")
     def test_filters_weekdays_only(self, mock_parse: Mock, mock_get: Mock, mock_cache_fn: Mock):
         """Test filtering for weekdays only (Mon-Fri)."""
         # Dec 18, 2023 = Monday, Dec 17 = Sunday, Dec 16 = Saturday, Dec 15 = Friday
@@ -159,9 +159,9 @@ class TestDayOfWeekFilter(unittest.TestCase):
         self.assertEqual(result[0].title, "Monday Episode")
         self.assertEqual(result[1].title, "Friday Episode")
 
-    @patch("adrift.adapters.episode_sources.episode_source_rss._RSS_CACHE")
-    @patch("adrift.adapters.episode_sources.episode_source_rss.requests.get")
-    @patch("adrift.adapters.episode_sources.episode_source_rss.feedparser.parse")
+    @patch("adrift.adapters.process.episode_sources.episode_source_rss._RSS_CACHE")
+    @patch("adrift.adapters.process.episode_sources.episode_source_rss.requests.get")
+    @patch("adrift.adapters.process.episode_sources.episode_source_rss.feedparser.parse")
     def test_filters_weekend_only(self, mock_parse: Mock, mock_get: Mock, mock_cache_fn: Mock):
         """Test filtering for weekend only (Sat-Sun)."""
         entry_mon = _create_mock_entry("ep1", "Monday Episode", "2023-12-18T10:00:00")
@@ -179,9 +179,9 @@ class TestDayOfWeekFilter(unittest.TestCase):
         self.assertEqual(result[0].title, "Sunday Episode")
         self.assertEqual(result[1].title, "Saturday Episode")
 
-    @patch("adrift.adapters.episode_sources.episode_source_rss._RSS_CACHE")
-    @patch("adrift.adapters.episode_sources.episode_source_rss.requests.get")
-    @patch("adrift.adapters.episode_sources.episode_source_rss.feedparser.parse")
+    @patch("adrift.adapters.process.episode_sources.episode_source_rss._RSS_CACHE")
+    @patch("adrift.adapters.process.episode_sources.episode_source_rss.requests.get")
+    @patch("adrift.adapters.process.episode_sources.episode_source_rss.feedparser.parse")
     def test_filters_single_day(self, mock_parse: Mock, mock_get: Mock, mock_cache_fn: Mock):
         """Test filtering for a single specific day."""
         # Dec 18 = Monday, Dec 19 = Tuesday, Dec 20 = Wednesday
@@ -196,9 +196,9 @@ class TestDayOfWeekFilter(unittest.TestCase):
         self.assertEqual(len(result), 1)
         self.assertEqual(result[0].title, "Wednesday Episode")
 
-    @patch("adrift.adapters.episode_sources.episode_source_rss._RSS_CACHE")
-    @patch("adrift.adapters.episode_sources.episode_source_rss.requests.get")
-    @patch("adrift.adapters.episode_sources.episode_source_rss.feedparser.parse")
+    @patch("adrift.adapters.process.episode_sources.episode_source_rss._RSS_CACHE")
+    @patch("adrift.adapters.process.episode_sources.episode_source_rss.requests.get")
+    @patch("adrift.adapters.process.episode_sources.episode_source_rss.feedparser.parse")
     def test_empty_day_filter_returns_all(
         self, mock_parse: Mock, mock_get: Mock, mock_cache_fn: Mock
     ):
@@ -211,9 +211,9 @@ class TestDayOfWeekFilter(unittest.TestCase):
 
         self.assertEqual(len(result), 2)
 
-    @patch("adrift.adapters.episode_sources.episode_source_rss._RSS_CACHE")
-    @patch("adrift.adapters.episode_sources.episode_source_rss.requests.get")
-    @patch("adrift.adapters.episode_sources.episode_source_rss.feedparser.parse")
+    @patch("adrift.adapters.process.episode_sources.episode_source_rss._RSS_CACHE")
+    @patch("adrift.adapters.process.episode_sources.episode_source_rss.requests.get")
+    @patch("adrift.adapters.process.episode_sources.episode_source_rss.feedparser.parse")
     def test_none_day_filter_returns_all(
         self, mock_parse: Mock, mock_get: Mock, mock_cache_fn: Mock
     ):
@@ -226,9 +226,9 @@ class TestDayOfWeekFilter(unittest.TestCase):
 
         self.assertEqual(len(result), 2)
 
-    @patch("adrift.adapters.episode_sources.episode_source_rss._RSS_CACHE")
-    @patch("adrift.adapters.episode_sources.episode_source_rss.requests.get")
-    @patch("adrift.adapters.episode_sources.episode_source_rss.feedparser.parse")
+    @patch("adrift.adapters.process.episode_sources.episode_source_rss._RSS_CACHE")
+    @patch("adrift.adapters.process.episode_sources.episode_source_rss.requests.get")
+    @patch("adrift.adapters.process.episode_sources.episode_source_rss.feedparser.parse")
     def test_handles_missing_pub_date(self, mock_parse: Mock, mock_get: Mock, mock_cache_fn: Mock):
         """Test that episodes with missing pub_date are excluded when using day filter."""
         entry_valid = _create_mock_entry("ep1", "Valid Episode", "2023-12-18T10:00:00")
@@ -241,9 +241,9 @@ class TestDayOfWeekFilter(unittest.TestCase):
         self.assertEqual(len(result), 1)
         self.assertEqual(result[0].title, "Valid Episode")
 
-    @patch("adrift.adapters.episode_sources.episode_source_rss._RSS_CACHE")
-    @patch("adrift.adapters.episode_sources.episode_source_rss.requests.get")
-    @patch("adrift.adapters.episode_sources.episode_source_rss.feedparser.parse")
+    @patch("adrift.adapters.process.episode_sources.episode_source_rss._RSS_CACHE")
+    @patch("adrift.adapters.process.episode_sources.episode_source_rss.requests.get")
+    @patch("adrift.adapters.process.episode_sources.episode_source_rss.feedparser.parse")
     def test_handles_invalid_pub_date(self, mock_parse: Mock, mock_get: Mock, mock_cache_fn: Mock):
         """Test that episodes with invalid pub_date format are excluded when using r_rules."""
         entry_valid = _create_mock_entry("ep1", "Valid Episode", "2023-12-18T10:00:00")
@@ -260,9 +260,9 @@ class TestDayOfWeekFilter(unittest.TestCase):
 class TestCombinedFilters(unittest.TestCase):
     """Test combining feed_filter and r_rules."""
 
-    @patch("adrift.adapters.episode_sources.episode_source_rss._RSS_CACHE")
-    @patch("adrift.adapters.episode_sources.episode_source_rss.requests.get")
-    @patch("adrift.adapters.episode_sources.episode_source_rss.feedparser.parse")
+    @patch("adrift.adapters.process.episode_sources.episode_source_rss._RSS_CACHE")
+    @patch("adrift.adapters.process.episode_sources.episode_source_rss.requests.get")
+    @patch("adrift.adapters.process.episode_sources.episode_source_rss.feedparser.parse")
     def test_both_filters_applied(self, mock_parse: Mock, mock_get: Mock, mock_cache_fn: Mock):
         """Test that both feed_filter and r_rules are applied together."""
         # Dec 18 = Monday, Dec 17 = Sunday, Dec 19 = Tuesday
@@ -292,9 +292,9 @@ class TestCombinedFilters(unittest.TestCase):
         self.assertEqual(result[0].title, "Episode 001")
         self.assertEqual(result[1].title, "Episode 003")
 
-    @patch("adrift.adapters.episode_sources.episode_source_rss._RSS_CACHE")
-    @patch("adrift.adapters.episode_sources.episode_source_rss.requests.get")
-    @patch("adrift.adapters.episode_sources.episode_source_rss.feedparser.parse")
+    @patch("adrift.adapters.process.episode_sources.episode_source_rss._RSS_CACHE")
+    @patch("adrift.adapters.process.episode_sources.episode_source_rss.requests.get")
+    @patch("adrift.adapters.process.episode_sources.episode_source_rss.feedparser.parse")
     def test_complex_regex_with_day_filter(
         self, mock_parse: Mock, mock_get: Mock, mock_cache_fn: Mock
     ):
@@ -329,9 +329,9 @@ class TestCombinedFilters(unittest.TestCase):
 class TestCacheKeyGeneration(unittest.TestCase):
     """Test that cache keys are generated correctly with filter parameters."""
 
-    @patch("adrift.adapters.episode_sources.episode_source_rss._RSS_CACHE")
-    @patch("adrift.adapters.episode_sources.episode_source_rss.requests.get")
-    @patch("adrift.adapters.episode_sources.episode_source_rss.feedparser.parse")
+    @patch("adrift.adapters.process.episode_sources.episode_source_rss._RSS_CACHE")
+    @patch("adrift.adapters.process.episode_sources.episode_source_rss.requests.get")
+    @patch("adrift.adapters.process.episode_sources.episode_source_rss.feedparser.parse")
     def test_cache_key_includes_day_filter(
         self, mock_parse: Mock, mock_get: Mock, mock_cache_fn: Mock
     ):
@@ -355,9 +355,9 @@ class TestCacheKeyGeneration(unittest.TestCase):
         call_args = mock_cache.get.call_args[0][0]
         self.assertIn("FREQ=WEEKLY;BYDAY=FR", call_args)
 
-    @patch("adrift.adapters.episode_sources.episode_source_rss._RSS_CACHE")
-    @patch("adrift.adapters.episode_sources.episode_source_rss.requests.get")
-    @patch("adrift.adapters.episode_sources.episode_source_rss.feedparser.parse")
+    @patch("adrift.adapters.process.episode_sources.episode_source_rss._RSS_CACHE")
+    @patch("adrift.adapters.process.episode_sources.episode_source_rss.requests.get")
+    @patch("adrift.adapters.process.episode_sources.episode_source_rss.feedparser.parse")
     def test_cache_key_converts_list_to_tuple(
         self, mock_parse: Mock, mock_get: Mock, mock_cache_fn: Mock
     ):

@@ -3,7 +3,7 @@ from pathlib import Path
 import pytest
 from yt_dlp.utils import DownloadError as YtDlpDownloadError
 
-from adrift.adapters.youtube import downloader
+from adrift.adapters.process.youtube import downloader
 
 
 def test_download_video_skips_members_only_download_error(

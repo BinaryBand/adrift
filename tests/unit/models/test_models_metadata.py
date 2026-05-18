@@ -1,7 +1,7 @@
 import unittest
 from datetime import datetime, timezone
 
-from adrift.adapters.youtube.normalizer import rss_episode_from_ytdlp
+from adrift.adapters.process.youtube.normalizer import rss_episode_from_ytdlp
 from adrift.models import YtDlpImage, YtDlpVideo
 
 

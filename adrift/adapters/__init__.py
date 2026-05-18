@@ -9,7 +9,7 @@ or source type, add one entry here without touching any function body.
 import os
 from collections.abc import Callable
 
-from adrift.adapters.ports import (
+from adrift.adapters.process.ports import (
     EpisodeSourcePort,
     SecretProviderPort,
 )
@@ -30,13 +30,17 @@ def _require_source_url(source: FeedSource) -> str:
 
 
 def _make_youtube_source() -> EpisodeSourcePort:
-    from adrift.adapters.episode_sources.episode_source_youtube import YouTubeEpisodeSourceAdapter
+    from adrift.adapters.process.episode_sources.episode_source_youtube import (
+        YouTubeEpisodeSourceAdapter,
+    )
 
     return YouTubeEpisodeSourceAdapter()
 
 
 def _make_rss_source() -> EpisodeSourcePort:
-    from adrift.adapters.episode_sources.episode_source_rss import RssEpisodeSourceAdapter
+    from adrift.adapters.process.episode_sources.episode_source_rss import (
+        RssEpisodeSourceAdapter,
+    )
 
     return RssEpisodeSourceAdapter()
 
@@ -66,7 +70,7 @@ def get_episode_source_adapter(source: FeedSource) -> EpisodeSourcePort:
 
 
 def _make_env_provider() -> SecretProviderPort:
-    from adrift.adapters.secrets.env_secrets import EnvironmentSecretProvider
+    from adrift.adapters.process.secrets.env_secrets import EnvironmentSecretProvider
 
     return EnvironmentSecretProvider()
 
@@ -104,7 +108,7 @@ def get_secret_provider_adapter(
     if not enable_prompt_fallback:
         return provider
 
-    from adrift.adapters.secrets.prompt_fallback import PromptFallbackProvider
+    from adrift.adapters.process.secrets.prompt_fallback import PromptFallbackProvider
 
     if prompt_callback is None:
         return PromptFallbackProvider(provider)

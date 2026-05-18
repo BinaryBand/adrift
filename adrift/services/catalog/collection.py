@@ -76,7 +76,7 @@ def _fetch_source_episodes(
     context: EpisodeFetchContext,
 ) -> list[RssEpisode]:
     from adrift.adapters import get_episode_source_adapter
-    from adrift.adapters.ports import EpisodeSourceFetchContext
+    from adrift.adapters.process.ports import EpisodeSourceFetchContext
 
     resolved = ensure_feed_source(source)
     return get_episode_source_adapter(resolved).fetch_episodes(

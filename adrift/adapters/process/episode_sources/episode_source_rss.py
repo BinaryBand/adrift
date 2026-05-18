@@ -7,14 +7,14 @@ import requests
 from diskcache import Cache
 from feedparser import FeedParserDict
 
-from adrift.adapters.cache_retry import RaceAwareCacheWrapper
-from adrift.adapters.episode_sources.rss_normalizer import (
+from adrift.adapters.process.cache_retry import RaceAwareCacheWrapper
+from adrift.adapters.process.episode_sources.rss_normalizer import (
     channel_from_feedparser,
     entry_pub_date_from_feedparser,
     entry_title_from_feedparser,
     episode_from_feedparser,
 )
-from adrift.adapters.ports import EpisodeSourceFetchContext, EpisodeSourcePort
+from adrift.adapters.process.ports import EpisodeSourceFetchContext, EpisodeSourcePort
 from adrift.models import FeedSource, RssChannel, RssEpisode
 from adrift.utils.progress import Callback
 from adrift.utils.regex import LINK_REGEX, re_compile

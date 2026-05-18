@@ -1,8 +1,8 @@
 from dataclasses import dataclass, field
 from urllib.parse import urljoin
 
-from adrift.adapters.youtube import ytdlp
-from adrift.adapters.youtube.normalizer import rss_channel_from_ytdlp
+from adrift.adapters.process.youtube import ytdlp
+from adrift.adapters.process.youtube.normalizer import rss_channel_from_ytdlp
 from adrift.models import RssChannel, RssEpisode
 from adrift.utils.progress import Callback
 from adrift.utils.regex import (

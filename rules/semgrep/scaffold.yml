@@ -44,3 +44,21 @@ rules:
         - /tests/unit/utils/**/*.py
         - "**/tests/unit/utils/**/*.py"
     pattern-regex: ^\s*(from|import|def|class|@|[A-Za-z_][\w]*\s*=)
+
+  - id: adrift-adapters-shape
+    message: >-
+      Keep adrift.adapters limited to the current stable shape: config, lint,
+      process, reporting, errors.py, and package init files.
+    severity: ERROR
+    languages: [python]
+    paths:
+      include:
+        - /adrift/adapters/**/*.py
+      exclude:
+        - /adrift/adapters/__init__.py
+        - /adrift/adapters/errors.py
+        - /adrift/adapters/config/**/*.py
+        - /adrift/adapters/lint/**/*.py
+        - /adrift/adapters/process/**/*.py
+        - /adrift/adapters/reporting/**/*.py
+    pattern-regex: ^\s*(from|import|def|class|@|[A-Za-z_][\w]*\s*=)

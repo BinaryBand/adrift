@@ -37,7 +37,7 @@ else:
     S3Client = Any
 
 from adrift.adapters import get_secret_provider_adapter
-from adrift.adapters.ports import SecretProviderPort, require_secrets
+from adrift.adapters.process.ports import SecretProviderPort, require_secrets
 from adrift.models import CacheMetadata, MediaMetadata
 
 _REQUIRED_S3_KEYS = ("S3_USERNAME", "S3_SECRET_KEY", "S3_ENDPOINT", "S3_REGION")

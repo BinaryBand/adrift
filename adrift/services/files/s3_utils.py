@@ -11,7 +11,7 @@ import boto3
 from botocore.client import Config
 from botocore.exceptions import BotoCoreError, ClientError
 
-from adrift.adapters.ports import SecretProviderPort, require_secrets
+from adrift.adapters.process.ports import SecretProviderPort, require_secrets
 from adrift.utils.progress import Callback
 
 if TYPE_CHECKING:

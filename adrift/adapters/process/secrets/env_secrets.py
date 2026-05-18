@@ -4,7 +4,7 @@ from pathlib import Path
 
 from dotenv import find_dotenv, load_dotenv
 
-from adrift.adapters.ports import SecretProviderPort, SecretStorePort
+from adrift.adapters.process.ports import SecretProviderPort, SecretStorePort
 
 
 class EnvironmentSecretProvider(SecretProviderPort):

@@ -8,7 +8,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, cast
 
-from adrift.adapters.youtube.downloader import BotDetectionError, download_video
+from adrift.adapters.process.youtube.downloader import BotDetectionError, download_video
 from adrift.models import DownloadEpisode, MediaMetadata, PodcastConfig
 from adrift.services.download_cache import _existing_media_sources
 from adrift.services.download_client import s3_prefix

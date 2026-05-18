@@ -1,4 +1,4 @@
-from adrift.adapters.youtube.downloader import _extract_progress_update
+from adrift.adapters.process.youtube.downloader import _extract_progress_update
 from adrift.services.files.audio import _maybe_report_ffmpeg_progress
 
 

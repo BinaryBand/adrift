@@ -5,7 +5,7 @@ from __future__ import annotations
 import time
 from typing import Any
 
-from adrift.adapters.ports.cache import CachePort
+from adrift.adapters.process.ports.cache import CachePort
 
 _CACHE_RECREATE_ERRORS = (AttributeError, OSError, RuntimeError, TypeError, ValueError)
 

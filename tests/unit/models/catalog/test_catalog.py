@@ -65,7 +65,7 @@ def _pairs_from_config(config: PodcastConfig) -> list[tuple[int, int]]:
 
 
 class TestCollectEpisodes(unittest.TestCase):
-    @patch("adrift.adapters.episode_sources.episode_source_rss.get_rss_episodes")
+    @patch("adrift.adapters.process.episode_sources.episode_source_rss.get_rss_episodes")
     def test_single_source_returns_all(self, mock_rss: MagicMock):
         eps = [_ep("1", "Ep 1"), _ep("2", "Ep 2"), _ep("3", "Ep 3")]
         mock_rss.return_value = eps
@@ -73,7 +73,7 @@ class TestCollectEpisodes(unittest.TestCase):
         result = _collect_episodes([_rss_source()], context)
         self.assertEqual(len(result), 3)
 
-    @patch("adrift.adapters.episode_sources.episode_source_rss.get_rss_episodes")
+    @patch("adrift.adapters.process.episode_sources.episode_source_rss.get_rss_episodes")
     def test_two_sources_deduplicates_overlap(self, mock_rss: MagicMock):
         ep1 = _ep("1", "Episode One", pub_date=_dt(2024, 2, 6))
         ep2 = _ep("2", "Episode Two", pub_date=_dt(2024, 2, 13))
@@ -92,7 +92,7 @@ class TestCollectEpisodes(unittest.TestCase):
         self.assertEqual(len(result), 3)
         self.assertEqual(titles.count("Episode Two"), 1)
 
-    @patch("adrift.adapters.episode_sources.episode_source_rss.get_rss_episodes")
+    @patch("adrift.adapters.process.episode_sources.episode_source_rss.get_rss_episodes")
     def test_two_sources_no_overlap(self, mock_rss: MagicMock):
         mock_rss.side_effect = [
             [_ep("1", "Episode One", pub_date=_dt(2024, 2, 6))],
@@ -120,14 +120,14 @@ class TestCollectEpisodes(unittest.TestCase):
 
 
 class TestProcessFeeds(unittest.TestCase):
-    @patch("adrift.adapters.episode_sources.episode_source_rss.get_rss_episodes")
+    @patch("adrift.adapters.process.episode_sources.episode_source_rss.get_rss_episodes")
     def test_rss_source_no_filter_returns_all(self, mock_rss: MagicMock):
         eps = [_ep(str(i), f"Ep {i}") for i in range(5)]
         mock_rss.return_value = eps
         result = process_feeds(_config(references=[_rss_source()]))
         self.assertEqual(len(result), 5)
 
-    @patch("adrift.adapters.episode_sources.episode_source_rss.get_rss_episodes")
+    @patch("adrift.adapters.process.episode_sources.episode_source_rss.get_rss_episodes")
     def test_r_rules_forwarded_to_get_rss_episodes(self, mock_rss: MagicMock):
         """process_feeds must pass r_rules from config through to get_rss_episodes."""
         mock_rss.return_value = []
@@ -137,15 +137,15 @@ class TestProcessFeeds(unittest.TestCase):
         # get_rss_episodes(url, filter_regex, r_rules, callback)
         self.assertEqual(mock_rss.call_args[0][2], rules)
 
-    @patch("adrift.adapters.youtube.metadata.get_youtube_episodes")
+    @patch("adrift.adapters.process.youtube.metadata.get_youtube_episodes")
     def test_youtube_source_returns_all(self, mock_yt: MagicMock):
         eps = [_ep("yt1", "YT Ep 1"), _ep("yt2", "YT Ep 2"), _ep("yt3", "YT Ep 3")]
         mock_yt.return_value = eps
         result = process_feeds(_config(references=[_yt_source()]))
         self.assertEqual(len(result), 3)
 
-    @patch("adrift.adapters.episode_sources.episode_source_rss.get_rss_episodes")
-    @patch("adrift.adapters.youtube.metadata.get_youtube_episodes")
+    @patch("adrift.adapters.process.episode_sources.episode_source_rss.get_rss_episodes")
+    @patch("adrift.adapters.process.youtube.metadata.get_youtube_episodes")
     def test_multiple_sources_merged(self, mock_yt: MagicMock, mock_rss: MagicMock):
         mock_rss.return_value = [_ep("r1", "RSS Ep 1"), _ep("r2", "RSS Ep 2")]
         mock_yt.return_value = [_ep("yt1", "YT Ep 3")]
@@ -163,7 +163,7 @@ class TestProcessFeeds(unittest.TestCase):
 
 
 class TestProcessSources(unittest.TestCase):
-    @patch("adrift.adapters.youtube.metadata.get_youtube_episodes")
+    @patch("adrift.adapters.process.youtube.metadata.get_youtube_episodes")
     def test_returns_youtube_episodes(self, mock_yt: MagicMock):
         mock_yt.return_value = [_ep("yt1", "YT Ep A"), _ep("yt2", "YT Ep B")]
         result = process_sources(_config(downloads=[_yt_source()]))
@@ -180,8 +180,8 @@ class TestProcessSources(unittest.TestCase):
 
 
 class TestFullPipeline(unittest.TestCase):
-    @patch("adrift.adapters.episode_sources.episode_source_rss.get_rss_episodes")
-    @patch("adrift.adapters.youtube.metadata.get_youtube_episodes")
+    @patch("adrift.adapters.process.episode_sources.episode_source_rss.get_rss_episodes")
+    @patch("adrift.adapters.process.youtube.metadata.get_youtube_episodes")
     def test_only_matched_downloads_survive(self, mock_yt: MagicMock, mock_rss: MagicMock):
         ep1 = _ep("r1", "The Show: Episode 101", pub_date=_dt(2024, 2, 6))
         ep2 = _ep("r2", "The Show: Episode 102", pub_date=_dt(2024, 2, 13))
@@ -203,8 +203,8 @@ class TestFullPipeline(unittest.TestCase):
         self.assertIn("The Show: Episode 102", survived_titles)
         self.assertNotIn("Science Quarterly: Quantum Tunneling", survived_titles)
 
-    @patch("adrift.adapters.episode_sources.episode_source_rss.get_rss_episodes")
-    @patch("adrift.adapters.youtube.metadata.get_youtube_episodes")
+    @patch("adrift.adapters.process.episode_sources.episode_source_rss.get_rss_episodes")
+    @patch("adrift.adapters.process.youtube.metadata.get_youtube_episodes")
     def test_merge_config_records_source_traces(self, mock_yt: MagicMock, mock_rss: MagicMock):
         mock_rss.return_value = [_ep("r1", "RSS Episode", pub_date=_dt(2024, 2, 6))]
         mock_yt.return_value = [_ep("d1", "YT Episode", pub_date=_dt(2024, 2, 6))]
@@ -232,8 +232,8 @@ class TestFullPipeline(unittest.TestCase):
         self.assertFalse(download_trace.has_filters)
         self.assertEqual(download_trace.source_type, "youtube")
 
-    @patch("adrift.adapters.episode_sources.episode_source_rss.get_rss_episodes")
-    @patch("adrift.adapters.youtube.metadata.get_youtube_episodes")
+    @patch("adrift.adapters.process.episode_sources.episode_source_rss.get_rss_episodes")
+    @patch("adrift.adapters.process.youtube.metadata.get_youtube_episodes")
     def test_daily_show_scenario(self, mock_yt: MagicMock, mock_rss: MagicMock):
         """Regression: only episodes matching a reference should survive.
 
@@ -283,7 +283,7 @@ class TestFullPipeline(unittest.TestCase):
                 ep.pub_date, _dt(2024, 1, 1), f"Old episode slipped through: {ep.title}"
             )
 
-    @patch("adrift.adapters.youtube.metadata.get_youtube_episodes")
+    @patch("adrift.adapters.process.youtube.metadata.get_youtube_episodes")
     def test_no_references_keeps_all_downloads(self, mock_yt: MagicMock):
         """When references is empty, the fallback in download.py keeps all downloads."""
         mock_yt.return_value = [_ep("a", "Ep A"), _ep("b", "Ep B")]
@@ -300,8 +300,8 @@ class TestFullPipeline(unittest.TestCase):
 
         self.assertEqual(len(survived), 2)
 
-    @patch("adrift.adapters.episode_sources.episode_source_rss.get_rss_episodes")
-    @patch("adrift.adapters.youtube.metadata.get_youtube_episodes")
+    @patch("adrift.adapters.process.episode_sources.episode_source_rss.get_rss_episodes")
+    @patch("adrift.adapters.process.youtube.metadata.get_youtube_episodes")
     def test_unmatched_reference_is_dropped(self, mock_yt: MagicMock, mock_rss: MagicMock):
         """A reference with no matching download produces no output episode."""
         mock_rss.return_value = [
@@ -318,8 +318,8 @@ class TestFullPipeline(unittest.TestCase):
 
         self.assertEqual(pairs, [])
 
-    @patch("adrift.adapters.episode_sources.episode_source_rss.get_rss_episodes")
-    @patch("adrift.adapters.youtube.metadata.get_youtube_episodes")
+    @patch("adrift.adapters.process.episode_sources.episode_source_rss.get_rss_episodes")
+    @patch("adrift.adapters.process.youtube.metadata.get_youtube_episodes")
     def test_unmatched_download_is_dropped(self, mock_yt: MagicMock, mock_rss: MagicMock):
         """A download with no reference counterpart must not survive alignment."""
         matched_ref = _ep("ref1", "The Show: Episode 5", pub_date=_dt(2024, 3, 5))
