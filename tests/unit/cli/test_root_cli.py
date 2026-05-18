@@ -6,7 +6,7 @@ from adrift.cli.root import app
 def test_root_help_lists_expected_commands() -> None:
     runner = CliRunner()
 
-    result = runner.invoke(app, ["--help"])
+    result = runner.invoke(app, ["--help"], color=False)
 
     assert result.exit_code == 0
     assert "download" in result.stdout
@@ -17,7 +17,7 @@ def test_root_help_lists_expected_commands() -> None:
 def test_help_command_prints_top_level_help() -> None:
     runner = CliRunner()
 
-    result = runner.invoke(app, ["help"])
+    result = runner.invoke(app, ["help"], color=False)
 
     assert result.exit_code == 0
     assert "Commands" in result.stdout
@@ -28,7 +28,7 @@ def test_help_command_prints_top_level_help() -> None:
 def test_help_download_shows_download_options() -> None:
     runner = CliRunner()
 
-    result = runner.invoke(app, ["help", "download"])
+    result = runner.invoke(app, ["help", "download"], color=False)
 
     assert result.exit_code == 0
     assert "--max-downloads" in result.stdout
@@ -38,7 +38,7 @@ def test_help_download_shows_download_options() -> None:
 def test_download_help_shows_download_options() -> None:
     runner = CliRunner()
 
-    result = runner.invoke(app, ["download", "--help"])
+    result = runner.invoke(app, ["download", "--help"], color=False)
 
     assert result.exit_code == 0
     assert "--max-downloads" in result.stdout
@@ -48,7 +48,7 @@ def test_download_help_shows_download_options() -> None:
 def test_help_unknown_command_returns_error() -> None:
     runner = CliRunner()
 
-    result = runner.invoke(app, ["help", "unknown-command"])
+    result = runner.invoke(app, ["help", "unknown-command"], color=False)
 
     assert result.exit_code != 0
     assert "Unknown command" in result.output
