@@ -1,0 +1,38 @@
+rules:
+  - id: adrift-root-scaffold-only
+    message: >-
+      Only these top-level packages are allowed directly under adrift/: adapters, cli,
+      models, services, utils. Move this module or update the scaffold policy.
+    severity: ERROR
+    languages: [python]
+    paths:
+      include:
+        - /adrift/**/*.py
+      exclude:
+        - /adrift/adapters/**/*.py
+        - /adrift/cli/**/*.py
+        - /adrift/models/**/*.py
+        - /adrift/services/**/*.py
+        - /adrift/utils/**/*.py
+        - /adrift/__init__.py
+    pattern-regex: ^\s*(from|import|def|class|@|[A-Za-z_][\w]*\s*=)
+
+  - id: adrift-ports-centralize-in-models
+    message: >-
+      Adapter port Protocol definitions must live in adrift/models/ports.py.
+      Move this Protocol interface there and re-export from adrift/adapters/__init__.py
+      if needed for backward compatibility.
+    severity: ERROR
+    languages: [python]
+    paths:
+      include:
+        - /adrift/adapters/**/*.py
+      exclude:
+        - /adrift/models/ports.py
+    patterns:
+      - pattern: |
+          class $NAME(Protocol):
+            ...
+      - metavariable-regex:
+          metavariable: $NAME
+          regex: "(.*Port|.*Handler)$"

@@ -10,14 +10,14 @@ os.environ.setdefault("S3_SECRET_KEY", "_test")
 os.environ.setdefault("S3_ENDPOINT", "http://localhost")
 os.environ.setdefault("S3_REGION", "us-east-1")
 
-from adrift.catalog import (
+from adrift.models import AlignmentConfig, RssEpisode
+from adrift.models.catalog import (
     align_episodes,
     align_episodes_impl,
     merge_episode,
     sim_date,
 )
-from adrift.catalog.alignment import _best_thumbnail
-from adrift.models import AlignmentConfig, RssEpisode
+from adrift.models.catalog.alignment import _best_thumbnail
 
 _MORBID_ALIGNMENT = AlignmentConfig(extra_stopwords=["morbid"])
 
@@ -145,7 +145,7 @@ class TestAlignEpisodes(unittest.TestCase):
             _ep(id="d3", title="Episode Three", pub_date=_dt(2024, 1, 3)),
         ]
 
-        with patch("adrift.catalog.alignment._normalized_alignment_title") as mocked_title:
+        with patch("adrift.models.catalog.alignment._normalized_alignment_title") as mocked_title:
             mocked_title.side_effect = lambda show, episode: episode.title.lower()
             align_episodes(refs, dls, "Example Show")
 

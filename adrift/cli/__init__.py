@@ -36,7 +36,7 @@ def load_podcast_configs(
     skip_schedule_filter: bool,
     tags: list[str],
 ) -> list[PodcastConfig]:
-    from adrift.app_common import filter_podcasts_by_tags, load_podcasts_config
+    from adrift.services.app_common import filter_podcasts_by_tags, load_podcasts_config
 
     configs = load_podcasts_config(
         include=include,

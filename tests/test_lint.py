@@ -122,7 +122,7 @@ class TestSemgrep:
     def test_semgrep(self):
         """Fail if Semgrep reports any architecture or process violations."""
         result = run_resolved(
-            ["semgrep", "scan", "--config", ".semgrep.yml", "--error"],
+            ["semgrep", "scan", "--config", "rules/.semgrep", "--error"],
             capture_output=True,
             text=True,
         )

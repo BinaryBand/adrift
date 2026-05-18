@@ -3,7 +3,7 @@
 import unittest
 from unittest.mock import Mock, patch
 
-from adrift.web.rss import get_rss_episodes
+from adrift.services.web.rss import get_rss_episodes
 
 
 def _create_mock_entry(id: str, title: str, pub_date: str) -> Mock:
@@ -25,9 +25,9 @@ def _create_mock_entry(id: str, title: str, pub_date: str) -> Mock:
 class TestFeedFilter(unittest.TestCase):
     """Test feed_filter (regex) functionality."""
 
-    @patch("adrift.web.rss._rss_cache")
-    @patch("adrift.web.rss.requests.get")
-    @patch("adrift.web.rss.feedparser.parse")
+    @patch("adrift.services.web.rss._rss_cache")
+    @patch("adrift.services.web.rss.requests.get")
+    @patch("adrift.services.web.rss.feedparser.parse")
     def test_filter_includes_matching_episodes(
         self, mock_parse: Mock, mock_get: Mock, mock_cache_fn: Mock
     ):
@@ -54,9 +54,9 @@ class TestFeedFilter(unittest.TestCase):
         self.assertEqual(result[0].title, "Episode 001: Introduction")
         self.assertEqual(result[1].title, "Episode 002: Deep Dive")
 
-    @patch("adrift.web.rss._rss_cache")
-    @patch("adrift.web.rss.requests.get")
-    @patch("adrift.web.rss.feedparser.parse")
+    @patch("adrift.services.web.rss._rss_cache")
+    @patch("adrift.services.web.rss.requests.get")
+    @patch("adrift.services.web.rss.feedparser.parse")
     def test_filter_excludes_non_matching_episodes(
         self, mock_parse: Mock, mock_get: Mock, mock_cache_fn: Mock
     ):
@@ -83,9 +83,9 @@ class TestFeedFilter(unittest.TestCase):
         self.assertEqual(len(result), 1)
         self.assertEqual(result[0].title, "Regular Episode")
 
-    @patch("adrift.web.rss._rss_cache")
-    @patch("adrift.web.rss.requests.get")
-    @patch("adrift.web.rss.feedparser.parse")
+    @patch("adrift.services.web.rss._rss_cache")
+    @patch("adrift.services.web.rss.requests.get")
+    @patch("adrift.services.web.rss.feedparser.parse")
     def test_filter_case_insensitive(self, mock_parse: Mock, mock_get: Mock, mock_cache_fn: Mock):
         """Test that filter can be case-insensitive with (?i) flag."""
         mock_cache = mock_cache_fn.return_value
@@ -109,9 +109,9 @@ class TestFeedFilter(unittest.TestCase):
         self.assertIn("SPECIAL", result[0].title)
         self.assertIn("special", result[1].title)
 
-    @patch("adrift.web.rss._rss_cache")
-    @patch("adrift.web.rss.requests.get")
-    @patch("adrift.web.rss.feedparser.parse")
+    @patch("adrift.services.web.rss._rss_cache")
+    @patch("adrift.services.web.rss.requests.get")
+    @patch("adrift.services.web.rss.feedparser.parse")
     def test_filter_empty_string_returns_all(
         self, mock_parse: Mock, mock_get: Mock, mock_cache_fn: Mock
     ):
@@ -133,9 +133,9 @@ class TestFeedFilter(unittest.TestCase):
 
         self.assertEqual(len(result), 2)
 
-    @patch("adrift.web.rss._rss_cache")
-    @patch("adrift.web.rss.requests.get")
-    @patch("adrift.web.rss.feedparser.parse")
+    @patch("adrift.services.web.rss._rss_cache")
+    @patch("adrift.services.web.rss.requests.get")
+    @patch("adrift.services.web.rss.feedparser.parse")
     def test_filter_none_returns_all(self, mock_parse: Mock, mock_get: Mock, mock_cache_fn: Mock):
         """Test that None filter returns all episodes."""
         mock_cache = mock_cache_fn.return_value
@@ -159,9 +159,9 @@ class TestFeedFilter(unittest.TestCase):
 class TestDayOfWeekFilter(unittest.TestCase):
     """Test r_rules (RFC 5545) episode date filtering."""
 
-    @patch("adrift.web.rss._rss_cache")
-    @patch("adrift.web.rss.requests.get")
-    @patch("adrift.web.rss.feedparser.parse")
+    @patch("adrift.services.web.rss._rss_cache")
+    @patch("adrift.services.web.rss.requests.get")
+    @patch("adrift.services.web.rss.feedparser.parse")
     def test_filters_weekdays_only(self, mock_parse: Mock, mock_get: Mock, mock_cache_fn: Mock):
         """Test filtering for weekdays only (Mon-Fri)."""
         mock_cache = mock_cache_fn.return_value
@@ -196,9 +196,9 @@ class TestDayOfWeekFilter(unittest.TestCase):
         self.assertEqual(result[0].title, "Monday Episode")
         self.assertEqual(result[1].title, "Friday Episode")
 
-    @patch("adrift.web.rss._rss_cache")
-    @patch("adrift.web.rss.requests.get")
-    @patch("adrift.web.rss.feedparser.parse")
+    @patch("adrift.services.web.rss._rss_cache")
+    @patch("adrift.services.web.rss.requests.get")
+    @patch("adrift.services.web.rss.feedparser.parse")
     def test_filters_weekend_only(self, mock_parse: Mock, mock_get: Mock, mock_cache_fn: Mock):
         """Test filtering for weekend only (Sat-Sun)."""
         mock_cache = mock_cache_fn.return_value
@@ -225,9 +225,9 @@ class TestDayOfWeekFilter(unittest.TestCase):
         self.assertEqual(result[0].title, "Sunday Episode")
         self.assertEqual(result[1].title, "Saturday Episode")
 
-    @patch("adrift.web.rss._rss_cache")
-    @patch("adrift.web.rss.requests.get")
-    @patch("adrift.web.rss.feedparser.parse")
+    @patch("adrift.services.web.rss._rss_cache")
+    @patch("adrift.services.web.rss.requests.get")
+    @patch("adrift.services.web.rss.feedparser.parse")
     def test_filters_single_day(self, mock_parse: Mock, mock_get: Mock, mock_cache_fn: Mock):
         """Test filtering for a single specific day."""
         mock_cache = mock_cache_fn.return_value
@@ -251,9 +251,9 @@ class TestDayOfWeekFilter(unittest.TestCase):
         self.assertEqual(len(result), 1)
         self.assertEqual(result[0].title, "Wednesday Episode")
 
-    @patch("adrift.web.rss._rss_cache")
-    @patch("adrift.web.rss.requests.get")
-    @patch("adrift.web.rss.feedparser.parse")
+    @patch("adrift.services.web.rss._rss_cache")
+    @patch("adrift.services.web.rss.requests.get")
+    @patch("adrift.services.web.rss.feedparser.parse")
     def test_empty_day_filter_returns_all(
         self, mock_parse: Mock, mock_get: Mock, mock_cache_fn: Mock
     ):
@@ -275,9 +275,9 @@ class TestDayOfWeekFilter(unittest.TestCase):
 
         self.assertEqual(len(result), 2)
 
-    @patch("adrift.web.rss._rss_cache")
-    @patch("adrift.web.rss.requests.get")
-    @patch("adrift.web.rss.feedparser.parse")
+    @patch("adrift.services.web.rss._rss_cache")
+    @patch("adrift.services.web.rss.requests.get")
+    @patch("adrift.services.web.rss.feedparser.parse")
     def test_none_day_filter_returns_all(
         self, mock_parse: Mock, mock_get: Mock, mock_cache_fn: Mock
     ):
@@ -299,9 +299,9 @@ class TestDayOfWeekFilter(unittest.TestCase):
 
         self.assertEqual(len(result), 2)
 
-    @patch("adrift.web.rss._rss_cache")
-    @patch("adrift.web.rss.requests.get")
-    @patch("adrift.web.rss.feedparser.parse")
+    @patch("adrift.services.web.rss._rss_cache")
+    @patch("adrift.services.web.rss.requests.get")
+    @patch("adrift.services.web.rss.feedparser.parse")
     def test_handles_missing_pub_date(self, mock_parse: Mock, mock_get: Mock, mock_cache_fn: Mock):
         """Test that episodes with missing pub_date are excluded when using day filter."""
         mock_cache = mock_cache_fn.return_value
@@ -323,9 +323,9 @@ class TestDayOfWeekFilter(unittest.TestCase):
         self.assertEqual(len(result), 1)
         self.assertEqual(result[0].title, "Valid Episode")
 
-    @patch("adrift.web.rss._rss_cache")
-    @patch("adrift.web.rss.requests.get")
-    @patch("adrift.web.rss.feedparser.parse")
+    @patch("adrift.services.web.rss._rss_cache")
+    @patch("adrift.services.web.rss.requests.get")
+    @patch("adrift.services.web.rss.feedparser.parse")
     def test_handles_invalid_pub_date(self, mock_parse: Mock, mock_get: Mock, mock_cache_fn: Mock):
         """Test that episodes with invalid pub_date format are excluded when using r_rules."""
         mock_cache = mock_cache_fn.return_value
@@ -351,9 +351,9 @@ class TestDayOfWeekFilter(unittest.TestCase):
 class TestCombinedFilters(unittest.TestCase):
     """Test combining feed_filter and r_rules."""
 
-    @patch("adrift.web.rss._rss_cache")
-    @patch("adrift.web.rss.requests.get")
-    @patch("adrift.web.rss.feedparser.parse")
+    @patch("adrift.services.web.rss._rss_cache")
+    @patch("adrift.services.web.rss.requests.get")
+    @patch("adrift.services.web.rss.feedparser.parse")
     def test_both_filters_applied(self, mock_parse: Mock, mock_get: Mock, mock_cache_fn: Mock):
         """Test that both feed_filter and r_rules are applied together."""
         mock_cache = mock_cache_fn.return_value
@@ -393,9 +393,9 @@ class TestCombinedFilters(unittest.TestCase):
         self.assertEqual(result[0].title, "Episode 001")
         self.assertEqual(result[1].title, "Episode 003")
 
-    @patch("adrift.web.rss._rss_cache")
-    @patch("adrift.web.rss.requests.get")
-    @patch("adrift.web.rss.feedparser.parse")
+    @patch("adrift.services.web.rss._rss_cache")
+    @patch("adrift.services.web.rss.requests.get")
+    @patch("adrift.services.web.rss.feedparser.parse")
     def test_complex_regex_with_day_filter(
         self, mock_parse: Mock, mock_get: Mock, mock_cache_fn: Mock
     ):
@@ -453,9 +453,9 @@ class TestCombinedFilters(unittest.TestCase):
 class TestCacheKeyGeneration(unittest.TestCase):
     """Test that cache keys are generated correctly with filter parameters."""
 
-    @patch("adrift.web.rss._rss_cache")
-    @patch("adrift.web.rss.requests.get")
-    @patch("adrift.web.rss.feedparser.parse")
+    @patch("adrift.services.web.rss._rss_cache")
+    @patch("adrift.services.web.rss.requests.get")
+    @patch("adrift.services.web.rss.feedparser.parse")
     def test_cache_key_includes_day_filter(
         self, mock_parse: Mock, mock_get: Mock, mock_cache_fn: Mock
     ):
@@ -488,9 +488,9 @@ class TestCacheKeyGeneration(unittest.TestCase):
         call_args = mock_cache.get.call_args[0][0]
         self.assertIn("FREQ=WEEKLY;BYDAY=FR", call_args)
 
-    @patch("adrift.web.rss._rss_cache")
-    @patch("adrift.web.rss.requests.get")
-    @patch("adrift.web.rss.feedparser.parse")
+    @patch("adrift.services.web.rss._rss_cache")
+    @patch("adrift.services.web.rss.requests.get")
+    @patch("adrift.services.web.rss.feedparser.parse")
     def test_cache_key_converts_list_to_tuple(
         self, mock_parse: Mock, mock_get: Mock, mock_cache_fn: Mock
     ):

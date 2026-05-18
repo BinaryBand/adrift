@@ -3,8 +3,8 @@ import tempfile
 import unittest
 from pathlib import Path
 
-from adrift.app_common import _expand_include_targets
 from adrift.models import PodcastConfig, SourceFilter
+from adrift.services.app_common import _expand_include_targets
 from adrift.utils.regex import (
     LINK_REGEX,
     YOUTUBE_PLAYLIST_SHORTHAND_REGEX,
@@ -44,7 +44,7 @@ class AuditConfigs(unittest.TestCase):
         # all entries regardless of day – load from both files without filtering.
         from dotenv import find_dotenv
 
-        from adrift.app_common import load_config  # type: ignore[attr-defined]
+        from adrift.services.app_common import load_config  # type: ignore[attr-defined]
 
         all_files = Path(find_dotenv()).parent.glob("config/*.toml")
         configs: list[PodcastConfig] = []

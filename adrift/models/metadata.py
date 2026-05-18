@@ -6,7 +6,7 @@ from typing import Any, Callable
 import pydantic
 from pydantic import BaseModel, ConfigDict
 
-from adrift.infrastructure.youtube.normalizer import (
+from adrift.services.youtube.normalizer import (
     coerce_str,
     ensure_ytdlp_model,
     extract_image_from_list,

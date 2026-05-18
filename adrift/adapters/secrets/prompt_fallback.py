@@ -4,8 +4,8 @@ from collections.abc import Callable
 
 from rich.prompt import Prompt
 
-from adrift.application.services.secret_service import describe_managed_secret
-from adrift.ports import SecretProviderPort
+from adrift.adapters.ports import SecretProviderPort
+from adrift.services.secret_service import describe_managed_secret
 
 PromptCallback = Callable[[str, str, bool], str]
 

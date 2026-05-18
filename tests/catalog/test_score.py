@@ -15,13 +15,13 @@ os.environ.setdefault("S3_SECRET_KEY", "_test")
 os.environ.setdefault("S3_ENDPOINT", "http://localhost")
 os.environ.setdefault("S3_REGION", "us-east-1")
 
-from adrift.catalog.alignment import (
+from adrift.models import RssEpisode
+from adrift.models.catalog.alignment import (
     _CONTAINMENT_BONUS,
     _AlignmentCandidate,
     _score,
     _Sims,
 )
-from adrift.models import RssEpisode
 
 
 def _dt(year: int, month: int, day: int) -> datetime:

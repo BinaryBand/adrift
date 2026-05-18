@@ -9,11 +9,11 @@ or source type, add one entry here without touching any function body.
 import os
 from collections.abc import Callable
 
-from adrift.models import FeedSource
-from adrift.ports import (
+from adrift.adapters.ports import (
     EpisodeSourcePort,
     SecretProviderPort,
 )
+from adrift.models import FeedSource
 from adrift.utils.text import is_youtube_channel
 
 

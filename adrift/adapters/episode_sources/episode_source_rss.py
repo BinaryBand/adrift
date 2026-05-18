@@ -1,5 +1,5 @@
+from adrift.adapters.ports import EpisodeSourceFetchContext, EpisodeSourcePort
 from adrift.models import FeedSource, RssChannel, RssEpisode
-from adrift.ports import EpisodeSourceFetchContext, EpisodeSourcePort
 
 
 class RssEpisodeSourceAdapter(EpisodeSourcePort):
@@ -11,7 +11,7 @@ class RssEpisodeSourceAdapter(EpisodeSourcePort):
         context: EpisodeSourceFetchContext | None = None,
     ) -> list[RssEpisode]:
         """Fetch episodes from an RSS feed."""
-        from adrift.web.rss import get_rss_episodes
+        from adrift.services.web.rss import get_rss_episodes
 
         resolved_context = context or EpisodeSourceFetchContext()
         url = source.url
@@ -24,7 +24,7 @@ class RssEpisodeSourceAdapter(EpisodeSourcePort):
 
     def fetch_channel(self, source: FeedSource) -> RssChannel:
         """Fetch channel metadata from an RSS feed."""
-        from adrift.web.rss import get_rss_channel
+        from adrift.services.web.rss import get_rss_channel
 
         url = source.url
         if not url:

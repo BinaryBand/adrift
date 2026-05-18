@@ -5,19 +5,19 @@ from typing import Annotated
 
 import typer
 
-from adrift.application.context import AppContext
-from adrift.application.download import (
-    DownloadPipeline,
-    DownloadPipelineDeps,
-    DownloadPipelineRuntime,
-    DownloadRunOptions,
-)
 from adrift.cli import (
     IncludeConfigsOption,
     SkipScheduleFilterOption,
     TagsOption,
     bootstrap_run_configs,
     build_cli,
+)
+from adrift.services.context import AppContext
+from adrift.services.download import (
+    DownloadPipeline,
+    DownloadPipelineDeps,
+    DownloadPipelineRuntime,
+    DownloadRunOptions,
 )
 
 DEFAULT_MAX_DOWNLOADS = 10
@@ -29,15 +29,12 @@ def _build_pipeline(
     ui,
     pipeline_options: DownloadRunOptions,
 ) -> DownloadPipeline:
-    from adrift.application.services.download_enrich import enrich_with_sponsors
-    from adrift.application.services.download_process import (
-        build_download_queue,
-        download_and_upload,
-    )
-    from adrift.application.services.download_rss import update_rss
-    from adrift.catalog import MergeConfigOptions, merge_config
+    from adrift.models.catalog import MergeConfigOptions, merge_config
+    from adrift.services.download_enrich import enrich_with_sponsors
+    from adrift.services.download_process import build_download_queue, download_and_upload
+    from adrift.services.download_rss import update_rss
+    from adrift.services.youtube.downloader import BotDetectionError
     from adrift.utils.run_ui import build_merge_callbacks
-    from adrift.youtube.downloader import BotDetectionError
 
     # greedy one-to-one bipartite matching
     runtime = DownloadPipelineRuntime(ctx=ctx, ui=ui, options=pipeline_options)
@@ -97,7 +94,7 @@ def _run_with_bot_detection(
     pipeline_options: DownloadRunOptions,
     bot_cooldown: int,
 ) -> int:
-    from adrift.youtube.downloader import BotDetectionError
+    from adrift.services.youtube.downloader import BotDetectionError
 
     try:
         return _run_pipeline(configs, ctx, pipeline_options)

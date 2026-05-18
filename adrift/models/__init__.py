@@ -1,5 +1,15 @@
 """Package wrapper for model definitions."""
 
+from .errors import (
+    AdriftError,
+    AlignmentError,
+    BotDetectionError,
+    CacheError,
+    DownloadError,
+    FetchError,
+    PipelineError,
+    StorageError,
+)
 from .metadata import (
     DEVICE,
     PROJECT,
@@ -30,6 +40,7 @@ from .podcast_config import (
     parse_podcasts_raw,
 )
 from .sponsorblock import SponsorSegment
+from .stage_result import StageResult
 from .ytdlp import YtDlpImage, YtDlpVideo
 
 __all__ = [
@@ -46,6 +57,7 @@ __all__ = [
     "AlignmentConfig",
     "FeedSource",
     "PodcastConfig",
+    "StageResult",
     "EpisodeData",
     "PodcastFeed",
     "MatchCandidateTrace",
@@ -53,6 +65,14 @@ __all__ = [
     "SourceTrace",
     "MergeResult",
     "DownloadEpisode",
+    "AdriftError",
+    "AlignmentError",
+    "BotDetectionError",
+    "CacheError",
+    "DownloadError",
+    "FetchError",
+    "PipelineError",
+    "StorageError",
     "SponsorSegment",
     "YtDlpImage",
     "YtDlpVideo",

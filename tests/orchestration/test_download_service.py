@@ -4,15 +4,15 @@ from types import SimpleNamespace
 
 import pytest
 
-from adrift.application.context import AppContext, EventBus
-from adrift.application.events import DownloadCompleted, OperationStarted, ProgressUpdated
-from adrift.application.services.download_process import (
+from adrift.adapters.ports.cache import InMemoryCache
+from adrift.models import DownloadEpisode, MediaMetadata, PodcastConfig, RssEpisode
+from adrift.services.context import AppContext, EventBus
+from adrift.services.download_process import (
     build_download_queue,
     episode_exists_on_s3,
     process_in_tmpdir,
 )
-from adrift.models import DownloadEpisode, MediaMetadata, PodcastConfig, RssEpisode
-from adrift.ports.cache import InMemoryCache
+from adrift.services.events import DownloadCompleted, OperationStarted, ProgressUpdated
 
 
 def _episode(title: str, pub_date: datetime | None = None) -> DownloadEpisode:
@@ -67,7 +67,7 @@ def test_build_download_queue_prioritizes_missing_then_newest(
         return ep.episode.title in existing_titles
 
     monkeypatch.setattr(
-        "adrift.application.services.download_process.episode_exists_on_s3",
+        "adrift.services.download_process.episode_exists_on_s3",
         _exists_on_s3,
     )
 
@@ -97,7 +97,7 @@ def test_build_download_queue_preserves_unknown_dates_after_dated_missing(
         return False
 
     monkeypatch.setattr(
-        "adrift.application.services.download_process.episode_exists_on_s3",
+        "adrift.services.download_process.episode_exists_on_s3",
         _always_missing,
     )
 
@@ -227,19 +227,19 @@ def test_process_in_tmpdir_reports_upload_progress(
         return 42.0
 
     monkeypatch.setattr(
-        "adrift.application.services.download_process.s3_prefix",
+        "adrift.services.download_process.s3_prefix",
         _s3_prefix_fn,
     )
     monkeypatch.setattr(
-        "adrift.application.services.download_process._download_audio",
+        "adrift.services.download_process._download_audio",
         _download_audio_fn,
     )
     monkeypatch.setattr(
-        "adrift.application.services.download_process.convert_to_opus",
+        "adrift.services.download_process.convert_to_opus",
         _convert_to_opus_fn,
     )
     monkeypatch.setattr(
-        "adrift.application.services.download_process.get_duration",
+        "adrift.services.download_process.get_duration",
         _get_duration_fn,
     )
 

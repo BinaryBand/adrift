@@ -1,13 +1,13 @@
 from types import SimpleNamespace
 from typing import Any, cast
 
-from adrift.application.download import (
+from adrift.models import PodcastConfig
+from adrift.services.download import (
     DownloadPipeline,
     DownloadPipelineDeps,
     DownloadPipelineRuntime,
     DownloadRunOptions,
 )
-from adrift.models import PodcastConfig
 
 
 def test_download_episodes_skips_existing_and_counts_new_uploads() -> None:

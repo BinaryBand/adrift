@@ -1,5 +1,5 @@
-from adrift.files.audio import _maybe_report_ffmpeg_progress
-from adrift.youtube.downloader import _extract_progress_update
+from adrift.services.files.audio import _maybe_report_ffmpeg_progress
+from adrift.services.youtube.downloader import _extract_progress_update
 
 
 def test_maybe_report_ffmpeg_progress_reports_out_time_us() -> None:

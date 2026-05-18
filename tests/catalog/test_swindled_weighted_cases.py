@@ -9,8 +9,8 @@ os.environ.setdefault("S3_SECRET_KEY", "_test")
 os.environ.setdefault("S3_ENDPOINT", "http://localhost")
 os.environ.setdefault("S3_REGION", "us-east-1")
 
-from adrift.catalog import align_episodes_impl
 from adrift.models import RssEpisode
+from adrift.models.catalog import align_episodes_impl
 
 _WEIGHTED_CASES = (
     Path(__file__).resolve().parents[1] / "resources" / "alignment" / "swindled_weighted_cases.csv"

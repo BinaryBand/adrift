@@ -5,26 +5,6 @@ from typing import Annotated
 
 import typer
 
-from adrift.application.merge import MergeUseCase
-from adrift.application.services.merge_service import (
-    MergeRunOptions,
-    MergeWriters,
-)
-from adrift.application.services.merge_service import (
-    format_duration as _format_duration,
-)
-from adrift.application.services.merge_service import (
-    write_json as service_write_json,
-)
-from adrift.application.services.merge_service import (
-    write_output_bundle as service_write_output_bundle,
-)
-from adrift.application.services.merge_service import (
-    write_report_file as service_write_report_file,
-)
-from adrift.application.services.merge_service import (
-    write_series_outputs as service_write_series_outputs,
-)
 from adrift.cli import (
     IncludeConfigsOption,
     SkipScheduleFilterOption,
@@ -33,6 +13,13 @@ from adrift.cli import (
     build_cli,
 )
 from adrift.models import PodcastConfig
+from adrift.services.merge import MergeUseCase
+from adrift.services.merge_service import MergeRunOptions, MergeWriters
+from adrift.services.merge_service import format_duration as _format_duration
+from adrift.services.merge_service import write_json as service_write_json
+from adrift.services.merge_service import write_output_bundle as service_write_output_bundle
+from adrift.services.merge_service import write_report_file as service_write_report_file
+from adrift.services.merge_service import write_series_outputs as service_write_series_outputs
 
 
 def _write_json(path, payload: object) -> None:

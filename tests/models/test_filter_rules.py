@@ -14,7 +14,7 @@ os.environ.setdefault("S3_SECRET_KEY", "_test")
 os.environ.setdefault("S3_ENDPOINT", "http://localhost")
 os.environ.setdefault("S3_REGION", "us-east-1")
 
-app_common = importlib.import_module("adrift.app_common")
+app_common = importlib.import_module("adrift.services.app_common")
 SourceFilter = app_common.SourceFilter
 _schedule_matches_today = app_common._schedule_matches_today
 
