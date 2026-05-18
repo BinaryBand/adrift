@@ -31,7 +31,7 @@ class TestCpd:
 
     @pytest.mark.parametrize(
         "config,path",
-        [("jscpd.json", ".")],
+        [("rules/jscpd.json", ".")],
     )
     def test_cpd(self, config, path):
         """Fail if jscpd reports any copy-paste duplication."""
@@ -122,7 +122,7 @@ class TestSemgrep:
     def test_semgrep(self):
         """Fail if Semgrep reports any architecture or process violations."""
         result = run_resolved(
-            ["semgrep", "scan", "--config", "rules/.semgrep", "--error"],
+            ["semgrep", "scan", "--config", "rules/semgrep", "--error"],
             capture_output=True,
             text=True,
         )
