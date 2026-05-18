@@ -9,11 +9,12 @@ os.environ.setdefault("S3_SECRET_KEY", "_test")
 os.environ.setdefault("S3_ENDPOINT", "http://localhost")
 os.environ.setdefault("S3_REGION", "us-east-1")
 
-from adrift.models import RssEpisode
+from adrift.models import AlignmentConfig, RssEpisode
 from adrift.models.catalog import align_episodes_impl
 
+_MORBID_ALIGNMENT = AlignmentConfig(extra_stopwords=["morbid"])
 _WEIGHTED_CASES = (
-    Path(__file__).resolve().parents[1] / "resources" / "alignment" / "swindled_weighted_cases.csv"
+    Path(__file__).resolve().parents[3] / "resources" / "alignment" / "morbid_weighted_cases.csv"
 )
 
 
@@ -74,7 +75,7 @@ def _episode(
     )
 
 
-def test_swindled_weighted_cases() -> None:
+def test_morbid_weighted_cases() -> None:
     cases = _load_cases()
     assert len(cases) > 0, "Weighted-case CSV should not be empty"
 
@@ -92,7 +93,7 @@ def test_swindled_weighted_cases() -> None:
             case.download_description,
             case.download_pub_date,
         )
-        matched = align_episodes_impl([ref], [dl], "Swindled") == [(0, 0)]
+        matched = align_episodes_impl([ref], [dl], "Morbid", _MORBID_ALIGNMENT) == [(0, 0)]
         if matched != case.should_match:
             mismatches.append(
                 f"scenario={case.scenario} expected={case.should_match} got={matched} "

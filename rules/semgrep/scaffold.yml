@@ -17,22 +17,30 @@ rules:
         - /adrift/__init__.py
     pattern-regex: ^\s*(from|import|def|class|@|[A-Za-z_][\w]*\s*=)
 
-  - id: adrift-ports-centralize-in-models
+  - id: tests-unit-mirror-adrift-top-level-shape
     message: >-
-      Adapter port Protocol definitions must live in adrift/models/ports.py.
-      Move this Protocol interface there and re-export from adrift/adapters/__init__.py
-      if needed for backward compatibility.
+      Keep tests/unit aligned with adrift top-level layers only: adapters, cli,
+      models, services, utils, and the audio adapter test slice. Add a new
+      adrift layer first, then mirror it in tests/unit deliberately.
     severity: ERROR
     languages: [python]
     paths:
       include:
-        - /adrift/adapters/**/*.py
+        - /tests/unit/**/*.py
+        - "**/tests/unit/**/*.py"
       exclude:
-        - /adrift/models/ports.py
-    patterns:
-      - pattern: |
-          class $NAME(Protocol):
-            ...
-      - metavariable-regex:
-          metavariable: $NAME
-          regex: "(.*Port|.*Handler)$"
+        - /tests/unit/__init__.py
+        - "**/tests/unit/__init__.py"
+        - /tests/unit/conftest.py
+        - "**/tests/unit/conftest.py"
+        - /tests/unit/adapters/**/*.py
+        - "**/tests/unit/adapters/**/*.py"
+        - /tests/unit/cli/**/*.py
+        - "**/tests/unit/cli/**/*.py"
+        - /tests/unit/models/**/*.py
+        - "**/tests/unit/models/**/*.py"
+        - /tests/unit/services/**/*.py
+        - "**/tests/unit/services/**/*.py"
+        - /tests/unit/utils/**/*.py
+        - "**/tests/unit/utils/**/*.py"
+    pattern-regex: ^\s*(from|import|def|class|@|[A-Za-z_][\w]*\s*=)

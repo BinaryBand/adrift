@@ -13,7 +13,7 @@ from adrift.models import RssEpisode
 from adrift.models.catalog import align_episodes_impl
 
 _WEIGHTED_CASES = (
-    Path(__file__).resolve().parents[1]
+    Path(__file__).resolve().parents[3]
     / "resources"
     / "alignment"
     / "financial_audit_weighted_cases.csv"

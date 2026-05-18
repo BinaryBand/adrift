@@ -4,5 +4,5 @@
   "threshold": 0,
   "languages": ["python"],
   "reporters": ["console"],
-  "ignore": ["**/.venv/**", "**/typings/**", "**/tests/**"]
+  "ignore": ["**/.venv/**", "**/typings/**", "tests/test_lint.py"]
 }

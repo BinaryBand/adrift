@@ -14,7 +14,7 @@ os.environ.setdefault("S3_REGION", "us-east-1")
 from adrift.models import RssEpisode
 from adrift.models.catalog import align_episodes
 
-FIXTURE_DIR = Path(__file__).resolve().parents[1] / "resources" / "alignment"
+FIXTURE_DIR = Path(__file__).resolve().parents[3] / "resources" / "alignment"
 
 
 def _parse_datetime(value: str) -> datetime | None:

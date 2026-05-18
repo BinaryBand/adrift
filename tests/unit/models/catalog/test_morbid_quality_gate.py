@@ -23,7 +23,7 @@ from adrift.models.catalog import align_episodes_impl
 
 _MORBID_ALIGNMENT = AlignmentConfig(extra_stopwords=["morbid"])
 _HARD_PACK = (
-    Path(__file__).resolve().parents[1] / "resources" / "alignment" / "morbid_hard_pack.csv"
+    Path(__file__).resolve().parents[3] / "resources" / "alignment" / "morbid_hard_pack.csv"
 )
 _STRICT_MIN_PRECISION = 0.95
 _STRICT_MAX_FALSE_POSITIVE_RATE = 0.05
