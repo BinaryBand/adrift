@@ -21,6 +21,19 @@ from adrift.services.youtube.ytdlp import (
 )
 
 
+def _cached_payload(
+    episode: RssEpisode,
+    fetched_at: datetime | None = None,
+    head_checked_at: datetime | None = None,
+) -> dict:
+    now = datetime.now(timezone.utc)
+    return {
+        "fetched_at": (fetched_at or now).isoformat(),
+        "head_checked_at": (head_checked_at or now).isoformat(),
+        "episodes": {episode.id: episode},
+    }
+
+
 class TestPydanticModels(unittest.TestCase):
     """Test Pydantic model validation and parsing."""
 
@@ -583,22 +596,21 @@ class TestGetCachedChannelInfo(unittest.TestCase):
 class TestGetYoutubeVideos(unittest.TestCase):
     """Test episode-list caching and refresh behavior."""
 
-    @patch("adrift.services.youtube.ytdlp._fetch_video_batch")
-    @patch("adrift.services.youtube.ytdlp._CACHE")
-    def test_returns_fresh_cached_episode_bundle_without_fetching(
-        self, mock_cache: MagicMock, mock_fetch_batch: MagicMock
-    ):
-        episode = RssEpisode(
+    def setUp(self) -> None:
+        self.episode = RssEpisode(
             id="vid123",
             title="Cached Video",
             author="Test Channel",
             content="https://youtube.com/watch?v=vid123",
         )
-        mock_cache.get.return_value = {
-            "fetched_at": datetime.now(timezone.utc).isoformat(),
-            "head_checked_at": datetime.now(timezone.utc).isoformat(),
-            "episodes": {episode.id: episode},
-        }
+
+    @patch("adrift.services.youtube.ytdlp._fetch_video_batch")
+    @patch("adrift.services.youtube.ytdlp._CACHE")
+    def test_returns_fresh_cached_episode_bundle_without_fetching(
+        self, mock_cache: MagicMock, mock_fetch_batch: MagicMock
+    ):
+        episode = self.episode
+        mock_cache.get.return_value = _cached_payload(episode)
 
         result = get_youtube_videos("https://youtube.com/@test/videos", "Test Channel")
 
@@ -611,12 +623,7 @@ class TestGetYoutubeVideos(unittest.TestCase):
     def test_refresh_bypasses_fresh_episode_bundle(
         self, mock_cache: MagicMock, mock_fetch_batch: MagicMock
     ):
-        episode = RssEpisode(
-            id="vid123",
-            title="Cached Video",
-            author="Test Channel",
-            content="https://youtube.com/watch?v=vid123",
-        )
+        episode = self.episode
         mock_cache.get.return_value = {
             "fetched_at": datetime.now(timezone.utc).isoformat(),
             "head_checked_at": datetime.now(timezone.utc).isoformat(),
@@ -644,12 +651,7 @@ class TestGetYoutubeVideos(unittest.TestCase):
     def test_legacy_cached_episode_map_is_treated_as_stale(
         self, mock_cache: MagicMock, mock_fetch_batch: MagicMock
     ):
-        episode = RssEpisode(
-            id="vid123",
-            title="Cached Video",
-            author="Test Channel",
-            content="https://youtube.com/watch?v=vid123",
-        )
+        episode = self.episode
         mock_cache.get.return_value = {episode.id: episode}
         mock_fetch_batch.side_effect = [[{"id": "vid123", "title": "Cached Video"}]]
 
@@ -670,18 +672,11 @@ class TestGetYoutubeVideos(unittest.TestCase):
     ):
         fresh_time = datetime(2026, 4, 17, tzinfo=timezone.utc)
         stale_time = fresh_time - YOUTUBE_EPISODE_CACHE_FRESHNESS - timedelta(seconds=1)
-        episode = RssEpisode(
-            id="vid123",
-            title="Cached Video",
-            author="Test Channel",
-            content="https://youtube.com/watch?v=vid123",
-        )
+        episode = self.episode
         mock_utcnow.return_value = fresh_time
-        mock_cache.get.return_value = {
-            "fetched_at": stale_time.isoformat(),
-            "head_checked_at": stale_time.isoformat(),
-            "episodes": {episode.id: episode},
-        }
+        mock_cache.get.return_value = _cached_payload(
+            episode, fetched_at=stale_time, head_checked_at=stale_time
+        )
         mock_fetch_batch.side_effect = [[{"id": "vid123", "title": "Cached Video"}]]
 
         get_youtube_videos("https://youtube.com/@test/videos", "Test Channel")
@@ -697,18 +692,11 @@ class TestGetYoutubeVideos(unittest.TestCase):
         now = datetime(2026, 4, 20, tzinfo=timezone.utc)
         fetched_at = now - timedelta(hours=2)
         head_checked_at = now - YOUTUBE_RECENT_EPISODE_CHECK_FRESHNESS - timedelta(seconds=1)
-        episode = RssEpisode(
-            id="vid123",
-            title="Cached Video",
-            author="Test Channel",
-            content="https://youtube.com/watch?v=vid123",
-        )
+        episode = self.episode
         mock_utcnow.return_value = now
-        mock_cache.get.return_value = {
-            "fetched_at": fetched_at.isoformat(),
-            "head_checked_at": head_checked_at.isoformat(),
-            "episodes": {episode.id: episode},
-        }
+        mock_cache.get.return_value = _cached_payload(
+            episode, fetched_at=fetched_at, head_checked_at=head_checked_at
+        )
         mock_fetch_batch.return_value = [{"id": "vid999", "title": "Brand New Video"}]
 
         result = get_youtube_videos("https://youtube.com/@test/videos", "Test Channel")
@@ -731,18 +719,11 @@ class TestGetYoutubeVideos(unittest.TestCase):
         self, mock_utcnow: MagicMock, mock_cache: MagicMock, mock_fetch_batch: MagicMock
     ):
         now = datetime(2026, 4, 20, tzinfo=timezone.utc)
-        episode = RssEpisode(
-            id="vid123",
-            title="Cached Video",
-            author="Test Channel",
-            content="https://youtube.com/watch?v=vid123",
-        )
+        episode = self.episode
         mock_utcnow.return_value = now
-        mock_cache.get.return_value = {
-            "fetched_at": (now - timedelta(hours=2)).isoformat(),
-            "head_checked_at": now.isoformat(),
-            "episodes": {episode.id: episode},
-        }
+        mock_cache.get.return_value = _cached_payload(
+            episode, fetched_at=(now - timedelta(hours=2)), head_checked_at=now
+        )
 
         result = get_youtube_videos("https://youtube.com/@test/videos", "Test Channel")
 

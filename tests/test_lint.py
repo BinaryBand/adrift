@@ -31,7 +31,7 @@ class TestCpd:
 
     @pytest.mark.parametrize(
         "config,path",
-        [("rules/jscpd.json", ".")],
+        [("rules/jscpd.json", "."), ("rules/jscpd.tests.json", "tests")],
     )
     def test_cpd(self, config, path):
         """Fail if jscpd reports any copy-paste duplication."""

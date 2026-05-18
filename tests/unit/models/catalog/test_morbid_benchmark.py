@@ -1,40 +1,12 @@
 import csv
-import os
 import unittest
-from datetime import datetime, timezone
 
-os.environ.setdefault("S3_USERNAME", "_test")
-os.environ.setdefault("S3_SECRET_KEY", "_test")
-os.environ.setdefault("S3_ENDPOINT", "http://localhost")
-os.environ.setdefault("S3_REGION", "us-east-1")
-
-from adrift.models import AlignmentConfig, RssEpisode
+from adrift.models import AlignmentConfig
 from adrift.models.catalog import align_episodes_impl
+from tests.unit.models.catalog._fixtures import dt as _dt
+from tests.unit.models.catalog._fixtures import ep as _ep
 
 _MORBID_ALIGNMENT = AlignmentConfig(extra_stopwords=["morbid"])
-
-
-def _dt(year: int, month: int, day: int) -> datetime:
-    return datetime(year, month, day, tzinfo=timezone.utc)
-
-
-def _ep(
-    id: str = "ep1",
-    title: str = "Episode 1",
-    description: str = "",
-    pub_date: datetime | None = None,
-    content: str = "https://example.com/ep1.mp3",
-    image: str | None = None,
-) -> RssEpisode:
-    return RssEpisode(
-        id=id,
-        title=title,
-        author="",
-        content=content,
-        description=description,
-        pub_date=pub_date,
-        image=image,
-    )
 
 
 class TestMorbidBenchmark(unittest.TestCase):

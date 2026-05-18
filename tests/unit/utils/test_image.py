@@ -1,12 +1,6 @@
 """Tests for src.utils.image — feedparser and yt-dlp image URL extraction."""
 
-import os
 import unittest
-
-os.environ.setdefault("S3_USERNAME", "_test")
-os.environ.setdefault("S3_SECRET_KEY", "_test")
-os.environ.setdefault("S3_ENDPOINT", "http://localhost")
-os.environ.setdefault("S3_REGION", "us-east-1")
 
 from adrift.models import YtDlpImage
 from adrift.utils.image import (

@@ -6,47 +6,23 @@ from unittest.mock import patch
 
 import adrift.cli as cli_mod
 from adrift.cli import merge as merge_mod
-from adrift.models import EpisodeData, FeedSource, MergeResult, PodcastConfig, RssEpisode
-
-
-def _config() -> PodcastConfig:
-    return PodcastConfig(
-        name="Example Show",
-        path="/tmp/example-show",
-        references=[FeedSource(url="https://example.com/reference.rss")],
-        downloads=[FeedSource(url="yt://@example-show")],
-    )
-
-
-def _rss_episode(identifier: str, title: str, content: str) -> RssEpisode:
-    return RssEpisode(
-        id=identifier,
-        title=title,
-        author="Example Author",
-        content=content,
-        description=f"Description for {title}",
-        pub_date=datetime(2024, 1, 1, tzinfo=timezone.utc),
-    )
-
-
-def _merged_episode() -> EpisodeData:
-    return EpisodeData(
-        id="merged-1",
-        title="Merged Episode",
-        description="Merged description",
-        source=["https://example.com/reference-1.mp3", "https://youtube.com/watch?v=abc123"],
-        upload_date=datetime(2024, 1, 1, tzinfo=timezone.utc),
-    )
+from adrift.models import EpisodeData, FeedSource, MergeResult, PodcastConfig
+from tests.unit._fixtures import (
+    _config,
+    _make_merge_result,
+    _merged_episode,
+    _rss_episode,
+    sample_merge_result,
+    sample_refs_downloads,
+)
 
 
 def test_write_series_outputs_creates_expected_layout(tmp_path: Path) -> None:
     config = _config()
-    references = [_rss_episode("ref-1", "Reference Episode", "https://example.com/reference-1.mp3")]
-    downloads = [_rss_episode("dl-1", "Download Episode", "https://youtube.com/watch?v=abc123")]
-    merged = [_merged_episode()]
+    references, downloads, merged = sample_refs_downloads()
 
-    result = MergeResult(
-        config=config, references=references, downloads=downloads, pairs=[], episodes=merged
+    result = _make_merge_result(
+        config=config, references=references, downloads=downloads, episodes=merged
     )
     series_entry = merge_mod._write_series_outputs(tmp_path, result)
     merge_mod._write_output_bundle(
@@ -75,16 +51,7 @@ def test_write_series_outputs_creates_expected_layout(tmp_path: Path) -> None:
 
 def test_main_writes_bundle_and_stdout(tmp_path: Path, capsys) -> None:
     config = _config()
-    references = [_rss_episode("ref-1", "Reference Episode", "https://example.com/reference-1.mp3")]
-    downloads = [_rss_episode("dl-1", "Download Episode", "https://youtube.com/watch?v=abc123")]
-    merged = [_merged_episode()]
-    result = MergeResult(
-        config=config,
-        references=references,
-        downloads=downloads,
-        pairs=[(0, 0)],
-        episodes=merged,
-    )
+    result = sample_merge_result(config)
 
     argv = [
         "adrift-merge",
@@ -127,14 +94,14 @@ def test_main_updates_output_file_after_each_podcast(tmp_path: Path, capsys) -> 
         references=[FeedSource(url="https://example.com/second-reference.rss")],
         downloads=[FeedSource(url="yt://@second-show")],
     )
-    first_result = MergeResult(
+    first_result = _make_merge_result(
         config=first,
         references=[_rss_episode("ref-1", "First Ref", "https://example.com/first-ref.mp3")],
         downloads=[_rss_episode("dl-1", "First Dl", "https://youtube.com/watch?v=first")],
         pairs=[(0, 0)],
         episodes=[_merged_episode()],
     )
-    second_result = MergeResult(
+    second_result = _make_merge_result(
         config=second,
         references=[_rss_episode("ref-2", "Second Ref", "https://example.com/second-ref.mp3")],
         downloads=[_rss_episode("dl-2", "Second Dl", "https://youtube.com/watch?v=second")],
@@ -191,13 +158,7 @@ def test_main_updates_output_file_after_each_podcast(tmp_path: Path, capsys) -> 
 def test_main_defaults_output_dir_to_downloads(tmp_path: Path, capsys) -> None:
     config = _config()
     downloads_root = tmp_path / "downloads"
-    result = MergeResult(
-        config=config,
-        references=[_rss_episode("ref-1", "Reference Episode", "https://example.com/ref.mp3")],
-        downloads=[_rss_episode("dl-1", "Download Episode", "https://youtube.com/watch?v=abc123")],
-        pairs=[(0, 0)],
-        episodes=[_merged_episode()],
-    )
+    result = sample_merge_result(config)
 
     argv = [
         "adrift-merge",
@@ -221,13 +182,7 @@ def test_main_defaults_output_dir_to_downloads(tmp_path: Path, capsys) -> None:
 
 def test_main_emits_timings_to_stderr(tmp_path: Path, capsys) -> None:
     config = _config()
-    result = MergeResult(
-        config=config,
-        references=[_rss_episode("ref-1", "Reference Episode", "https://example.com/ref.mp3")],
-        downloads=[_rss_episode("dl-1", "Download Episode", "https://youtube.com/watch?v=abc123")],
-        pairs=[(0, 0)],
-        episodes=[_merged_episode()],
-    )
+    result = sample_merge_result(config)
 
     def _merge_config_with_timings(*args, **kwargs) -> MergeResult:
         timings = kwargs.get("timings")

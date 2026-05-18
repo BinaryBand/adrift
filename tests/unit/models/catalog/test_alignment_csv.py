@@ -1,15 +1,9 @@
 """CSV-backed alignment tests that mirror live align_episodes behavior."""
 
 import csv
-import os
 import unittest
 from datetime import datetime
 from pathlib import Path
-
-os.environ.setdefault("S3_USERNAME", "_test")
-os.environ.setdefault("S3_SECRET_KEY", "_test")
-os.environ.setdefault("S3_ENDPOINT", "http://localhost")
-os.environ.setdefault("S3_REGION", "us-east-1")
 
 from adrift.models import RssEpisode
 from adrift.models.catalog import align_episodes

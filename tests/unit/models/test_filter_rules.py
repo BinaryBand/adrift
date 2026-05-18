@@ -1,18 +1,9 @@
 """Tests for the FilterRules model and RRULE schedule matching."""
 
 import importlib
-import os
 import re
 import unittest
 from datetime import datetime
-
-# Provide placeholder S3 credentials so importing src.app_common does not
-# fail the module-level assertions in adrift/files/s3.py.  setdefault leaves
-# real credentials untouched when running in a fully configured environment.
-os.environ.setdefault("S3_USERNAME", "_test")
-os.environ.setdefault("S3_SECRET_KEY", "_test")
-os.environ.setdefault("S3_ENDPOINT", "http://localhost")
-os.environ.setdefault("S3_REGION", "us-east-1")
 
 app_common = importlib.import_module("adrift.services.app_common")
 SourceFilter = app_common.SourceFilter

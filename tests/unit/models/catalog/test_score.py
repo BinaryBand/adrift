@@ -6,14 +6,8 @@ complement the full alignment integration tests by targeting the logic branch
 controlled by the include_date flag directly.
 """
 
-import os
 import unittest
 from datetime import datetime, timezone
-
-os.environ.setdefault("S3_USERNAME", "_test")
-os.environ.setdefault("S3_SECRET_KEY", "_test")
-os.environ.setdefault("S3_ENDPOINT", "http://localhost")
-os.environ.setdefault("S3_REGION", "us-east-1")
 
 from adrift.models import RssEpisode
 from adrift.models.catalog.alignment import (

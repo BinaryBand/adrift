@@ -9,15 +9,8 @@ External I/O is patched at the source-fetch boundary:
   - src.catalog.get_youtube_episodes
 """
 
-import os
 import unittest
-from datetime import datetime, timezone
 from unittest.mock import MagicMock, patch
-
-os.environ.setdefault("S3_USERNAME", "_test")
-os.environ.setdefault("S3_SECRET_KEY", "_test")
-os.environ.setdefault("S3_ENDPOINT", "http://localhost")
-os.environ.setdefault("S3_REGION", "us-east-1")
 
 from adrift.models import FeedSource, PodcastConfig, RssEpisode, SourceFilter
 from adrift.models.catalog import (
@@ -28,29 +21,8 @@ from adrift.models.catalog import (
     process_sources,
 )
 from adrift.models.catalog.collection import _collect_episodes
-
-
-def _dt(year: int, month: int, day: int) -> datetime:
-    return datetime(year, month, day, tzinfo=timezone.utc)
-
-
-def _ep(
-    id: str = "ep1",
-    title: str = "Episode 1",
-    description: str = "",
-    pub_date: datetime | None = None,
-    content: str = "https://example.com/ep1.mp3",
-    image: str | None = None,
-) -> RssEpisode:
-    return RssEpisode(
-        id=id,
-        title=title,
-        author="",
-        content=content,
-        description=description,
-        pub_date=pub_date,
-        image=image,
-    )
+from tests.unit.models.catalog._fixtures import dt as _dt
+from tests.unit.models.catalog._fixtures import ep as _ep
 
 
 def _rss_source(
@@ -74,6 +46,17 @@ def _config(
         references=references or [],
         downloads=downloads or [],
     )
+
+
+def _align_from_config(config: PodcastConfig) -> list[RssEpisode]:
+    references = process_feeds(config)
+    downloads = process_sources(config)
+    pairs = align_episodes(references, downloads)
+    return [downloads[d_idx] for _, d_idx in pairs]
+
+
+def _pairs_from_config(config: PodcastConfig) -> list[tuple[int, int]]:
+    return align_episodes(process_feeds(config), process_sources(config))
 
 
 # ---------------------------------------------------------------------------
@@ -212,10 +195,7 @@ class TestFullPipeline(unittest.TestCase):
         ]
 
         config = _config(references=[_rss_source()], downloads=[_yt_source()])
-        references = process_feeds(config)
-        downloads = process_sources(config)
-        pairs = align_episodes(references, downloads)
-        survived = [downloads[d_idx] for _, d_idx in pairs]
+        survived = _align_from_config(config)
 
         self.assertEqual(len(survived), 2)
         survived_titles = {ep.title for ep in survived}
@@ -294,10 +274,7 @@ class TestFullPipeline(unittest.TestCase):
             references=[_rss_source()],
             downloads=[_yt_source("@TheDailyShow")],
         )
-        references = process_feeds(config)
-        downloads = process_sources(config)
-        pairs = align_episodes(references, downloads)
-        survived = [downloads[d_idx] for _, d_idx in pairs]
+        survived = _align_from_config(config)
 
         self.assertEqual(len(survived), 5)
         for ep in survived:
@@ -337,9 +314,7 @@ class TestFullPipeline(unittest.TestCase):
         mock_yt.return_value = []
 
         config = _config(references=[_rss_source()], downloads=[_yt_source()])
-        references = process_feeds(config)
-        downloads = process_sources(config)
-        pairs = align_episodes(references, downloads)
+        pairs = _pairs_from_config(config)
 
         self.assertEqual(pairs, [])
 
@@ -355,10 +330,8 @@ class TestFullPipeline(unittest.TestCase):
         mock_yt.return_value = [matched_dl, orphan_dl]
 
         config = _config(references=[_rss_source()], downloads=[_yt_source()])
-        references = process_feeds(config)
-        downloads = process_sources(config)
-        pairs = align_episodes(references, downloads)
-        survived = [downloads[d_idx] for _, d_idx in pairs]
+        pairs = _pairs_from_config(config)
+        survived = [process_sources(config)[d_idx] for _, d_idx in pairs]
 
         survived_titles = {ep.title for ep in survived}
         self.assertNotIn("Download Only: Bonus Footage", survived_titles)

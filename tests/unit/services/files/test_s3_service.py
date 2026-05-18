@@ -3,14 +3,7 @@ from __future__ import annotations
 from typing import Any
 
 from adrift.services.files.s3 import S3Service
-
-
-class _FakeProvider:
-    def __init__(self, values: dict[str, str]) -> None:
-        self._values = values
-
-    def get(self, key: str, default: str = "") -> str:
-        return self._values.get(key, default)
+from tests.unit._fixtures import _FakeProvider
 
 
 class _FakeSession:

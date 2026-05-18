@@ -6,17 +6,11 @@ regressing obvious positives.
 """
 
 import csv
-import os
 from dataclasses import dataclass
 from datetime import datetime, timezone
 from pathlib import Path
 
 import pytest
-
-os.environ.setdefault("S3_USERNAME", "_test")
-os.environ.setdefault("S3_SECRET_KEY", "_test")
-os.environ.setdefault("S3_ENDPOINT", "http://localhost")
-os.environ.setdefault("S3_REGION", "us-east-1")
 
 from adrift.models import AlignmentConfig, RssEpisode
 from adrift.models.catalog import align_episodes_impl

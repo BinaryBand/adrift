@@ -1,14 +1,7 @@
 import pytest
 
 from adrift.adapters.ports import require_secrets
-
-
-class _FakeProvider:
-    def __init__(self, values: dict[str, str]) -> None:
-        self._values = values
-
-    def get(self, key: str, default: str = "") -> str:
-        return self._values.get(key, default)
+from tests.unit._fixtures import _FakeProvider
 
 
 def test_require_secrets_returns_values_when_all_present() -> None:
