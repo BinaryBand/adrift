@@ -39,6 +39,7 @@ def _build_pipeline(
     from adrift.utils.run_ui import build_merge_callbacks
     from adrift.youtube.downloader import BotDetectionError
 
+    # greedy one-to-one bipartite matching
     runtime = DownloadPipelineRuntime(ctx=ctx, ui=ui, options=pipeline_options)
     deps = DownloadPipelineDeps(
         merge_config=merge_config,

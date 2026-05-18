@@ -106,9 +106,18 @@ tags = ["podcasts", "morbid"]
 
 [[podcasts.references]]
 url = "https://feeds.simplecast.com/ohmVlJZQ"
+[podcasts.references.filters]
+exclude = ["listener tales", "listener tale"]
 
 [[podcasts.downloads]]
 url = "yt://@morbidpodcast"
+[podcasts.downloads.filters]
+exclude = ["listener tales", "listener tale"]
+
+[[podcasts.downloads]]
+url = "https://feeds.simplecast.com/ohmVlJZQ"
+[podcasts.downloads.filters]
+exclude = ["listener tales", "listener tale"]
 
 [podcasts.alignment]
 extra_stopwords = ["morbid"]
