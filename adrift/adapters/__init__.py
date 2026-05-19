@@ -115,7 +115,7 @@ _SCORED_ALIGNMENT_REGISTRY: dict[str, Callable[[], ScoredAlignmentPort | None]] 
 
 def get_scored_alignment_adapter(backend_name: str | None = None) -> ScoredAlignmentPort | None:
     """Return a scored alignment adapter backend, or None for legacy service implementation."""
-    selected = (backend_name or os.getenv("ADRIFT_ALIGNMENT_BACKEND") or "optimized").lower()
+    selected = (backend_name or os.getenv("ADRIFT_ALIGNMENT_BACKEND") or "legacy").lower()
     factory = _SCORED_ALIGNMENT_REGISTRY.get(selected)
     if factory is None:
         raise ValueError(f"Unsupported alignment backend: {selected}")

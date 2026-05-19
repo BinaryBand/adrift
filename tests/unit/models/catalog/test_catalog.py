@@ -12,9 +12,10 @@ External I/O is patched at the source-fetch boundary:
 import unittest
 from unittest.mock import MagicMock, patch
 
-from adrift.models import FeedSource, PodcastConfig, RssEpisode, SourceFilter
+from adrift.models import EpisodeData, FeedSource, PodcastConfig, RssEpisode, SourceFilter
 from adrift.services.catalog import (
     EpisodeFetchContext,
+    MergeConfigOptions,
     align_episodes,
     merge_config,
     process_feeds,
@@ -57,6 +58,32 @@ def _align_from_config(config: PodcastConfig) -> list[RssEpisode]:
 
 def _pairs_from_config(config: PodcastConfig) -> list[tuple[int, int]]:
     return align_episodes(process_feeds(config), process_sources(config))
+
+
+def _single_episode_config(mock_yt: MagicMock, mock_rss: MagicMock) -> PodcastConfig:
+    mock_rss.return_value = [_ep("r1", "Ref Episode", pub_date=_dt(2024, 2, 6))]
+    mock_yt.return_value = [_ep("d1", "Download Episode", pub_date=_dt(2024, 2, 6))]
+    return _config(references=[_rss_source()], downloads=[_yt_source()])
+
+
+class _FakeScoredAlignmentPort:
+    def __init__(self, score: float = 0.99, track_calls: bool = False) -> None:
+        self._score = score
+        self._track_calls = track_calls
+        self.called = False
+
+    def align_with_scores(
+        self,
+        references,
+        downloads,
+        *,
+        show="",
+        alignment=None,
+    ):
+        if self._track_calls:
+            self.called = True
+        del references, downloads, show, alignment
+        return [(0, 0)], {(0, 0): self._score}
 
 
 # ---------------------------------------------------------------------------
@@ -271,30 +298,9 @@ class TestFullPipeline(unittest.TestCase):
     def test_merge_config_uses_injected_scored_alignment_port(
         self, mock_yt: MagicMock, mock_rss: MagicMock
     ):
-        mock_rss.return_value = [_ep("r1", "Ref Episode", pub_date=_dt(2024, 2, 6))]
-        mock_yt.return_value = [_ep("d1", "Download Episode", pub_date=_dt(2024, 2, 6))]
+        config = _single_episode_config(mock_yt, mock_rss)
 
-        config = _config(references=[_rss_source()], downloads=[_yt_source()])
-
-        class FakeScoredAlignmentPort:
-            def __init__(self) -> None:
-                self.called = False
-
-            def align_with_scores(
-                self,
-                references,
-                downloads,
-                *,
-                show="",
-                alignment=None,
-            ):
-                self.called = True
-                del references, downloads, show, alignment
-                return [(0, 0)], {(0, 0): 0.99}
-
-        from adrift.services.catalog import MergeConfigOptions
-
-        fake_port = FakeScoredAlignmentPort()
+        fake_port = _FakeScoredAlignmentPort(track_calls=True)
         result = merge_config(
             config,
             MergeConfigOptions(scored_alignment_port=fake_port),
@@ -303,6 +309,58 @@ class TestFullPipeline(unittest.TestCase):
         self.assertTrue(fake_port.called)
         self.assertEqual(result.pairs, [(0, 0)])
         self.assertEqual(result.match_traces[0].matched_download_index, 0)
+
+    @patch("adrift.adapters.process.episode_sources.episode_source_rss.get_rss_episodes")
+    @patch("adrift.adapters.process.youtube.metadata.get_youtube_episodes")
+    def test_merge_config_runs_candidate_episode_merger_port_in_ab_mode(
+        self, mock_yt: MagicMock, mock_rss: MagicMock
+    ):
+        config = _single_episode_config(mock_yt, mock_rss)
+
+        class PrimaryEpisodeMergerPort:
+            def merge(self, references, downloads, pairs):
+                del references, downloads, pairs
+                return [
+                    EpisodeData(
+                        id="primary",
+                        title="Primary",
+                        description="primary",
+                        source=["primary"],
+                    )
+                ]
+
+        class CandidateEpisodeMergerPort:
+            def __init__(self) -> None:
+                self.called = False
+
+            def merge(self, references, downloads, pairs):
+                self.called = True
+                del references, downloads, pairs
+                return [
+                    EpisodeData(
+                        id="candidate",
+                        title="Candidate",
+                        description="candidate",
+                        source=["candidate"],
+                    )
+                ]
+
+        warnings: list[str] = []
+        candidate_port = CandidateEpisodeMergerPort()
+
+        result = merge_config(
+            config,
+            MergeConfigOptions(
+                scored_alignment_port=_FakeScoredAlignmentPort(),
+                episode_merger_port=PrimaryEpisodeMergerPort(),
+                episode_merger_candidate_port=candidate_port,
+                ab_warnings=warnings,
+            ),
+        )
+
+        self.assertTrue(candidate_port.called)
+        self.assertEqual(result.episodes[0].id, "primary")
+        self.assertTrue(any("merge_episodes A/B mismatch" in warning for warning in warnings))
 
     @patch("adrift.adapters.process.episode_sources.episode_source_rss.get_rss_episodes")
     @patch("adrift.adapters.process.youtube.metadata.get_youtube_episodes")

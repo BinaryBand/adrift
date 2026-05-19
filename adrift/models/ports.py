@@ -5,7 +5,9 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Generic, Protocol, TypeVar, runtime_checkable
 
-from adrift.models import AlignmentConfig, FeedSource, RssChannel, RssEpisode
+from adrift.models import AlignmentConfig, FeedSource, PodcastConfig, RssChannel, RssEpisode
+from adrift.models.output import EpisodeData
+from adrift.models.pipeline import ReferenceMatchTrace, SourceTrace
 
 Callback = Callable[[int, int | None], None]
 
@@ -38,6 +40,40 @@ class ScoredAlignmentPort(Protocol):
         downloads: list[RssEpisode],
         **kwargs: object,
     ) -> tuple[list[tuple[int, int]], dict[tuple[int, int], float]]: ...
+
+
+@runtime_checkable
+class EpisodeCollectorPort(Protocol):
+    def collect(
+        self,
+        config: PodcastConfig,
+        *,
+        is_reference: bool,
+        callback: Callable[[int, int | None], None] | None = None,
+        refresh_sources: bool = False,
+    ) -> tuple[list[RssEpisode], list[SourceTrace]]: ...
+
+
+@runtime_checkable
+class MatchTraceBuilderPort(Protocol):
+    def build(
+        self,
+        references: list[RssEpisode],
+        downloads: list[RssEpisode],
+        pairs: list[tuple[int, int]],
+        show: str,
+        scores: dict[tuple[int, int], float],
+    ) -> list[ReferenceMatchTrace]: ...
+
+
+@runtime_checkable
+class EpisodeMergerPort(Protocol):
+    def merge(
+        self,
+        references: list[RssEpisode],
+        downloads: list[RssEpisode],
+        pairs: list[tuple[int, int]],
+    ) -> list[EpisodeData]: ...
 
 
 @runtime_checkable
