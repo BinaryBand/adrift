@@ -1,6 +1,7 @@
 # pyright: reportPrivateUsage=false
+import os
 from collections.abc import Callable
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from time import perf_counter
 from typing import TypedDict, TypeVar, Unpack
 
@@ -137,9 +138,10 @@ def _collect_feed_sets(
     options: MergeConfigOptions,
 ) -> tuple[list[RssEpisode], list[RssEpisode], list[SourceTrace]]:
     collector = _resolved_collector_port(options)
+    candidate_collector = _resolved_collector_candidate_port(options)
     references, reference_traces = _collect_role_with_optional_candidate(
         collector,
-        options.collector_candidate_port,
+        candidate_collector,
         config,
         is_reference=True,
         primary_stage="process_feeds",
@@ -149,7 +151,7 @@ def _collect_feed_sets(
     )
     downloads, download_traces = _collect_role_with_optional_candidate(
         collector,
-        options.collector_candidate_port,
+        candidate_collector,
         config,
         is_reference=False,
         primary_stage="process_sources",
@@ -197,7 +199,7 @@ def _run_alignment_ab_candidate(
     primary_pairs: list[tuple[int, int]],
     primary_scores: dict[tuple[int, int], float],
 ) -> None:
-    candidate_port = options.scored_alignment_candidate_port
+    candidate_port = _resolved_alignment_candidate_port(options)
     if candidate_port is None:
         return
     candidate_pairs, candidate_scores = _timed_stage(
@@ -279,6 +281,7 @@ def _merge_config_artifacts(
 ) -> tuple[list[tuple[int, int]], list[ReferenceMatchTrace], list[EpisodeData]]:
     trace_builder = _resolved_trace_builder_port(options)
     episode_merger = _resolved_episode_merger_port(options)
+    options = _with_resolved_candidate_ports(options)
     primary_runner = _primary_alignment_runner(options, references, downloads, config)
     shadow_runner = _alignment_shadow_runner(options, references, downloads, config)
     pairs, scores = _align_with_ab_shadow(options, primary_runner, shadow_runner)
@@ -331,7 +334,7 @@ def _build_match_traces_with_ab(
 ) -> list[ReferenceMatchTrace]:
     match_traces = trace_builder.build(references, downloads, pairs, config.name, scores)
     _run_candidate_stage(
-        options.trace_builder_candidate_port,
+        _resolved_trace_builder_candidate_port(options),
         "build_match_traces_ab_candidate",
         "build_match_traces",
         options,
@@ -353,7 +356,7 @@ def _merge_episodes_with_ab(
         lambda: episode_merger.merge(references, downloads, pairs),
         options,
     )
-    candidate_port = options.episode_merger_candidate_port
+    candidate_port = _resolved_episode_merger_candidate_port(options)
     if candidate_port is not None:
         candidate_episodes = _timed_stage(
             "merge_episodes_ab_candidate",
@@ -372,6 +375,69 @@ def _align_with_ab_shadow(
     pairs, scores = _timed_stage("align_episodes", align_primary, options)
     run_shadow(pairs, scores)
     return pairs, scores
+
+
+def _with_resolved_candidate_ports(options: MergeConfigOptions) -> MergeConfigOptions:
+    return replace(
+        options,
+        scored_alignment_candidate_port=_resolved_alignment_candidate_port(options),
+        collector_candidate_port=_resolved_collector_candidate_port(options),
+        trace_builder_candidate_port=_resolved_trace_builder_candidate_port(options),
+        episode_merger_candidate_port=_resolved_episode_merger_candidate_port(options),
+    )
+
+
+def _resolved_alignment_candidate_port(options: MergeConfigOptions) -> ScoredAlignmentPort | None:
+    if options.scored_alignment_candidate_port is not None:
+        return options.scored_alignment_candidate_port
+    backend = _candidate_backend_name("ADRIFT_AB_ALIGN_CANDIDATE")
+    if backend is None:
+        return None
+    return get_scored_alignment_adapter(backend)
+
+
+def _resolved_collector_candidate_port(options: MergeConfigOptions) -> EpisodeCollectorPort | None:
+    if options.collector_candidate_port is not None:
+        return options.collector_candidate_port
+    backend = _candidate_backend_name("ADRIFT_AB_COLLECTOR_CANDIDATE")
+    if backend is None:
+        return None
+    if backend == "legacy":
+        return LegacyEpisodeCollectorAdapter()
+    raise ValueError(f"Unsupported collector candidate backend: {backend}")
+
+
+def _resolved_trace_builder_candidate_port(
+    options: MergeConfigOptions,
+) -> MatchTraceBuilderPort | None:
+    if options.trace_builder_candidate_port is not None:
+        return options.trace_builder_candidate_port
+    backend = _candidate_backend_name("ADRIFT_AB_TRACE_CANDIDATE")
+    if backend is None:
+        return None
+    if backend == "legacy":
+        return LegacyTraceBuilderAdapter()
+    raise ValueError(f"Unsupported trace candidate backend: {backend}")
+
+
+def _resolved_episode_merger_candidate_port(
+    options: MergeConfigOptions,
+) -> EpisodeMergerPort | None:
+    if options.episode_merger_candidate_port is not None:
+        return options.episode_merger_candidate_port
+    backend = _candidate_backend_name("ADRIFT_AB_MERGER_CANDIDATE")
+    if backend is None:
+        return None
+    if backend == "legacy":
+        return LegacyEpisodeMergerAdapter()
+    raise ValueError(f"Unsupported merger candidate backend: {backend}")
+
+
+def _candidate_backend_name(env_name: str) -> str | None:
+    value = os.getenv(env_name, "").strip().lower()
+    if not value or value == "none":
+        return None
+    return value
 
 
 @profile

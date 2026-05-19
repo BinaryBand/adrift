@@ -123,5 +123,7 @@ def emit_timings(config_name: str, timings: dict[str, float]) -> None:
     rendered_parts = [
         f"{key}={format_duration(timings[key])}" for key in ordered_keys if key in timings
     ]
+    extra_keys = sorted(key for key in timings if key not in ordered_keys)
+    rendered_parts.extend(f"{key}={format_duration(timings[key])}" for key in extra_keys)
     if rendered_parts:
         sys.stderr.write(f"TIMING {config_name}: {' '.join(rendered_parts)}\n")
