@@ -120,7 +120,7 @@ def _compare_ab_result(
 def _resolved_collector_port(options: MergeConfigOptions) -> EpisodeCollectorPort:
     if options.collector_port is not None:
         return options.collector_port
-    port = options.scored_alignment_port
+    port = _resolved_scored_alignment_port(options)
     dedup_port = port if isinstance(port, ScoredAlignmentBatchPort) else None
     return LegacyEpisodeCollectorAdapter(dedup_port=dedup_port)
 

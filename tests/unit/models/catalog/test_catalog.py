@@ -290,7 +290,7 @@ class TestFullPipeline(unittest.TestCase):
 
         result = merge_config(config, MergeConfigOptions())
 
-        mock_get_adapter.assert_called_once_with()
+        mock_get_adapter.assert_called_with()
         self.assertEqual(result.pairs, [(0, 0)])
 
     @patch("adrift.adapters.process.episode_sources.episode_source_rss.get_rss_episodes")
