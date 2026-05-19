@@ -4,6 +4,7 @@ from dataclasses import dataclass
 from time import perf_counter
 from typing import TypedDict, TypeVar, Unpack
 
+from adrift.adapters import get_scored_alignment_adapter
 from adrift.models import (
     EpisodeData,
     MergeResult,
@@ -118,8 +119,9 @@ def _align_with_selected_port(
     downloads: list[RssEpisode],
     config: PodcastConfig,
 ) -> tuple[list[tuple[int, int]], dict[tuple[int, int], float]]:
-    if options.scored_alignment_port is not None:
-        return options.scored_alignment_port.align_with_scores(
+    port = _resolved_scored_alignment_port(options)
+    if port is not None:
+        return port.align_with_scores(
             references,
             downloads,
             show=config.name,
@@ -131,6 +133,12 @@ def _align_with_selected_port(
         show=config.name,
         alignment=config.alignment,
     )
+
+
+def _resolved_scored_alignment_port(options: MergeConfigOptions) -> ScoredAlignmentPort | None:
+    if options.scored_alignment_port is not None:
+        return options.scored_alignment_port
+    return get_scored_alignment_adapter()
 
 
 def _merge_config_artifacts(

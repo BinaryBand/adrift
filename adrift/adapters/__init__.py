@@ -12,6 +12,7 @@ from collections.abc import Callable
 from adrift.models import FeedSource
 from adrift.models.ports import (
     EpisodeSourcePort,
+    ScoredAlignmentPort,
     SecretProviderPort,
 )
 from adrift.utils.text import is_youtube_channel
@@ -98,3 +99,24 @@ def get_secret_provider_adapter(
     """Return the configured secret provider adapter instance."""
     _selected, provider = _build_selected_provider(provider_name)
     return provider
+
+
+def _make_optimized_scored_alignment_adapter() -> ScoredAlignmentPort:
+    from adrift.adapters.process.alignment import OptimizedScoredAlignmentAdapter
+
+    return OptimizedScoredAlignmentAdapter()
+
+
+_SCORED_ALIGNMENT_REGISTRY: dict[str, Callable[[], ScoredAlignmentPort | None]] = {
+    "optimized": _make_optimized_scored_alignment_adapter,
+    "legacy": lambda: None,
+}
+
+
+def get_scored_alignment_adapter(backend_name: str | None = None) -> ScoredAlignmentPort | None:
+    """Return a scored alignment adapter backend, or None for legacy service implementation."""
+    selected = (backend_name or os.getenv("ADRIFT_ALIGNMENT_BACKEND") or "optimized").lower()
+    factory = _SCORED_ALIGNMENT_REGISTRY.get(selected)
+    if factory is None:
+        raise ValueError(f"Unsupported alignment backend: {selected}")
+    return factory()
