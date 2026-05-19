@@ -1,6 +1,7 @@
 # pyright: reportPrivateUsage=false
 import os
 from collections.abc import Callable
+from concurrent.futures import ThreadPoolExecutor
 from dataclasses import dataclass, replace
 from time import perf_counter
 from typing import TypedDict, TypeVar, Unpack
@@ -22,7 +23,7 @@ from adrift.models.ports import (
     ScoredAlignmentPort,
 )
 from adrift.utils.alignment_pairs import AlignmentResult
-from adrift.utils.profiler import profile
+from adrift.utils.profiler import profile, profile_block
 from adrift.utils.progress import Callback
 
 from .alignment import align_episodes_with_scores, prepare_alignment_batch
@@ -141,30 +142,68 @@ def _collect_feed_sets(
     config: PodcastConfig,
     options: MergeConfigOptions,
 ) -> tuple[list[RssEpisode], list[RssEpisode], list[SourceTrace]]:
-    collector = _resolved_collector_port(options)
-    candidate_collector = _resolved_collector_candidate_port(options)
-    references, reference_traces = _collect_role_with_optional_candidate(
-        collector,
-        candidate_collector,
-        config,
-        is_reference=True,
-        primary_stage="process_feeds",
-        candidate_stage="process_feeds_ab_candidate",
-        compare_stage="process_feeds",
-        options=options,
-    )
-    downloads, download_traces = _collect_role_with_optional_candidate(
-        collector,
-        candidate_collector,
-        config,
-        is_reference=False,
-        primary_stage="process_sources",
-        candidate_stage="process_sources_ab_candidate",
-        compare_stage="process_sources",
-        options=options,
-    )
+    with profile_block("merge.collect_feed_sets"):
+        collector = _resolved_collector_port(options)
+        candidate_collector = _resolved_collector_candidate_port(options)
+        references, downloads, reference_traces, download_traces = _collect_feed_roles_parallel(
+            collector,
+            candidate_collector,
+            config,
+            options,
+        )
 
-    return references, downloads, [*reference_traces, *download_traces]
+        return references, downloads, [*reference_traces, *download_traces]
+
+
+def _collect_feed_roles_parallel(
+    collector: EpisodeCollectorPort,
+    candidate_collector: EpisodeCollectorPort | None,
+    config: PodcastConfig,
+    options: MergeConfigOptions,
+) -> tuple[list[RssEpisode], list[RssEpisode], list[SourceTrace], list[SourceTrace]]:
+    with ThreadPoolExecutor(max_workers=2) as executor:
+        reference_future = _submit_collect_role(
+            executor,
+            collector,
+            candidate_collector,
+            config,
+            True,
+            options,
+        )
+        download_future = _submit_collect_role(
+            executor,
+            collector,
+            candidate_collector,
+            config,
+            False,
+            options,
+        )
+        references, reference_traces = reference_future.result()
+        downloads, download_traces = download_future.result()
+    return references, downloads, reference_traces, download_traces
+
+
+def _submit_collect_role(
+    executor: ThreadPoolExecutor,
+    collector: EpisodeCollectorPort,
+    candidate_collector: EpisodeCollectorPort | None,
+    config: PodcastConfig,
+    is_reference: bool,
+    options: MergeConfigOptions,
+):
+    return executor.submit(
+        _collect_role_with_optional_candidate,
+        collector,
+        candidate_collector,
+        config,
+        is_reference=is_reference,
+        primary_stage="process_feeds" if is_reference else "process_sources",
+        candidate_stage="process_feeds_ab_candidate"
+        if is_reference
+        else "process_sources_ab_candidate",
+        compare_stage="process_feeds" if is_reference else "process_sources",
+        options=options,
+    )
 
 
 def _align_with_selected_port(
@@ -173,15 +212,16 @@ def _align_with_selected_port(
     downloads: list[RssEpisode],
     config: PodcastConfig,
 ) -> AlignmentResult:
-    port = _resolved_scored_alignment_port(options)
-    if port is None:
-        return align_episodes_with_scores(
-            references,
-            downloads,
-            show=config.name,
-            alignment=config.alignment,
-        )
-    return _align_with_port(port, references, downloads, config)
+    with profile_block(f"merge.align_selected_port_{len(references)}ref_{len(downloads)}dl"):
+        port = _resolved_scored_alignment_port(options)
+        if port is None:
+            return align_episodes_with_scores(
+                references,
+                downloads,
+                show=config.name,
+                alignment=config.alignment,
+            )
+        return _align_with_port(port, references, downloads, config)
 
 
 def _align_with_port(
@@ -190,20 +230,23 @@ def _align_with_port(
     downloads: list[RssEpisode],
     config: PodcastConfig,
 ) -> AlignmentResult:
-    if isinstance(port, ScoredAlignmentBatchPort):
-        batch = prepare_alignment_batch(
-            references,
-            downloads,
-            request_or_show=config.name,
-            alignment=config.alignment,
-        )
-        return port.align_batch(batch)
-    return port.align_with_scores(
-        references,
-        downloads,
-        show=config.name,
-        alignment=config.alignment,
-    )
+    with profile_block(f"merge.align_with_port_{type(port).__name__}"):
+        if isinstance(port, ScoredAlignmentBatchPort):
+            with profile_block("merge.align_batch"):
+                batch = prepare_alignment_batch(
+                    references,
+                    downloads,
+                    request_or_show=config.name,
+                    alignment=config.alignment,
+                )
+                return port.align_batch(batch)
+        with profile_block("merge.align_with_scores"):
+            return port.align_with_scores(
+                references,
+                downloads,
+                show=config.name,
+                alignment=config.alignment,
+            )
 
 
 def _resolved_scored_alignment_port(
@@ -297,22 +340,25 @@ def _merge_config_artifacts(
     downloads: list[RssEpisode],
     options: MergeConfigOptions,
 ) -> tuple[list[tuple[int, int]], list[ReferenceMatchTrace], list[EpisodeData]]:
-    trace_builder = _resolved_trace_builder_port(options)
-    episode_merger = _resolved_episode_merger_port(options)
-    options = _with_resolved_candidate_ports(options)
-    primary_runner = _primary_alignment_runner(options, references, downloads, config)
-    shadow_runner = _alignment_shadow_runner(options, references, downloads, config)
-    pairs, scores = _align_with_ab_shadow(options, primary_runner, shadow_runner)
-    match_traces = _build_match_traces_with_ab(
-        trace_builder,
-        options,
-        references,
-        downloads,
-        pairs,
-        config,
-        scores,
-    )
-    episodes = _merge_episodes_with_ab(episode_merger, options, (references, downloads), pairs)
+    with profile_block("merge.align_config"):
+        trace_builder = _resolved_trace_builder_port(options)
+        episode_merger = _resolved_episode_merger_port(options)
+        options = _with_resolved_candidate_ports(options)
+        primary_runner = _primary_alignment_runner(options, references, downloads, config)
+        shadow_runner = _alignment_shadow_runner(options, references, downloads, config)
+        pairs, scores = _align_with_ab_shadow(options, primary_runner, shadow_runner)
+    with profile_block("merge.build_match_traces"):
+        match_traces = _build_match_traces_with_ab(
+            trace_builder,
+            options,
+            references,
+            downloads,
+            pairs,
+            config,
+            scores,
+        )
+    with profile_block("merge.merge_episodes"):
+        episodes = _merge_episodes_with_ab(episode_merger, options, (references, downloads), pairs)
     return pairs, match_traces, episodes
 
 

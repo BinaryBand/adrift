@@ -595,26 +595,30 @@ def prepare_alignment_batch(
             ref_records = tuple(_build_alignment_batch_records(references, request.show))
             dl_records = tuple(_build_alignment_batch_records(downloads, request.show))
         return AlignmentBatch(
-            config=AlignmentBatchConfig(
-                id_weight=resolved_alignment.weights.id,
-                date_weight=resolved_alignment.weights.date,
-                title_weight=resolved_alignment.weights.title,
-                description_weight=resolved_alignment.weights.description,
-                date_score_tiers=tuple(resolved_alignment.date_score_tiers),
-                sparse_title_min=resolved_alignment.sparse_title_min,
-                match_tolerance=resolved_alignment.match_tolerance,
-                title_certainty_min=_TITLE_CERTAINTY_MIN,
-                metadata_rescue_subset_sim_min=_METADATA_RESCUE_SUBSET_SIM_MIN,
-                containment_bonus=_CONTAINMENT_BONUS,
-                base_anchor_stopwords=tuple(sorted(_BASE_ANCHOR_STOPWORDS)),
-                extra_stopwords=tuple(
-                    item.strip().lower() for item in resolved_alignment.extra_stopwords if item.strip()
-                ),
-                numbered_marker_patterns=_NUMBERED_MARKER_PATTERNS,
-            ),
+            config=_build_alignment_batch_config(resolved_alignment),
             references=ref_records,
             downloads=dl_records,
         )
+
+
+def _build_alignment_batch_config(alignment: AlignmentConfig) -> AlignmentBatchConfig:
+    return AlignmentBatchConfig(
+        id_weight=alignment.weights.id,
+        date_weight=alignment.weights.date,
+        title_weight=alignment.weights.title,
+        description_weight=alignment.weights.description,
+        date_score_tiers=tuple(alignment.date_score_tiers),
+        sparse_title_min=alignment.sparse_title_min,
+        match_tolerance=alignment.match_tolerance,
+        title_certainty_min=_TITLE_CERTAINTY_MIN,
+        metadata_rescue_subset_sim_min=_METADATA_RESCUE_SUBSET_SIM_MIN,
+        containment_bonus=_CONTAINMENT_BONUS,
+        base_anchor_stopwords=tuple(sorted(_BASE_ANCHOR_STOPWORDS)),
+        extra_stopwords=tuple(
+            item.strip().lower() for item in alignment.extra_stopwords if item.strip()
+        ),
+        numbered_marker_patterns=_NUMBERED_MARKER_PATTERNS,
+    )
 
 
 def _build_alignment_batch_records(
