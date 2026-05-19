@@ -2,7 +2,7 @@ import os
 
 from dotenv import find_dotenv, load_dotenv
 
-from adrift.adapters.process.ports import SecretProviderPort
+from adrift.models.ports import SecretProviderPort
 
 
 class EnvironmentSecretProvider(SecretProviderPort):

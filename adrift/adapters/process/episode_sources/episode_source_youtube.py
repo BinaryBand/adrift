@@ -1,5 +1,5 @@
-from adrift.adapters.process.ports import EpisodeSourceFetchContext, EpisodeSourcePort
 from adrift.models import FeedSource, RssChannel, RssEpisode
+from adrift.models.ports import EpisodeSourceFetchContext, EpisodeSourcePort
 
 
 class YouTubeEpisodeSourceAdapter(EpisodeSourcePort):

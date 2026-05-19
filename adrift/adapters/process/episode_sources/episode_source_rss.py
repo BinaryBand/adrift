@@ -14,8 +14,8 @@ from adrift.adapters.process.episode_sources.rss_normalizer import (
     entry_title_from_feedparser,
     episode_from_feedparser,
 )
-from adrift.adapters.process.ports import EpisodeSourceFetchContext, EpisodeSourcePort
 from adrift.models import FeedSource, RssChannel, RssEpisode
+from adrift.models.ports import EpisodeSourceFetchContext, EpisodeSourcePort
 from adrift.utils.progress import Callback
 from adrift.utils.regex import LINK_REGEX, re_compile
 from adrift.utils.schedule import rrule_occurrence_exists

@@ -63,16 +63,33 @@ rules:
         - /adrift/adapters/reporting/**/*.py
     pattern-regex: ^\s*(from|import|def|class|@|[A-Za-z_][\w]*\s*=)
 
-  - id: no-port-shim-files
+  - id: no-cross-layer-init-reexport
     message: >-
-      adrift/adapters/process/ports/ is a single-file package: all port symbols
-      must be exported from __init__.py. Non-init modules here are shims; delete
-      the file and re-export its symbols from __init__.py instead.
+      This __init__.py imports symbols from a different adrift layer and re-exports
+      them. Consumers should import from the canonical source directly; shim packages
+      add indirection with no value. Relative imports (from .module) for aggregation
+      within your own package are fine and exempt from this rule. Excluded by design:
+      adrift/adapters/__init__.py (registry with real logic) and
+      adrift/cli/__init__.py (shared CLI constants and types).
     severity: ERROR
     languages: [python]
     paths:
       include:
-        - /adrift/adapters/process/ports/**/*.py
+        - /adrift/**/__init__.py
       exclude:
-        - /adrift/adapters/process/ports/__init__.py
-    pattern-regex: ^\s*(from|import|def|class|@|[A-Za-z_][\w]*\s*=)
+        - /adrift/__init__.py
+        - /adrift/models/**/__init__.py
+        - /adrift/adapters/__init__.py
+        - /adrift/cli/__init__.py
+    patterns:
+      - pattern-either:
+          - pattern: from adrift.models import $X
+          - pattern: from adrift.models.$M import $X
+          - pattern: from adrift.adapters import $X
+          - pattern: from adrift.adapters.$M import $X
+          - pattern: from adrift.services import $X
+          - pattern: from adrift.services.$M import $X
+          - pattern: from adrift.cli import $X
+          - pattern: from adrift.cli.$M import $X
+          - pattern: from adrift.utils import $X
+          - pattern: from adrift.utils.$M import $X

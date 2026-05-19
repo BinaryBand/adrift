@@ -1,6 +1,6 @@
 import pytest
 
-from adrift.adapters.process.ports import require_secrets
+from adrift.models.ports import require_secrets
 from tests.unit._fixtures import _FakeProvider
 
 

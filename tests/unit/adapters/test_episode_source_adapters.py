@@ -9,8 +9,8 @@ from adrift.adapters.process.episode_sources.episode_source_rss import (
 from adrift.adapters.process.episode_sources.episode_source_youtube import (
     YouTubeEpisodeSourceAdapter,
 )
-from adrift.adapters.process.ports import EpisodeSourceFetchContext
 from adrift.models import FeedSource, RssChannel, RssEpisode
+from adrift.models.ports import EpisodeSourceFetchContext
 
 
 def test_rss_adapter_fetches_episodes():
