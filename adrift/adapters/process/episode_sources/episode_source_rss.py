@@ -1,6 +1,6 @@
 from datetime import datetime, timedelta
 from pathlib import Path
-from typing import cast
+from typing import Any, TypeVar, cast
 
 import feedparser
 import requests
@@ -20,6 +20,11 @@ from adrift.utils.progress import Callback
 from adrift.utils.regex import LINK_REGEX, re_compile
 from adrift.utils.schedule import rrule_occurrence_exists
 
+_RSS_HTTP_CACHE_PREFIX = "rss:http:"
+_RSS_HTTP_CACHE_TTL_SECONDS = 30 * 24 * 3600
+
+T = TypeVar("T")
+
 
 def _build_rss_cache() -> Cache:
     path = Path(".cache/rss").resolve()
@@ -31,27 +36,86 @@ _RSS_CACHE = _build_rss_cache()
 _RSS_CACHE_WRAPPER = RaceAwareCacheWrapper(_RSS_CACHE)
 
 
-def _cache_set_with_retry(cache: Cache, key: str, value: str, expire: int | None = None) -> None:
+def _cache_set_with_retry(cache: Cache, key: str, value: T, expire: int | None = None) -> None:
     if cache is _RSS_CACHE:
         _RSS_CACHE_WRAPPER.set(key, value, expire=expire)
         return
     RaceAwareCacheWrapper(cache).set(key, value, expire=expire)
 
 
-def _fetch_channel_feed_str(rss_url: str) -> str:
-    cache_key = f"rss:{rss_url}"
+def _rss_http_cache_key(
+    rss_url: str,
+    filter_value: str | None = None,
+    r_rules: list[str] | None = None,
+) -> str:
+    if filter_value is None and r_rules is None:
+        return f"{_RSS_HTTP_CACHE_PREFIX}{rss_url}"
+    rules_key = ",".join(sorted(r_rules or []))
+    filter_key = "" if filter_value is None else filter_value
+    return f"{_RSS_HTTP_CACHE_PREFIX}{rss_url}:{filter_key}:{rules_key}"
+
+
+def _load_cached_rss_payload(cache_key: str) -> dict[str, str] | None:
     cached = _RSS_CACHE.get(cache_key)
-    feed_str: str | None = cached if isinstance(cached, str) else None
-    if feed_str is None:
+    if isinstance(cached, dict) and isinstance(cached.get("feed_str"), str):
+        return cached
+    return None
+
+
+def _conditional_rss_headers(cached_payload: dict[str, str] | None) -> dict[str, str]:
+    if cached_payload is None:
+        return {}
+    headers: dict[str, str] = {}
+    etag = cached_payload.get("etag")
+    if etag:
+        headers["If-None-Match"] = etag
+    last_modified = cached_payload.get("last_modified")
+    if last_modified:
+        headers["If-Modified-Since"] = last_modified
+    return headers
+
+
+def _store_cached_rss_payload(cache_key: str, feed_str: str, headers: dict[str, str]) -> None:
+    payload: dict[str, str] = {"feed_str": feed_str}
+    etag = headers.get("ETag")
+    if etag:
+        payload["etag"] = etag
+    last_modified = headers.get("Last-Modified")
+    if last_modified:
+        payload["last_modified"] = last_modified
+    _cache_set_with_retry(_RSS_CACHE, cache_key, payload, expire=_RSS_HTTP_CACHE_TTL_SECONDS)
+
+
+def _response_headers_dict(response: Any) -> dict[str, str]:
+    raw_headers = getattr(response, "headers", None)
+    if raw_headers is None:
+        return {}
+    items = getattr(raw_headers, "items", None)
+    if not callable(items):
+        return {}
+    try:
+        return {str(key): str(value) for key, value in items()}
+    except TypeError:
+        return {}
+
+
+def _fetch_rss_feed_str(rss_url: str, cache_key: str | None = None) -> str:
+    resolved_cache_key = cache_key or _rss_http_cache_key(rss_url)
+    cached_payload = _load_cached_rss_payload(resolved_cache_key)
+    response = requests.get(rss_url, timeout=15, headers=_conditional_rss_headers(cached_payload))
+    if response.status_code == 304:
+        if cached_payload is not None:
+            return cached_payload["feed_str"]
         response = requests.get(rss_url, timeout=15)
-        feed_str = response.text
-        _cache_set_with_retry(_RSS_CACHE, cache_key, feed_str, expire=3600)
+    response.raise_for_status()
+    feed_str = response.text
+    _store_cached_rss_payload(resolved_cache_key, feed_str, _response_headers_dict(response))
     return feed_str
 
 
 def get_rss_channel(rss_url: str) -> RssChannel:
     """Fetch and parse an RSS feed to extract channel information."""
-    feed_str = _fetch_channel_feed_str(rss_url)
+    feed_str = _fetch_rss_feed_str(rss_url)
     feed: FeedParserDict = feedparser.parse(feed_str)
     if feed.bozo and hasattr(feed, "bozo_exception"):
         issue = feed.get("bozo_exception")
@@ -120,13 +184,8 @@ def get_rss_episodes(
     if not LINK_REGEX.match(url):
         raise ValueError("Invalid RSS feed url or file path")
     r_rules = r_rules or []
-    r_rules_key = ",".join(sorted(r_rules))
-    cache_key = f"feed:{url}:{filter}:{r_rules_key}"
-    feed_str: str | None = _RSS_CACHE.get(cache_key)
-    if feed_str is None:
-        response = requests.get(url, timeout=15)
-        feed_str = response.text
-        _cache_set_with_retry(_RSS_CACHE, cache_key, feed_str, 1800)
+    cache_key = _rss_http_cache_key(url, filter, r_rules)
+    feed_str = _fetch_rss_feed_str(url, cache_key=cache_key)
     parsed = feedparser.parse(feed_str)
     raw_entries = getattr(parsed, "entries", [])
     entries_list = cast(list[FeedParserDict], raw_entries) if isinstance(raw_entries, list) else []

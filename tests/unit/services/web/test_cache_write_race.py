@@ -55,12 +55,17 @@ def test_get_rss_episodes_calls_cache_set(tmp_path, monkeypatch):
     class MockResponse:
         def __init__(self, text):
             self.text = text
+            self.status_code = 200
+            self.headers = {}
 
-    monkeypatch.setattr(
-        rss,
-        "requests",
-        SimpleNamespace(get=lambda url, timeout=15: MockResponse("<rss/>")),
-    )
+        def raise_for_status(self):
+            return None
+
+    def fake_get(url, timeout=15, headers=None):
+        del url, timeout, headers
+        return MockResponse("<rss/>")
+
+    monkeypatch.setattr(rss, "requests", SimpleNamespace(get=fake_get))
     monkeypatch.setattr(
         rss, "feedparser", SimpleNamespace(parse=lambda s: SimpleNamespace(entries=[]))
     )
@@ -70,3 +75,47 @@ def test_get_rss_episodes_calls_cache_set(tmp_path, monkeypatch):
 
     assert dummy.set_called is True
     assert isinstance(episodes, list)
+
+
+def test_fetch_rss_feed_str_uses_conditional_headers_on_304(monkeypatch):
+    cached_payload = {
+        "feed_str": "<rss/>",
+        "etag": '"abc123"',
+        "last_modified": "Mon, 01 Jan 2024 00:00:00 GMT",
+    }
+    requested_headers: list[dict[str, str]] = []
+
+    class DummyCache:
+        def get(self, key):
+            return cached_payload
+
+        def set(self, key, value, expire=None):
+            raise AssertionError("cache write not expected on 304")
+
+    class MockResponse:
+        def __init__(self, status_code: int):
+            self.status_code = status_code
+            self.text = ""
+            self.headers: dict[str, str] = {}
+
+        def raise_for_status(self):
+            return None
+
+    def fake_get(url, timeout=15, headers=None):
+        del url, timeout
+        requested_headers.append(headers or {})
+        return MockResponse(304)
+
+    monkeypatch.setattr(rss, "_RSS_CACHE", DummyCache())
+    monkeypatch.setattr(rss, "_RSS_CACHE_WRAPPER", rss.RaceAwareCacheWrapper(DummyCache()))
+    monkeypatch.setattr(rss, "requests", SimpleNamespace(get=fake_get))
+
+    feed_str = rss._fetch_rss_feed_str("https://example.com/feed.xml")
+
+    assert feed_str == "<rss/>"
+    assert requested_headers == [
+        {
+            "If-None-Match": '"abc123"',
+            "If-Modified-Since": "Mon, 01 Jan 2024 00:00:00 GMT",
+        }
+    ]

@@ -3,7 +3,7 @@ from typing import Any, Literal
 
 from adrift.models import FeedSource, PodcastConfig, RssEpisode, SourceTrace, ensure_feed_source
 from adrift.models.ports import ScoredAlignmentBatchPort
-from adrift.utils.profiler import profile
+from adrift.utils.profiler import profile, profile_block
 from adrift.utils.progress import Callback
 from adrift.utils.text import is_youtube_channel
 
@@ -60,7 +60,11 @@ def _collect_episodes_with_traces(
     albums: list[list[RssEpisode]] = []
     traces: list[SourceTrace] = []
     for source in sources:
-        album = _fetch_source_episodes(source, context)
+        role = "reference" if context.is_reference else "download"
+        source_kind = _source_type(source)
+        block_name = f"source_fetch.{role}.{source_kind}"
+        with profile_block(block_name):
+            album = _fetch_source_episodes(source, context)
         albums.append(album)
         traces.append(_build_source_trace(source, context, len(album)))
 
