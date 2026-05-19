@@ -31,6 +31,16 @@ class AlignmentPort(Protocol):
 
 
 @runtime_checkable
+class ScoredAlignmentPort(Protocol):
+    def align_with_scores(
+        self,
+        references: list[RssEpisode],
+        downloads: list[RssEpisode],
+        **kwargs: object,
+    ) -> tuple[list[tuple[int, int]], dict[tuple[int, int], float]]: ...
+
+
+@runtime_checkable
 class EpisodeSourcePort(Protocol):
     def fetch_episodes(
         self,

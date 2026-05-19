@@ -12,6 +12,7 @@ from adrift.models import (
     RssEpisode,
     SourceTrace,
 )
+from adrift.models.ports import ScoredAlignmentPort
 from adrift.utils.profiler import profile
 from adrift.utils.progress import Callback
 
@@ -26,6 +27,7 @@ class MergeConfigOptions:
     refresh_sources: bool = False
     timings: dict[str, float] | None = None
     on_stage: Callable[[str], None] | None = None
+    scored_alignment_port: ScoredAlignmentPort | None = None
 
 
 class MergeConfigOptionOverrides(TypedDict, total=False):
@@ -33,6 +35,7 @@ class MergeConfigOptionOverrides(TypedDict, total=False):
     refresh_sources: bool
     timings: dict[str, float] | None
     on_stage: Callable[[str], None] | None
+    scored_alignment_port: ScoredAlignmentPort | None
 
 
 _T = TypeVar("_T")
@@ -109,6 +112,27 @@ def _collect_feed_sets(
     return references, downloads, [*reference_traces, *download_traces]
 
 
+def _align_with_selected_port(
+    options: MergeConfigOptions,
+    references: list[RssEpisode],
+    downloads: list[RssEpisode],
+    config: PodcastConfig,
+) -> tuple[list[tuple[int, int]], dict[tuple[int, int], float]]:
+    if options.scored_alignment_port is not None:
+        return options.scored_alignment_port.align_with_scores(
+            references,
+            downloads,
+            show=config.name,
+            alignment=config.alignment,
+        )
+    return align_episodes_with_scores(
+        references,
+        downloads,
+        show=config.name,
+        alignment=config.alignment,
+    )
+
+
 def _merge_config_artifacts(
     config: PodcastConfig,
     references: list[RssEpisode],
@@ -117,12 +141,7 @@ def _merge_config_artifacts(
 ) -> tuple[list[tuple[int, int]], list[ReferenceMatchTrace], list[EpisodeData]]:
     pairs, scores = _timed_stage(
         "align_episodes",
-        lambda: align_episodes_with_scores(
-            references,
-            downloads,
-            show=config.name,
-            alignment=config.alignment,
-        ),
+        lambda: _align_with_selected_port(options, references, downloads, config),
         options,
     )
     match_traces = _build_match_traces(references, downloads, pairs, config.name, scores=scores)

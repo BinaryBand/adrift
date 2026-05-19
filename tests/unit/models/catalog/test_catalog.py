@@ -234,6 +234,44 @@ class TestFullPipeline(unittest.TestCase):
 
     @patch("adrift.adapters.process.episode_sources.episode_source_rss.get_rss_episodes")
     @patch("adrift.adapters.process.youtube.metadata.get_youtube_episodes")
+    def test_merge_config_uses_injected_scored_alignment_port(
+        self, mock_yt: MagicMock, mock_rss: MagicMock
+    ):
+        mock_rss.return_value = [_ep("r1", "Ref Episode", pub_date=_dt(2024, 2, 6))]
+        mock_yt.return_value = [_ep("d1", "Download Episode", pub_date=_dt(2024, 2, 6))]
+
+        config = _config(references=[_rss_source()], downloads=[_yt_source()])
+
+        class FakeScoredAlignmentPort:
+            def __init__(self) -> None:
+                self.called = False
+
+            def align_with_scores(
+                self,
+                references,
+                downloads,
+                *,
+                show="",
+                alignment=None,
+            ):
+                self.called = True
+                del references, downloads, show, alignment
+                return [(0, 0)], {(0, 0): 0.99}
+
+        from adrift.services.catalog import MergeConfigOptions
+
+        fake_port = FakeScoredAlignmentPort()
+        result = merge_config(
+            config,
+            MergeConfigOptions(scored_alignment_port=fake_port),
+        )
+
+        self.assertTrue(fake_port.called)
+        self.assertEqual(result.pairs, [(0, 0)])
+        self.assertEqual(result.match_traces[0].matched_download_index, 0)
+
+    @patch("adrift.adapters.process.episode_sources.episode_source_rss.get_rss_episodes")
+    @patch("adrift.adapters.process.youtube.metadata.get_youtube_episodes")
     def test_daily_show_scenario(self, mock_yt: MagicMock, mock_rss: MagicMock):
         """Regression: only episodes matching a reference should survive.
 
