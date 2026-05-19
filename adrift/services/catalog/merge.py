@@ -18,12 +18,13 @@ from adrift.models.ports import (
     EpisodeCollectorPort,
     EpisodeMergerPort,
     MatchTraceBuilderPort,
+    ScoredAlignmentBatchPort,
     ScoredAlignmentPort,
 )
 from adrift.utils.profiler import profile
 from adrift.utils.progress import Callback
 
-from .alignment import align_episodes_with_scores
+from .alignment import align_episodes_with_scores, prepare_alignment_batch
 from .merge_adapters import (
     LegacyEpisodeCollectorAdapter,
     LegacyEpisodeMergerAdapter,
@@ -37,11 +38,11 @@ class MergeConfigOptions:
     refresh_sources: bool = False
     timings: dict[str, float] | None = None
     on_stage: Callable[[str], None] | None = None
-    scored_alignment_port: ScoredAlignmentPort | None = None
+    scored_alignment_port: ScoredAlignmentPort | ScoredAlignmentBatchPort | None = None
     collector_port: EpisodeCollectorPort | None = None
     trace_builder_port: MatchTraceBuilderPort | None = None
     episode_merger_port: EpisodeMergerPort | None = None
-    scored_alignment_candidate_port: ScoredAlignmentPort | None = None
+    scored_alignment_candidate_port: ScoredAlignmentPort | ScoredAlignmentBatchPort | None = None
     collector_candidate_port: EpisodeCollectorPort | None = None
     trace_builder_candidate_port: MatchTraceBuilderPort | None = None
     episode_merger_candidate_port: EpisodeMergerPort | None = None
@@ -53,11 +54,11 @@ class MergeConfigOptionOverrides(TypedDict, total=False):
     refresh_sources: bool
     timings: dict[str, float] | None
     on_stage: Callable[[str], None] | None
-    scored_alignment_port: ScoredAlignmentPort | None
+    scored_alignment_port: ScoredAlignmentPort | ScoredAlignmentBatchPort | None
     collector_port: EpisodeCollectorPort | None
     trace_builder_port: MatchTraceBuilderPort | None
     episode_merger_port: EpisodeMergerPort | None
-    scored_alignment_candidate_port: ScoredAlignmentPort | None
+    scored_alignment_candidate_port: ScoredAlignmentPort | ScoredAlignmentBatchPort | None
     collector_candidate_port: EpisodeCollectorPort | None
     trace_builder_candidate_port: MatchTraceBuilderPort | None
     episode_merger_candidate_port: EpisodeMergerPort | None
@@ -171,12 +172,7 @@ def _align_with_selected_port(
 ) -> tuple[list[tuple[int, int]], dict[tuple[int, int], float]]:
     port = _resolved_scored_alignment_port(options)
     if port is not None:
-        return port.align_with_scores(
-            references,
-            downloads,
-            show=config.name,
-            alignment=config.alignment,
-        )
+        return _align_with_port(port, references, downloads, config)
     return align_episodes_with_scores(
         references,
         downloads,
@@ -185,7 +181,31 @@ def _align_with_selected_port(
     )
 
 
-def _resolved_scored_alignment_port(options: MergeConfigOptions) -> ScoredAlignmentPort | None:
+def _align_with_port(
+    port: ScoredAlignmentPort | ScoredAlignmentBatchPort,
+    references: list[RssEpisode],
+    downloads: list[RssEpisode],
+    config: PodcastConfig,
+) -> tuple[list[tuple[int, int]], dict[tuple[int, int], float]]:
+    if isinstance(port, ScoredAlignmentBatchPort):
+        batch = prepare_alignment_batch(
+            references,
+            downloads,
+            request_or_show=config.name,
+            alignment=config.alignment,
+        )
+        return port.align_batch(batch)
+    return port.align_with_scores(
+        references,
+        downloads,
+        show=config.name,
+        alignment=config.alignment,
+    )
+
+
+def _resolved_scored_alignment_port(
+    options: MergeConfigOptions,
+) -> ScoredAlignmentPort | ScoredAlignmentBatchPort | None:
     if options.scored_alignment_port is not None:
         return options.scored_alignment_port
     return get_scored_alignment_adapter()
@@ -204,12 +224,7 @@ def _run_alignment_ab_candidate(
         return
     candidate_pairs, candidate_scores = _timed_stage(
         "align_episodes_ab_candidate",
-        lambda: candidate_port.align_with_scores(
-            references,
-            downloads,
-            show=config.name,
-            alignment=config.alignment,
-        ),
+        lambda: _align_with_port(candidate_port, references, downloads, config),
         options,
     )
     _compare_ab_result("align_episodes.pairs", options, primary_pairs, candidate_pairs)
@@ -387,7 +402,9 @@ def _with_resolved_candidate_ports(options: MergeConfigOptions) -> MergeConfigOp
     )
 
 
-def _resolved_alignment_candidate_port(options: MergeConfigOptions) -> ScoredAlignmentPort | None:
+def _resolved_alignment_candidate_port(
+    options: MergeConfigOptions,
+) -> ScoredAlignmentPort | ScoredAlignmentBatchPort | None:
     if options.scored_alignment_candidate_port is not None:
         return options.scored_alignment_candidate_port
     backend = _candidate_backend_name("ADRIFT_AB_ALIGN_CANDIDATE")

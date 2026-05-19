@@ -6,6 +6,7 @@ from .alignment import (
     match,
     merge_episode,
     merge_episode_pairs,
+    prepare_alignment_batch,
     sim_date,
 )
 from .collection import (
@@ -27,5 +28,6 @@ __all__ = [
     "merge_episode_pairs",
     "process_feeds",
     "process_sources",
+    "prepare_alignment_batch",
     "sim_date",
 ]

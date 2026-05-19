@@ -312,6 +312,62 @@ class TestFullPipeline(unittest.TestCase):
 
     @patch("adrift.adapters.process.episode_sources.episode_source_rss.get_rss_episodes")
     @patch("adrift.adapters.process.youtube.metadata.get_youtube_episodes")
+    def test_merge_config_uses_injected_batch_alignment_port(
+        self, mock_yt: MagicMock, mock_rss: MagicMock
+    ):
+        config = _single_episode_config(mock_yt, mock_rss)
+
+        class FakeBatchAlignmentPort:
+            def __init__(self) -> None:
+                self.called = False
+
+            def align_batch(self, batch):
+                self.called = True
+                del batch
+                return [(0, 0)], {(0, 0): 0.94}
+
+        fake_port = FakeBatchAlignmentPort()
+        result = merge_config(
+            config,
+            MergeConfigOptions(scored_alignment_port=fake_port),
+        )
+
+        self.assertTrue(fake_port.called)
+        self.assertEqual(result.pairs, [(0, 0)])
+
+    @patch("adrift.adapters.process.episode_sources.episode_source_rss.get_rss_episodes")
+    @patch("adrift.adapters.process.youtube.metadata.get_youtube_episodes")
+    def test_merge_config_runs_candidate_batch_alignment_port_in_ab_mode(
+        self, mock_yt: MagicMock, mock_rss: MagicMock
+    ):
+        config = _single_episode_config(mock_yt, mock_rss)
+
+        class CandidateBatchAlignmentPort:
+            def __init__(self) -> None:
+                self.called = False
+
+            def align_batch(self, batch):
+                self.called = True
+                del batch
+                return [(0, 0)], {(0, 0): 0.50}
+
+        warnings: list[str] = []
+        candidate = CandidateBatchAlignmentPort()
+
+        merge_config(
+            config,
+            MergeConfigOptions(
+                scored_alignment_port=_FakeScoredAlignmentPort(),
+                scored_alignment_candidate_port=candidate,
+                ab_warnings=warnings,
+            ),
+        )
+
+        self.assertTrue(candidate.called)
+        self.assertTrue(any("align_episodes.scores A/B mismatch" in warning for warning in warnings))
+
+    @patch("adrift.adapters.process.episode_sources.episode_source_rss.get_rss_episodes")
+    @patch("adrift.adapters.process.youtube.metadata.get_youtube_episodes")
     def test_merge_config_runs_candidate_episode_merger_port_in_ab_mode(
         self, mock_yt: MagicMock, mock_rss: MagicMock
     ):
@@ -322,10 +378,7 @@ class TestFullPipeline(unittest.TestCase):
                 del references, downloads, pairs
                 return [
                     EpisodeData(
-                        id="primary",
-                        title="Primary",
-                        description="primary",
-                        source=["primary"],
+                        id="primary", title="Primary", description="primary", source=["primary"]
                     )
                 ]
 

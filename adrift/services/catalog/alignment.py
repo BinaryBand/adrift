@@ -2,12 +2,17 @@
 import re
 from collections.abc import Callable
 from dataclasses import dataclass
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Any, NamedTuple, cast
 
 from rapidfuzz import fuzz
 
 from adrift.models import AlignmentConfig, EpisodeData, RssEpisode
+from adrift.models.alignment_batch import (
+    AlignmentBatch,
+    AlignmentBatchConfig,
+    AlignmentEpisodeRecord,
+)
 from adrift.utils.profiler import profile
 from adrift.utils.progress import Callback
 from adrift.utils.text import normalize_text
@@ -566,6 +571,61 @@ def _build_alignment_scores(
     )
 
 
+def prepare_alignment_batch(
+    references: list[RssEpisode],
+    downloads: list[RssEpisode],
+    request_or_show: _AlignmentRequest | str = "",
+    alignment: AlignmentConfig | None = None,
+) -> AlignmentBatch:
+    """Build a primitive-heavy payload suitable for a Rust scorer."""
+    request = _resolve_alignment_request(request_or_show, alignment)
+    resolved_alignment = request.runtime.config
+    return AlignmentBatch(
+        config=AlignmentBatchConfig(
+            id_weight=resolved_alignment.weights.id,
+            date_weight=resolved_alignment.weights.date,
+            title_weight=resolved_alignment.weights.title,
+            description_weight=resolved_alignment.weights.description,
+            date_score_tiers=tuple(resolved_alignment.date_score_tiers),
+            sparse_title_min=resolved_alignment.sparse_title_min,
+            match_tolerance=resolved_alignment.match_tolerance,
+            title_certainty_min=_TITLE_CERTAINTY_MIN,
+            metadata_rescue_subset_sim_min=_METADATA_RESCUE_SUBSET_SIM_MIN,
+            containment_bonus=_CONTAINMENT_BONUS,
+            base_anchor_stopwords=tuple(sorted(_BASE_ANCHOR_STOPWORDS)),
+            extra_stopwords=tuple(
+                item.strip().lower() for item in resolved_alignment.extra_stopwords if item.strip()
+            ),
+            numbered_marker_patterns=_NUMBERED_MARKER_PATTERNS,
+        ),
+        references=tuple(_build_alignment_batch_records(references, request.show)),
+        downloads=tuple(_build_alignment_batch_records(downloads, request.show)),
+    )
+
+
+def _build_alignment_batch_records(
+    episodes: list[RssEpisode],
+    show: str,
+) -> list[AlignmentEpisodeRecord]:
+    return [
+        AlignmentEpisodeRecord(
+            episode_id=episode.id,
+            normalized_title=_normalized_alignment_title(show, episode),
+            normalized_description=_normalized_alignment_description(episode),
+            pub_date_unix_s=_unix_seconds(episode.pub_date),
+        )
+        for episode in episodes
+    ]
+
+
+def _unix_seconds(value: datetime | None) -> int | None:
+    if value is None:
+        return None
+    if value.tzinfo is None:
+        value = value.replace(tzinfo=timezone.utc)
+    return int(value.astimezone(timezone.utc).timestamp())
+
+
 def _sorted_pairs_above_tolerance(
     scores: dict[tuple[int, int], float],
     match_tolerance: float,
@@ -724,6 +784,7 @@ __all__ = [
     "match",
     "merge_episode",
     "merge_episode_pairs",
+    "prepare_alignment_batch",
     "sim_date",
     "_best_thumbnail",
     "_build_alignment_scores",

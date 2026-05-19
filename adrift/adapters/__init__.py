@@ -12,6 +12,7 @@ from collections.abc import Callable
 from adrift.models import FeedSource
 from adrift.models.ports import (
     EpisodeSourcePort,
+    ScoredAlignmentBatchPort,
     ScoredAlignmentPort,
     SecretProviderPort,
 )
@@ -107,13 +108,25 @@ def _make_optimized_scored_alignment_adapter() -> ScoredAlignmentPort:
     return OptimizedScoredAlignmentAdapter()
 
 
-_SCORED_ALIGNMENT_REGISTRY: dict[str, Callable[[], ScoredAlignmentPort | None]] = {
+def _make_rust_scored_alignment_adapter() -> ScoredAlignmentBatchPort:
+    from adrift.adapters.process.alignment import RustScoredAlignmentAdapter
+
+    return RustScoredAlignmentAdapter()
+
+
+_SCORED_ALIGNMENT_REGISTRY: dict[
+    str,
+    Callable[[], ScoredAlignmentPort | ScoredAlignmentBatchPort | None],
+] = {
     "optimized": _make_optimized_scored_alignment_adapter,
+    "rust": _make_rust_scored_alignment_adapter,
     "legacy": lambda: None,
 }
 
 
-def get_scored_alignment_adapter(backend_name: str | None = None) -> ScoredAlignmentPort | None:
+def get_scored_alignment_adapter(
+    backend_name: str | None = None,
+) -> ScoredAlignmentPort | ScoredAlignmentBatchPort | None:
     """Return a scored alignment adapter backend, or None for legacy service implementation."""
     selected = (backend_name or os.getenv("ADRIFT_ALIGNMENT_BACKEND") or "legacy").lower()
     factory = _SCORED_ALIGNMENT_REGISTRY.get(selected)

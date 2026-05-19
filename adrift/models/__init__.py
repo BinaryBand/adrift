@@ -1,5 +1,6 @@
 """Package wrapper for model definitions."""
 
+from .alignment_batch import AlignmentBatch, AlignmentBatchConfig, AlignmentEpisodeRecord
 from .errors import (
     AdriftError,
     AlignmentError,
@@ -64,6 +65,9 @@ __all__ = [
     "PodcastConfigInput",
     "PodcastsTomlConfig",
     "StageResult",
+    "AlignmentBatch",
+    "AlignmentBatchConfig",
+    "AlignmentEpisodeRecord",
     "EpisodeData",
     "PodcastFeed",
     "MatchCandidateTrace",

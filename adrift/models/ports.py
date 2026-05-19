@@ -6,6 +6,7 @@ from pathlib import Path
 from typing import Generic, Protocol, TypeVar, runtime_checkable
 
 from adrift.models import AlignmentConfig, FeedSource, PodcastConfig, RssChannel, RssEpisode
+from adrift.models.alignment_batch import AlignmentBatch
 from adrift.models.output import EpisodeData
 from adrift.models.pipeline import ReferenceMatchTrace, SourceTrace
 
@@ -39,6 +40,14 @@ class ScoredAlignmentPort(Protocol):
         references: list[RssEpisode],
         downloads: list[RssEpisode],
         **kwargs: object,
+    ) -> tuple[list[tuple[int, int]], dict[tuple[int, int], float]]: ...
+
+
+@runtime_checkable
+class ScoredAlignmentBatchPort(Protocol):
+    def align_batch(
+        self,
+        batch: AlignmentBatch,
     ) -> tuple[list[tuple[int, int]], dict[tuple[int, int], float]]: ...
 
 
