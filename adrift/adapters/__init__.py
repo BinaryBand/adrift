@@ -127,8 +127,25 @@ _SCORED_ALIGNMENT_REGISTRY: dict[
 def get_scored_alignment_adapter(
     backend_name: str | None = None,
 ) -> ScoredAlignmentPort | ScoredAlignmentBatchPort | None:
-    """Return a scored alignment adapter backend, or None for legacy service implementation."""
-    selected = (backend_name or os.getenv("ADRIFT_ALIGNMENT_BACKEND") or "legacy").lower()
+    """Return a scored alignment adapter backend, or None for legacy service implementation.
+
+    Priority:
+    1. If backend_name is explicitly passed, use it.
+    2. If ADRIFT_ALIGNMENT_BACKEND env var is set, use it.
+    3. Otherwise, try to load Rust backend (with auto-compile if needed).
+    4. Fall back to legacy if Rust is not available.
+    """
+    from adrift.adapters.process.alignment import should_use_rust_backend
+
+    explicit_backend = backend_name or os.getenv("ADRIFT_ALIGNMENT_BACKEND", "").lower()
+
+    if explicit_backend:
+        selected = explicit_backend
+    elif should_use_rust_backend():
+        selected = "rust"
+    else:
+        selected = "legacy"
+
     factory = _SCORED_ALIGNMENT_REGISTRY.get(selected)
     if factory is None:
         raise ValueError(f"Unsupported alignment backend: {selected}")

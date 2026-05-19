@@ -14,7 +14,7 @@ from adrift.models.alignment_batch import (
     AlignmentEpisodeRecord,
 )
 from adrift.utils.alignment_pairs import AlignmentResult, AlignmentScores, select_alignment_pairs
-from adrift.utils.profiler import profile
+from adrift.utils.profiler import profile, profile_block
 from adrift.utils.progress import Callback
 from adrift.utils.text import normalize_text
 from adrift.utils.title_normalization import normalize_title
@@ -196,14 +196,15 @@ def _normalized_alignment_description(episode: RssEpisode) -> str:
 
 
 def _build_alignment_candidates(episodes: list[RssEpisode], show: str) -> list[_AlignmentCandidate]:
-    return [
-        _AlignmentCandidate(
-            episode=episode,
-            title=_normalized_alignment_title(show, episode),
-            description=_normalized_alignment_description(episode),
-        )
-        for episode in episodes
-    ]
+    with profile_block(f"alignment.build_candidates_{len(episodes)}_episodes"):
+        return [
+            _AlignmentCandidate(
+                episode=episode,
+                title=_normalized_alignment_title(show, episode),
+                description=_normalized_alignment_description(episode),
+            )
+            for episode in episodes
+        ]
 
 
 def _has_date_signal(ref: _AlignmentCandidate, dl: _AlignmentCandidate) -> bool:
@@ -500,31 +501,33 @@ def _build_similarity_matrices(
     dl_candidates: list[_AlignmentCandidate],
     similarity: StringSimilarityFn,
 ) -> tuple[list[list[float]], list[list[float]]]:
-    title_matrix = similarity(
-        [candidate.title for candidate in ref_candidates],
-        [candidate.title for candidate in dl_candidates],
-    )
-    desc_matrix = similarity(
-        [candidate.description for candidate in ref_candidates],
-        [candidate.description for candidate in dl_candidates],
-    )
+    with profile_block(f"alignment.similarity_matrices_{len(ref_candidates)}x{len(dl_candidates)}"):
+        title_matrix = similarity(
+            [candidate.title for candidate in ref_candidates],
+            [candidate.title for candidate in dl_candidates],
+        )
+        desc_matrix = similarity(
+            [candidate.description for candidate in ref_candidates],
+            [candidate.description for candidate in dl_candidates],
+        )
     return title_matrix, desc_matrix
 
 
 def _score_alignment_candidates(state: _AlignmentState) -> AlignmentScores:
-    scores: AlignmentScores = {}
-    for r_idx, ref in enumerate(state.refs):
-        for d_idx, dl in enumerate(state.dls):
-            sims = _Sims(
-                float(state.title_matrix[r_idx][d_idx]),
-                float(state.description_matrix[r_idx][d_idx]),
-            )
-            scores[(r_idx, d_idx)] = _alignment_score(
-                ref,
-                dl,
-                sims,
-                state.runtime,
-            )
+    with profile_block(f"alignment.score_candidates_{len(state.refs)}x{len(state.dls)}"):
+        scores: AlignmentScores = {}
+        for r_idx, ref in enumerate(state.refs):
+            for d_idx, dl in enumerate(state.dls):
+                sims = _Sims(
+                    float(state.title_matrix[r_idx][d_idx]),
+                    float(state.description_matrix[r_idx][d_idx]),
+                )
+                scores[(r_idx, d_idx)] = _alignment_score(
+                    ref,
+                    dl,
+                    sims,
+                    state.runtime,
+                )
     return scores
 
 
@@ -559,23 +562,24 @@ def _build_alignment_scores(
     downloads: list[RssEpisode],
     request: _AlignmentRequest,
 ) -> AlignmentScores:
-    ref_candidates = _build_alignment_candidates(references, request.show)
-    dl_candidates = _build_alignment_candidates(downloads, request.show)
+    with profile_block(f"alignment.build_scores_{len(references)}ref_{len(downloads)}dl"):
+        ref_candidates = _build_alignment_candidates(references, request.show)
+        dl_candidates = _build_alignment_candidates(downloads, request.show)
 
-    title_matrix, description_matrix = _build_similarity_matrices(
-        ref_candidates,
-        dl_candidates,
-        request.similarity,
-    )
-    return _score_alignment_candidates(
-        _AlignmentState(
-            refs=ref_candidates,
-            dls=dl_candidates,
-            title_matrix=title_matrix,
-            description_matrix=description_matrix,
-            runtime=request.runtime,
+        title_matrix, description_matrix = _build_similarity_matrices(
+            ref_candidates,
+            dl_candidates,
+            request.similarity,
         )
-    )
+        return _score_alignment_candidates(
+            _AlignmentState(
+                refs=ref_candidates,
+                dls=dl_candidates,
+                title_matrix=title_matrix,
+                description_matrix=description_matrix,
+                runtime=request.runtime,
+            )
+        )
 
 
 def prepare_alignment_batch(
@@ -585,28 +589,32 @@ def prepare_alignment_batch(
     alignment: AlignmentConfig | None = None,
 ) -> AlignmentBatch:
     """Build a primitive-heavy payload suitable for a Rust scorer."""
-    request, resolved_alignment = _resolve_alignment_context(request_or_show, alignment)
-    return AlignmentBatch(
-        config=AlignmentBatchConfig(
-            id_weight=resolved_alignment.weights.id,
-            date_weight=resolved_alignment.weights.date,
-            title_weight=resolved_alignment.weights.title,
-            description_weight=resolved_alignment.weights.description,
-            date_score_tiers=tuple(resolved_alignment.date_score_tiers),
-            sparse_title_min=resolved_alignment.sparse_title_min,
-            match_tolerance=resolved_alignment.match_tolerance,
-            title_certainty_min=_TITLE_CERTAINTY_MIN,
-            metadata_rescue_subset_sim_min=_METADATA_RESCUE_SUBSET_SIM_MIN,
-            containment_bonus=_CONTAINMENT_BONUS,
-            base_anchor_stopwords=tuple(sorted(_BASE_ANCHOR_STOPWORDS)),
-            extra_stopwords=tuple(
-                item.strip().lower() for item in resolved_alignment.extra_stopwords if item.strip()
+    with profile_block(f"alignment.prepare_batch_{len(references)}ref_{len(downloads)}dl"):
+        request, resolved_alignment = _resolve_alignment_context(request_or_show, alignment)
+        with profile_block("alignment.batch_records"):
+            ref_records = tuple(_build_alignment_batch_records(references, request.show))
+            dl_records = tuple(_build_alignment_batch_records(downloads, request.show))
+        return AlignmentBatch(
+            config=AlignmentBatchConfig(
+                id_weight=resolved_alignment.weights.id,
+                date_weight=resolved_alignment.weights.date,
+                title_weight=resolved_alignment.weights.title,
+                description_weight=resolved_alignment.weights.description,
+                date_score_tiers=tuple(resolved_alignment.date_score_tiers),
+                sparse_title_min=resolved_alignment.sparse_title_min,
+                match_tolerance=resolved_alignment.match_tolerance,
+                title_certainty_min=_TITLE_CERTAINTY_MIN,
+                metadata_rescue_subset_sim_min=_METADATA_RESCUE_SUBSET_SIM_MIN,
+                containment_bonus=_CONTAINMENT_BONUS,
+                base_anchor_stopwords=tuple(sorted(_BASE_ANCHOR_STOPWORDS)),
+                extra_stopwords=tuple(
+                    item.strip().lower() for item in resolved_alignment.extra_stopwords if item.strip()
+                ),
+                numbered_marker_patterns=_NUMBERED_MARKER_PATTERNS,
             ),
-            numbered_marker_patterns=_NUMBERED_MARKER_PATTERNS,
-        ),
-        references=tuple(_build_alignment_batch_records(references, request.show)),
-        downloads=tuple(_build_alignment_batch_records(downloads, request.show)),
-    )
+            references=ref_records,
+            downloads=dl_records,
+        )
 
 
 def _build_alignment_batch_records(
@@ -647,17 +655,20 @@ def align_episodes_with_scores(
     alignment: AlignmentConfig | None = None,
 ) -> AlignmentResult:
     """Return selected matches together with the full pairwise score map."""
-    resolved_alignment = _coerce_alignment(alignment)
-    runtime = _AlignmentRuntime(
-        config=resolved_alignment,
-        stopwords=_alignment_stopwords(resolved_alignment),
-    )
-    scores = _build_alignment_scores(
-        references,
-        downloads,
-        _AlignmentRequest(show=show, similarity=_cdist_similarity, runtime=runtime),
-    )
-    return _select_matches_from_scores(scores, resolved_alignment.match_tolerance), scores
+    with profile_block("alignment.resolve_config_and_scores"):
+        resolved_alignment = _coerce_alignment(alignment)
+        runtime = _AlignmentRuntime(
+            config=resolved_alignment,
+            stopwords=_alignment_stopwords(resolved_alignment),
+        )
+        scores = _build_alignment_scores(
+            references,
+            downloads,
+            _AlignmentRequest(show=show, similarity=_cdist_similarity, runtime=runtime),
+        )
+    with profile_block("alignment.select_matches_from_scores"):
+        matches = _select_matches_from_scores(scores, resolved_alignment.match_tolerance)
+    return matches, scores
 
 
 @profile
