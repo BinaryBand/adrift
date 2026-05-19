@@ -1,4 +1,6 @@
 # pyright: reportPrivateUsage=false
+import os
+import sys
 from collections.abc import Callable
 from dataclasses import dataclass
 from time import perf_counter
@@ -118,8 +120,9 @@ def _align_with_selected_port(
     downloads: list[RssEpisode],
     config: PodcastConfig,
 ) -> tuple[list[tuple[int, int]], dict[tuple[int, int], float]]:
-    if options.scored_alignment_port is not None:
-        return options.scored_alignment_port.align_with_scores(
+    selected_port = _resolve_scored_alignment_port(options)
+    if selected_port is not None:
+        return selected_port.align_with_scores(
             references,
             downloads,
             show=config.name,
@@ -131,6 +134,25 @@ def _align_with_selected_port(
         show=config.name,
         alignment=config.alignment,
     )
+
+
+def _resolve_scored_alignment_port(options: MergeConfigOptions) -> ScoredAlignmentPort | None:
+    if options.scored_alignment_port is not None:
+        return options.scored_alignment_port
+
+    backend = os.getenv("ADRIFT_ALIGNMENT_BACKEND", "python").strip().lower()
+    if backend != "rust":
+        return None
+
+    try:
+        from adrift.adapters.process.alignment.rust_scored import build_rust_scored_alignment_port
+
+        return build_rust_scored_alignment_port()
+    except Exception as exc:  # pragma: no cover - fallback path depends on local Rust setup
+        sys.stderr.write(
+            f"WARN: Rust alignment backend unavailable ({exc}); using Python alignment.\n"
+        )
+        return None
 
 
 def _merge_config_artifacts(

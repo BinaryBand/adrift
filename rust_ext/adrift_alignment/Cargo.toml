@@ -1,0 +1,12 @@
+[package]
+name = "adrift_alignment"
+version = "0.1.0"
+edition = "2021"
+
+[lib]
+name = "adrift_rust_align"
+crate-type = ["cdylib"]
+
+[dependencies]
+pyo3 = { version = "0.22", features = ["extension-module"] }
+strsim = "0.11"
