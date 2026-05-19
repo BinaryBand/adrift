@@ -2,11 +2,12 @@ from dataclasses import dataclass
 from typing import Any, Literal
 
 from adrift.models import FeedSource, PodcastConfig, RssEpisode, SourceTrace, ensure_feed_source
+from adrift.models.ports import ScoredAlignmentBatchPort
 from adrift.utils.profiler import profile
 from adrift.utils.progress import Callback
 from adrift.utils.text import is_youtube_channel
 
-from .alignment import align_episodes
+from .alignment import align_episodes, prepare_alignment_batch
 
 
 @dataclass(frozen=True)
@@ -53,6 +54,7 @@ def _build_source_trace(
 def _collect_episodes_with_traces(
     sources: list[FeedSource],
     context: EpisodeFetchContext,
+    dedup_port: ScoredAlignmentBatchPort | None = None,
 ) -> tuple[list[RssEpisode], list[SourceTrace]]:
     """Fetch, trace, and deduplicate episodes from a list of FeedSource objects."""
     albums: list[list[RssEpisode]] = []
@@ -67,7 +69,7 @@ def _collect_episodes_with_traces(
 
     merged: list[RssEpisode] = albums[0]
     for album in albums[1:]:
-        _merge_episode_album(merged, album)
+        _merge_episode_album(merged, album, context.title, dedup_port)
 
     return merged, traces
 
@@ -91,11 +93,27 @@ def _fetch_source_episodes(
     )
 
 
+def _dedup_via_batch_port(
+    merged: list[RssEpisode],
+    album: list[RssEpisode],
+    show: str,
+    port: ScoredAlignmentBatchPort,
+) -> set[int]:
+    batch = prepare_alignment_batch(merged, album, request_or_show=show)
+    pairs, _scores = port.align_batch(batch)
+    return {d_idx for _, d_idx in pairs}
+
+
 def _merge_episode_album(
     merged: list[RssEpisode],
     album: list[RssEpisode],
+    show: str = "",
+    dedup_port: ScoredAlignmentBatchPort | None = None,
 ) -> None:
-    duplicate_indices = {download_index for _, download_index in align_episodes(merged, album)}
+    if dedup_port is not None:
+        duplicate_indices = _dedup_via_batch_port(merged, album, show, dedup_port)
+    else:
+        duplicate_indices = {d_idx for _, d_idx in align_episodes(merged, album)}
     for index, episode in enumerate(album):
         if index not in duplicate_indices:
             merged.append(episode)

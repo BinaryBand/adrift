@@ -35,10 +35,20 @@ def test_factory_returns_rust_adapter_for_rust_backend() -> None:
     assert isinstance(adapter, RustScoredAlignmentAdapter)
 
 
-def test_rust_adapter_raises_helpful_error_when_extension_missing() -> None:
+def test_rust_adapter_uses_prototype_when_extension_missing() -> None:
     adapter = RustScoredAlignmentAdapter()
-    with pytest.raises(RuntimeError, match="adrift_rust_alignment"):
-        adapter.align_batch(_empty_batch())
+    result = adapter.align_batch(_empty_batch())
+    assert result == ([], {})
+
+
+def test_rust_adapter_raises_helpful_error_when_no_backend_is_available() -> None:
+    adapter = RustScoredAlignmentAdapter()
+    with patch(
+        "adrift.adapters.process.alignment.rust_scored.import_module",
+        side_effect=ModuleNotFoundError("missing"),
+    ):
+        with pytest.raises(RuntimeError, match="adrift_rust_alignment"):
+            adapter.align_batch(_empty_batch())
 
 
 def test_rust_adapter_uses_extension_align_batch_callable() -> None:

@@ -1,0 +1,14 @@
+[package]
+name = "adrift_rust_alignment"
+version = "0.1.0"
+edition = "2021"
+
+[lib]
+name = "adrift_rust_alignment"
+crate-type = ["cdylib"]
+
+[dependencies]
+pyo3 = { version = "0.22.6", features = ["extension-module"] }
+rapidfuzz = "0.5"
+rayon = "1.12"
+regex = "1"

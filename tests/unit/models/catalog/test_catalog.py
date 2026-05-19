@@ -364,7 +364,9 @@ class TestFullPipeline(unittest.TestCase):
         )
 
         self.assertTrue(candidate.called)
-        self.assertTrue(any("align_episodes.scores A/B mismatch" in warning for warning in warnings))
+        self.assertTrue(
+            any("align_episodes.scores A/B mismatch" in warning for warning in warnings)
+        )
 
     @patch("adrift.adapters.process.episode_sources.episode_source_rss.get_rss_episodes")
     @patch("adrift.adapters.process.youtube.metadata.get_youtube_episodes")

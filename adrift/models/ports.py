@@ -10,6 +10,8 @@ from adrift.models.alignment_batch import AlignmentBatch
 from adrift.models.output import EpisodeData
 from adrift.models.pipeline import ReferenceMatchTrace, SourceTrace
 
+AlignmentResult = tuple[list[tuple[int, int]], dict[tuple[int, int], float]]
+
 Callback = Callable[[int, int | None], None]
 
 T = TypeVar("T")
@@ -40,7 +42,7 @@ class ScoredAlignmentPort(Protocol):
         references: list[RssEpisode],
         downloads: list[RssEpisode],
         **kwargs: object,
-    ) -> tuple[list[tuple[int, int]], dict[tuple[int, int], float]]: ...
+    ) -> AlignmentResult: ...
 
 
 @runtime_checkable
@@ -48,7 +50,7 @@ class ScoredAlignmentBatchPort(Protocol):
     def align_batch(
         self,
         batch: AlignmentBatch,
-    ) -> tuple[list[tuple[int, int]], dict[tuple[int, int], float]]: ...
+    ) -> AlignmentResult: ...
 
 
 @runtime_checkable

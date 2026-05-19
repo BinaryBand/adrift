@@ -51,6 +51,7 @@ vulture = "~=2.16"
 semgrep = "<1.160.0"
 setuptools = ">=75.0,<81"
 pyinstrument = "^5.1.2"
+maturin = "^1.8.0"
 
 [tool.pytest.ini_options]
 addopts = "-m 'not slow'"
@@ -90,3 +91,8 @@ output-format = "full"
 [tool.ty.rules]
 # Enforce strict typing by default.
 all = "error"
+
+[tool.maturin]
+bindings = "pyo3"
+manifest-path = "rust/adrift_rust_alignment/Cargo.toml"
+module-name = "adrift_rust_alignment"

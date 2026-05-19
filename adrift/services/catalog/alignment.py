@@ -13,6 +13,7 @@ from adrift.models.alignment_batch import (
     AlignmentBatchConfig,
     AlignmentEpisodeRecord,
 )
+from adrift.utils.alignment_pairs import AlignmentResult, AlignmentScores, select_alignment_pairs
 from adrift.utils.profiler import profile
 from adrift.utils.progress import Callback
 from adrift.utils.text import normalize_text
@@ -510,8 +511,8 @@ def _build_similarity_matrices(
     return title_matrix, desc_matrix
 
 
-def _score_alignment_candidates(state: _AlignmentState) -> dict[tuple[int, int], float]:
-    scores: dict[tuple[int, int], float] = {}
+def _score_alignment_candidates(state: _AlignmentState) -> AlignmentScores:
+    scores: AlignmentScores = {}
     for r_idx, ref in enumerate(state.refs):
         for d_idx, dl in enumerate(state.dls):
             sims = _Sims(
@@ -545,13 +546,19 @@ def _resolve_alignment_request(
     )
 
 
+def _resolve_alignment_context(
+    request_or_show: _AlignmentRequest | str,
+    alignment: AlignmentConfig | None,
+) -> tuple[_AlignmentRequest, AlignmentConfig]:
+    request = _resolve_alignment_request(request_or_show, alignment)
+    return request, request.runtime.config
+
+
 def _build_alignment_scores(
     references: list[RssEpisode],
     downloads: list[RssEpisode],
-    request_or_show: _AlignmentRequest | str = "",
-    alignment: AlignmentConfig | None = None,
-) -> dict[tuple[int, int], float]:
-    request = _resolve_alignment_request(request_or_show, alignment)
+    request: _AlignmentRequest,
+) -> AlignmentScores:
     ref_candidates = _build_alignment_candidates(references, request.show)
     dl_candidates = _build_alignment_candidates(downloads, request.show)
 
@@ -578,8 +585,7 @@ def prepare_alignment_batch(
     alignment: AlignmentConfig | None = None,
 ) -> AlignmentBatch:
     """Build a primitive-heavy payload suitable for a Rust scorer."""
-    request = _resolve_alignment_request(request_or_show, alignment)
-    resolved_alignment = request.runtime.config
+    request, resolved_alignment = _resolve_alignment_context(request_or_show, alignment)
     return AlignmentBatch(
         config=AlignmentBatchConfig(
             id_weight=resolved_alignment.weights.id,
@@ -626,40 +632,11 @@ def _unix_seconds(value: datetime | None) -> int | None:
     return int(value.astimezone(timezone.utc).timestamp())
 
 
-def _sorted_pairs_above_tolerance(
-    scores: dict[tuple[int, int], float],
-    match_tolerance: float,
-) -> list[tuple[tuple[int, int], float]]:
-    ordered_pairs = sorted(scores.items(), key=lambda x: x[1], reverse=True)
-    return [pair for pair in ordered_pairs if pair[1] >= match_tolerance]
-
-
-def _append_match_if_unused(
-    pair: tuple[int, int],
-    matches: list[tuple[int, int]],
-    used_refs: set[int],
-    used_dls: set[int],
-) -> None:
-    r_idx, d_idx = pair
-    if r_idx in used_refs or d_idx in used_dls:
-        return
-    matches.append((r_idx, d_idx))
-    used_refs.add(r_idx)
-    used_dls.add(d_idx)
-
-
 def _select_matches_from_scores(
-    scores: dict[tuple[int, int], float],
+    scores: AlignmentScores,
     match_tolerance: float,
 ) -> list[tuple[int, int]]:
-    matches: list[tuple[int, int]] = []
-    used_refs: set[int] = set()
-    used_dls: set[int] = set()
-
-    for (r_idx, d_idx), _score in _sorted_pairs_above_tolerance(scores, match_tolerance):
-        _append_match_if_unused((r_idx, d_idx), matches, used_refs, used_dls)
-
-    return matches
+    return select_alignment_pairs(scores, match_tolerance)
 
 
 def align_episodes_with_scores(
@@ -668,7 +645,7 @@ def align_episodes_with_scores(
     *,
     show: str = "",
     alignment: AlignmentConfig | None = None,
-) -> tuple[list[tuple[int, int]], dict[tuple[int, int], float]]:
+) -> AlignmentResult:
     """Return selected matches together with the full pairwise score map."""
     resolved_alignment = _coerce_alignment(alignment)
     runtime = _AlignmentRuntime(

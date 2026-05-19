@@ -4,7 +4,7 @@ from typing import Literal
 
 from adrift.models import AlignmentConfig, MatchCandidateTrace, ReferenceMatchTrace, RssEpisode
 
-from .alignment import _build_alignment_scores
+from .alignment import _build_alignment_scores, _resolve_alignment_request
 
 _MATCH_DEBUG_CANDIDATE_LIMIT = 3
 # Default match tolerance threshold (pairs below this are discarded)
@@ -167,7 +167,9 @@ def _build_match_traces(
         return _empty_match_traces(references)
 
     resolved_scores = (
-        scores if scores is not None else _build_alignment_scores(references, downloads, show)
+        scores
+        if scores is not None
+        else _build_alignment_scores(references, downloads, _resolve_alignment_request(show, None))
     )
     context = _MatchTraceContext(
         scores=resolved_scores,

@@ -21,6 +21,7 @@ from adrift.models.ports import (
     ScoredAlignmentBatchPort,
     ScoredAlignmentPort,
 )
+from adrift.utils.alignment_pairs import AlignmentResult
 from adrift.utils.profiler import profile
 from adrift.utils.progress import Callback
 
@@ -119,7 +120,9 @@ def _compare_ab_result(
 def _resolved_collector_port(options: MergeConfigOptions) -> EpisodeCollectorPort:
     if options.collector_port is not None:
         return options.collector_port
-    return LegacyEpisodeCollectorAdapter()
+    port = options.scored_alignment_port
+    dedup_port = port if isinstance(port, ScoredAlignmentBatchPort) else None
+    return LegacyEpisodeCollectorAdapter(dedup_port=dedup_port)
 
 
 def _resolved_trace_builder_port(options: MergeConfigOptions) -> MatchTraceBuilderPort:
@@ -169,16 +172,16 @@ def _align_with_selected_port(
     references: list[RssEpisode],
     downloads: list[RssEpisode],
     config: PodcastConfig,
-) -> tuple[list[tuple[int, int]], dict[tuple[int, int], float]]:
+) -> AlignmentResult:
     port = _resolved_scored_alignment_port(options)
-    if port is not None:
-        return _align_with_port(port, references, downloads, config)
-    return align_episodes_with_scores(
-        references,
-        downloads,
-        show=config.name,
-        alignment=config.alignment,
-    )
+    if port is None:
+        return align_episodes_with_scores(
+            references,
+            downloads,
+            show=config.name,
+            alignment=config.alignment,
+        )
+    return _align_with_port(port, references, downloads, config)
 
 
 def _align_with_port(
@@ -186,7 +189,7 @@ def _align_with_port(
     references: list[RssEpisode],
     downloads: list[RssEpisode],
     config: PodcastConfig,
-) -> tuple[list[tuple[int, int]], dict[tuple[int, int], float]]:
+) -> AlignmentResult:
     if isinstance(port, ScoredAlignmentBatchPort):
         batch = prepare_alignment_batch(
             references,

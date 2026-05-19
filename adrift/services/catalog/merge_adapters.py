@@ -3,6 +3,7 @@ from __future__ import annotations
 from typing import cast
 
 from adrift.models import EpisodeData, PodcastConfig, ReferenceMatchTrace, RssEpisode, SourceTrace
+from adrift.models.ports import ScoredAlignmentBatchPort
 
 from .alignment import merge_episode
 from .collection import EpisodeFetchContext, _collect_episodes_with_traces
@@ -10,6 +11,9 @@ from .merge_trace import _build_match_traces
 
 
 class LegacyEpisodeCollectorAdapter:
+    def __init__(self, dedup_port: ScoredAlignmentBatchPort | None = None) -> None:
+        self._dedup_port = dedup_port
+
     def collect(
         self,
         config: PodcastConfig,
@@ -27,6 +31,7 @@ class LegacyEpisodeCollectorAdapter:
                 callback=callback,
                 refresh_sources=refresh_sources,
             ),
+            dedup_port=self._dedup_port,
         )
 
 

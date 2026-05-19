@@ -1,0 +1,62 @@
+{
+  "version": "2.0.0",
+  "tasks": [
+    {
+      "label": "rust-align: install extension (debug)",
+      "type": "shell",
+      "command": "poetry",
+      "args": [
+        "run",
+        "maturin",
+        "develop",
+        "--manifest-path",
+        "rust/adrift_rust_alignment/Cargo.toml"
+      ],
+      "group": "build",
+      "problemMatcher": []
+    },
+    {
+      "label": "rust-align: install extension (release)",
+      "type": "shell",
+      "command": "poetry",
+      "args": [
+        "run",
+        "maturin",
+        "develop",
+        "--release",
+        "--manifest-path",
+        "rust/adrift_rust_alignment/Cargo.toml"
+      ],
+      "group": "build",
+      "problemMatcher": []
+    },
+    {
+      "label": "rust-align: verify import",
+      "type": "shell",
+      "command": "poetry",
+      "args": [
+        "run",
+        "python",
+        "-c",
+        "import adrift_rust_alignment as m; print('ok', hasattr(m, 'align_batch'))"
+      ],
+      "problemMatcher": []
+    },
+    {
+      "label": "rust-align: benchmark merge",
+      "type": "shell",
+      "command": "poetry",
+      "args": [
+        "run",
+        "env",
+        "ADRIFT_ALIGNMENT_BACKEND=rust",
+        "adrift",
+        "merge",
+        "--tags",
+        "morbid",
+        "--timings"
+      ],
+      "problemMatcher": []
+    }
+  ]
+}
