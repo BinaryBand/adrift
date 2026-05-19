@@ -62,3 +62,17 @@ rules:
         - /adrift/adapters/process/**/*.py
         - /adrift/adapters/reporting/**/*.py
     pattern-regex: ^\s*(from|import|def|class|@|[A-Za-z_][\w]*\s*=)
+
+  - id: no-port-shim-files
+    message: >-
+      adrift/adapters/process/ports/ is a single-file package: all port symbols
+      must be exported from __init__.py. Non-init modules here are shims; delete
+      the file and re-export its symbols from __init__.py instead.
+    severity: ERROR
+    languages: [python]
+    paths:
+      include:
+        - /adrift/adapters/process/ports/**/*.py
+      exclude:
+        - /adrift/adapters/process/ports/__init__.py
+    pattern-regex: ^\s*(from|import|def|class|@|[A-Za-z_][\w]*\s*=)

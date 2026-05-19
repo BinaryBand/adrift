@@ -7,7 +7,7 @@ from typing import Any, cast
 
 import requests
 
-from adrift.adapters.process.ports.cache import DiskCacheAdapter
+from adrift.adapters.process.ports import DiskCacheAdapter
 from adrift.models import SponsorSegment
 from adrift.utils.crypto import sha256
 

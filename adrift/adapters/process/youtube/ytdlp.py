@@ -15,7 +15,7 @@ from dateutil import parser
 from pydantic import BaseModel, ValidationError, field_validator
 from yt_dlp import YoutubeDL
 
-from adrift.adapters.process.ports.cache import DiskCacheAdapter
+from adrift.adapters.process.ports import DiskCacheAdapter
 from adrift.adapters.process.youtube.auth import get_auth_ydl_opts, get_ydl_opts
 from adrift.adapters.process.youtube.error_utils import yt_dlp_retry_reason
 from adrift.adapters.process.youtube.normalizer import rss_episode_from_ytdlp

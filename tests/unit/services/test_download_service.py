@@ -4,7 +4,7 @@ from types import SimpleNamespace
 
 import pytest
 
-from adrift.adapters.process.ports.cache import InMemoryCache
+from adrift.adapters.process.ports import InMemoryCache
 from adrift.models import DownloadEpisode, MediaMetadata, PodcastConfig, RssEpisode
 from adrift.services.context import AppContext, EventBus
 from adrift.services.download_process import (
