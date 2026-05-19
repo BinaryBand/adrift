@@ -15,7 +15,7 @@ from adrift.models import (
 from adrift.utils.profiler import profile
 from adrift.utils.progress import Callback
 
-from .alignment import align_episodes_impl, merge_episode
+from .alignment import align_episodes_with_scores, merge_episode
 from .collection import EpisodeFetchContext, _collect_episodes_with_traces
 from .merge_trace import _build_match_traces
 
@@ -115,12 +115,17 @@ def _merge_config_artifacts(
     downloads: list[RssEpisode],
     options: MergeConfigOptions,
 ) -> tuple[list[tuple[int, int]], list[ReferenceMatchTrace], list[EpisodeData]]:
-    pairs = _timed_stage(
+    pairs, scores = _timed_stage(
         "align_episodes",
-        lambda: align_episodes_impl(references, downloads, config.name, config.alignment),
+        lambda: align_episodes_with_scores(
+            references,
+            downloads,
+            show=config.name,
+            alignment=config.alignment,
+        ),
         options,
     )
-    match_traces = _build_match_traces(references, downloads, pairs, config.name)
+    match_traces = _build_match_traces(references, downloads, pairs, config.name, scores=scores)
     episodes = _timed_stage(
         "merge_episodes",
         lambda: _merge_episode_list(references, downloads, pairs),

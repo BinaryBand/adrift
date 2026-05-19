@@ -588,14 +588,28 @@ def _append_match_if_unused(
     used_dls.add(d_idx)
 
 
-@profile
-def align_episodes_impl(
+def _select_matches_from_scores(
+    scores: dict[tuple[int, int], float],
+    match_tolerance: float,
+) -> list[tuple[int, int]]:
+    matches: list[tuple[int, int]] = []
+    used_refs: set[int] = set()
+    used_dls: set[int] = set()
+
+    for (r_idx, d_idx), _score in _sorted_pairs_above_tolerance(scores, match_tolerance):
+        _append_match_if_unused((r_idx, d_idx), matches, used_refs, used_dls)
+
+    return matches
+
+
+def align_episodes_with_scores(
     references: list[RssEpisode],
     downloads: list[RssEpisode],
+    *,
     show: str = "",
     alignment: AlignmentConfig | None = None,
-) -> list[tuple[int, int]]:
-    """Core greedy aligner implementation (internal)."""
+) -> tuple[list[tuple[int, int]], dict[tuple[int, int], float]]:
+    """Return selected matches together with the full pairwise score map."""
     resolved_alignment = _coerce_alignment(alignment)
     runtime = _AlignmentRuntime(
         config=resolved_alignment,
@@ -606,16 +620,23 @@ def align_episodes_impl(
         downloads,
         _AlignmentRequest(show=show, similarity=_cdist_similarity, runtime=runtime),
     )
-    matches: list[tuple[int, int]] = []
-    used_refs: set[int] = set()
-    used_dls: set[int] = set()
+    return _select_matches_from_scores(scores, resolved_alignment.match_tolerance), scores
 
-    for (r_idx, d_idx), _score in _sorted_pairs_above_tolerance(
-        scores,
-        resolved_alignment.match_tolerance,
-    ):
-        _append_match_if_unused((r_idx, d_idx), matches, used_refs, used_dls)
 
+@profile
+def align_episodes_impl(
+    references: list[RssEpisode],
+    downloads: list[RssEpisode],
+    show: str = "",
+    alignment: AlignmentConfig | None = None,
+) -> list[tuple[int, int]]:
+    """Core greedy aligner implementation (internal)."""
+    matches, _scores = align_episodes_with_scores(
+        references,
+        downloads,
+        show=show,
+        alignment=alignment,
+    )
     return matches
 
 

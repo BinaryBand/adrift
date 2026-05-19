@@ -159,14 +159,18 @@ def _build_match_traces(
     downloads: list[RssEpisode],
     pairs: list[tuple[int, int]],
     show: str,
+    scores: dict[tuple[int, int], float] | None = None,
 ) -> list[ReferenceMatchTrace]:
     if not references:
         return []
     if not downloads:
         return _empty_match_traces(references)
 
+    resolved_scores = (
+        scores if scores is not None else _build_alignment_scores(references, downloads, show)
+    )
     context = _MatchTraceContext(
-        scores=_build_alignment_scores(references, downloads, show),
+        scores=resolved_scores,
         matched_by_reference=_match_index(pairs, invert=False),
         matched_by_download=_match_index(pairs, invert=True),
         pair_set=set(pairs),
