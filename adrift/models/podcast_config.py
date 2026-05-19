@@ -1,5 +1,7 @@
+import json
 import re
 from functools import lru_cache
+from pathlib import Path
 from typing import Any, TypeVar, cast
 
 from pydantic import BaseModel, ConfigDict, Field, computed_field
@@ -91,23 +93,42 @@ class AlignmentConfig(BaseModel):
     extra_stopwords: list[str] = Field(default_factory=list)
 
 
-class PodcastConfig(BaseModel):
-    """Configuration for a single podcast series."""
+class _PodcastConfigBase(BaseModel):
+    """Shared podcast config fields used by runtime and TOML input models."""
 
     model_config = ConfigDict(extra="forbid")
 
     name: str
-    path: str
     references: list[FeedSource] = Field(default_factory=list)
     downloads: list[FeedSource] = Field(default_factory=list)
     schedule: list[str] = Field(default_factory=list)
     tags: list[str] = Field(default_factory=list)
     alignment: AlignmentConfig = Field(default_factory=AlignmentConfig)
 
+
+class PodcastConfig(_PodcastConfigBase):
+    """Configuration for a single podcast series."""
+
+    path: str
+
     @computed_field(return_type=str)
     @property
     def slug(self) -> str:
         return _slug(self.name)
+
+
+class PodcastConfigInput(_PodcastConfigBase):
+    """Input-only podcast config shape as authored in TOML files."""
+
+    path: str | None = None
+
+
+class PodcastsTomlConfig(BaseModel):
+    """Top-level TOML config document consumed by app_common.load_config."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    podcasts: list[PodcastConfigInput] = Field(default_factory=list)
 
 
 def _ensure_model(value: Any, cls: type[_ModelT], **defaults: Any) -> _ModelT:
@@ -158,3 +179,23 @@ def ensure_podcast_config(podcast: PodcastConfig | dict[str, Any]) -> PodcastCon
 
 def parse_podcasts_raw(raw: list[PodcastConfig]) -> list[PodcastConfig]:
     return [ensure_podcast_config(entry) for entry in raw]
+
+
+def podcast_toml_json_schema() -> dict[str, Any]:
+    """Return JSON Schema for config/*.toml validation in editors and CI tooling."""
+    schema = PodcastsTomlConfig.model_json_schema(mode="validation")
+    schema["$schema"] = "https://json-schema.org/draft/2020-12/schema"
+    return schema
+
+
+def compile_podcast_toml_schema(
+    output_path: str | Path = "adrift/models/podcasts.schema.json",
+) -> Path:
+    """Compile and write TOML JSON Schema used by Even Better TOML."""
+    out = Path(output_path)
+    out.parent.mkdir(parents=True, exist_ok=True)
+    out.write_text(
+        json.dumps(podcast_toml_json_schema(), indent=2, sort_keys=True) + "\n",
+        encoding="utf-8",
+    )
+    return out

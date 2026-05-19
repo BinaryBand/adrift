@@ -1,0 +1,196 @@
+{
+  "$defs": {
+    "AlignmentConfig": {
+      "additionalProperties": false,
+      "description": "Per-podcast alignment tuning knobs.",
+      "properties": {
+        "date_score_tiers": {
+          "items": {
+            "maxItems": 2,
+            "minItems": 2,
+            "prefixItems": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "number"
+              }
+            ],
+            "type": "array"
+          },
+          "title": "Date Score Tiers",
+          "type": "array"
+        },
+        "extra_stopwords": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Extra Stopwords",
+          "type": "array"
+        },
+        "match_tolerance": {
+          "default": 0.75,
+          "title": "Match Tolerance",
+          "type": "number"
+        },
+        "sparse_title_min": {
+          "default": 0.85,
+          "title": "Sparse Title Min",
+          "type": "number"
+        },
+        "weights": {
+          "$ref": "#/$defs/ScoringWeights"
+        }
+      },
+      "title": "AlignmentConfig",
+      "type": "object"
+    },
+    "FeedSource": {
+      "additionalProperties": false,
+      "description": "A single URL source with optional per-source filter rules.",
+      "properties": {
+        "filters": {
+          "$ref": "#/$defs/SourceFilter"
+        },
+        "url": {
+          "title": "Url",
+          "type": "string"
+        }
+      },
+      "required": [
+        "url"
+      ],
+      "title": "FeedSource",
+      "type": "object"
+    },
+    "PodcastConfigInput": {
+      "additionalProperties": false,
+      "description": "Input-only podcast config shape as authored in TOML files.",
+      "properties": {
+        "alignment": {
+          "$ref": "#/$defs/AlignmentConfig"
+        },
+        "downloads": {
+          "items": {
+            "$ref": "#/$defs/FeedSource"
+          },
+          "title": "Downloads",
+          "type": "array"
+        },
+        "name": {
+          "title": "Name",
+          "type": "string"
+        },
+        "path": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Path"
+        },
+        "references": {
+          "items": {
+            "$ref": "#/$defs/FeedSource"
+          },
+          "title": "References",
+          "type": "array"
+        },
+        "schedule": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Schedule",
+          "type": "array"
+        },
+        "tags": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Tags",
+          "type": "array"
+        }
+      },
+      "required": [
+        "name"
+      ],
+      "title": "PodcastConfigInput",
+      "type": "object"
+    },
+    "ScoringWeights": {
+      "additionalProperties": false,
+      "description": "Alignment signal weights for title/date/description/id scoring.",
+      "properties": {
+        "date": {
+          "default": 0.3,
+          "title": "Date",
+          "type": "number"
+        },
+        "description": {
+          "default": 0.1,
+          "title": "Description",
+          "type": "number"
+        },
+        "id": {
+          "default": 0.1,
+          "title": "Id",
+          "type": "number"
+        },
+        "title": {
+          "default": 0.5,
+          "title": "Title",
+          "type": "number"
+        }
+      },
+      "title": "ScoringWeights",
+      "type": "object"
+    },
+    "SourceFilter": {
+      "additionalProperties": false,
+      "description": "Structured filter rules for podcast episode selection.",
+      "properties": {
+        "exclude": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Exclude",
+          "type": "array"
+        },
+        "include": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Include",
+          "type": "array"
+        },
+        "r_rules": {
+          "items": {
+            "type": "string"
+          },
+          "title": "R Rules",
+          "type": "array"
+        }
+      },
+      "title": "SourceFilter",
+      "type": "object"
+    }
+  },
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "description": "Top-level TOML config document consumed by app_common.load_config.",
+  "properties": {
+    "podcasts": {
+      "items": {
+        "$ref": "#/$defs/PodcastConfigInput"
+      },
+      "title": "Podcasts",
+      "type": "array"
+    }
+  },
+  "title": "PodcastsTomlConfig",
+  "type": "object"
+}

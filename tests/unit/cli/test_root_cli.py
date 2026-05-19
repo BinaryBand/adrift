@@ -25,6 +25,7 @@ def test_root_help_lists_expected_commands() -> None:
     assert result.exit_code == 0
     assert "download" in result.stdout
     assert "merge" in result.stdout
+    assert "schema" in result.stdout
     assert "help" in result.stdout
 
 
@@ -37,6 +38,7 @@ def test_help_command_prints_top_level_help() -> None:
     assert "Commands" in result.stdout
     assert "download" in result.stdout
     assert "merge" in result.stdout
+    assert "schema" in result.stdout
 
 
 def test_help_download_shows_download_options() -> None:

@@ -7,6 +7,7 @@ import typer
 
 from adrift.cli.download import app as download_app
 from adrift.cli.merge import app as merge_app
+from adrift.cli.schema import app as schema_app
 
 app = typer.Typer(
     add_completion=False,
@@ -15,6 +16,7 @@ app = typer.Typer(
 )
 app.add_typer(download_app, name="download")
 app.add_typer(merge_app, name="merge")
+app.add_typer(schema_app, name="schema")
 
 
 @app.command("help")

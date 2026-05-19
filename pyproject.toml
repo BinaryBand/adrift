@@ -10,6 +10,7 @@ packages = [{ include = "adrift" }]
 adrift = "adrift.cli.root:main"
 adrift-download = "adrift.cli.download:main"
 adrift-merge = "adrift.cli.merge:main"
+adrift-schema = "adrift.cli.schema:main"
 
 [tool.poetry.dependencies]
 python = ">=3.11,<4.0"

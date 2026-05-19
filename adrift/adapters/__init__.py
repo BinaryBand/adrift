@@ -94,22 +94,7 @@ def _build_selected_provider(provider_name: str | None) -> tuple[str, SecretProv
 
 def get_secret_provider_adapter(
     provider_name: str | None = None,
-    *,
-    enable_prompt_fallback: bool | None = None,
-    prompt_callback: Callable[[str, str, bool], str] | None = None,
 ) -> SecretProviderPort:
     """Return the configured secret provider adapter instance."""
     _selected, provider = _build_selected_provider(provider_name)
-
-    if enable_prompt_fallback is None:
-        raw = os.getenv("ADRIFT_SECRETS_PROMPT_FALLBACK", "").strip().lower()
-        enable_prompt_fallback = raw in {"1", "true", "yes", "on"}
-
-    if not enable_prompt_fallback:
-        return provider
-
-    from adrift.adapters.process.secrets.prompt_fallback import PromptFallbackProvider
-
-    if prompt_callback is None:
-        return PromptFallbackProvider(provider)
-    return PromptFallbackProvider(provider, prompt_callback=prompt_callback)
+    return provider

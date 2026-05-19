@@ -32,12 +32,16 @@ from .podcast_config import (
     AlignmentConfig,
     FeedSource,
     PodcastConfig,
+    PodcastConfigInput,
+    PodcastsTomlConfig,
     ScoringWeights,
     SourceFilter,
+    compile_podcast_toml_schema,
     ensure_feed_source,
     ensure_podcast_config,
     ensure_source_filter,
     parse_podcasts_raw,
+    podcast_toml_json_schema,
 )
 from .sponsorblock import SponsorSegment
 from .stage_result import StageResult
@@ -57,6 +61,8 @@ __all__ = [
     "AlignmentConfig",
     "FeedSource",
     "PodcastConfig",
+    "PodcastConfigInput",
+    "PodcastsTomlConfig",
     "StageResult",
     "EpisodeData",
     "PodcastFeed",
@@ -79,5 +85,7 @@ __all__ = [
     "ensure_feed_source",
     "ensure_podcast_config",
     "ensure_source_filter",
+    "podcast_toml_json_schema",
+    "compile_podcast_toml_schema",
     "parse_podcasts_raw",
 ]

@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from collections.abc import Callable, Mapping, Sequence
+from collections.abc import Callable, Sequence
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Generic, Protocol, TypeVar, runtime_checkable
@@ -46,24 +46,6 @@ class SecretProviderPort(Protocol):
     source_name: str
 
     def get(self, key: str, default: str = "") -> str: ...
-
-
-@runtime_checkable
-class ReadOnlySecretStorePort(Protocol):
-    def get(self, key: str, default: str = "") -> str: ...
-
-    def has(self, key: str) -> bool: ...
-
-    def items(self) -> Mapping[str, str]: ...
-
-
-@runtime_checkable
-class SecretStorePort(ReadOnlySecretStorePort, Protocol):
-    def set(self, key: str, value: str) -> None: ...
-
-    def delete(self, key: str) -> None: ...
-
-    def save(self) -> None: ...
 
 
 @dataclass(frozen=True)
