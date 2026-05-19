@@ -2,6 +2,7 @@ from dataclasses import dataclass
 from typing import Any, Literal
 
 from adrift.models import FeedSource, PodcastConfig, RssEpisode, SourceTrace, ensure_feed_source
+from adrift.utils.profiler import profile
 from adrift.utils.progress import Callback
 from adrift.utils.text import is_youtube_channel
 
@@ -100,6 +101,7 @@ def _merge_episode_album(
             merged.append(episode)
 
 
+@profile
 def process_sources(
     config: PodcastConfig,
     callback: Callback | None = None,
@@ -120,6 +122,7 @@ def process_sources(
     return episodes
 
 
+@profile
 def process_feeds(
     config: PodcastConfig,
     callback: Callback | None = None,

@@ -15,6 +15,7 @@ from adrift.cli import (
     build_cli,
 )
 from adrift.services.merge import MergeUseCase
+from adrift.utils.profiler import disable_profiling, enable_profiling, print_profile_report
 
 if TYPE_CHECKING:
     from adrift.services.app_common import PodcastConfig
@@ -112,48 +113,55 @@ def _run(
         typer.Option(help="Emit per-podcast stage timings to stderr."),
     ] = False,
 ) -> None:
-    load_start = perf_counter()
-    configs, output_dir = bootstrap_run_configs(include, tags, skip_schedule_filter, output_dir)
-    load_duration = perf_counter() - load_start
     if timings:
-        sys.stderr.write(f"TIMING load_configs: {_format_duration(load_duration)}\n")
-    options = MergeRunOptions(
-        include_counts=include_counts,
-        pretty=pretty,
-        output_dir=output_dir,
-        output_file=output_file,
-        refresh_sources=refresh_sources,
-        timings_enabled=timings,
-    )
-    merge_result = _run_merge(configs, options)
-    # Write unmatched reference episodes (references with no matched download)
+        enable_profiling()
     try:
-        from pathlib import Path
+        load_start = perf_counter()
+        configs, output_dir = bootstrap_run_configs(include, tags, skip_schedule_filter, output_dir)
+        load_duration = perf_counter() - load_start
+        if timings:
+            sys.stderr.write(f"TIMING load_configs: {_format_duration(load_duration)}\n")
+        options = MergeRunOptions(
+            include_counts=include_counts,
+            pretty=pretty,
+            output_dir=output_dir,
+            output_file=output_file,
+            refresh_sources=refresh_sources,
+            timings_enabled=timings,
+        )
+        merge_result = _run_merge(configs, options)
+        # Write unmatched reference episodes (references with no matched download)
+        try:
+            from pathlib import Path
 
-        unmatched_per_series: list[dict[str, object]] = []
-        for merged in merge_result.value:
-            unmatched_refs: list[dict[str, object]] = []
-            for trace in merged.match_traces:
-                if trace.matched_download_index is None:
-                    ref = merged.references[trace.reference_index]
-                    unmatched_refs.append(ref.model_dump(mode="json"))
-            if unmatched_refs:
-                cfg = merged.config.model_dump(mode="json")
-                unmatched_per_series.append(
-                    {
-                        "name": cfg.get("name"),
-                        "slug": str(cfg.get("slug")),
-                        "unmatched_references": unmatched_refs,
-                    }
-                )
-        if unmatched_per_series:
-            outpath = Path(output_dir) / "unmatched_references.json"
-            _write_json(outpath, unmatched_per_series)
-    except Exception as exc:  # pragma: no cover - best-effort logging on failure
-        sys.stderr.write(f"Failed writing unmatched references: {exc}\n")
-    output = _build_stdout_output(merge_result, include_counts)
-    json.dump(output, sys.stdout, indent=2 if pretty else None)
-    sys.stdout.write("\n")
+            unmatched_per_series: list[dict[str, object]] = []
+            for merged in merge_result.value:
+                unmatched_refs: list[dict[str, object]] = []
+                for trace in merged.match_traces:
+                    if trace.matched_download_index is None:
+                        ref = merged.references[trace.reference_index]
+                        unmatched_refs.append(ref.model_dump(mode="json"))
+                if unmatched_refs:
+                    cfg = merged.config.model_dump(mode="json")
+                    unmatched_per_series.append(
+                        {
+                            "name": cfg.get("name"),
+                            "slug": str(cfg.get("slug")),
+                            "unmatched_references": unmatched_refs,
+                        }
+                    )
+            if unmatched_per_series:
+                outpath = Path(output_dir) / "unmatched_references.json"
+                _write_json(outpath, unmatched_per_series)
+        except Exception as exc:  # pragma: no cover - best-effort logging on failure
+            sys.stderr.write(f"Failed writing unmatched references: {exc}\n")
+        output = _build_stdout_output(merge_result, include_counts)
+        json.dump(output, sys.stdout, indent=2 if pretty else None)
+        sys.stdout.write("\n")
+    finally:
+        if timings:
+            print_profile_report()
+            disable_profiling()
 
 
 app, main = build_cli(_run)

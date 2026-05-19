@@ -8,6 +8,7 @@ from typing import Any, NamedTuple, cast
 from rapidfuzz import fuzz
 
 from adrift.models import AlignmentConfig, EpisodeData, RssEpisode
+from adrift.utils.profiler import profile
 from adrift.utils.progress import Callback
 from adrift.utils.text import normalize_text
 from adrift.utils.title_normalization import normalize_title
@@ -587,6 +588,7 @@ def _append_match_if_unused(
     used_dls.add(d_idx)
 
 
+@profile
 def align_episodes_impl(
     references: list[RssEpisode],
     downloads: list[RssEpisode],

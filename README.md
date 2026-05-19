@@ -1,12 +1,130 @@
 # adrift
 
-A podcast source aggregation and reference alignment tool. It fetches podcast metadata from RSS feeds and YouTube, filters episodes, and merges matched reference/source entries into a canonical output set.
+**Merge podcast episodes from multiple sources (RSS, YouTube) and find matches.**
 
-## Install Dependencies
+adrift aligns your reference episodes (what you want) with your download sources (where to get it), and outputs a unified feed. It's like a deduplication and reconciliation tool for podcast pipelines.
 
-### Node.js (Recommended for YouTube Downloads)
+## 5-Minute Quickstart
 
-Node.js helps yt-dlp handle YouTube's metadata extraction edge cases and solve JavaScript challenges.
+### 1. Install Python & Poetry
+
+- **Python 3.11+**: [python.org](https://www.python.org/)
+- **Poetry**: `curl -sSL https://install.python-poetry.org | python3 -`
+
+### 2. Clone & Set Up
+
+```bash
+git clone <repo>
+cd adrift
+poetry install --with dev
+```
+
+### 3. Run Your First Merge
+
+```bash
+poetry run adrift-merge --include 'config/podcasts.toml' --pretty
+```
+
+That's it! The output is JSON printed to stdout. Add `--output-dir downloads` to save results to disk.
+
+---
+
+## What Does It Do?
+
+**Input:** Podcast reference feeds (RSS/YouTube) + download sources  
+**Process:** Fetch episodes, filter by title/date, match similar titles  
+**Output:** Aligned episodes with metadata merged  
+
+Example:
+
+```text
+Reference: "Episode 42: The Big One"
+Download:  "S03E42 The Big One [HD]"
+Result:    → Merged as one episode with both metadata sources
+```
+
+---
+
+## Configuration
+
+Create TOML files in `config/`:
+
+```toml
+[[podcasts]]
+title    = "My Show"
+feeds    = ["https://example.com/rss"]           # Reference episodes
+sources  = ["yt://@MyChannel"]                   # Download sources
+schedule = "FREQ=WEEKLY;BYDAY=WE,FR"            # Optional: download on Wed/Fri
+
+[podcasts.filters]
+exclude = ["bonus", "clip"]                      # Skip these titles
+include = []                                     # If set, title must match one
+```
+
+| Schedule | Meaning |
+| ---------- | --------- |
+| `FREQ=WEEKLY;BYDAY=MO` | Every Monday |
+| `FREQ=WEEKLY;BYDAY=WE,FR` | Every Wed & Fri |
+| *(omitted)* | Every run |
+
+See `config/podcasts.toml` and `config/youtube.toml` for examples.
+
+---
+
+## Common Commands
+
+```bash
+# Basic merge, pretty-printed
+poetry run adrift-merge --include 'config/*.toml' --pretty
+
+# Include episode counts
+poetry run adrift-merge --include 'config/podcasts.toml' --include-counts
+
+# Save output to files (creates downloads/ directory)
+poetry run adrift-merge --include 'config/*.toml' --output-dir downloads
+
+# Output performance metrics
+poetry run adrift-merge --include 'config/*.toml' --timings
+
+# Download episodes (not just merge)
+poetry run adrift-download --include 'config/*.toml' --max-downloads 5
+```
+
+---
+
+## Secrets (.env)
+
+If you use S3 storage, create `.env`:
+
+```text
+S3_USERNAME=your_user
+S3_SECRET_KEY=your_key
+S3_ENDPOINT=https://s3.example.com
+S3_REGION=us-east-1
+```
+
+---
+
+## Project Layout
+
+```text
+adrift/
+├── cli/              # Commands (merge, download, schema)
+├── services/         # Core logic (merge, download, alignment)
+├── models/          # Data structures
+├── adapters/        # RSS & YouTube fetchers
+└── utils/           # Helpers (profiler, cache, progress)
+config/              # Your podcast configs (TOML)
+tests/               # Unit tests
+```
+
+---
+
+## Advanced Setup
+
+### Node.js (for YouTube)
+
+YouTube metadata extraction is more robust with Node.js installed:
 
 **Linux/WSL:**
 
@@ -15,187 +133,61 @@ curl -fsSL https://deb.nodesource.com/setup_lts.x | sudo -E bash -
 sudo apt install -y nodejs
 ```
 
-**Windows:**
-Download from [nodejs.org](https://nodejs.org/) or use:
+**Windows:** Download from [nodejs.org](https://nodejs.org/) or `choco install nodejs`
+
+### Working with Poetry
 
 ```bash
-choco install nodejs  # Using Chocolatey
-# or
-winget install OpenJS.NodeJS  # Using winget
-```
-
-**Verify installation:**
-
-```bash
-node --version
-npm --version
-```
-
-## Install Poetry
-
-This project uses [Poetry](https://python-poetry.org/) for dependency management.
-
-**Install via the official installer:**
-
-```bash
-(Invoke-WebRequest -Uri https://install.python-poetry.org -UseBasicParsing).Content | python -
-```
-
-Then add `%APPDATA%\Python\Scripts` to your PATH (the installer will show the exact command).
-
-## Working with the Virtual Environment
-<!-- cspell:words venv -->
-
-```bash
-# Install all dependencies (creates .venv in the project folder)
+# Install dependencies
 poetry install --with dev
 
-# Activate the virtual environment
-.venv\Scripts\activate
+# Run command directly
+poetry run adrift-merge --help
 
-# Or run a command directly without activating
-poetry run python -m adrift.cli.merge --pretty
+# Activate venv for shell
+source .venv/bin/activate  # Linux/Mac
+.venv\Scripts\activate     # Windows
 
-# When done, deactivate
-deactivate
-```
+# Add a dependency
+poetry add some-package
+poetry add --group dev some-dev-package
 
-## Update Dependencies
-
-```bash
-# Add a new dependency
-poetry add <package>
-
-# Add a dev-only dependency
-poetry add --group dev <package>
-
-# Update all packages to latest allowed versions
+# Update packages
 poetry update
-
-# Show outdated packages
-poetry show --outdated
 ```
 
-## Project Structure
+### Profiling
 
-- `adrift/cli/` - Command-line entry points for merge and download workflows
-- `adrift/` - Core source code
-  - `adapters/` - Source adapters for RSS and YouTube
-  - `web/` - RSS feed parsing and serialization
-  - `youtube/` - YouTube metadata extraction
-  - `utils/` - Normalization, caching, and progress helpers
-- `config/` - Podcast configurations in TOML format
-- `tests/` - Unit tests
-
-## Usage
-
-Run the merge pipeline across one or more config files:
+Enable function-level timing to find bottlenecks:
 
 ```bash
-poetry run python -m adrift.cli.merge --include config/*.toml --pretty
+poetry run adrift-merge --include 'config/*.toml' --timings
 ```
 
-Useful options:
+Outputs both per-podcast stage timings and a full profiling report showing which functions took the most time.
 
-- `--skip-schedule-filter` to include podcasts even when their configured schedule does not match today.
-- `--include-counts` to include reference and source counts alongside merged episodes.
-- `--output-dir downloads` to write a navigable output bundle per config under `./downloads`.
+---
 
-When `--output-dir` is set, the merge run writes:
-
-- `downloads/report.json` for the aggregate JSON report.
-- `downloads/index.json` as a directory map from config to generated feed snapshots.
-- `downloads/<slug>/config.json` for the resolved config.
-- `downloads/<slug>/feeds/combined.json`, a single per-podcast JSON file containing the full `MergeResult` payload.
-
-Note: the per-feed `references.json` and `downloads.json` files are no longer written by default; their contents are included in the `MergeResult` stored in `feeds/combined.json`.
-
-## Secret Management
-
-Secrets are managed directly through `.env`.
-
-Required keys:
-
-- `S3_USERNAME`
-- `S3_SECRET_KEY`
-- `S3_ENDPOINT`
-- `S3_REGION`
-
-Notes:
-
-- Runtime secret-provider selection still uses `ADRIFT_SECRETS_PROVIDER`.
-- Set `ADRIFT_SECRETS_PROMPT_FALLBACK=1` to let runtime reads prompt interactively for missing managed S3 keys instead of failing immediately. Leave it unset for automation and non-interactive runs.
-
-## Running the download pipeline locally
-
-The project no longer maintains a Docker-based workflow. Run the download pipeline locally using the CLI modules in this repository.
-
-Prerequisites:
-
-- A populated `.env` file for S3 and other runtime settings
-- Optional: a `cookies.txt` file if you need authenticated YouTube access
-
-Run:
+## Development
 
 ```bash
-poetry run python -m adrift.cli.download --skip-download
+# Run tests
+poetry run pytest
+
+# Lint & format
+poetry run ruff check adrift/
+poetry run mypy adrift/
+
+# Type stubs & code complexity
+poetry run ty check --project .
+poetry run lizard adrift/
 ```
 
-You can pass the same flags directly to `adrift.cli.download`, for example `poetry run python -m adrift.cli.download --include config/youtube.toml --max-downloads 3`.
+---
 
-## Configuration
+## Need More?
 
-Podcast series are defined in TOML files under `config/`:
-
-| File | Contents |
-| ------ | ---------- |
-| `config/podcasts.toml` | RSS-first podcast series |
-| `config/youtube.toml` | YouTube-first podcast series |
-
-### Entry format
-
-```toml
-[[podcasts]]
-title    = "My Podcast"
-path     = "/media/podcasts/my-podcast"
-feeds    = ["https://example.com/feed.rss"]
-sources  = ["yt://@MyChannel"]
-schedule = "FREQ=WEEKLY;BYDAY=WE,FR"   # download every Wed & Fri
-
-[podcasts.filters]       # applied to both feeds and sources by default
-exclude = ["bonus", "preview"]
-include = []             # if non-empty, title must match at least one pattern
-
-[podcasts.feed_filters]  # overrides filters for RSS feeds only (optional)
-exclude = ["shorts"]
-
-[podcasts.source_filters]  # overrides filters for sources only (optional)
-include = ["My Podcast"]   # only grab videos with this title
-```
-
-### Filter rules
-
-Each filter sub-table supports three fields. All patterns are Python
-[`re.search`](https://docs.python.org/3/library/re.html#re.search)
-patterns (case-insensitive):
-
-| Field | Effect |
-| ------- | -------- |
-| `exclude` | Episode is **rejected** if its title matches *any* pattern. Prefix a pattern with `^` to anchor it at the start of the title. |
-| `include` | When non-empty, episode is **rejected** unless its title matches *at least one* pattern. |
-| `r_rules` | RFC 5545 RRULE strings; only keep episodes whose publish date matches any of the given recurrence rules (e.g. `"FREQ=WEEKLY;BYDAY=MO"` for Monday-only). |
-
-### Schedule filter (RRULE)
-
-The `schedule` field accepts a subset of the
-[iCalendar RRULE](https://icalendar.org/iCalendar-RFC-5545/3-8-5-3-recurrence-rule.html)
-format:
-
-| Value | Meaning |
-| ------- | --------- |
-| `"FREQ=WEEKLY;BYDAY=WE,FR"` | Every Wednesday and Friday |
-| `"FREQ=WEEKLY;BYDAY=MO"` | Every Monday |
-| `"FREQ=WEEKLY"` | Once per week on a day derived deterministically from the show title |
-| *(omitted)* | Include every time the script runs |
-
-BYDAY codes: `MO` `TU` `WE` `TH` `FR` `SA` `SU`
+- Filter syntax: Python `re.search` patterns (case-insensitive)
+- Alignment details: See [docs/DESIGN.md](docs/DESIGN.md)
+- Contributing: See [docs/CONTRIBUTING.md](docs/CONTRIBUTING.md)
+- Architecture: See [docs/SPECS.md](docs/SPECS.md)

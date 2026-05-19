@@ -12,6 +12,7 @@ from adrift.models import (
     RssEpisode,
     SourceTrace,
 )
+from adrift.utils.profiler import profile
 from adrift.utils.progress import Callback
 
 from .alignment import align_episodes_impl, merge_episode
@@ -128,6 +129,7 @@ def _merge_config_artifacts(
     return pairs, match_traces, episodes
 
 
+@profile
 def merge_config(
     config: PodcastConfig,
     options: MergeConfigOptions | None = None,

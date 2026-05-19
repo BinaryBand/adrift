@@ -15,6 +15,7 @@ from adrift.services.merge_service import (
     emit_timings,
     model_payloads,
 )
+from adrift.utils.profiler import profile
 
 if TYPE_CHECKING:
     from adrift.models import MergeResult, PodcastConfig
@@ -60,6 +61,7 @@ class MergeUseCase:
     def __init__(self, writers: MergeWriters | None = None) -> None:
         self._writers = writers or MergeWriters()
 
+    @profile
     def run(
         self,
         configs: list[PodcastConfig],
@@ -87,6 +89,7 @@ class MergeUseCase:
 
         return StageResult(value=state.results, errors=tuple(errors))
 
+    @profile
     def _run_single_config(self, frame: _MergeConfigFrame) -> None:
         frame.runtime.ui.set_podcast(frame.config.name)
         frame.podcast_start = perf_counter()
@@ -146,6 +149,7 @@ class MergeUseCase:
             report["downloads_count"] = len(result.downloads)
         return report
 
+    @profile
     def _write_outputs(
         self,
         result: MergeResult,

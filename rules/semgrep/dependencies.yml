@@ -8,6 +8,10 @@ rules:
 
   # ── CLI ──────────────────────────────────────────────────────────────────
   - id: cli-no-direct-models-import
+    # ── Portability ────────────────────────────────────────────────────────────
+    # Replace "adrift" with your root package name. The three pattern forms
+    # cover `from X import`, `from X.sub import`, and bare `import X`.
+    # ───────────────────────────────────────────────────────────────────────────
     message: >-
       CLI must not import adrift.models directly. Route through adrift.services
       so the dependency graph stays CLI → Services → Models.
@@ -23,6 +27,10 @@ rules:
           - pattern: import adrift.models
 
   - id: cli-no-direct-adapters-import
+    # ── Portability ────────────────────────────────────────────────────────────
+    # Replace "adrift" with your root package name. The three pattern forms
+    # cover `from X import`, `from X.sub import`, and bare `import X`.
+    # ───────────────────────────────────────────────────────────────────────────
     message: >-
       CLI must not import adrift.adapters directly. Route through adrift.services
       so the dependency graph stays CLI → Services → Adapters.
@@ -39,6 +47,10 @@ rules:
 
   # ── Services ─────────────────────────────────────────────────────────────
   - id: services-no-cli-import
+    # ── Portability ────────────────────────────────────────────────────────────
+    # Replace "adrift" with your root package name. The three pattern forms
+    # cover `from X import`, `from X.sub import`, and bare `import X`.
+    # ───────────────────────────────────────────────────────────────────────────
     message: >-
       adrift.services must not import from adrift.cli. Services are downstream
       of CLI; importing upward inverts the dependency graph.
@@ -55,6 +67,10 @@ rules:
 
   # ── Adapters ─────────────────────────────────────────────────────────────
   - id: adapters-no-services-import
+    # ── Portability ────────────────────────────────────────────────────────────
+    # Replace "adrift" with your root package name. The three pattern forms
+    # cover `from X import`, `from X.sub import`, and bare `import X`.
+    # ───────────────────────────────────────────────────────────────────────────
     message: >-
       adrift.adapters must not import from adrift.services. The graph runs
       Services → Adapters; importing back creates a cycle.
@@ -70,6 +86,10 @@ rules:
           - pattern: import adrift.services
 
   - id: adapters-no-cli-import
+    # ── Portability ────────────────────────────────────────────────────────────
+    # Replace "adrift" with your root package name. The three pattern forms
+    # cover `from X import`, `from X.sub import`, and bare `import X`.
+    # ───────────────────────────────────────────────────────────────────────────
     message: >-
       adrift.adapters must not import from adrift.cli. Adapters are a downstream
       infrastructure layer; importing CLI inverts the dependency graph.
@@ -86,6 +106,12 @@ rules:
 
   # ── Models ───────────────────────────────────────────────────────────────
   - id: models-no-internal-imports
+    # ── Portability ────────────────────────────────────────────────────────────
+    # Replace "adrift" in the patterns with your root package name.
+    # Update the $LAYER regex to list every layer that models must not import
+    # from. When you add a new top-level layer, add it here if models should
+    # remain independent of it.
+    # ───────────────────────────────────────────────────────────────────────────
     message: >-
       adrift.models must not import from any other adrift layer. Models are pure
       data structures — no behaviour, no side effects, no upward dependencies.
@@ -96,17 +122,20 @@ rules:
         - /adrift/models/**/*.py
     patterns:
       - pattern-either:
-          - pattern: from adrift.cli import $X
-          - pattern: from adrift.cli.$M import $X
-          - pattern: from adrift.services import $X
-          - pattern: from adrift.services.$M import $X
-          - pattern: from adrift.adapters import $X
-          - pattern: from adrift.adapters.$M import $X
-          - pattern: from adrift.utils import $X
-          - pattern: from adrift.utils.$M import $X
+          - pattern: from adrift.$LAYER import $X
+          - pattern: from adrift.$LAYER.$M import $X
+      - metavariable-regex:
+          metavariable: $LAYER
+          regex: ^(cli|services|adapters|utils)$
 
   # ── Utils ─────────────────────────────────────────────────────────────────
   - id: utils-no-internal-imports
+    # ── Portability ────────────────────────────────────────────────────────────
+    # Replace "adrift" in the patterns with your root package name.
+    # Update the $LAYER regex to list every layer that utils must not import
+    # from. When you add a new top-level layer, add it here if utils should
+    # remain independent of it.
+    # ───────────────────────────────────────────────────────────────────────────
     message: >-
       adrift.utils must not import from any other adrift layer. Utils are the
       foundational leaf layer; importing upward creates cycles.
@@ -117,11 +146,8 @@ rules:
         - /adrift/utils/**/*.py
     patterns:
       - pattern-either:
-          - pattern: from adrift.cli import $X
-          - pattern: from adrift.cli.$M import $X
-          - pattern: from adrift.services import $X
-          - pattern: from adrift.services.$M import $X
-          - pattern: from adrift.adapters import $X
-          - pattern: from adrift.adapters.$M import $X
-          - pattern: from adrift.models import $X
-          - pattern: from adrift.models.$M import $X
+          - pattern: from adrift.$LAYER import $X
+          - pattern: from adrift.$LAYER.$M import $X
+      - metavariable-regex:
+          metavariable: $LAYER
+          regex: ^(cli|services|adapters|models)$
