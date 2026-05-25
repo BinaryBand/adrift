@@ -70,7 +70,12 @@ _SHOW_RULES = {
             r"(?i)\|\s*morbid$",
             r"(?i)\|\s*episode\s+\d+\s*$",
         ),
-        slug_suffixes=("Morbid", "Morbid Podcast", "Morbid A True Crime Podcast"),
+        slug_suffixes=(
+            "Morbid",
+            "Morbid Podcast",
+            "Morbid Podcast Video",
+            "Morbid A True Crime Podcast",
+        ),
     ),
     "Revisionist History": _ShowRule(
         suffix_patterns=(r"(?i)\| revisionist history malcolm gladwell$",),

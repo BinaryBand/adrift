@@ -6,12 +6,14 @@ def test_duplicate_audio_candidates_prefers_canonical_opus() -> None:
         "candy-mossler.opus",
         "candy-mossler-morbid-a-true-crime-podcast.opus",
         "candy-mossler-morbid-podcast.opus",
+        "candy-mossler-morbid-podcast-video.opus",
     ]
 
     result = _duplicate_audio_candidates("Morbid", file_names)
 
     assert result == [
         "candy-mossler-morbid-a-true-crime-podcast.opus",
+        "candy-mossler-morbid-podcast-video.opus",
         "candy-mossler-morbid-podcast.opus",
     ]
 

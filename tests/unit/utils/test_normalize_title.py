@@ -76,6 +76,10 @@ class TestNormalizeTitleMorbid(unittest.TestCase):
         result = normalize_title("Morbid", "Candy Mossler Morbid A True Crime Podcast")
         self.assertEqual(result, "candy-mossler")
 
+    def test_strips_podcast_video_slug_suffix(self):
+        result = normalize_title("Morbid", "Candy Mossler Morbid Podcast Video")
+        self.assertEqual(result, "candy-mossler")
+
 
 class TestNormalizeTitleCaching(unittest.TestCase):
     def test_second_call_returns_same_result(self):
