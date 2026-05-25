@@ -37,11 +37,70 @@ def _assert_filter_rules_valid(tc: unittest.TestCase, rules: SourceFilter, label
             tc.fail(f"{label}: to_regex() produced invalid regex: {exc}")
 
 
+def _assert_title_normalization_rules_valid(tc: unittest.TestCase, podcast: PodcastConfig) -> None:
+    rules = podcast.cleanup.title_normalization
+
+    for pattern in rules.prefix_patterns + rules.suffix_patterns:
+        try:
+            re.compile(pattern)
+        except re.error as exc:
+            tc.fail(f"{podcast.name}: invalid title normalization pattern {pattern!r}: {exc}")
+
+    for replacement in rules.replacements:
+        try:
+            re.compile(replacement.pattern)
+        except re.error as exc:
+            tc.fail(
+                f"{podcast.name}: invalid title normalization replacement pattern "
+                f"{replacement.pattern!r}: {exc}"
+            )
+        tc.assertIn(
+            replacement.target,
+            {"title", "slug"},
+            f"{podcast.name}: invalid title normalization target {replacement.target!r}",
+        )
+
+
+def _assert_schedule_rules_valid(tc: unittest.TestCase, podcast: PodcastConfig) -> None:
+    for rule in podcast.schedule:
+        tc.assertIsInstance(rule, str)
+        tc.assertTrue(
+            rule.startswith("FREQ=")
+            or (
+                "DTSTART:" in rule.upper() and "RRULE:" in rule.upper() and "FREQ=" in rule.upper()
+            ),
+            f"{podcast.name}: unsupported schedule format {rule!r}",
+        )
+
+    for fs in podcast.references + podcast.downloads:
+        for rule in fs.filters.r_rules:
+            tc.assertIsInstance(rule, str)
+            tc.assertTrue(
+                rule.startswith("FREQ=")
+                or (
+                    "DTSTART:" in rule.upper()
+                    and "RRULE:" in rule.upper()
+                    and "FREQ=" in rule.upper()
+                ),
+                f"{podcast.name}: invalid r_rules entry {rule!r}",
+            )
+
+
+def _assert_feed_source_valid(tc: unittest.TestCase, podcast: PodcastConfig) -> None:
+    for fs in podcast.references:
+        tc.assertIsInstance(fs.url, str)
+        tc.assertTrue(is_valid_url(fs.url), f"Invalid reference URL: {fs.url}")
+        _assert_filter_rules_valid(tc, fs.filters, f"{podcast.name} reference {fs.url} filters")
+
+    for fs in podcast.downloads:
+        tc.assertIsInstance(fs.url, str)
+        tc.assertTrue(is_valid_url(fs.url), f"Invalid download URL: {fs.url}")
+        _assert_filter_rules_valid(tc, fs.filters, f"{podcast.name} download {fs.url} filters")
+
+
 class AuditConfigs(unittest.TestCase):
     def test_audit_podcast_configs(self):
         """Test that all podcast configs parsed from TOML are structurally valid."""
-        # load_podcasts_config filters by today's schedule, but we want to audit
-        # all entries regardless of day – load from both files without filtering.
         from dotenv import find_dotenv
 
         from adrift.services.app_common import load_config  # type: ignore[attr-defined]
@@ -55,51 +114,9 @@ class AuditConfigs(unittest.TestCase):
 
         for podcast in configs:
             self.assertIsInstance(podcast, PodcastConfig)
-
-            for fs in podcast.references:
-                self.assertIsInstance(fs.url, str)
-                self.assertTrue(is_valid_url(fs.url), f"Invalid reference URL: {fs.url}")
-
-            for fs in podcast.downloads:
-                self.assertIsInstance(fs.url, str)
-                self.assertTrue(is_valid_url(fs.url), f"Invalid download URL: {fs.url}")
-
-            # Validate filter rules for each FeedSource
-            for fs in podcast.references:
-                _assert_filter_rules_valid(
-                    self, fs.filters, f"{podcast.name} reference {fs.url} filters"
-                )
-            for fs in podcast.downloads:
-                _assert_filter_rules_valid(
-                    self, fs.filters, f"{podcast.name} download {fs.url} filters"
-                )
-
-            # Validate schedule is either legacy FREQ= or RFC5545 DTSTART+RRULE.
-            for rule in podcast.schedule:
-                self.assertIsInstance(rule, str)
-                self.assertTrue(
-                    rule.startswith("FREQ=")
-                    or (
-                        "DTSTART:" in rule.upper()
-                        and "RRULE:" in rule.upper()
-                        and "FREQ=" in rule.upper()
-                    ),
-                    f"{podcast.name}: unsupported schedule format {rule!r}",
-                )
-
-            # Validate r_rules entries are RRULE strings.
-            for fs in podcast.references + podcast.downloads:
-                for rule in fs.filters.r_rules:
-                    self.assertIsInstance(rule, str)
-                    self.assertTrue(
-                        rule.startswith("FREQ=")
-                        or (
-                            "DTSTART:" in rule.upper()
-                            and "RRULE:" in rule.upper()
-                            and "FREQ=" in rule.upper()
-                        ),
-                        f"{podcast.name}: invalid r_rules entry {rule!r}",
-                    )
+            _assert_title_normalization_rules_valid(self, podcast)
+            _assert_feed_source_valid(self, podcast)
+            _assert_schedule_rules_valid(self, podcast)
 
 
 class ExpandIncludeTargets(unittest.TestCase):

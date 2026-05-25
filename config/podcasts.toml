@@ -18,6 +18,10 @@ url = "yt://@BehindTheBastards"
 [podcasts.downloads.filters]
 exclude = ["it could happen here", "behind the bastards presents", "czm rewind"]
 
+[podcasts.cleanup.title_normalization]
+suffix_patterns = ["(?i)\\| behind the bastards$"]
+slug_suffixes = ["Behind the Bastards"]
+
 
 [[podcasts]]
 name = "Camp Gagnon"
@@ -44,6 +48,14 @@ url = "https://feeds.megaphone.fm/creepcast"
 [[podcasts.downloads]]
 url = "yt://@CreepPodcast"
 
+[podcasts.cleanup.title_normalization]
+suffix_patterns = [
+    "(?i)\\| creep cast$",
+    "(?i)\\| creepcast$",
+    "(?i)\\| creep tv$",
+]
+slug_suffixes = ["Creep Cast", "CreepCast", "Creep TV"]
+
 
 [[podcasts]]
 name = "Darknet Diaries"
@@ -56,6 +68,13 @@ url = "https://podcast.darknetdiaries.com"
 
 [[podcasts.downloads]]
 url = "yt://@JackRhysider"
+
+[podcasts.cleanup.title_normalization]
+
+[[podcasts.cleanup.title_normalization.replacements]]
+target = "slug"
+pattern = "^.*?ep\\-*(\\d{1,3}[\\-a-z0-9]+)$"
+replacement = "\\1"
 
 
 [[podcasts]]
@@ -98,6 +117,10 @@ exclude = [
     "fat & fatter",
 ]
 
+[podcasts.cleanup.title_normalization]
+suffix_patterns = ["(?i)\\| financial audit$"]
+slug_suffixes = ["Financial Audit"]
+
 
 [[podcasts]]
 name = "Morbid"
@@ -123,6 +146,27 @@ exclude = ["listener tales", "listener tale"]
 [podcasts.alignment]
 extra_stopwords = ["morbid"]
 
+[podcasts.cleanup.title_normalization]
+prefix_patterns = [
+    "(?i)^episode(?:\\s+|\\-+)\\d{1,3}[:\\-]?\\s*",
+    "(?i)^fan favorite:\\s*",
+    "(?i)^episode revisit:\\s*",
+]
+suffix_patterns = [
+    "(?i)\\|\\s*morbid:\\s*a true crime podcast$",
+    "(?i)\\|\\s*morbid\\s*\\|\\s*podcast\\s*\\|\\s*video$",
+    "(?i)\\|\\s*morbid\\s*\\|\\s*podcast$",
+    "(?i)\\|\\s*morbid\\|\\s*podcast$",
+    "(?i)\\|\\s*morbid$",
+    "(?i)\\|\\s*episode\\s+\\d+\\s*$",
+]
+slug_suffixes = [
+    "Morbid",
+    "Morbid Podcast",
+    "Morbid Podcast Video",
+    "Morbid A True Crime Podcast",
+]
+
 
 [[podcasts]]
 name = "Smosh Reads Reddit Stories"
@@ -137,6 +181,10 @@ url = "https://audioboom.com/channels/5148149.rss"
 url = "yt://@smoshpit"
 [podcasts.downloads.filters]
 include = ["Reading Reddit Stories"]
+
+[podcasts.cleanup.title_normalization]
+suffix_patterns = ["(?i)\\| smosh reading reddit stories$"]
+slug_suffixes = ["Smosh Reading Reddit Stories"]
 
 
 # [[podcasts]]
@@ -183,6 +231,20 @@ url = "https://feeds.megaphone.fm/swindled"
 url = "yt://@SwindledPodcast"
 [podcasts.downloads.filters]
 exclude = ["rerun", "documentary"]
+
+[podcasts.cleanup.title_normalization]
+
+[[podcasts.cleanup.title_normalization.replacements]]
+pattern = "(?i)\\s*\\|\\s*Audio Podcast$"
+replacement = ""
+
+[[podcasts.cleanup.title_normalization.replacements]]
+pattern = "(?i)\\s*\\|\\s*Documentary$"
+replacement = ""
+
+[[podcasts.cleanup.title_normalization.replacements]]
+pattern = "\\(([^/\\)]+)/[^)]*\\)"
+replacement = "(\\1)"
 
 
 [[podcasts]]

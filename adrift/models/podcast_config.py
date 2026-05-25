@@ -93,6 +93,35 @@ class AlignmentConfig(BaseModel):
     extra_stopwords: list[str] = Field(default_factory=list)
 
 
+class TitleNormalizationReplacement(BaseModel):
+    """Regex replacement rule for title/slug normalization."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    pattern: str
+    replacement: str = ""
+    target: str = "title"
+
+
+class TitleNormalizationConfig(BaseModel):
+    """Per-podcast cleanup rules for title normalization."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    prefix_patterns: list[str] = Field(default_factory=list)
+    suffix_patterns: list[str] = Field(default_factory=list)
+    slug_suffixes: list[str] = Field(default_factory=list)
+    replacements: list[TitleNormalizationReplacement] = Field(default_factory=list)
+
+
+class CleanupConfig(BaseModel):
+    """Per-podcast cleanup behavior settings."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    title_normalization: TitleNormalizationConfig = Field(default_factory=TitleNormalizationConfig)
+
+
 class _PodcastConfigBase(BaseModel):
     """Shared podcast config fields used by runtime and TOML input models."""
 
@@ -104,6 +133,7 @@ class _PodcastConfigBase(BaseModel):
     schedule: list[str] = Field(default_factory=list)
     tags: list[str] = Field(default_factory=list)
     alignment: AlignmentConfig = Field(default_factory=AlignmentConfig)
+    cleanup: CleanupConfig = Field(default_factory=CleanupConfig)
 
 
 class PodcastConfig(_PodcastConfigBase):

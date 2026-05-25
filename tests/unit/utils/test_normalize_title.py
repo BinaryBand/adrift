@@ -65,10 +65,16 @@ class TestNormalizeTitleSwindled(unittest.TestCase):
         self.assertIn("big-scam", result)
 
 
-class TestNormalizeTitleCoffeeBreakSwedish(unittest.TestCase):
-    def test_strips_podcast_suffix(self):
-        result = normalize_title("Coffee Break Swedish", "Lesson 12 | Coffee Break Swedish Podcast")
-        self.assertNotIn("coffee-break-swedish-podcast", result)
+class TestNormalizeTitleCreepCast(unittest.TestCase):
+    def test_strips_creepcast_suffix(self):
+        result = normalize_title("CreepCast", "The Story | CreepCast")
+        self.assertNotIn("creepcast", result)
+
+
+class TestNormalizeTitleFinancialAudit(unittest.TestCase):
+    def test_strips_financial_audit_suffix(self):
+        result = normalize_title("Financial Audit", "Big Debt Story | Financial Audit")
+        self.assertEqual(result, "big-debt-story")
 
 
 class TestNormalizeTitleMorbid(unittest.TestCase):
@@ -79,6 +85,15 @@ class TestNormalizeTitleMorbid(unittest.TestCase):
     def test_strips_podcast_video_slug_suffix(self):
         result = normalize_title("Morbid", "Candy Mossler Morbid Podcast Video")
         self.assertEqual(result, "candy-mossler")
+
+
+class TestNormalizeTitleSmoshReadsRedditStories(unittest.TestCase):
+    def test_strips_smosh_suffix(self):
+        result = normalize_title(
+            "Smosh Reads Reddit Stories",
+            "Worst Family Drama | Smosh Reading Reddit Stories",
+        )
+        self.assertEqual(result, "worst-family-drama")
 
 
 class TestNormalizeTitleCaching(unittest.TestCase):

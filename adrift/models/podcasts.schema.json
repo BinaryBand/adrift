@@ -45,6 +45,17 @@
       "title": "AlignmentConfig",
       "type": "object"
     },
+    "CleanupConfig": {
+      "additionalProperties": false,
+      "description": "Per-podcast cleanup behavior settings.",
+      "properties": {
+        "title_normalization": {
+          "$ref": "#/$defs/TitleNormalizationConfig"
+        }
+      },
+      "title": "CleanupConfig",
+      "type": "object"
+    },
     "FeedSource": {
       "additionalProperties": false,
       "description": "A single URL source with optional per-source filter rules.",
@@ -69,6 +80,9 @@
       "properties": {
         "alignment": {
           "$ref": "#/$defs/AlignmentConfig"
+        },
+        "cleanup": {
+          "$ref": "#/$defs/CleanupConfig"
         },
         "downloads": {
           "items": {
@@ -176,6 +190,67 @@
         }
       },
       "title": "SourceFilter",
+      "type": "object"
+    },
+    "TitleNormalizationConfig": {
+      "additionalProperties": false,
+      "description": "Per-podcast cleanup rules for title normalization.",
+      "properties": {
+        "prefix_patterns": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Prefix Patterns",
+          "type": "array"
+        },
+        "replacements": {
+          "items": {
+            "$ref": "#/$defs/TitleNormalizationReplacement"
+          },
+          "title": "Replacements",
+          "type": "array"
+        },
+        "slug_suffixes": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Slug Suffixes",
+          "type": "array"
+        },
+        "suffix_patterns": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Suffix Patterns",
+          "type": "array"
+        }
+      },
+      "title": "TitleNormalizationConfig",
+      "type": "object"
+    },
+    "TitleNormalizationReplacement": {
+      "additionalProperties": false,
+      "description": "Regex replacement rule for title/slug normalization.",
+      "properties": {
+        "pattern": {
+          "title": "Pattern",
+          "type": "string"
+        },
+        "replacement": {
+          "default": "",
+          "title": "Replacement",
+          "type": "string"
+        },
+        "target": {
+          "default": "title",
+          "title": "Target",
+          "type": "string"
+        }
+      },
+      "required": [
+        "pattern"
+      ],
+      "title": "TitleNormalizationReplacement",
       "type": "object"
     }
   },
