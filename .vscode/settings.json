@@ -42,6 +42,7 @@
   "python-envs.defaultPackageManager": "ms-python.python:poetry",
   "python-envs.defaultEnvManager": "ms-python.python:poetry",
   "evenBetterToml.schema.associations": {
-    "config/*.toml": "file://${workspaceFolder}/adrift/models/podcasts.schema.json"
+    "config/podcasts.toml": "file://${workspaceFolder}/adrift/models/podcasts.schema.json",
+    "config/.podcasts.toml": "file://${workspaceFolder}/adrift/models/podcasts.schema.json"
   }
 }
