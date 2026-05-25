@@ -71,6 +71,12 @@ class TestNormalizeTitleCoffeeBreakSwedish(unittest.TestCase):
         self.assertNotIn("coffee-break-swedish-podcast", result)
 
 
+class TestNormalizeTitleMorbid(unittest.TestCase):
+    def test_strips_true_crime_podcast_slug_suffix(self):
+        result = normalize_title("Morbid", "Candy Mossler Morbid A True Crime Podcast")
+        self.assertEqual(result, "candy-mossler")
+
+
 class TestNormalizeTitleCaching(unittest.TestCase):
     def test_second_call_returns_same_result(self):
         # Warm cache, then call again — must return same value

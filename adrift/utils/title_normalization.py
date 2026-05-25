@@ -58,7 +58,7 @@ _SHOW_RULES = {
     ),
     "Morbid": _ShowRule(
         prefix_patterns=(
-            r"(?i)^episode \d{1,3}[:\-]?\s*",
+            r"(?i)^episode(?:\s+|\-+)\d{1,3}[:\-]?\s*",
             r"(?i)^fan favorite:\s*",
             r"(?i)^episode revisit:\s*",
         ),
@@ -70,7 +70,7 @@ _SHOW_RULES = {
             r"(?i)\|\s*morbid$",
             r"(?i)\|\s*episode\s+\d+\s*$",
         ),
-        slug_suffixes=("Morbid", "Morbid Podcast"),
+        slug_suffixes=("Morbid", "Morbid Podcast", "Morbid A True Crime Podcast"),
     ),
     "Revisionist History": _ShowRule(
         suffix_patterns=(r"(?i)\| revisionist history malcolm gladwell$",),

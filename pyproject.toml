@@ -8,6 +8,7 @@ packages = [{ include = "adrift" }]
 
 [tool.poetry.scripts]
 adrift = "adrift.cli.root:main"
+adrift-cleanup = "adrift.cli.cleanup:main"
 adrift-download = "adrift.cli.download:main"
 adrift-merge = "adrift.cli.merge:main"
 adrift-schema = "adrift.cli.schema:main"

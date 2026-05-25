@@ -23,6 +23,7 @@ def test_root_help_lists_expected_commands() -> None:
     result = runner.invoke(app, ["--help"], color=False)
 
     assert result.exit_code == 0
+    assert "cleanup" in result.stdout
     assert "download" in result.stdout
     assert "merge" in result.stdout
     assert "schema" in result.stdout
@@ -36,6 +37,7 @@ def test_help_command_prints_top_level_help() -> None:
 
     assert result.exit_code == 0
     assert "Commands" in result.stdout
+    assert "cleanup" in result.stdout
     assert "download" in result.stdout
     assert "merge" in result.stdout
     assert "schema" in result.stdout
