@@ -25,6 +25,15 @@ def _unmatched_indices(pairs: list[tuple[int, int]], total: int) -> list[int]:
     return [index for index in range(total) if index not in matched]
 
 
+def _matched_download_slugs(result: Any) -> set[str]:
+    from adrift.utils.title_normalization import normalize_title
+
+    return {
+        normalize_title(result.config.name, result.downloads[download_index].title)
+        for _, download_index in result.pairs
+    }
+
+
 def _resolve_s3_key(s3: Any, bucket: str, prefix: str, slug: str) -> str | None:
     key_prefix = f"{prefix}/{slug}"
     actual_name = s3.exists(bucket, key_prefix)
@@ -65,11 +74,14 @@ def _process_unmatched(result: Any, s3: Any, dry_run: bool) -> tuple[int, int]:
 
     bucket, prefix = s3_prefix(result.config)
     indices = _unmatched_indices(result.pairs, len(result.downloads))
+    matched_slugs = _matched_download_slugs(result)
     found = 0
     missing = 0
     for index in indices:
         download = result.downloads[index]
         slug = normalize_title(result.config.name, download.title)
+        if slug in matched_slugs:
+            continue
         key = _resolve_s3_key(s3, bucket, prefix, slug)
         if key is None:
             missing += 1

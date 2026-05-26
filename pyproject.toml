@@ -53,6 +53,7 @@ semgrep = "<1.160.0"
 setuptools = ">=75.0,<81"
 pyinstrument = "^5.1.2"
 maturin = "^1.8.0"
+hypothesis = "^6.153.0"
 
 [tool.pytest.ini_options]
 addopts = "-m 'not slow'"

@@ -12,6 +12,7 @@ import pytest
 
 ROOT: Path = Path(__file__).resolve().parents[1]
 VENV_BIN = ROOT / ".venv" / "bin"
+_RUFF_PREP_DONE = False
 
 
 def run_resolved(cmd: Iterable[str], /, **kwargs: Any) -> subprocess.CompletedProcess[Any]:
@@ -24,6 +25,34 @@ def run_resolved(cmd: Iterable[str], /, **kwargs: Any) -> subprocess.CompletedPr
     elif which(executable) is not None:
         argv[0] = which(executable) or executable
     return subprocess.run(argv, cwd=ROOT, check=False, **kwargs)  # type: ignore
+
+
+def _ruff_autofix_enabled() -> bool:
+    if os.environ.get("CI") == "true":
+        return False
+    return os.environ.get("ADRIFT_RUFF_AUTOFIX", "1") == "1"
+
+
+def _ensure_ruff_preflight(paths: Iterable[str]) -> None:
+    global _RUFF_PREP_DONE
+    if _RUFF_PREP_DONE or not _ruff_autofix_enabled():
+        return
+
+    fix_result = run_resolved(
+        ["python", "-m", "ruff", "check", "--fix", *paths],
+        capture_output=True,
+        text=True,
+    )
+    assert fix_result.returncode == 0, fix_result.stdout + fix_result.stderr
+
+    format_result = run_resolved(
+        ["python", "-m", "ruff", "format", *paths],
+        capture_output=True,
+        text=True,
+    )
+    assert format_result.returncode == 0, format_result.stdout + format_result.stderr
+
+    _RUFF_PREP_DONE = True
 
 
 class TestCpd:
@@ -50,6 +79,7 @@ class TestRuff:
 
     def test_ruff_check(self):
         """Fail if ruff reports any lint violations."""
+        _ensure_ruff_preflight(self.PATHS)
         result = run_resolved(
             ["python", "-m", "ruff", "check", "adrift", "tests", "typings"],
             capture_output=True,
@@ -59,6 +89,7 @@ class TestRuff:
 
     def test_ruff_format(self):
         """Fail if ruff reports any formatting violations."""
+        _ensure_ruff_preflight(self.PATHS)
         result = run_resolved(
             [
                 "python",

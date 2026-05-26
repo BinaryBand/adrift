@@ -5,8 +5,6 @@
     "**/.cache": true,
     "**/*.cache": true,
     "**/*_cache": true,
-    "**/.claude": true,
-    "**/.claude/**": true,
     "**/.pytest_cache": true,
     "**/.ruff_cache": true
   },
