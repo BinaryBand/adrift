@@ -34,6 +34,15 @@ url = "https://anchor.fm/s/fc9f8628/podcast/rss"
 [[podcasts.downloads]]
 url = "yt://@CampGagnon"
 
+[podcasts.alignment]
+match_tolerance = 0.78
+
+[podcasts.alignment.weights]
+title = 0.25
+date = 0.60
+description = 0.10
+id = 0.05
+
 
 [[podcasts]]
 name = "CreepCast"

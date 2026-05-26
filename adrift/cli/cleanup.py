@@ -68,7 +68,45 @@ def _duplicate_audio_candidates(show: str, file_names: list[str]) -> list[str]:
     return sorted(duplicates)
 
 
-def _process_unmatched(result: Any, s3: Any, dry_run: bool) -> tuple[int, int]:
+def _best_alignment_candidate_for_download(
+    result: Any, download_index: int
+) -> tuple[str, float, str] | None:
+    best: tuple[str, float, str] | None = None
+    references = getattr(result, "references", [])
+    for trace in getattr(result, "match_traces", []):
+        reference_index = getattr(trace, "reference_index", None)
+        reference_title = f"<reference {reference_index}>"
+        if isinstance(reference_index, int) and 0 <= reference_index < len(references):
+            reference_title = references[reference_index].title
+        for candidate in getattr(trace, "candidates", []):
+            if getattr(candidate, "download_index", None) != download_index:
+                continue
+            reason = str(getattr(candidate, "reason", "unknown"))
+            score = float(getattr(candidate, "score", 0.0))
+            if best is None or score > best[1]:
+                best = (reason, score, reference_title)
+    return best
+
+
+def _write_unmatched_verbose(result: Any, download_index: int) -> None:
+    download = result.downloads[download_index]
+    sys.stdout.write(f"    title:  {download.title}\n")
+    sys.stdout.write(f"    source: {download.content}\n")
+    best_candidate = _best_alignment_candidate_for_download(result, download_index)
+    if best_candidate:
+        reason, score, reference_title = best_candidate
+        sys.stdout.write(f"    candidate ref: {reference_title!r}\n")
+        sys.stdout.write(f"    alignment: reason={reason}, score={score:.2f}\n")
+    else:
+        sys.stdout.write("    alignment: no candidate trace for this download\n")
+
+
+def _process_unmatched(
+    result: Any,
+    s3: Any,
+    dry_run: bool,
+    verbose: bool = False,
+) -> tuple[int, int]:
     from adrift.services.download_client import s3_prefix
     from adrift.utils.title_normalization import normalize_title
 
@@ -88,6 +126,8 @@ def _process_unmatched(result: Any, s3: Any, dry_run: bool) -> tuple[int, int]:
             continue
         label = "would delete" if dry_run else "deleted"
         sys.stdout.write(f"  {label}: {bucket}/{key}\n")
+        if verbose:
+            _write_unmatched_verbose(result, index)
         if not dry_run:
             _delete_key(s3, bucket, key)
         found += 1
@@ -114,6 +154,7 @@ def _run_cleanup(
     dry_run: bool,
     refresh_sources: bool,
     prune_duplicates: bool,
+    verbose: bool = False,
 ) -> None:
     from adrift.services.catalog.merge import merge_config
 
@@ -125,7 +166,7 @@ def _run_cleanup(
         unmatched = _unmatched_indices(result.pairs, len(result.downloads))
         sys.stdout.write(f"\n{config.name}: {len(unmatched)} unmatched download(s)\n")
         if unmatched:
-            found, missing = _process_unmatched(result, s3, dry_run)
+            found, missing = _process_unmatched(result, s3, dry_run, verbose=verbose)
             total_unmatched_found += found
             total_missing += missing
         if prune_duplicates:
@@ -160,12 +201,28 @@ def _run(
         bool,
         typer.Option(help="Remove duplicate audio objects when a canonical slug.opus exists."),
     ] = True,
+    verbose: Annotated[
+        bool,
+        typer.Option(
+            help=(
+                "Show download title/source plus exact match-trace candidate reason and score "
+                "for each deletion."
+            )
+        ),
+    ] = False,
 ) -> None:
     from adrift.services.context import AppContext
 
     configs, _ = bootstrap_run_configs(include, tags, skip_schedule_filter)
     ctx = AppContext.from_env()
-    _run_cleanup(configs, cast(Any, ctx.s3), dry_run, refresh_sources, prune_duplicates)
+    _run_cleanup(
+        configs,
+        cast(Any, ctx.s3),
+        dry_run,
+        refresh_sources,
+        prune_duplicates,
+        verbose=verbose,
+    )
 
 
 app, main = build_cli(_run)

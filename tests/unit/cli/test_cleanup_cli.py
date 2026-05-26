@@ -4,7 +4,11 @@ from unittest.mock import patch
 from hypothesis import given
 from hypothesis import strategies as st
 
-from adrift.cli.cleanup import _duplicate_audio_candidates, _matched_download_slugs
+from adrift.cli.cleanup import (
+    _best_alignment_candidate_for_download,
+    _duplicate_audio_candidates,
+    _matched_download_slugs,
+)
 
 
 def test_duplicate_audio_candidates_prefers_canonical_opus() -> None:
@@ -77,6 +81,54 @@ def test_matched_download_slugs_includes_all_matched_download_entries() -> None:
         "the-candy-mossler-case",
         "the-tragic-death-of-gloria-ramirez",
     }
+
+
+def test_best_alignment_candidate_for_download_prefers_highest_score() -> None:
+    result = SimpleNamespace(
+        references=[
+            SimpleNamespace(title="Reference A"),
+            SimpleNamespace(title="Reference B"),
+        ],
+        match_traces=[
+            SimpleNamespace(
+                reference_index=0,
+                candidates=[
+                    SimpleNamespace(download_index=3, score=0.51, reason="below_threshold"),
+                    SimpleNamespace(download_index=1, score=0.20, reason="not_selected"),
+                ],
+            ),
+            SimpleNamespace(
+                reference_index=1,
+                candidates=[
+                    SimpleNamespace(
+                        download_index=3,
+                        score=0.77,
+                        reason="download_matched_elsewhere",
+                    )
+                ],
+            ),
+        ],
+    )
+
+    best = _best_alignment_candidate_for_download(result, 3)
+
+    assert best == ("download_matched_elsewhere", 0.77, "Reference B")
+
+
+def test_best_alignment_candidate_for_download_returns_none_without_candidate() -> None:
+    result = SimpleNamespace(
+        references=[SimpleNamespace(title="Reference A")],
+        match_traces=[
+            SimpleNamespace(
+                reference_index=0,
+                candidates=[SimpleNamespace(download_index=1, score=0.4, reason="not_selected")],
+            )
+        ],
+    )
+
+    best = _best_alignment_candidate_for_download(result, 3)
+
+    assert best is None
 
 
 @given(
