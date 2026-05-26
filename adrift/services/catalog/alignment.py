@@ -294,6 +294,17 @@ def _contains_discriminating_subset_extra_token(tokens: frozenset[str]) -> bool:
     )
 
 
+def _contains_discriminating_overlap_token(tokens: frozenset[str]) -> bool:
+    return any(
+        (
+            (any(ch.isdigit() for ch in token) and len(token) >= 2)
+            or (any(ch.isalpha() for ch in token) and len(token) >= 4)
+        )
+        and token not in _TEMPORAL_METADATA_TOKENS
+        for token in tokens
+    )
+
+
 def _should_reject_weak_anchor_match(
     ref: _AlignmentCandidate,
     dl: _AlignmentCandidate,
@@ -342,6 +353,10 @@ _METADATA_RESCUE_SUBSET_SIM_MIN = 0.78
 # in the longer title.  Helps references with simplified titles match enriched
 # download titles (e.g. "Denise Huber Part 1" ↔ "Disappearance of Denise Huber Part 1").
 _CONTAINMENT_BONUS = 0.08
+
+# Additive bonus for partial anchor-token overlap (without full containment).
+# This helps retitled episodes that keep one or more distinctive anchor tokens.
+_ANCHOR_OVERLAP_BONUS = 0.03
 
 
 class _Sims(NamedTuple):
@@ -410,8 +425,9 @@ def _score_with_context(
 ) -> float:
     base = _weighted_base_score(ref, dl, sims, context)
     containment = _containment_bonus(ref, dl, context)
+    overlap = _anchor_overlap_bonus(ref, dl, context)
     id_bonus = context.runtime.config.weights.id * _id_similarity(ref.episode, dl.episode)
-    return min(1.0, base + id_bonus + containment)
+    return min(1.0, base + id_bonus + containment + overlap)
 
 
 def _weighted_base_score(
@@ -442,9 +458,33 @@ def _containment_bonus(
     dl: _AlignmentCandidate,
     context: _ScoreContext,
 ) -> float:
-    anchor_tokens = AnchorTokens.from_titles(ref.title, dl.title, context.runtime.stopwords)
+    anchor_tokens = _anchor_tokens(ref, dl, context)
     has_containment = context.include_date and anchor_tokens.containment
     return _CONTAINMENT_BONUS if has_containment else 0.0
+
+
+def _anchor_overlap_bonus(
+    ref: _AlignmentCandidate,
+    dl: _AlignmentCandidate,
+    context: _ScoreContext,
+) -> float:
+    anchor_tokens = _anchor_tokens(ref, dl, context)
+    overlap_tokens = anchor_tokens.ref & anchor_tokens.dl
+    has_partial_overlap = bool(overlap_tokens) and not anchor_tokens.containment
+    has_discriminating_overlap = _contains_discriminating_overlap_token(overlap_tokens)
+    return (
+        _ANCHOR_OVERLAP_BONUS
+        if context.include_date and has_partial_overlap and has_discriminating_overlap
+        else 0.0
+    )
+
+
+def _anchor_tokens(
+    ref: _AlignmentCandidate,
+    dl: _AlignmentCandidate,
+    context: _ScoreContext,
+) -> AnchorTokens:
+    return AnchorTokens.from_titles(ref.title, dl.title, context.runtime.stopwords)
 
 
 def _alignment_score(
@@ -506,10 +546,10 @@ def _build_similarity_matrices(
             [candidate.title for candidate in ref_candidates],
             [candidate.title for candidate in dl_candidates],
         )
-        desc_matrix = similarity(
-            [candidate.description for candidate in ref_candidates],
-            [candidate.description for candidate in dl_candidates],
-        )
+
+        ref_descriptions = [candidate.description for candidate in ref_candidates]
+        dl_descriptions = [candidate.description for candidate in dl_candidates]
+        desc_matrix = similarity(ref_descriptions, dl_descriptions)
     return title_matrix, desc_matrix
 
 

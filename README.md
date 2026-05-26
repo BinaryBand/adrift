@@ -183,6 +183,32 @@ poetry run ty check --project .
 poetry run lizard adrift/
 ```
 
+### Performance benchmarks
+
+Benchmarks live in `tests/benchmarks/` and are skipped by default. They run
+offline and cover:
+
+| Benchmark | What is timed |
+| --- | --- |
+| `alignment.50x50` | Scoring kernel: 50 refs × 50 downloads |
+| `alignment.150x150` | Scoring kernel: 150 refs × 150 downloads |
+| `normalize_title.cold` | 300 titles, no caches warm |
+| `normalize_title.warm_disk` | 300 titles, disk cache warm, LRU empty |
+
+Baselines are stored as CPU-normalized values in
+`tests/benchmarks/baselines.json` so the same file works across machines.
+
+```bash
+# Record baselines (run once on your machine after a performance change):
+RECORD_PERF_BASELINE=1 poetry run pytest tests/benchmarks/
+
+# Enforce baselines — fails if any benchmark exceeds 2× its recorded median:
+RUN_PERF_TESTS=1 poetry run pytest tests/benchmarks/
+
+# Relax the threshold (e.g. on a slower CI machine):
+PERF_TOLERANCE=3.0 RUN_PERF_TESTS=1 poetry run pytest tests/benchmarks/
+```
+
 ---
 
 ## Need More?

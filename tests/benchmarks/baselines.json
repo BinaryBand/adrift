@@ -1,0 +1,22 @@
+{
+  "alignment.150x150": {
+    "calibration_s": 0.004739,
+    "normalized_median": 17.51721788047522,
+    "raw_median_ms": 83.01
+  },
+  "alignment.50x50": {
+    "calibration_s": 0.004739,
+    "normalized_median": 2.0419228058420518,
+    "raw_median_ms": 9.68
+  },
+  "normalize_title.cold": {
+    "calibration_s": 0.004739,
+    "normalized_median": 2.467186223600086,
+    "raw_median_ms": 11.69
+  },
+  "normalize_title.warm_disk": {
+    "calibration_s": 0.004739,
+    "normalized_median": 2.415916027452504,
+    "raw_median_ms": 11.45
+  }
+}

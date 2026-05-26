@@ -57,7 +57,10 @@ hypothesis = "^6.153.0"
 
 [tool.pytest.ini_options]
 addopts = "-m 'not slow'"
-markers = ["slow: marks slower integration-oriented tests (run with -m slow)"]
+markers = [
+    "slow: marks slower integration-oriented tests (run with -m slow)",
+    "perf: performance benchmarks (run via: RUN_PERF_TESTS=1 pytest tests/benchmarks/)",
+]
 
 [tool.mypy]
 mypy_path = "typings"

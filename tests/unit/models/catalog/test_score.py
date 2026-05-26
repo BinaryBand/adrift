@@ -11,6 +11,7 @@ from datetime import datetime, timezone
 
 from adrift.models import RssEpisode
 from adrift.services.catalog.alignment import (
+    _ANCHOR_OVERLAP_BONUS,
     _CONTAINMENT_BONUS,
     _AlignmentCandidate,
     _score,
@@ -127,6 +128,23 @@ class TestScoreIncludeDateTrue(unittest.TestCase):
         # And the increment should match the defined constant
         self.assertAlmostEqual(
             score_with_containment - score_without_containment, _CONTAINMENT_BONUS, places=4
+        )
+
+    def test_partial_anchor_overlap_bonus_applied(self):
+        ref = _candidate(_ep(), "john mcafee mystery")
+        dl = _candidate(_ep(), "who killed john mcafee")
+
+        ref2 = _candidate(_ep(), "gorilla attack jungle")
+        dl2 = _candidate(_ep(), "dolphin swim ocean")
+
+        score_with_overlap = _score(ref, dl, _Sims(0.8), include_date=True)
+        score_without_overlap = _score(ref2, dl2, _Sims(0.8), include_date=True)
+
+        self.assertGreater(score_with_overlap, score_without_overlap)
+        self.assertAlmostEqual(
+            score_with_overlap - score_without_overlap,
+            _ANCHOR_OVERLAP_BONUS,
+            places=4,
         )
 
     def test_score_capped_at_one(self):

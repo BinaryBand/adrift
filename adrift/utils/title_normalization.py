@@ -1,15 +1,17 @@
 # cspell: words creepcast darknet gladwell smosh
 import pathlib
 from dataclasses import dataclass
+from functools import lru_cache
 from typing import Any
 
 import tomllib
-from cachetools import LRUCache, cached
+from diskcache import Cache
 
 from adrift.utils.regex import re_compile
 from adrift.utils.text import create_slug, remove_control_chars
 
-_TITLE_CACHE: LRUCache[Any, Any] = LRUCache(2048)
+_TITLE_DISK_CACHE = Cache(str(pathlib.Path(".cache/title_normalization").resolve()))
+_CACHE_CONFIG_MTIME_KEY = "__config_mtime__"
 
 
 def _strip_suffix(pattern: str, episode: str) -> str:
@@ -84,9 +86,11 @@ def _parse_single_podcast(podcast: dict[str, Any], rules: dict[str, _ShowRule]) 
     )
 
 
+_CONFIG_PATH = pathlib.Path(__file__).parent.parent.parent / "config" / "podcasts.toml"
+
+
 def _load_show_rules() -> dict[str, _ShowRule]:
-    config_path = pathlib.Path(__file__).parent.parent.parent / "config" / "podcasts.toml"
-    with open(config_path, "rb") as f:
+    with open(_CONFIG_PATH, "rb") as f:
         config = tomllib.load(f)
 
     rules: dict[str, _ShowRule] = {}
@@ -102,6 +106,23 @@ def _load_show_rules() -> dict[str, _ShowRule]:
 
 
 _SHOW_RULES = _load_show_rules()
+
+
+def _config_mtime() -> float:
+    try:
+        return _CONFIG_PATH.stat().st_mtime
+    except OSError:
+        return 0.0
+
+
+def _invalidate_title_cache_if_stale() -> None:
+    current = _config_mtime()
+    if _TITLE_DISK_CACHE.get(_CACHE_CONFIG_MTIME_KEY) != current:
+        _TITLE_DISK_CACHE.clear()
+        _TITLE_DISK_CACHE.set(_CACHE_CONFIG_MTIME_KEY, current)
+
+
+_invalidate_title_cache_if_stale()
 
 
 def _apply_show_rules(show: str, episode: str) -> str:
@@ -138,8 +159,18 @@ def _strip_slug_suffixes(show: str, slug: str) -> str:
     return slug.strip("-")
 
 
-@cached(_TITLE_CACHE)
+@lru_cache(maxsize=2048)
 def normalize_title(show: str, episode: str) -> str:
+    key = (show, episode)
+    cached: str | None = _TITLE_DISK_CACHE.get(key)
+    if cached is not None:
+        return cached
+    result = _compute_normalize_title(show, episode)
+    _TITLE_DISK_CACHE.set(key, result)
+    return result
+
+
+def _compute_normalize_title(show: str, episode: str) -> str:
     episode = remove_control_chars(episode)
     episode = _apply_show_rules(show, episode)
     return _strip_slug_suffixes(show, create_slug(episode).strip("-"))

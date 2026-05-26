@@ -1,3 +1,4 @@
+import hashlib
 from datetime import datetime, timedelta
 from pathlib import Path
 from typing import Any, TypeVar, cast
@@ -21,6 +22,7 @@ from adrift.utils.regex import LINK_REGEX, re_compile
 from adrift.utils.schedule import rrule_occurrence_exists
 
 _RSS_HTTP_CACHE_PREFIX = "rss:http:"
+_RSS_PARSED_CACHE_PREFIX = "rss:parsed:"
 _RSS_HTTP_CACHE_TTL_SECONDS = 30 * 24 * 3600
 
 T = TypeVar("T")
@@ -174,6 +176,23 @@ def _parse_feed_entries(
     return episodes
 
 
+def _feed_fingerprint(feed_str: str) -> str:
+    return hashlib.md5(feed_str.encode(), usedforsecurity=False).hexdigest()[:16]
+
+
+def _parsed_episodes_cache_key(http_cache_key: str, feed_str: str) -> str:
+    return f"{_RSS_PARSED_CACHE_PREFIX}{http_cache_key}:{_feed_fingerprint(feed_str)}"
+
+
+def _load_cached_episodes(parsed_key: str) -> list[RssEpisode] | None:
+    cached = _RSS_CACHE.get(parsed_key)
+    return cached if isinstance(cached, list) else None
+
+
+def _store_cached_episodes(parsed_key: str, episodes: list[RssEpisode]) -> None:
+    _cache_set_with_retry(_RSS_CACHE, parsed_key, episodes, expire=_RSS_HTTP_CACHE_TTL_SECONDS)
+
+
 def get_rss_episodes(
     url: str,
     filter: str | None = "",
@@ -186,11 +205,19 @@ def get_rss_episodes(
     r_rules = r_rules or []
     cache_key = _rss_http_cache_key(url, filter, r_rules)
     feed_str = _fetch_rss_feed_str(url, cache_key=cache_key)
+    parsed_key = _parsed_episodes_cache_key(cache_key, feed_str)
+    cached_episodes = _load_cached_episodes(parsed_key)
+    if cached_episodes is not None:
+        if callback:
+            callback(len(cached_episodes), len(cached_episodes))
+        return cached_episodes
     parsed = feedparser.parse(feed_str)
     raw_entries = getattr(parsed, "entries", [])
     entries_list = cast(list[FeedParserDict], raw_entries) if isinstance(raw_entries, list) else []
     entries = _filter_feed_entries(entries_list, filter, r_rules)
-    return _parse_feed_entries(entries, callback)
+    episodes = _parse_feed_entries(entries, callback)
+    _store_cached_episodes(parsed_key, episodes)
+    return episodes
 
 
 class RssEpisodeSourceAdapter(EpisodeSourcePort):
