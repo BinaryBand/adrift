@@ -27,12 +27,24 @@ _TITLE_POOL = [
     "{person} Reveals the Secrets of {topic}",
 ]
 _TOPICS = [
-    "AI", "Climate", "History", "Crime", "Science",
-    "Politics", "Health", "Finance", "Space", "Culture",
+    "AI",
+    "Climate",
+    "History",
+    "Crime",
+    "Science",
+    "Politics",
+    "Health",
+    "Finance",
+    "Space",
+    "Culture",
 ]
 _PEOPLE = [
-    "Dr. Johnson", "Sarah Williams", "Mark Thompson",
-    "Prof. Chen", "Lisa Garcia", "James Okafor",
+    "Dr. Johnson",
+    "Sarah Williams",
+    "Mark Thompson",
+    "Prof. Chen",
+    "Lisa Garcia",
+    "James Okafor",
 ]
 
 _scorer = RustScoredAlignmentAdapter()

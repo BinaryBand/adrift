@@ -78,7 +78,10 @@ def _build_stdout_output(merge_result, include_counts: bool) -> list[dict[str, o
                 if include_counts
                 else {}
             ),
-            "episodes": [episode.model_dump(mode="json") for episode in merged.episodes],
+            "episodes": [
+                episode.model_dump(mode="json", exclude={"description"})
+                for episode in merged.episodes
+            ],
         }
         for merged in merge_result.value
     ]

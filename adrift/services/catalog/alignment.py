@@ -1,10 +1,13 @@
 # cspell: ignore cdist
+import hashlib
+import pathlib
 import re
 from collections.abc import Callable
 from dataclasses import dataclass
 from datetime import datetime, timezone
 from typing import Any, NamedTuple, cast
 
+from diskcache import Cache
 from rapidfuzz import fuzz
 
 from adrift.models import AlignmentConfig, EpisodeData, RssEpisode
@@ -20,6 +23,9 @@ from adrift.utils.text import normalize_text
 from adrift.utils.title_normalization import normalize_title
 
 StringSimilarityFn = Callable[[list[str], list[str]], list[list[float]]]
+
+_ALIGNMENT_BATCH_CACHE = Cache(str(pathlib.Path(".cache/alignment_batch").resolve()))
+_ALIGNMENT_BATCH_CACHE_TTL = 30 * 24 * 3600  # 30 days
 
 _THUMBNAIL_RANK = {"maxres": 4, "hq": 3, "mq": 2, "sq": 1}
 # Podcast-specific brand words ("morbid", "tales", "listener") are included
@@ -622,6 +628,35 @@ def _build_alignment_scores(
         )
 
 
+def _episode_list_fingerprint(episodes: list[RssEpisode]) -> str:
+    """Stable MD5 of episode content (id, title, description, pub_date), order-independent."""
+    parts = sorted(
+        f"{ep.id}|{ep.title}|{ep.description or ''}"
+        f"|{ep.pub_date.isoformat() if ep.pub_date else ''}"
+        for ep in episodes
+    )
+    return hashlib.md5("\n".join(parts).encode(), usedforsecurity=False).hexdigest()[:16]
+
+
+def _alignment_config_fingerprint(alignment: AlignmentConfig) -> str:
+    """Stable MD5 of the alignment config that affects batch content."""
+    cfg = _build_alignment_batch_config(alignment)
+    payload = str(
+        (
+            cfg.id_weight,
+            cfg.date_weight,
+            cfg.title_weight,
+            cfg.description_weight,
+            cfg.date_score_tiers,
+            cfg.sparse_title_min,
+            cfg.match_tolerance,
+            cfg.base_anchor_stopwords,
+            cfg.extra_stopwords,
+        )
+    )
+    return hashlib.md5(payload.encode(), usedforsecurity=False).hexdigest()[:8]
+
+
 def prepare_alignment_batch(
     references: list[RssEpisode],
     downloads: list[RssEpisode],
@@ -631,14 +666,27 @@ def prepare_alignment_batch(
     """Build a primitive-heavy payload suitable for a Rust scorer."""
     with profile_block(f"alignment.prepare_batch_{len(references)}ref_{len(downloads)}dl"):
         request, resolved_alignment = _resolve_alignment_context(request_or_show, alignment)
+
+        cache_key = (
+            request.show,
+            _alignment_config_fingerprint(resolved_alignment),
+            _episode_list_fingerprint(references),
+            _episode_list_fingerprint(downloads),
+        )
+        cached: AlignmentBatch | None = _ALIGNMENT_BATCH_CACHE.get(cache_key)
+        if cached is not None:
+            return cached
+
         with profile_block("alignment.batch_records"):
             ref_records = tuple(_build_alignment_batch_records(references, request.show))
             dl_records = tuple(_build_alignment_batch_records(downloads, request.show))
-        return AlignmentBatch(
+        batch = AlignmentBatch(
             config=_build_alignment_batch_config(resolved_alignment),
             references=ref_records,
             downloads=dl_records,
         )
+        _ALIGNMENT_BATCH_CACHE.set(cache_key, batch, expire=_ALIGNMENT_BATCH_CACHE_TTL)
+        return batch
 
 
 def _build_alignment_batch_config(alignment: AlignmentConfig) -> AlignmentBatchConfig:

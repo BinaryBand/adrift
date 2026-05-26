@@ -1,5 +1,7 @@
+import pathlib
 from functools import lru_cache
 
+from diskcache import Cache
 from unidecode import unidecode
 
 # from adrift.services.app_common import load_static_config
@@ -82,6 +84,14 @@ _NUMBER_WORDS = {
     "thousand": "1000",
 }
 
+_TEXT_NORM_CACHE_VERSION = "1"
+_TEXT_DISK_CACHE = Cache(str(pathlib.Path(".cache/text_normalization").resolve()))
+
+# Invalidate disk cache when the version constant changes.
+if _TEXT_DISK_CACHE.get("__version__") != _TEXT_NORM_CACHE_VERSION:
+    _TEXT_DISK_CACHE.clear()
+    _TEXT_DISK_CACHE.set("__version__", _TEXT_NORM_CACHE_VERSION)
+
 _ROMAN_NUMERALS = {
     "IV": "4",
     "VIII": "8",
@@ -162,6 +172,15 @@ def _apply_ligatures(text: str) -> str:
 
 @lru_cache(maxsize=1000)
 def normalize_text(text: str) -> str:
+    cached: str | None = _TEXT_DISK_CACHE.get(text)
+    if cached is not None:
+        return cached
+    result = _compute_normalize_text(text)
+    _TEXT_DISK_CACHE.set(text, result)
+    return result
+
+
+def _compute_normalize_text(text: str) -> str:
     text = remove_file_extension(text)
     text = _apply_ligatures(text)
     text = unidecode(text)
