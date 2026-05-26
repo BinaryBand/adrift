@@ -13,6 +13,8 @@ import unittest
 from datetime import datetime, timezone
 from pathlib import Path
 
+import pytest
+
 from adrift.models import AlignmentConfig, RssEpisode
 from adrift.services.app_common import load_podcasts_config
 from adrift.services.catalog import align_episodes_impl
@@ -23,6 +25,12 @@ FOR_REVIEW_CSV = REPO_ROOT / "docs" / ".dev" / "for_review.csv"
 FIXED_PUB_DATE = datetime(2024, 1, 1, tzinfo=timezone.utc)
 # Current best-achieved floor with this scorer/config family is ~95%.
 _MIN_CONFIRMED_POSITIVE_MATCH_RATE = 0.95
+
+_FIXTURES_AVAILABLE = SOURCE_TO_REF_CSV.exists() and FOR_REVIEW_CSV.exists()
+_skip_without_fixtures = pytest.mark.skipif(
+    not _FIXTURES_AVAILABLE,
+    reason="Local dev CSV fixtures not present (docs/.dev/); skipped in CI.",
+)
 
 
 def _camp_gagnon_alignment() -> AlignmentConfig:
@@ -86,6 +94,7 @@ def _load_false_positive_pairs() -> list[tuple[str, str, str, str, str]]:
 
 
 class TestCampGagnonQualityGate(unittest.TestCase):
+    @_skip_without_fixtures
     def test_confirmed_positive_pairs_should_match(self) -> None:
         alignment = _camp_gagnon_alignment()
         positive_pairs = _load_confirmed_positive_pairs()
@@ -114,6 +123,7 @@ class TestCampGagnonQualityGate(unittest.TestCase):
             + ("\nExamples:\n" + "\n".join(mismatches[:10]) if mismatches else ""),
         )
 
+    @_skip_without_fixtures
     def test_false_positive_pairs_should_not_match(self) -> None:
         alignment = _camp_gagnon_alignment()
         false_positive_pairs = _load_false_positive_pairs()
