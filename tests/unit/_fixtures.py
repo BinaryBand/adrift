@@ -77,11 +77,12 @@ def _make_pipeline(
     max_downloads: int,
     build_download_queue: Any,
     download_and_upload: Any,
+    options: DownloadRunOptions | None = None,
 ) -> DownloadPipeline:
     runtime = DownloadPipelineRuntime(
         ctx=ctx,
         ui=ui,
-        options=DownloadRunOptions(max_downloads=max_downloads),
+        options=options or DownloadRunOptions(max_downloads=max_downloads),
     )
     deps = DownloadPipelineDeps(
         merge_config=lambda config, options: None,

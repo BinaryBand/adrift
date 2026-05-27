@@ -78,16 +78,18 @@ def _sleep_on_bot_detection(bot_cooldown: int) -> None:
 
 
 def _build_pipeline_options(
+    dry_run: bool,
     skip_download: bool,
     skip_update: bool,
     max_downloads: int,
     refresh_sources: bool,
 ) -> DownloadRunOptions:
     return DownloadRunOptions(
-        skip_download=skip_download,
-        skip_update=skip_update,
+        skip_download=skip_download or dry_run,
+        skip_update=skip_update or dry_run,
         max_downloads=max_downloads,
         refresh_sources=refresh_sources,
+        show_download_plan=dry_run,
     )
 
 
@@ -110,6 +112,10 @@ def _run(
     include: IncludeConfigsOption = None,
     skip_schedule_filter: SkipScheduleFilterOption = False,
     tags: TagsOption = None,
+    dry_run: bool = typer.Option(
+        False,
+        help="Simulate a download run without downloading/uploading media or updating RSS.",
+    ),
     skip_download: Annotated[
         bool, typer.Option(help="Skip download/upload stage (only enrich and update RSS).")
     ] = False,
@@ -127,6 +133,7 @@ def _run(
     configs, _ = bootstrap_run_configs(include, tags, skip_schedule_filter)
     ctx = AppContext.from_env()
     pipeline_options = _build_pipeline_options(
+        dry_run,
         skip_download,
         skip_update,
         max_downloads,
@@ -135,7 +142,10 @@ def _run(
 
     downloaded_total = _run_with_bot_detection(configs, ctx, pipeline_options, bot_cooldown)
 
-    sys.stderr.write(f"\nDownloaded {downloaded_total} new episode(s).\n")
+    if dry_run:
+        sys.stderr.write("\nDry run complete. No downloads or RSS updates were performed.\n")
+    else:
+        sys.stderr.write(f"\nDownloaded {downloaded_total} new episode(s).\n")
 
 
 app, main = build_cli(_run)

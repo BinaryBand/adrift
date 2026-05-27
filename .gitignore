@@ -238,3 +238,4 @@ cookies.txt
 .vscode/schemas/*.json
 config/**/.*.toml
 docs/*.*
+.dev

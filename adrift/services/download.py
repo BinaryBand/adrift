@@ -14,6 +14,7 @@ from adrift.services.events import (
     OperationStarted,
     ProgressUpdated,
 )
+from adrift.utils.title_normalization import normalize_title
 
 if TYPE_CHECKING:
     from adrift.models import MergeResult
@@ -37,6 +38,7 @@ class DownloadRunOptions:
     skip_update: bool = False
     max_downloads: int = 10
     refresh_sources: bool = False
+    show_download_plan: bool = False
 
 
 @dataclass(frozen=True)
@@ -108,7 +110,11 @@ class DownloadPipeline:
         episodes = self._merge_and_enrich(config, callbacks)
 
         added = 0
-        if not self._runtime.options.skip_download:
+        if self._runtime.options.skip_download:
+            if self._runtime.options.show_download_plan:
+                self._runtime.ui.set_stage("download")
+                added = self._plan_downloads(episodes, config, downloaded_total)
+        else:
             self._runtime.ui.set_stage("download")
             added = self._download_episodes(episodes, config, downloaded_total)
 
@@ -119,6 +125,24 @@ class DownloadPipeline:
         self._runtime.ui.set_stage("done")
         self._runtime.ui.advance()
         return added
+
+    def _plan_downloads(
+        self,
+        episodes: list[DownloadEpisode],
+        config: PodcastConfig,
+        downloaded_total: int,
+    ) -> int:
+        planned = 0
+        for queue_item in self._deps.build_download_queue(episodes, config, self._runtime.ctx):
+            if downloaded_total + planned >= self._runtime.options.max_downloads:
+                break
+            if queue_item.exists_on_s3:
+                continue
+            title = queue_item.episode.episode.title
+            slug = normalize_title(config.name, title)
+            self._runtime.ui.emit("info", f"would download: {config.path}/{slug}.opus")
+            planned += 1
+        return planned
 
     def _merge_and_enrich(
         self,

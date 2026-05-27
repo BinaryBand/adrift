@@ -2,7 +2,9 @@ from types import SimpleNamespace
 from typing import Any, cast
 
 from adrift.models import PodcastConfig
+from adrift.services.download import DownloadRunOptions
 from tests.unit._fixtures import (
+    _config,
     _make_pipeline,
     _queue_item,
     make_build_download_queue_from_queue,
@@ -95,6 +97,70 @@ def test_download_episodes_reports_nonfatal_errors_and_continues() -> None:
 
     assert added == 1
     assert emitted == [("error", "CreepCast — Broken: boom")]
+
+
+def test_plan_downloads_emits_would_download_file_paths() -> None:
+    emitted: list[tuple[Any, str]] = []
+    ui = make_ui_emit_only(emitted)
+    config = _config(name="Morbid", path="/media/podcasts/morbid")
+
+    queue = [
+        _queue_item(True, "Already There"),
+        _queue_item(False, "Part One: Haunted Mansion"),
+        _queue_item(False, "Part Two: Haunted Mansion"),
+    ]
+
+    pipeline = _make_pipeline(
+        ui=ui,
+        ctx=SimpleNamespace(event_bus=SimpleNamespace(publish=lambda _event: None)),
+        max_downloads=5,
+        build_download_queue=make_build_download_queue_from_queue(queue),
+        download_and_upload=lambda _ep, _cfg, _ctx: False,
+        options=DownloadRunOptions(
+            skip_download=True,
+            skip_update=True,
+            max_downloads=5,
+            show_download_plan=True,
+        ),
+    )
+
+    planned = pipeline._plan_downloads([], config, downloaded_total=0)
+
+    assert planned == 2
+    assert emitted == [
+        ("info", "would download: /media/podcasts/morbid/part-one-haunted-mansion.opus"),
+        ("info", "would download: /media/podcasts/morbid/part-two-haunted-mansion.opus"),
+    ]
+
+
+def test_plan_downloads_respects_global_max_download_cap() -> None:
+    emitted: list[tuple[Any, str]] = []
+    ui = make_ui_emit_only(emitted)
+    config = _config(name="Morbid", path="/media/podcasts/morbid")
+
+    queue = [
+        _queue_item(False, "Episode A"),
+        _queue_item(False, "Episode B"),
+    ]
+
+    pipeline = _make_pipeline(
+        ui=ui,
+        ctx=SimpleNamespace(event_bus=SimpleNamespace(publish=lambda _event: None)),
+        max_downloads=3,
+        build_download_queue=make_build_download_queue_from_queue(queue),
+        download_and_upload=lambda _ep, _cfg, _ctx: False,
+        options=DownloadRunOptions(
+            skip_download=True,
+            skip_update=True,
+            max_downloads=3,
+            show_download_plan=True,
+        ),
+    )
+
+    planned = pipeline._plan_downloads([], config, downloaded_total=2)
+
+    assert planned == 1
+    assert emitted == [("info", "would download: /media/podcasts/morbid/episode-a.opus")]
 
 
 # Helpers `_queue_item` and `_make_pipeline` are provided by
