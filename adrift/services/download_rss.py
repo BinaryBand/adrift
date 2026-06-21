@@ -98,6 +98,16 @@ def update_rss(config: PodcastConfig, ctx: AppContext) -> None:
     channel = _build_channel(config)
     ref_episodes = process_feeds(config)
     matched = _match_to_s3(config, ref_episodes, ctx)
+    if not matched:
+        # A transient source-fetch failure produces an empty build (no episodes,
+        # often no channel image). Publishing it would overwrite a previously
+        # healthy feed with a broken stub, so skip the upload instead.
+        logger.warning(
+            "Skipping RSS upload for %s: no episodes matched (source fetch likely "
+            "failed); preserving existing feed.rss",
+            config.name,
+        )
+        return
     rss_xml = podcast_to_rss(channel, matched)
     _upload_rss(bucket, prefix, rss_xml, ctx)
 
