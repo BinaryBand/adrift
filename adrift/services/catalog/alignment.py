@@ -7,6 +7,7 @@ from dataclasses import dataclass
 from datetime import datetime, timezone
 from typing import Any, NamedTuple, cast
 
+import requests
 from diskcache import Cache
 from rapidfuzz import fuzz
 
@@ -28,6 +29,9 @@ _ALIGNMENT_BATCH_CACHE = Cache(str(pathlib.Path(".cache/alignment_batch").resolv
 _ALIGNMENT_BATCH_CACHE_TTL = 30 * 24 * 3600  # 30 days
 
 _THUMBNAIL_RANK = {"maxres": 4, "hq": 3, "mq": 2, "sq": 1}
+# Matches the YouTube thumbnail path so ``maxresdefault`` can be rewritten to a
+# more reliable variant, preserving the path prefix and file extension.
+_YOUTUBE_MAXRES_RE = re.compile(r"(.*/)maxresdefault(\.\w+)")
 # Podcast-specific brand words ("morbid", "tales", "listener") are included
 # because they appear in nearly every episode title on their respective feeds,
 # making them useless as discriminating anchor tokens.
@@ -800,12 +804,48 @@ def _thumbnail_rank(url: str | None) -> int:
     return max((rank for kw, rank in _THUMBNAIL_RANK.items() if kw in url), default=0)
 
 
+def _thumbnail_url_exists(url: str) -> bool:
+    """Best-effort check that a thumbnail URL actually resolves.
+
+    YouTube's ``maxresdefault.jpg`` variant is generated only for some videos
+    and 404s for the rest, which surfaces as a broken image in the feed. We
+    HEAD the URL to detect that. Any network/transport error returns ``True``
+    so offline runs (and tests) keep the original URL rather than degrading it.
+    """
+    try:
+        return requests.head(url, timeout=5, allow_redirects=True).status_code == 200
+    except requests.RequestException:
+        return True
+
+
+def _downgrade_maxres(url: str) -> str | None:
+    """Rewrite a YouTube ``maxresdefault`` thumbnail to the always-available
+    ``hqdefault`` variant. Returns ``None`` when ``url`` is not a maxres URL."""
+    downgraded, replaced = _YOUTUBE_MAXRES_RE.subn(r"\1hqdefault\2", url)
+    return downgraded if replaced else None
+
+
 def _best_thumbnail(a: str | None, b: str | None) -> str | None:
-    """Return the higher-resolution thumbnail inferred from URL keywords."""
+    """Return the best thumbnail, avoiding broken YouTube ``maxresdefault`` URLs.
+
+    Ranks candidates by resolution keyword, but if the winner is a fragile
+    ``maxresdefault`` URL that doesn't resolve, prefers a stable non-YouTube
+    cover (e.g. the RSS show art) and otherwise falls back to ``hqdefault``.
+    """
     candidates = [url for url in (a, b) if url]
     if not candidates:
         return None
-    return max(candidates, key=_thumbnail_rank)
+    best = cast(str, max(candidates, key=_thumbnail_rank))
+    return _resolve_fragile_thumbnail(best, candidates)
+
+
+def _resolve_fragile_thumbnail(best: str, candidates: list[str]) -> str:
+    """Replace a broken ``maxresdefault`` winner with a stable cover or hqdefault."""
+    downgraded = _downgrade_maxres(best)
+    if downgraded is None or _thumbnail_url_exists(best):
+        return best
+    stable = next((url for url in candidates if _thumbnail_rank(url) == 0), None)
+    return stable or downgraded
 
 
 def _choose_episode_id(ref: RssEpisode, dl: RssEpisode) -> str:

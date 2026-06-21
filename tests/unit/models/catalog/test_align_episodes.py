@@ -353,8 +353,9 @@ class TestMergeEpisode(unittest.TestCase):
 # ---------------------------------------------------------------------------
 
 
+@patch("adrift.services.catalog.alignment._thumbnail_url_exists", return_value=True)
 class TestBestThumbnail(unittest.TestCase):
-    def test_none_inputs(self):
+    def test_none_inputs(self, _exists):
         self.assertIsNone(_best_thumbnail(None, None))
         self.assertEqual(
             _best_thumbnail("https://ex.com/thumb.jpg", None),
@@ -365,21 +366,42 @@ class TestBestThumbnail(unittest.TestCase):
             "https://ex.com/thumb.jpg",
         )
 
-    def test_maxres_beats_hq(self):
+    def test_maxres_beats_hq(self, _exists):
         a = "https://img.youtube.com/vi/abc/maxresdefault.jpg"
         b = "https://img.youtube.com/vi/abc/hqdefault.jpg"
         self.assertEqual(_best_thumbnail(a, b), a)
         self.assertEqual(_best_thumbnail(b, a), a)
 
-    def test_hq_beats_mq(self):
+    def test_hq_beats_mq(self, _exists):
         a = "https://img.youtube.com/vi/abc/hqdefault.jpg"
         b = "https://img.youtube.com/vi/abc/mqdefault.jpg"
         self.assertEqual(_best_thumbnail(a, b), a)
 
-    def test_equal_rank_returns_first(self):
+    def test_equal_rank_returns_first(self, _exists):
         a = "https://img.youtube.com/vi/abc/hqdefault.jpg"
         b = "https://img.youtube.com/vi/xyz/hqdefault.jpg"
         self.assertEqual(_best_thumbnail(a, b), a)
+
+
+class TestBestThumbnailFragileMaxres(unittest.TestCase):
+    """A maxresdefault URL that doesn't resolve must not break the feed."""
+
+    _MAXRES = "https://img.youtube.com/vi/abc/maxresdefault.jpg"
+    _RSS = "https://image.simplecastcdn.com/images/show/cover.jpg"
+
+    @patch("adrift.services.catalog.alignment._thumbnail_url_exists", return_value=False)
+    def test_broken_maxres_prefers_stable_rss_cover(self, _exists):
+        self.assertEqual(_best_thumbnail(self._RSS, self._MAXRES), self._RSS)
+
+    @patch("adrift.services.catalog.alignment._thumbnail_url_exists", return_value=False)
+    def test_broken_maxres_falls_back_to_hqdefault(self, _exists):
+        hq = "https://img.youtube.com/vi/abc/hqdefault.jpg"
+        # Only YouTube candidates available -> downgrade rather than break.
+        self.assertEqual(_best_thumbnail(self._MAXRES, hq), hq)
+
+    @patch("adrift.services.catalog.alignment._thumbnail_url_exists", return_value=True)
+    def test_existing_maxres_is_kept(self, _exists):
+        self.assertEqual(_best_thumbnail(self._RSS, self._MAXRES), self._MAXRES)
 
 
 if __name__ == "__main__":

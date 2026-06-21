@@ -9,6 +9,9 @@ from .alignment import merge_episode
 from .collection import EpisodeFetchContext, _collect_episodes_with_traces
 from .merge_trace import _build_match_traces
 
+# Reference/download episode lists plus their aligned index pairs.
+_EpisodeMergeArgs = tuple[list[RssEpisode], list[RssEpisode], list[tuple[int, int]]]
+
 
 class LegacyEpisodeCollectorAdapter:
     def __init__(self, dedup_port: ScoredAlignmentBatchPort | None = None) -> None:
@@ -80,7 +83,7 @@ def _coerce_trace_build_args(
 def _coerce_episode_merge_args(
     args: tuple[object, ...],
     kwargs: dict[str, object],
-) -> tuple[list[RssEpisode], list[RssEpisode], list[tuple[int, int]]]:
+) -> _EpisodeMergeArgs:
     if len(args) == 3:
         references, downloads, pairs = args
     else:
