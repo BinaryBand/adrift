@@ -1,5 +1,4 @@
 {
-  "python.defaultInterpreterPath": "/home/owen/Documents/Dev/adrift/.venv/bin/python",
   "files.exclude": {
     "**/__pycache__": true,
     "**/.cache": true,
@@ -7,7 +6,10 @@
     "**/*_cache": true,
     "**/.hypothesis": true,
     "**/.pytest_cache": true,
-    "**/.ruff_cache": true
+    "**/.ruff_cache": true,
+    ".hypothesis": true,
+    ".import_linter_cache": true,
+    ".venv": true
   },
   "editor.formatOnSave": true,
   "editor.codeActionsOnSave": {
@@ -15,33 +17,12 @@
     "source.organizeImports.ruff": "explicit"
   },
   "[python]": {
-    "editor.defaultFormatter": "charliermarsh.ruff"
+    "editor.defaultFormatter": "charliermarsh.ruff",
+    "editor.formatOnSave": true
   },
-  "cSpell.words": [
-    "BYDAY",
-    "cooldown",
-    "dateutil",
-    "dedupe",
-    "dotenv",
-    "DTSTART",
-    "ffprobe",
-    "flac",
-    "grimp",
-    "libopus",
-    "phash",
-    "rrule",
-    "rrules",
-    "sponsorblock",
-    "tobytes",
-    "ytdlp"
+  "python.testing.pytestArgs": [
+    "tests"
   ],
-  "python.testing.pytestArgs": ["tests"],
   "python.testing.unittestEnabled": false,
-  "python.testing.pytestEnabled": true,
-  "python-envs.defaultPackageManager": "ms-python.python:poetry",
-  "python-envs.defaultEnvManager": "ms-python.python:poetry",
-  "evenBetterToml.schema.associations": {
-    "config/podcasts.toml": "file://${workspaceFolder}/adrift/models/podcasts.schema.json",
-    "config/.podcasts.toml": "file://${workspaceFolder}/adrift/models/podcasts.schema.json"
-  }
+  "python.testing.pytestEnabled": true
 }
