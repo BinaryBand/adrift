@@ -1,14 +1,19 @@
 """Adapter implementations for various ports.
 
-Lazy imports inside factory functions are intentional: they prevent circular
-imports between the adapters package and the modules it depends on.  The
-registries below are the single points of extension — to add a new provider
-or source type, add one entry here without touching any function body.
+Lazy imports inside factory functions prevent circular imports for adapters
+whose dependencies may import back into this package (alignment, secrets).
+Episode-source adapters are safe to import eagerly -- they only depend on
+adrift.models -- and MUST be eager so that ThreadPoolExecutor workers never
+race on Python's per-module _ModuleLock.
 """
 
 import os
 from collections.abc import Callable
 
+from adrift.adapters.process.episode_sources.episode_source_rss import RssEpisodeSourceAdapter
+from adrift.adapters.process.episode_sources.episode_source_youtube import (
+    YouTubeEpisodeSourceAdapter,
+)
 from adrift.models import FeedSource
 from adrift.models.ports import (
     EpisodeSourcePort,
@@ -32,18 +37,10 @@ def _require_source_url(source: FeedSource) -> str:
 
 
 def _make_youtube_source() -> EpisodeSourcePort:
-    from adrift.adapters.process.episode_sources.episode_source_youtube import (
-        YouTubeEpisodeSourceAdapter,
-    )
-
     return YouTubeEpisodeSourceAdapter()
 
 
 def _make_rss_source() -> EpisodeSourcePort:
-    from adrift.adapters.process.episode_sources.episode_source_rss import (
-        RssEpisodeSourceAdapter,
-    )
-
     return RssEpisodeSourceAdapter()
 
 

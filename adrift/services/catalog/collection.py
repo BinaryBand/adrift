@@ -3,8 +3,9 @@ from dataclasses import dataclass
 from itertools import repeat
 from typing import Any, Literal
 
+from adrift.adapters import get_episode_source_adapter
 from adrift.models import FeedSource, PodcastConfig, RssEpisode, SourceTrace, ensure_feed_source
-from adrift.models.ports import ScoredAlignmentBatchPort
+from adrift.models.ports import EpisodeSourceFetchContext, ScoredAlignmentBatchPort
 from adrift.utils.profiler import profile, profile_block
 from adrift.utils.progress import Callback
 from adrift.utils.text import is_youtube_channel
@@ -84,9 +85,6 @@ def _fetch_source_episodes(
     source: FeedSource | dict[str, Any],
     context: EpisodeFetchContext,
 ) -> list[RssEpisode]:
-    from adrift.adapters import get_episode_source_adapter
-    from adrift.models.ports import EpisodeSourceFetchContext
-
     resolved = ensure_feed_source(source)
     return get_episode_source_adapter(resolved).fetch_episodes(
         resolved,
