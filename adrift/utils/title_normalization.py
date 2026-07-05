@@ -86,12 +86,15 @@ def _parse_single_podcast(podcast: dict[str, Any], rules: dict[str, _ShowRule]) 
     )
 
 
-_CONFIG_PATH = pathlib.Path(__file__).parent.parent.parent / "config" / "podcasts.toml"
+_CONFIG_PATH = pathlib.Path("config") / "podcasts.toml"
 
 
 def _load_show_rules() -> dict[str, _ShowRule]:
-    with open(_CONFIG_PATH, "rb") as f:
-        config = tomllib.load(f)
+    try:
+        with open(_CONFIG_PATH, "rb") as f:
+            config = tomllib.load(f)
+    except FileNotFoundError:
+        return {}
 
     rules: dict[str, _ShowRule] = {}
     podcasts = config.get("podcasts")
