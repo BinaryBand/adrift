@@ -85,7 +85,7 @@ class BotDetectionError(DownloadError):
 
 @dataclass(frozen=True)
 class StorageError(AdriftError):
-    """Failed to upload, download, or verify S3 objects."""
+    """Failed to upload, download, or verify storage objects."""
 
     bucket: str
     key: str

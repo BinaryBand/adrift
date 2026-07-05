@@ -27,10 +27,10 @@ def _channel() -> RssChannel:
     )
 
 
-@patch.object(download_rss, "s3_prefix", return_value=("bucket", "media/podcasts/example"))
+@patch.object(download_rss, "storage_prefix", return_value=("bucket", "media/podcasts/example"))
 @patch.object(download_rss, "process_feeds", return_value=[])
 @patch.object(download_rss, "_build_channel")
-@patch.object(download_rss, "_match_to_s3")
+@patch.object(download_rss, "_match_to_storage")
 @patch.object(download_rss, "podcast_to_rss", return_value="<rss/>")
 @patch.object(download_rss, "_upload_rss")
 class TestUpdateRssClobberGuard(unittest.TestCase):

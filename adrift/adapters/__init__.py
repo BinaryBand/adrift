@@ -9,6 +9,7 @@ race on Python's per-module _ModuleLock.
 
 import os
 from collections.abc import Callable
+from pathlib import Path
 
 from adrift.adapters.process.episode_sources.episode_source_rss import RssEpisodeSourceAdapter
 from adrift.adapters.process.episode_sources.episode_source_youtube import (
@@ -20,6 +21,7 @@ from adrift.models.ports import (
     ScoredAlignmentBatchPort,
     ScoredAlignmentPort,
     SecretProviderPort,
+    StoragePort,
 )
 from adrift.utils.text import is_youtube_channel
 
@@ -97,6 +99,32 @@ def get_secret_provider_adapter(
     """Return the configured secret provider adapter instance."""
     _selected, provider = _build_selected_provider(provider_name)
     return provider
+
+
+# --- Storage registry ---------------------------------------------------
+# Maps backend name → factory function.  Adding a new backend = one new
+# entry here; get_storage_adapter is never modified.
+
+
+def _make_local_storage() -> StoragePort:
+    from adrift.adapters.process.storage.local_storage import LocalFilesystemStorage
+    from adrift.services.config import STORAGE_ROOT
+
+    return LocalFilesystemStorage(Path(STORAGE_ROOT))
+
+
+_STORAGE_REGISTRY: dict[str, Callable[[], StoragePort]] = {
+    "local": _make_local_storage,
+}
+
+
+def get_storage_adapter(backend_name: str | None = None) -> StoragePort:
+    """Return the configured storage adapter instance."""
+    selected = (backend_name or os.getenv("ADRIFT_STORAGE_BACKEND") or "local").lower()
+    factory = _STORAGE_REGISTRY.get(selected)
+    if factory is None:
+        raise ValueError(f"Unsupported storage backend: {selected}")
+    return factory()
 
 
 def _make_optimized_scored_alignment_adapter() -> ScoredAlignmentPort:

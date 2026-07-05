@@ -29,7 +29,6 @@ cachetools = "~=7.0.5"
 diskcache = "~=5.6.3"
 yarl = "~=1.23.0"
 python-dateutil = "~=2.9.0.post0"
-boto3 = "~=1.42.91"
 rich = "~=15.0.0"
 typer = "^0.24.1"
 
@@ -38,8 +37,6 @@ typer = "^0.24.1"
 types-tqdm = "~=4.67.3.20260402"
 types-cachetools = "~=6.2.0.20260317"
 types-yt-dlp = "~=2026.3.17.20260402"
-types-python-dateutil = "~=2.9.0.20260402"
-boto3-stubs = { extras = ["s3"], version = "~=1.42.91" }
 # Linting & formatting
 ruff = "~=0.15.9"
 mypy = "~=1.20.0"

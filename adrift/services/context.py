@@ -49,14 +49,14 @@ class AppContext:
     No implicit module state; all dependencies are explicit and testable.
 
     Attributes:
-        s3: StoragePort for S3 operations (upload, download, list)
+        storage: StoragePort for object storage operations (upload, list, delete)
         secrets: SecretProviderPort for credentials
         rss_cache: CachePort for RSS feed caching
         yt_cache: CachePort for YouTube metadata caching
         event_bus: EventBus for publishing pipeline events
     """
 
-    s3: StoragePort
+    storage: StoragePort
     secrets: SecretProviderPort
     rss_cache: CachePort
     yt_cache: CachePort
@@ -73,13 +73,12 @@ class AppContext:
         """
         # Import here to avoid circular imports
 
-        from adrift.adapters import get_secret_provider_adapter
+        from adrift.adapters import get_secret_provider_adapter, get_storage_adapter
         from adrift.models.ports import DiskCacheAdapter
-        from adrift.services.files.s3 import S3Service
 
         secrets = get_secret_provider_adapter()
         return cls(
-            s3=S3Service(secrets),  # type: ignore  # S3Service implements StoragePort (Phase B)
+            storage=get_storage_adapter(),
             secrets=secrets,
             rss_cache=DiskCacheAdapter(".cache/rss"),
             yt_cache=DiskCacheAdapter(".cache/youtube"),

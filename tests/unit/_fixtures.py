@@ -63,9 +63,9 @@ def make_fake_ui(
     return _FakeUI()
 
 
-def _queue_item(exists_on_s3: bool, title: str) -> SimpleNamespace:
+def _queue_item(exists_in_storage: bool, title: str) -> SimpleNamespace:
     return SimpleNamespace(
-        exists_on_s3=exists_on_s3,
+        exists_in_storage=exists_in_storage,
         episode=SimpleNamespace(episode=SimpleNamespace(title=title)),
     )
 

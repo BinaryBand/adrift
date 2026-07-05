@@ -1,4 +1,4 @@
-"""Cleanup CLI: remove unmatched download audio files from S3."""
+"""Cleanup CLI: remove unmatched download audio files from storage."""
 
 from __future__ import annotations
 
@@ -34,18 +34,17 @@ def _matched_download_slugs(result: Any) -> set[str]:
     }
 
 
-def _resolve_s3_key(s3: Any, bucket: str, prefix: str, slug: str) -> str | None:
+def _resolve_storage_key(storage: Any, bucket: str, prefix: str, slug: str) -> str | None:
     key_prefix = f"{prefix}/{slug}"
-    actual_name = s3.exists(bucket, key_prefix)
+    actual_name = storage.exists(bucket, key_prefix)
     if actual_name is None:
         return None
     parent = Path(key_prefix).parent.as_posix()
     return f"{parent}/{actual_name}"
 
 
-def _delete_key(s3: Any, bucket: str, key: str) -> None:
-    s3.get_client().delete_object(Bucket=bucket, Key=key)
-    s3.invalidate_file_map_cache(bucket, key)
+def _delete_key(storage: Any, bucket: str, key: str) -> None:
+    storage.delete(bucket, key)
 
 
 def _audio_object_names(file_names: list[str]) -> list[str]:
@@ -103,14 +102,14 @@ def _write_unmatched_verbose(result: Any, download_index: int) -> None:
 
 def _process_unmatched(
     result: Any,
-    s3: Any,
+    storage: Any,
     dry_run: bool,
     verbose: bool = False,
 ) -> tuple[int, int]:
-    from adrift.services.download_client import s3_prefix
+    from adrift.services.download_client import storage_prefix
     from adrift.utils.title_normalization import normalize_title
 
-    bucket, prefix = s3_prefix(result.config)
+    bucket, prefix = storage_prefix(result.config)
     indices = _unmatched_indices(result.pairs, len(result.downloads))
     matched_slugs = _matched_download_slugs(result)
     found = 0
@@ -120,7 +119,7 @@ def _process_unmatched(
         slug = normalize_title(result.config.name, download.title)
         if slug in matched_slugs:
             continue
-        key = _resolve_s3_key(s3, bucket, prefix, slug)
+        key = _resolve_storage_key(storage, bucket, prefix, slug)
         if key is None:
             missing += 1
             continue
@@ -129,28 +128,30 @@ def _process_unmatched(
         if verbose:
             _write_unmatched_verbose(result, index)
         if not dry_run:
-            _delete_key(s3, bucket, key)
+            _delete_key(storage, bucket, key)
         found += 1
     return found, missing
 
 
-def _process_duplicate_audio_files(config: Any, s3: Any, dry_run: bool) -> int:
-    from adrift.services.download_client import s3_prefix
+def _process_duplicate_audio_files(config: Any, storage: Any, dry_run: bool) -> int:
+    from adrift.services.download_client import storage_prefix
 
-    bucket, prefix = s3_prefix(config)
-    duplicates = _duplicate_audio_candidates(config.name, s3.get_file_list(bucket, prefix, False))
+    bucket, prefix = storage_prefix(config)
+    duplicates = _duplicate_audio_candidates(
+        config.name, storage.get_file_list(bucket, prefix, False)
+    )
     for name in duplicates:
         key = f"{prefix}/{name}"
         label = "would delete duplicate" if dry_run else "deleted duplicate"
         sys.stdout.write(f"  {label}: {bucket}/{key}\n")
         if not dry_run:
-            _delete_key(s3, bucket, key)
+            _delete_key(storage, bucket, key)
     return len(duplicates)
 
 
 def _run_cleanup(
     configs: list[Any],
-    s3: Any,
+    storage: Any,
     dry_run: bool,
     refresh_sources: bool,
     prune_duplicates: bool,
@@ -166,11 +167,11 @@ def _run_cleanup(
         unmatched = _unmatched_indices(result.pairs, len(result.downloads))
         sys.stdout.write(f"\n{config.name}: {len(unmatched)} unmatched download(s)\n")
         if unmatched:
-            found, missing = _process_unmatched(result, s3, dry_run, verbose=verbose)
+            found, missing = _process_unmatched(result, storage, dry_run, verbose=verbose)
             total_unmatched_found += found
             total_missing += missing
         if prune_duplicates:
-            duplicate_count = _process_duplicate_audio_files(config, s3, dry_run)
+            duplicate_count = _process_duplicate_audio_files(config, storage, dry_run)
             total_duplicates += duplicate_count
             if duplicate_count:
                 sys.stdout.write(f"  duplicate object(s): {duplicate_count}\n")
@@ -179,7 +180,7 @@ def _run_cleanup(
     total_removed = total_unmatched_found + total_duplicates
     sys.stderr.write(
         f"\n{summary} {total_removed} file(s): {total_unmatched_found} unmatched, "
-        f"{total_duplicates} duplicate. {total_missing} not found on S3.\n"
+        f"{total_duplicates} duplicate. {total_missing} not found in storage.\n"
     )
     if dry_run and total_removed > 0:
         sys.stderr.write("Run with --no-dry-run to actually delete.\n")
@@ -217,7 +218,7 @@ def _run(
     ctx = AppContext.from_env()
     _run_cleanup(
         configs,
-        cast(Any, ctx.s3),
+        cast(Any, ctx.storage),
         dry_run,
         refresh_sources,
         prune_duplicates,

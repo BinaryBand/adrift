@@ -27,7 +27,7 @@ class DownloadCompleted:
     """Signals that an episode finished download/upload processing."""
 
     episode: RssEpisode
-    s3_key: str
+    storage_key: str
     sponsors_removed: bool
 
 

@@ -9,7 +9,7 @@ from adrift.models.ports import InMemoryCache
 from adrift.services.context import AppContext, EventBus
 from adrift.services.download_process import (
     build_download_queue,
-    episode_exists_on_s3,
+    episode_exists_in_storage,
     process_in_tmpdir,
 )
 from adrift.services.events import DownloadCompleted, OperationStarted, ProgressUpdated
@@ -39,12 +39,12 @@ def _config() -> PodcastConfig:
 
 
 def _ctx() -> AppContext:
-    return _ctx_with_s3(SimpleNamespace())
+    return _ctx_with_storage(SimpleNamespace())
 
 
-def _ctx_with_s3(s3: object) -> AppContext:
+def _ctx_with_storage(storage: object) -> AppContext:
     return AppContext(
-        s3=s3,
+        storage=storage,
         secrets=SimpleNamespace(source_name="test", get=lambda key, default="": default),
         rss_cache=InMemoryCache(),
         yt_cache=InMemoryCache(),
@@ -61,14 +61,14 @@ def test_build_download_queue_prioritizes_missing_then_newest(
 
     existing_titles = {"Newest Existing"}
 
-    def _exists_on_s3(ep: DownloadEpisode, config: PodcastConfig, ctx: AppContext) -> bool:
+    def _exists_in_storage(ep: DownloadEpisode, config: PodcastConfig, ctx: AppContext) -> bool:
         del config
         del ctx
         return ep.episode.title in existing_titles
 
     monkeypatch.setattr(
-        "adrift.services.download_process.episode_exists_on_s3",
-        _exists_on_s3,
+        "adrift.services.download_process.episode_exists_in_storage",
+        _exists_in_storage,
     )
 
     queue = build_download_queue(
@@ -97,7 +97,7 @@ def test_build_download_queue_preserves_unknown_dates_after_dated_missing(
         return False
 
     monkeypatch.setattr(
-        "adrift.services.download_process.episode_exists_on_s3",
+        "adrift.services.download_process.episode_exists_in_storage",
         _always_missing,
     )
 
@@ -109,7 +109,7 @@ def test_build_download_queue_preserves_unknown_dates_after_dated_missing(
     ]
 
 
-def test_episode_exists_on_s3_matches_existing_youtube_video_id(
+def test_episode_exists_in_storage_matches_existing_youtube_video_id(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     episode = DownloadEpisode(
@@ -134,10 +134,10 @@ def test_episode_exists_on_s3_matches_existing_youtube_video_id(
         upload_date=datetime(2026, 4, 19, tzinfo=timezone.utc),
         sponsors_removed=False,
     )
-    assert episode_exists_on_s3(episode, config, _ctx_with_s3(fake)) is True
+    assert episode_exists_in_storage(episode, config, _ctx_with_storage(fake)) is True
 
 
-def test_episode_exists_on_s3_matches_existing_direct_source_url(
+def test_episode_exists_in_storage_matches_existing_direct_source_url(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     episode = DownloadEpisode(
@@ -167,10 +167,10 @@ def test_episode_exists_on_s3_matches_existing_direct_source_url(
         upload_date=datetime(2026, 4, 19, tzinfo=timezone.utc),
         sponsors_removed=False,
     )
-    assert episode_exists_on_s3(episode, config, _ctx_with_s3(fake)) is True
+    assert episode_exists_in_storage(episode, config, _ctx_with_storage(fake)) is True
 
 
-def test_episode_exists_on_s3_matches_cleaned_existing_filename(
+def test_episode_exists_in_storage_matches_cleaned_existing_filename(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     episode = DownloadEpisode(
@@ -197,7 +197,7 @@ def test_episode_exists_on_s3_matches_cleaned_existing_filename(
         "ann-billy-woodward-morbid-podcast.opus"
     ]
     fake.get_metadata = lambda bucket, key: None
-    assert episode_exists_on_s3(episode, config, _ctx_with_s3(fake)) is True
+    assert episode_exists_in_storage(episode, config, _ctx_with_storage(fake)) is True
 
 
 def test_process_in_tmpdir_reports_upload_progress(
@@ -214,7 +214,7 @@ def test_process_in_tmpdir_reports_upload_progress(
     updates: list[tuple[int, int | None]] = []
     completions: list[str] = []
 
-    def _s3_prefix_fn(cfg: PodcastConfig) -> tuple[str, str]:
+    def _storage_prefix_fn(cfg: PodcastConfig) -> tuple[str, str]:
         return ("bucket", "podcasts/creepcast")
 
     def _download_audio_fn(ep: DownloadEpisode, dest: Path, ctx: object | None = None) -> Path:
@@ -227,8 +227,8 @@ def test_process_in_tmpdir_reports_upload_progress(
         return 42.0
 
     monkeypatch.setattr(
-        "adrift.services.download_process.s3_prefix",
-        _s3_prefix_fn,
+        "adrift.services.download_process.storage_prefix",
+        _storage_prefix_fn,
     )
     monkeypatch.setattr(
         "adrift.services.download_process._download_audio",
@@ -259,13 +259,13 @@ def test_process_in_tmpdir_reports_upload_progress(
     fake.upload_file = lambda bucket_key, file_path, options: _upload_file(
         bucket_key[0], bucket_key[1], file_path, options
     )
-    ctx = _ctx_with_s3(fake)
+    ctx = _ctx_with_storage(fake)
     ctx.event_bus.subscribe(OperationStarted, lambda event: operations.append(event.label))
     ctx.event_bus.subscribe(
         ProgressUpdated,
         lambda event: updates.append((event.current, event.total)),
     )
-    ctx.event_bus.subscribe(DownloadCompleted, lambda event: completions.append(event.s3_key))
+    ctx.event_bus.subscribe(DownloadCompleted, lambda event: completions.append(event.storage_key))
 
     uploaded = process_in_tmpdir(episode, config, tmp_path, ctx)
 
