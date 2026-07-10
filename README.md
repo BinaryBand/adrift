@@ -40,7 +40,7 @@ Example:
 ```text
 Reference: "Episode 42: The Big One"
 Download:  "S03E42 The Big One [HD]"
-Result:    → Merged as one episode with both metadata sources
+Result:    -> Merged as one episode with both metadata sources
 ```
 
 ---
@@ -51,14 +51,18 @@ Create TOML files in `config/`:
 
 ```toml
 [[podcasts]]
-title    = "My Show"
-feeds    = ["https://example.com/rss"]           # Reference episodes
-sources  = ["yt://@MyChannel"]                   # Download sources
-schedule = "FREQ=WEEKLY;BYDAY=WE,FR"            # Optional: download on Wed/Fri
+name     = "My Show"
+path     = "/media/podcasts/my-show"             # Storage bucket/prefix
+schedule = ["FREQ=WEEKLY;BYDAY=WE,FR"]           # Optional: download on Wed/Fri
 
-[podcasts.filters]
+[[podcasts.references]]
+url = "https://example.com/rss"                  # Reference episodes (metadata)
+[podcasts.references.filters]
 exclude = ["bonus", "clip"]                      # Skip these titles
 include = []                                     # If set, title must match one
+
+[[podcasts.downloads]]
+url = "yt://@MyChannel"                          # Download sources (files)
 ```
 
 | Schedule | Meaning |
@@ -92,28 +96,15 @@ poetry run adrift-download --include 'config/*.toml' --max-downloads 5
 
 ---
 
-## Secrets (.env)
-
-If you use S3 storage, create `.env`:
-
-```text
-S3_USERNAME=your_user
-S3_SECRET_KEY=your_key
-S3_ENDPOINT=https://s3.example.com
-S3_REGION=us-east-1
-```
-
----
-
 ## Project Layout
 
 ```text
 adrift/
-├── cli/              # Commands (merge, download, schema)
-├── services/         # Core logic (merge, download, alignment)
-├── models/          # Data structures
-├── adapters/        # RSS & YouTube fetchers
-└── utils/           # Helpers (profiler, cache, progress)
+|-- cli/              # Commands (merge, download, schema)
+|-- services/         # Core logic (merge, download, alignment)
+|-- models/          # Data structures
+|-- adapters/        # RSS & YouTube fetchers
+`-- utils/           # Helpers (profiler, cache, progress)
 config/              # Your podcast configs (TOML)
 tests/               # Unit tests
 ```
@@ -174,13 +165,12 @@ Outputs both per-podcast stage timings and a full profiling report showing which
 # Run tests
 poetry run pytest
 
-# Lint & format
-poetry run ruff check adrift/
-poetry run mypy adrift/
-
-# Type stubs & code complexity
+# Lint, format, and all other quality gates (also runnable via pytest tests/test_lint.py)
+poetry run ruff check adrift tests typings
+poetry run ruff format --check adrift tests typings
 poetry run ty check --project .
-poetry run lizard adrift/
+poetry run python -m vulture adrift tests --min-confidence 80
+poetry run python -m lizard adrift -x 'adrift/cli/*' -C 8 -L 30 -a 9
 ```
 
 ### Performance benchmarks
@@ -190,8 +180,8 @@ offline and cover:
 
 | Benchmark | What is timed |
 | --- | --- |
-| `alignment.50x50` | Scoring kernel: 50 refs × 50 downloads |
-| `alignment.150x150` | Scoring kernel: 150 refs × 150 downloads |
+| `alignment.50x50` | Scoring kernel: 50 refs x 50 downloads |
+| `alignment.150x150` | Scoring kernel: 150 refs x 150 downloads |
 | `normalize_title.cold` | 300 titles, no caches warm |
 | `normalize_title.warm_disk` | 300 titles, disk cache warm, LRU empty |
 
@@ -202,7 +192,7 @@ Baselines are stored as CPU-normalized values in
 # Record baselines (run once on your machine after a performance change):
 RECORD_PERF_BASELINE=1 poetry run pytest tests/benchmarks/
 
-# Enforce baselines — fails if any benchmark exceeds 2× its recorded median:
+# Enforce baselines -- fails if any benchmark exceeds 2x its recorded median:
 RUN_PERF_TESTS=1 poetry run pytest tests/benchmarks/
 
 # Relax the threshold (e.g. on a slower CI machine):

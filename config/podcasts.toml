@@ -3,7 +3,7 @@
 
 [[podcasts]]
 name = "Behind the Bastards"
-path = "/media/podcasts/behind-the-bastards"
+path = "/Podcasts/behind-the-bastards"
 schedule = ["FREQ=WEEKLY;BYDAY=TH,TU"]
 tags = ["podcasts", "behind-the-bastards"]
 
@@ -24,7 +24,7 @@ slug_suffixes = ["Behind the Bastards"]
 
 [[podcasts]]
 name = "Camp Gagnon"
-path = "/media/podcasts/camp-gagnon"
+path = "/Podcasts/camp-gagnon"
 schedule = ["FREQ=WEEKLY;BYDAY=TH,TU"]
 tags = ["podcasts", "camp-gagnon"]
 
@@ -46,7 +46,7 @@ id = 0.05
 
 [[podcasts]]
 name = "CreepCast"
-path = "/media/podcasts/creepcast"
+path = "/Podcasts/creepcast"
 schedule = ["FREQ=WEEKLY;BYDAY=SU"]
 tags = ["podcasts", "creepcast"]
 
@@ -67,7 +67,7 @@ slug_suffixes = ["Creep Cast", "CreepCast", "Creep TV"]
 
 [[podcasts]]
 name = "Darknet Diaries"
-path = "/media/podcasts/darknet-diaries"
+path = "/Podcasts/darknet-diaries"
 schedule = ["FREQ=WEEKLY;BYDAY=TU"]
 tags = ["podcasts", "darknet-diaries"]
 
@@ -87,7 +87,7 @@ replacement = "\\1"
 
 [[podcasts]]
 name = "Financial Audit"
-path = "/media/podcasts/financial-audit"
+path = "/Podcasts/financial-audit"
 schedule = ["FREQ=WEEKLY;BYDAY=FR,WE,SA"]
 tags = ["podcasts", "financial-audit"]
 
@@ -132,7 +132,7 @@ slug_suffixes = ["Financial Audit"]
 
 [[podcasts]]
 name = "Morbid"
-path = "/media/podcasts/morbid"
+path = "/Podcasts/morbid"
 schedule = ["FREQ=WEEKLY;BYDAY=TH,MO,TU"]
 tags = ["podcasts", "morbid"]
 
@@ -178,7 +178,7 @@ slug_suffixes = [
 
 [[podcasts]]
 name = "Smosh Reads Reddit Stories"
-path = "/media/podcasts/smosh-reads-reddit-stories"
+path = "/Podcasts/smosh-reads-reddit-stories"
 schedule = ["FREQ=WEEKLY;BYDAY=SA"]
 tags = ["podcasts", "smosh-reads-reddit-stories"]
 
@@ -228,7 +228,7 @@ slug_suffixes = ["Smosh Reading Reddit Stories"]
 
 [[podcasts]]
 name = "Swindled"
-path = "/media/podcasts/swindled"
+path = "/Podcasts/swindled"
 schedule = ["FREQ=WEEKLY;BYDAY=WE,SU,SA"]
 tags = ["podcasts", "swindled"]
 
@@ -257,7 +257,7 @@ replacement = "(\\1)"
 
 [[podcasts]]
 name = "The Daily Show"
-path = "/media/podcasts/the-daily-show"
+path = "/Podcasts/the-daily-show"
 schedule = ["FREQ=WEEKLY;BYDAY=TH,WE,SA"]
 tags = ["podcasts", "the-daily-show"]
 
@@ -273,7 +273,7 @@ url = "yt://#PLeskMkEaHJYfTMaKwmBWGq4NogX9FLF2J"
 
 [[podcasts]]
 name = "The Weekly Show with Jon Stewart"
-path = "/media/podcasts/the-weekly-show-with-jon-stewart"
+path = "/Podcasts/the-weekly-show-with-jon-stewart"
 schedule = ["FREQ=WEEKLY;BYDAY=WE,TH,FR"]
 tags = ["podcasts", "the-weekly-show-with-jon-stewart"]
 
