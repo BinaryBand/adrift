@@ -239,3 +239,4 @@ cookies.txt
 config/**/.*.toml
 docs/*.*
 .dev
+CLAUDE.md
