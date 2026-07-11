@@ -312,5 +312,46 @@ class TestGetYoutubeVideosEdgeCases(unittest.TestCase):
         self.assertEqual(str(context.exception), "Network error")
 
 
+class TestConcurrentChannelFetch(unittest.TestCase):
+    """Concurrent fetches of the same channel must not overlap."""
+
+    @patch("adrift.adapters.process.youtube.metadata._normalize_youtube_link")
+    @patch("adrift.adapters.process.youtube.ytdlp.get_youtube_videos")
+    def test_same_channel_fetches_serialize(
+        self, mock_get_videos: MagicMock, mock_normalize: MagicMock
+    ):
+        """Two threads fetching one channel (reference + download roles) serialize."""
+        import threading
+        from concurrent.futures import ThreadPoolExecutor
+
+        mock_normalize.return_value = "https://youtube.com/@test/videos"
+        active = 0
+        max_active = 0
+        guard = threading.Lock()
+
+        def fake_fetch(*args: object, **kwargs: object) -> list[RssEpisode]:
+            nonlocal active, max_active
+            del args, kwargs
+            with guard:
+                active += 1
+                max_active = max(max_active, active)
+            threading.Event().wait(0.02)
+            with guard:
+                active -= 1
+            return []
+
+        mock_get_videos.side_effect = fake_fetch
+        opts = YtFetchOptions(detailed=False)
+        with ThreadPoolExecutor(max_workers=2) as executor:
+            futures = [
+                executor.submit(get_youtube_episodes, "https://youtube.com/@test", "author", opts)
+                for _ in range(2)
+            ]
+            for future in futures:
+                future.result()
+
+        self.assertEqual(max_active, 1)
+
+
 if __name__ == "__main__":
     unittest.main()

@@ -1,3 +1,4 @@
+import threading
 from dataclasses import dataclass, field
 from urllib.parse import urljoin
 
@@ -181,16 +182,29 @@ def _post_process_episodes(
     return episodes
 
 
+# Reference and download collection run in parallel threads; when a config lists
+# the same channel in both roles, identical fetches must serialize so the second
+# one hits the caches written by the first instead of re-scraping the channel.
+_CHANNEL_FETCH_LOCKS: dict[str, threading.Lock] = {}
+_CHANNEL_FETCH_LOCKS_GUARD = threading.Lock()
+
+
+def _channel_fetch_lock(normalized_url: str) -> threading.Lock:
+    with _CHANNEL_FETCH_LOCKS_GUARD:
+        return _CHANNEL_FETCH_LOCKS.setdefault(normalized_url, threading.Lock())
+
+
 def get_youtube_episodes(
     url: str, author: str, opts: YtFetchOptions | None = None
 ) -> list[RssEpisode]:
     """Fetch RSS episodes from a given URL."""
     fetch_opts = _coerce_fetch_options(opts)
     normalized_url = _normalize_youtube_link(url)
-    episodes = ytdlp.get_youtube_videos(
-        normalized_url,
-        author,
-        fetch_opts.callback,
-        refresh=fetch_opts.refresh,
-    )
-    return _post_process_episodes(episodes, url, author, fetch_opts)
+    with _channel_fetch_lock(normalized_url):
+        episodes = ytdlp.get_youtube_videos(
+            normalized_url,
+            author,
+            fetch_opts.callback,
+            refresh=fetch_opts.refresh,
+        )
+        return _post_process_episodes(episodes, url, author, fetch_opts)

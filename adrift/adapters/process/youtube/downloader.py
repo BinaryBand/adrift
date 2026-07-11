@@ -204,7 +204,8 @@ def _run_download_attempt(
 def _should_retry_attempt(error: Exception, attempt_index: int) -> bool:
     if _is_terminal_download_reason(error):
         return False
-    return _is_unavailable_format_error(error) and attempt_index < len(_DOWNLOAD_ATTEMPTS) - 1
+    retryable = _is_unavailable_format_error(error) or _is_forbidden_download_error(error)
+    return retryable and attempt_index < len(_DOWNLOAD_ATTEMPTS) - 1
 
 
 def _audio_postprocessor() -> dict[str, str]:
@@ -246,6 +247,12 @@ def _is_unavailable_format_error(error: Exception) -> bool:
         or "This video is only available for" in err_str
         or "Sign in" in err_str
     )
+
+
+def _is_forbidden_download_error(error: Exception) -> bool:
+    # Stale signed googlevideo URLs or a client/cookie mismatch surface as 403;
+    # the later attempts (auth, alternate player clients) usually clear it.
+    return "HTTP Error 403" in str(error)
 
 
 def _retry_reason(error: Exception) -> str:
