@@ -23,8 +23,10 @@ from adrift.services.events import (
     OperationStarted,
     ProgressUpdated,
 )
-from adrift.services.files.audio import convert_to_opus, cut_segments, get_duration
+from adrift.services.files.audio import convert_to_opus, get_duration
 from adrift.services.web.rss import download_direct
+from adrift.services.web.sponsorblock import compute_ad_segments_expiry
+from adrift.utils.crypto import sha256_file
 from adrift.utils.title_normalization import normalize_title
 
 if TYPE_CHECKING:
@@ -111,7 +113,7 @@ def process_in_tmpdir(
         return False
     opus = _prepare_upload_audio(ep, audio, ctx)
     duration = get_duration(opus)
-    metadata = _build_metadata(ep, duration, sponsors_removed=bool(ep.sponsor_segments))
+    metadata = _build_metadata(ep, opus, duration)
     upload_request = _build_upload_request(bucket, key_prefix, opus, metadata)
     return _upload_and_publish_completion(ep, upload_request, ctx)
 
@@ -137,7 +139,7 @@ def _upload_and_publish_completion(
         DownloadCompleted(
             episode=ep.episode,
             storage_key=upload_request.key,
-            sponsors_removed=bool(ep.sponsor_segments),
+            ad_segments_found=bool(ep.sponsor_segments),
         )
     )
     return True
@@ -163,26 +165,23 @@ def _download_episode_audio(ep: DownloadEpisode, tmp: Path, ctx: AppContext) -> 
 
 
 def _prepare_upload_audio(ep: DownloadEpisode, audio: Path, ctx: AppContext) -> Path:
-    if ep.sponsor_segments:
-        ctx.event_bus.publish(OperationStarted(label=f"cut sponsors: {ep.episode.title}"))
-        cut_segments(
-            audio,
-            ep.sponsor_segments,
-            callback=_progress_callback(ctx),
-        )
     ctx.event_bus.publish(OperationStarted(label=f"convert opus: {ep.episode.title}"))
     return convert_to_opus(audio, callback=_progress_callback(ctx))
 
 
-def _build_metadata(
-    ep: DownloadEpisode, duration: float | None, *, sponsors_removed: bool
-) -> MediaMetadata:
+def _build_metadata(ep: DownloadEpisode, opus: Path, duration: float | None) -> MediaMetadata:
     pub_date = ep.episode.pub_date or datetime.now(tz=timezone.utc)
+    now = datetime.now(tz=timezone.utc)
+    video_age_days = (now - pub_date.replace(tzinfo=pub_date.tzinfo or timezone.utc)).days
     return MediaMetadata(
         duration=duration or 0.0,
         source=ep.episode.content,
         upload_date=pub_date,
-        sponsors_removed=sponsors_removed,
+        audio_hash=sha256_file(opus),
+        ad_segments=ep.sponsor_segments,
+        ad_segments_expires_at=(
+            compute_ad_segments_expiry(video_age_days, now) if ep.sponsor_segments else None
+        ),
     )
 
 

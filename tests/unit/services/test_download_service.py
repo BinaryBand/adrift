@@ -1,3 +1,4 @@
+import hashlib
 from datetime import datetime, timezone
 from pathlib import Path
 from types import SimpleNamespace
@@ -132,7 +133,6 @@ def test_episode_exists_in_storage_matches_existing_youtube_video_id(
         duration=1.0,
         source="https://youtube.com/watch?v=stable-video-id",
         upload_date=datetime(2026, 4, 19, tzinfo=timezone.utc),
-        sponsors_removed=False,
     )
     assert episode_exists_in_storage(episode, config, _ctx_with_storage(fake)) is True
 
@@ -165,7 +165,6 @@ def test_episode_exists_in_storage_matches_existing_direct_source_url(
         duration=1.0,
         source="https://cdn.example.com/audio/episode.mp3",
         upload_date=datetime(2026, 4, 19, tzinfo=timezone.utc),
-        sponsors_removed=False,
     )
     assert episode_exists_in_storage(episode, config, _ctx_with_storage(fake)) is True
 
@@ -277,8 +276,54 @@ def test_process_in_tmpdir_reports_upload_progress(
     ]
     assert updates == [(3, 10)]
     assert completions == ["podcasts/creepcast/upload-progress.opus"]
-    options = captured["options"]
-    assert isinstance(options, object)
-    assert captured["bucket"] == "bucket"
-    assert captured["key"] == "podcasts/creepcast/upload-progress.opus"
-    assert captured["file_path"] == opus_path
+    metadata = captured["options"].metadata  # type: ignore[union-attr]
+    assert isinstance(metadata, MediaMetadata)
+    assert metadata.audio_hash == hashlib.sha256(b"opus").hexdigest()
+    assert metadata.ad_segments == []
+    assert metadata.ad_segments_expires_at is None
+
+
+def test_process_in_tmpdir_sets_ad_segments_expiry_when_segments_found(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    episode = _episode("Sponsor Segments", pub_date=datetime(2020, 1, 1, tzinfo=timezone.utc))
+    episode.sponsor_segments = [(0.0, 30.0)]
+    config = _config()
+    audio_path = tmp_path / "audio.m4a"
+    opus_path = tmp_path / "audio.opus"
+    audio_path.write_bytes(b"audio")
+    opus_path.write_bytes(b"opus")
+
+    monkeypatch.setattr(
+        "adrift.services.download_process.storage_prefix",
+        lambda cfg: ("bucket", "podcasts/creepcast"),
+    )
+    monkeypatch.setattr(
+        "adrift.services.download_process._download_audio",
+        lambda ep, dest, ctx=None: audio_path,
+    )
+    monkeypatch.setattr(
+        "adrift.services.download_process.convert_to_opus",
+        lambda audio, callback=None: opus_path,
+    )
+    monkeypatch.setattr(
+        "adrift.services.download_process.get_duration",
+        lambda path: 42.0,
+    )
+
+    captured: dict[str, object] = {}
+
+    def _upload_file(bucket_key: tuple[str, str], file_path: Path, options: object | None) -> None:
+        captured["options"] = options
+
+    fake = SimpleNamespace()
+    fake.upload_file = _upload_file
+    ctx = _ctx_with_storage(fake)
+
+    assert process_in_tmpdir(episode, config, tmp_path, ctx) is True
+
+    metadata = captured["options"].metadata  # type: ignore[union-attr]
+    assert isinstance(metadata, MediaMetadata)
+    assert metadata.ad_segments == [(0.0, 30.0)]
+    assert metadata.ad_segments_expires_at is not None
+    assert metadata.ad_segments_expires_at > datetime.now(tz=timezone.utc)

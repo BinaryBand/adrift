@@ -1,9 +1,7 @@
 import json
 import logging
 import os
-import shutil
 import subprocess
-import tempfile
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, TypedDict, Unpack, cast
@@ -12,10 +10,6 @@ from adrift.utils.media import AUDIO_EXTENSIONS
 from adrift.utils.progress import Callback
 
 logger = logging.getLogger(__name__)
-
-Segment = tuple[float, float]
-
-MIN_LENGTH = 0.1  # seconds
 
 _FFMPEG_BASE = ["ffmpeg", "-hide_banner", "-loglevel", "error"]
 
@@ -65,21 +59,6 @@ def _parse_ffprobe_duration(stdout: str) -> float:
     return float(duration)
 
 
-def _concat_command(concat: Path, dest: Path) -> list[str]:
-    return _FFMPEG_BASE + [
-        "-f",
-        "concat",
-        "-safe",
-        "0",
-        "-i",
-        str(concat),
-        "-c:a",
-        "copy",
-        "-y",
-        str(dest),
-    ]
-
-
 def handle_subprocess_error(
     e: subprocess.CalledProcessError, cmd: list[str], file: Path
 ) -> RuntimeError:
@@ -110,115 +89,6 @@ def get_duration(file: Path) -> float | None:
     except (OSError, TypeError, ValueError, json.JSONDecodeError) as e:
         logger.warning("Failed to get duration for %s: %s", file, e)
         return None
-
-
-def invert_segments(file: Path, segments: list[Segment]) -> list[Segment]:
-    prev_end = 0.0
-    content_segments: list[Segment] = []
-    for seg in segments:
-        content_segments.append((prev_end, seg[0]))
-        prev_end = seg[1]
-
-    total_len = get_duration(file)
-    if total_len is None:
-        raise ValueError(f"Could not get duration for {file}")
-
-    content_segments.append((prev_end, total_len))
-    return content_segments
-
-
-def _extract_segment(file: Path, start: float, duration: float, dest: Path) -> None:
-    """Extract one time-bounded segment from a source file.
-
-    -ss is placed before -i so ffmpeg uses input-side (keyframe) seeking instead
-    of decoding from the start of the file.  Combined with -c:a copy this makes
-    the cut essentially free: no decode, no encode, just byte copying.  Cut
-    precision is within one keyframe interval (~0.1-0.5 s for typical podcasts),
-    which is more than accurate enough for sponsor removal.
-    """
-    cmd = _FFMPEG_BASE + [
-        "-ss",
-        str(start),
-        "-i",
-        str(file),
-        "-t",
-        str(duration),
-        "-c:a",
-        "copy",
-        "-y",
-        str(dest),
-    ]
-    subprocess.run(cmd, check=True, capture_output=True)
-
-
-def _write_concat_list(segment_files: list[Path]) -> Path:
-    """Write an ffmpeg concat-list file alongside the first segment."""
-    concat = segment_files[0].parent / "concat.txt"
-    with open(concat, "w", encoding="utf-8") as f:
-        for seg_file in segment_files:
-            f.write(f"file '{seg_file.absolute().as_posix()}'\n")
-    return concat
-
-
-def _concat_segment_files(segment_files: list[Path], dest: Path, source_file: Path) -> None:
-    """Concatenate extracted segments into a single output file."""
-    if len(segment_files) == 1:
-        shutil.copy(segment_files[0], dest)
-        return
-    concat = _write_concat_list(segment_files)
-    cmd = _concat_command(concat, dest)
-    try:
-        subprocess.run(cmd, check=True, capture_output=True)
-    except (subprocess.CalledProcessError, OSError, RuntimeError, TypeError, ValueError) as e:
-        if isinstance(e, subprocess.CalledProcessError):
-            raise handle_subprocess_error(e, cmd, source_file)
-        raise RuntimeError(f"Failed to concat segments for {source_file}: {e}")
-
-
-def _extract_all_segments(
-    keep_segs: list[Segment], file: Path, temp_path: Path, callback: Callback | None
-) -> list[Path]:
-    """Extract every keep segment to individual temp files."""
-    segment_files: list[Path] = []
-    for i, (start, end) in enumerate(keep_segs):
-        seg_file = temp_path / f"seg_{i:04d}{file.suffix}"
-        _extract_segment(file, start, end - start, seg_file)
-        segment_files.append(seg_file)
-        if callback:
-            callback(i + 1, len(keep_segs))
-    return segment_files
-
-
-def _cut_segments(
-    file: Path,
-    segments: list[Segment],
-    dest: Path,
-    callback: Callback | None = None,
-) -> None:
-    """Cut segments using stream copy (fast: keyframe seek + no re-encode)."""
-    keep_segs = [(s, e) for s, e in invert_segments(file, segments) if e - s >= MIN_LENGTH]
-    with tempfile.TemporaryDirectory() as temp_dir:
-        seg_files = _extract_all_segments(keep_segs, file, Path(temp_dir), callback)
-        _concat_segment_files(seg_files, dest, file)
-        if callback and len(seg_files) > 1:
-            callback(len(keep_segs), len(keep_segs))
-
-
-def cut_segments(
-    file: Path,
-    segments: list[Segment],
-    dest: Path | None = None,
-    callback: Callback | None = None,
-) -> None:
-    """Cut segments from audio file."""
-    if dest is None:
-        with tempfile.TemporaryDirectory() as temp:
-            temp_path = Path(temp) / file.name
-            _cut_segments(file, segments, temp_path, callback=callback)
-            file.unlink(missing_ok=True)
-            shutil.move(str(temp_path), str(file))
-    else:
-        _cut_segments(file, segments, dest, callback=callback)
 
 
 def _normalize_streams(data: dict[str, Any]) -> list[dict[str, Any]]:

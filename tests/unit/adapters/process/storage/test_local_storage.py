@@ -22,7 +22,9 @@ def _metadata() -> MediaMetadata:
         duration=12.5,
         source="https://youtube.com/watch?v=abc123",
         upload_date=datetime(2026, 4, 20, tzinfo=timezone.utc),
-        sponsors_removed=True,
+        audio_hash="deadbeef",
+        ad_segments=[(0.0, 15.0), (120.5, 145.25)],
+        ad_segments_expires_at=datetime(2026, 6, 1, tzinfo=timezone.utc),
     )
 
 
@@ -35,7 +37,7 @@ def test_upload_file_writes_identical_bytes_and_returns_url(tmp_path: Path) -> N
 
     dest = tmp_path / "media" / "podcasts" / "show" / "ep1.opus"
     assert dest.read_bytes() == b"episode audio bytes"
-    assert url == "https://cdn.example.com/media/podcasts/show/ep1.opus"
+    assert url == "https://cdn.example.com/podcasts/show/ep1.opus"
 
 
 def test_upload_file_leaves_no_temp_files_behind(tmp_path: Path) -> None:
@@ -162,5 +164,5 @@ def test_get_public_urls_builds_well_formed_urls(tmp_path: Path) -> None:
     storage.upload_file(("media", "podcasts/show/ep1.opus"), src)
 
     assert storage.get_public_urls("media", "podcasts/show") == [
-        "https://cdn.example.com/media/podcasts/show/ep1.opus"
+        "https://cdn.example.com/podcasts/show/ep1.opus"
     ]

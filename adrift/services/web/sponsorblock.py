@@ -1,8 +1,9 @@
 """
-SponsorBlock API integration for fetching and removing sponsored segments.
+SponsorBlock API integration for fetching sponsored segments.
 """
 
 import logging
+from datetime import datetime, timedelta
 from typing import Any, cast
 
 import requests
@@ -17,6 +18,12 @@ logger = logging.getLogger(__name__)
 _CACHE = DiskCacheAdapter(".cache/sponsorblock")
 _CACHE_EXPIRY_DAYS = {False: 7, True: 35}  # Days to cache (no segments vs has segments)
 _API_TIMEOUT = 10
+
+# (max video age in days, TTL in days) tiers, ascending -- older videos have more
+# settled community-voted segment timestamps, so published segment data can be
+# trusted for longer before it needs refetching.
+_AD_SEGMENTS_TTL_TIERS = [(7, 3), (30, 14), (180, 60)]
+_AD_SEGMENTS_TTL_DEFAULT_DAYS = 180
 
 
 def _fetch_sponsor_segments(video_id: str) -> list[SponsorSegment]:
@@ -93,3 +100,20 @@ def fetch_sponsor_segments(video_id: str) -> list[tuple[float, float]]:
     except (requests.RequestException, TypeError, ValueError, KeyError) as e:
         logger.error("Error fetching segments for %s: %s", video_id, e)
         return []
+
+
+def _ttl_days_for_video_age(video_age_days: float) -> int:
+    for max_age_days, ttl_days in _AD_SEGMENTS_TTL_TIERS:
+        if video_age_days <= max_age_days:
+            return ttl_days
+    return _AD_SEGMENTS_TTL_DEFAULT_DAYS
+
+
+def compute_ad_segments_expiry(video_age_days: float, fetched_at: datetime) -> datetime:
+    """Expiration for published ad-segment data.
+
+    `fetched_at` anchors the expiry to when we pulled the audio/segments;
+    `video_age_days` scales the TTL length -- older videos have more settled
+    segment timestamps, so their published data is trusted longer.
+    """
+    return fetched_at + timedelta(days=_ttl_days_for_video_age(video_age_days))

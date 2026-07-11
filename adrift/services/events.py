@@ -28,7 +28,7 @@ class DownloadCompleted:
 
     episode: RssEpisode
     storage_key: str
-    sponsors_removed: bool
+    ad_segments_found: bool
 
 
 @dataclass(frozen=True)
