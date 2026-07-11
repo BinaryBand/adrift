@@ -48,7 +48,7 @@ class LocalFilesystemStorage:
         if metadata is not None:
             _atomic_write_json(self._sidecar_path(bucket, key), metadata.to_dict())
 
-        return self._build_url(bucket, key)
+        return self._build_url(key)
 
     def exists(self, bucket: str, prefix: str, extension_agnostic: bool = True) -> str | None:
         prefix = prefix.lstrip(".").rstrip("/")
@@ -82,9 +82,7 @@ class LocalFilesystemStorage:
 
     def get_public_urls(self, bucket: str, prefix: str) -> list[str]:
         file_list = self.get_file_list(bucket, prefix)
-        return [
-            self._build_url(bucket, f"{prefix}/{name}" if prefix else name) for name in file_list
-        ]
+        return [self._build_url(f"{prefix}/{name}" if prefix else name) for name in file_list]
 
     def get_metadata(self, bucket: str, key: str) -> MediaMetadata | None:
         try:
@@ -107,12 +105,12 @@ class LocalFilesystemStorage:
     def _sidecar_path(self, bucket: str, key: str) -> Path:
         return self._object_path(bucket, f"{key}{_METADATA_SUFFIX}")
 
-    def _build_url(self, bucket: str, key: str) -> str:
+    def _build_url(self, key: str) -> str:
         from adrift.services.config import RSS_BASE_URL
 
         if not RSS_BASE_URL:
             raise RuntimeError("RSS_BASE_URL must be set to build public storage URLs")
-        return urljoin(RSS_BASE_URL, Path(bucket, key).as_posix())
+        return urljoin(RSS_BASE_URL, key)
 
 
 def _reject_traversal(*parts: str) -> None:
