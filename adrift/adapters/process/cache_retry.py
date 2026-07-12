@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import time
+from pathlib import Path
 from typing import Any
 
 from adrift.models.ports import CachePort
@@ -58,8 +59,6 @@ class RaceAwareCacheWrapper:
     def _recreate_cache_dir(self) -> None:
         """Recreate the cache directory if it was removed by concurrent cleanup."""
         try:
-            from pathlib import Path
-
             cache_dir_raw = getattr(self.cache, "directory", None)
             if not isinstance(cache_dir_raw, str):
                 return

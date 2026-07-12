@@ -141,22 +141,6 @@ class TestLizard:
         assert result.returncode == 0, result.stdout + result.stderr
 
 
-def _semgrep_runnable() -> bool:
-    """Return whether Semgrep is installed *and* actually executes here.
-
-    Semgrep's bundled protobuf has no working C extension on Python 3.14, so the
-    binary can be present yet crash on import. Treat that as "unavailable" rather
-    than a lint failure -- CI runs Semgrep on a supported interpreter.
-    """
-    if not ((VENV_BIN / "semgrep").exists() or which("semgrep") is not None):
-        return False
-    try:
-        probe = run_resolved(["semgrep", "--version"], capture_output=True, text=True)
-    except OSError:
-        return False
-    return probe.returncode == 0
-
-
 class TestImportLinter:
     """Ensure the codebase passes import-linter dependency contracts."""
 
@@ -170,21 +154,53 @@ class TestImportLinter:
         assert result.returncode == 0, result.stdout + result.stderr
 
 
-class TestSemgrep:
-    """Ensure the codebase passes the current Semgrep architecture gate."""
+class TestAstGrep:
+    """Ensure the codebase passes the ast-grep AST-pattern gate."""
 
     @pytest.mark.skipif(
-        os.environ.get("CI") == "true" or not _semgrep_runnable(),
-        reason="Semgrep is already run via semgrep/semgrep-action in CI",
+        not ((VENV_BIN / "ast-grep").exists() or which("ast-grep") is not None),
+        reason="ast-grep is not installed",
     )
-    def test_semgrep(self):
-        """Fail if Semgrep reports any architecture or process violations."""
+    def test_ast_grep(self):
+        """Fail if ast-grep reports any error-severity findings."""
         result = run_resolved(
-            ["semgrep", "scan", "--config", "static/rules/semgrep", "--error"],
+            ["ast-grep", "scan", "--config", "sgconfig.yml"],
             capture_output=True,
             text=True,
         )
         assert result.returncode == 0, result.stdout + result.stderr
+
+
+def _stray_files(base: Path, allowed_dirs: set[str], allowed_files: set[str]) -> list[str]:
+    """Return .py files under ``base`` outside the allowed sub-packages and files."""
+    return sorted(
+        rel.as_posix()
+        for rel in (p.relative_to(base) for p in base.rglob("*.py"))
+        if rel.as_posix() not in allowed_files and rel.parts[0] not in allowed_dirs
+    )
+
+
+class TestScaffold:
+    """Keep the package and test-tree shape aligned with the scaffold policy."""
+
+    LAYERS = {"adapters", "cli", "models", "services", "utils"}
+
+    def test_adrift_top_level_shape(self):
+        """Only the declared layers (plus __init__.py) may sit under adrift/."""
+        stray = _stray_files(ROOT / "adrift", self.LAYERS, {"__init__.py"})
+        assert not stray, f"Unexpected modules under adrift/: {stray}"
+
+    def test_tests_unit_mirror_shape(self):
+        """tests/unit must mirror the adrift top-level layers only."""
+        allowed_files = {"__init__.py", "conftest.py", "_fixtures.py"}
+        stray = _stray_files(ROOT / "tests" / "unit", self.LAYERS, allowed_files)
+        assert not stray, f"Unexpected modules under tests/unit/: {stray}"
+
+    def test_adapters_shape(self):
+        """Keep adrift.adapters limited to its stable sub-packages."""
+        allowed = {"config", "lint", "process", "reporting"}
+        stray = _stray_files(ROOT / "adrift" / "adapters", allowed, {"__init__.py", "errors.py"})
+        assert not stray, f"Unexpected modules under adrift/adapters/: {stray}"
 
 
 class TestVulture:

@@ -50,7 +50,6 @@ pytest = "~=9.0.2"
 ty = "^0.0.32"
 lizard = "~=1.21.3"
 vulture = "~=2.16"
-semgrep = "<1.160.0"
 setuptools = ">=75.0,<81"
 pyinstrument = "^5.1.2"
 maturin = "^1.8.0"
@@ -76,7 +75,13 @@ show_error_codes = true
 line-length = 100
 
 [tool.ruff.lint]
-select = ["E", "F", "I"]
+# S101 bans bare `assert` outside tests; use explicit exceptions since
+# assertions can be disabled with -O.
+select = ["E", "F", "I", "S101"]
+
+[tool.ruff.lint.per-file-ignores]
+"tests/**" = ["S101"]
+"conftest.py" = ["S101"]
 
 [tool.ty.environment]
 # `python` intentionally omitted so `ty` auto-detects the project's Python

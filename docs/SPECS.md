@@ -233,7 +233,7 @@ Field-level precedence when resolving a matched pair into `EpisodeData`:
 
 - Regression rows: `tests/resources/alignment/morbid_benchmark.csv` (exercised by `tests/unit/models/catalog/test_morbid_benchmark.py`) -- add a row for every fixed false negative.
 - Unit tests: `tests/unit/models/catalog/test_align_episodes.py` covers date-tiering, containment, part/volume/episode guards, and certainty-path behaviour.
-- Lint gates: `tests/test_lint.py` runs ruff (check + format), ty, Lizard (CCN $\le 8$, length $\le 30$; `adrift/cli/*` excluded), jscpd copy-paste detection, import-linter dependency contracts (`pyproject.toml`), Semgrep scaffold rules (`static/rules/semgrep`), and Vulture dead-code detection.
+- Lint gates: `tests/test_lint.py` runs ruff (check + format), ty, Lizard (CCN $\le 8$, length $\le 30$; `adrift/cli/*` excluded), jscpd copy-paste detection, import-linter dependency contracts (`pyproject.toml`), scaffold shape checks (pytest), ast-grep AST rules (`static/rules/ast-grep`), and Vulture dead-code detection.
 - Performance benchmarks: `tests/benchmarks/` (opt-in via `RUN_PERF_TESTS=1`).
 
 ---

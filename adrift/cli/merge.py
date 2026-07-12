@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 import sys
+from pathlib import Path
 from time import perf_counter
 from typing import TYPE_CHECKING, Annotated
 
@@ -89,8 +90,6 @@ def _build_stdout_output(merge_result, include_counts: bool) -> list[dict[str, o
 
 def _write_unmatched_references(merge_result, output_dir: str) -> None:
     try:
-        from pathlib import Path
-
         unmatched_per_series: list[dict[str, object]] = []
         for merged in merge_result.value:
             unmatched_refs: list[dict[str, object]] = []
@@ -111,8 +110,6 @@ def _write_unmatched_references(merge_result, output_dir: str) -> None:
             outpath = Path(output_dir) / "unmatched_references.json"
             _write_json(outpath, unmatched_per_series)
     except Exception as e:
-        import sys
-
         sys.stderr.write(f"WARNING: _write_unmatched_references failed: {e}\n")
 
 

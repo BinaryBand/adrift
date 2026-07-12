@@ -21,7 +21,7 @@ There is no `.pre-commit-config.yaml`; quality gates run through pytest (`tests/
 .venv/bin/python -m vulture adrift tests --min-confidence 80
 .venv/bin/python -m lizard adrift -x 'adrift/cli/*' -C 8 -L 30 -a 9
 npx jscpd --config static/rules/jscpd.json .
-.venv/bin/semgrep scan --config static/rules/semgrep --error
+ast-grep scan --config sgconfig.yml
 ```
 
 The optional Rust alignment extension is built with maturin (see the `rust-align:` tasks in `.vscode/tasks.json`):
@@ -47,7 +47,7 @@ All tooling behaviour is driven by committed config files -- editor-agnostic, pi
 line-length = 100
 
 [tool.ruff.lint]
-select = ["E", "F", "I"]
+select = ["E", "F", "I", "S101"]
 
 [tool.ty.src]
 include = ["adrift"]
@@ -62,7 +62,7 @@ addopts = "-m 'not slow'"
 
 Type checking is done by `ty` (strict: every rule is an error), configured under `[tool.ty.*]` in `pyproject.toml` and run via `ty check --project .`. mypy is also available as a dev dependency with its own `[tool.mypy]` config; custom type stubs live in `typings/`.
 
-Copy-paste detection (jscpd), dependency architecture (import-linter), scaffold/process rules (Semgrep), and AST patterns (ast-grep) are configured across `pyproject.toml`, `static/rules/`, and `sgconfig.yml`.
+Copy-paste detection (jscpd), dependency architecture (import-linter), scaffold shape checks (pytest, `tests/test_lint.py::TestScaffold`), and AST patterns (ast-grep) are configured across `pyproject.toml`, `static/rules/`, and `sgconfig.yml`.
 
 ### VS Code
 
@@ -90,10 +90,11 @@ Every rule is paired with its enforcement tier. Rules marked **review** have no 
 | Parameters per function <= 9 | Automated | Lizard (`-a 9`) |
 | Nesting depth <= 3 | Review | -- |
 | No type errors | Automated | ty (strict, `[tool.ty.rules] all = "error"`) |
-| No lint violations | Automated | Ruff (`E`, `F`, `I`) |
+| No lint violations | Automated | Ruff (`E`, `F`, `I`, `S101`) |
+| No bare `assert` outside tests | Automated | Ruff (`S101`; `tests/**` exempt) |
 | No copy-paste duplication | Automated | jscpd (`static/rules/jscpd.json`, `static/rules/jscpd.tests.json`) |
 | No layering violations | Automated | import-linter (shell + layer + independence contracts in `pyproject.toml`) |
-| Scaffold / process rules | Automated | Semgrep (`static/rules/semgrep`) |
+| Scaffold / process rules | Automated | pytest shape checks (`tests/test_lint.py::TestScaffold`) + ast-grep (`static/rules/ast-grep`) |
 | Dead code confidence floor (80%+) | Automated | Vulture |
 | No mutable globals | Review | -- |
 | No silent exception swallowing | Review | Not currently selected in Ruff rules |
