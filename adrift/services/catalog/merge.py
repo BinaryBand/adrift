@@ -257,6 +257,15 @@ def _resolved_scored_alignment_port(
     return get_scored_alignment_adapter()
 
 
+def ensure_rust_alignment_backend() -> bool:
+    """Guard called by CLI runners before the alignment stage: make sure the
+    Rust extension is compiled if possible, falling back to Python otherwise.
+    """
+    from adrift.adapters.process.alignment import ensure_rust_alignment_backend as _ensure
+
+    return _ensure()
+
+
 def _run_alignment_ab_candidate(
     options: MergeConfigOptions,
     references: list[RssEpisode],

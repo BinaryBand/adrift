@@ -8,7 +8,7 @@ name = "adrift_rust_alignment"
 crate-type = ["cdylib"]
 
 [dependencies]
-pyo3 = { version = "0.22.6", features = ["extension-module"] }
+pyo3 = { version = "0.29.0", features = ["extension-module"] }
 rapidfuzz = "0.5"
 rayon = "1.12"
 regex = "1"

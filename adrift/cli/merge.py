@@ -162,6 +162,10 @@ def _run(
             with nullcontext():
                 yield
 
+    from adrift.services.catalog import ensure_rust_alignment_backend
+
+    ensure_rust_alignment_backend()
+
     if timings:
         enable_profiling()
     try:

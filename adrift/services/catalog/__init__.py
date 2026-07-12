@@ -14,7 +14,12 @@ from .collection import (
     process_feeds,
     process_sources,
 )
-from .merge import MergeConfigOptionOverrides, MergeConfigOptions, merge_config
+from .merge import (
+    MergeConfigOptionOverrides,
+    MergeConfigOptions,
+    ensure_rust_alignment_backend,
+    merge_config,
+)
 
 __all__ = [
     "EpisodeFetchContext",
@@ -22,6 +27,7 @@ __all__ = [
     "MergeConfigOptionOverrides",
     "align_episodes",
     "align_episodes_impl",
+    "ensure_rust_alignment_backend",
     "match",
     "merge_config",
     "merge_episode",

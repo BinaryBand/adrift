@@ -130,6 +130,10 @@ def _run(
         bool, typer.Option(help="Bypass fresh source caches and refetch source data.")
     ] = False,
 ) -> None:
+    from adrift.services.catalog import ensure_rust_alignment_backend
+
+    ensure_rust_alignment_backend()
+
     configs, _ = bootstrap_run_configs(include, tags, skip_schedule_filter)
     ctx = AppContext.from_env()
     pipeline_options = _build_pipeline_options(

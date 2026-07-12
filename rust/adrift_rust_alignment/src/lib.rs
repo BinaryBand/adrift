@@ -384,7 +384,7 @@ fn align_batch(py: Python<'_>, batch: &Bound<'_, PyAny>) -> PyResult<(Py<PyList>
     let n_dls = downloads.len();
 
     // Release the GIL while computing the N×M score matrix in parallel.
-    let scored: Vec<((usize, usize), f64)> = py.allow_threads(|| {
+    let scored: Vec<((usize, usize), f64)> = py.detach(|| {
         (0..n_refs * n_dls)
             .into_par_iter()
             .map(|idx| {
@@ -395,16 +395,16 @@ fn align_batch(py: Python<'_>, batch: &Bound<'_, PyAny>) -> PyResult<(Py<PyList>
             .collect()
     });
 
-    let scores = PyDict::new_bound(py);
+    let scores = PyDict::new(py);
     for ((r_idx, d_idx), score) in &scored {
-        let key = PyTuple::new_bound(py, [r_idx.into_py(py), d_idx.into_py(py)]);
+        let key = PyTuple::new(py, [*r_idx, *d_idx])?;
         scores.set_item(key, *score)?;
     }
 
     let selected = select_pairs(scored, cfg.match_tolerance);
-    let pairs = PyList::empty_bound(py);
+    let pairs = PyList::empty(py);
     for (r_idx, d_idx) in selected {
-        pairs.append(PyTuple::new_bound(py, [r_idx.into_py(py), d_idx.into_py(py)]))?;
+        pairs.append(PyTuple::new(py, [r_idx, d_idx])?)?;
     }
 
     Ok((pairs.unbind(), scores.unbind()))
