@@ -10,7 +10,7 @@ from adrift.models.storage_options import UploadOptions
 
 @pytest.fixture(autouse=True)
 def _rss_base_url(monkeypatch: pytest.MonkeyPatch) -> None:
-    monkeypatch.setattr("adrift.services.config.RSS_BASE_URL", "https://cdn.example.com/")
+    monkeypatch.setenv("RSS_BASE_URL", "https://cdn.example.com/")
 
 
 def _storage(tmp_path: Path) -> LocalFilesystemStorage:
@@ -152,7 +152,7 @@ def test_get_public_urls_raises_when_rss_base_url_unset(
     src.write_bytes(b"data")
     storage.upload_file(("media", "podcasts/show/ep1.opus"), src)
 
-    monkeypatch.setattr("adrift.services.config.RSS_BASE_URL", "")
+    monkeypatch.delenv("RSS_BASE_URL", raising=False)
     with pytest.raises(RuntimeError):
         storage.get_public_urls("media", "podcasts/show")
 

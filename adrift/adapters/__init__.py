@@ -108,9 +108,10 @@ def get_secret_provider_adapter(
 
 def _make_local_storage() -> StoragePort:
     from adrift.adapters.process.storage.local_storage import LocalFilesystemStorage
-    from adrift.services.config import STORAGE_ROOT
 
-    return LocalFilesystemStorage(Path(STORAGE_ROOT))
+    # STORAGE_ROOT: root for storage writes (<root>/<bucket>/<key>); in
+    # production an rclone mount point synced and served outside this app.
+    return LocalFilesystemStorage(Path(os.getenv("STORAGE_ROOT", "./storage")))
 
 
 _STORAGE_REGISTRY: dict[str, Callable[[], StoragePort]] = {

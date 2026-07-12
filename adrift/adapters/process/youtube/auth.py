@@ -9,13 +9,13 @@ from adrift.utils.terminal import emit_info, emit_warning
 
 
 class _QuietYtDlpLogger:
-    def debug(self, msg: str) -> None:
+    def debug(self, _msg: str) -> None:
         return
 
-    def warning(self, msg: str) -> None:
+    def warning(self, _msg: str) -> None:
         return
 
-    def error(self, msg: str) -> None:
+    def error(self, _msg: str) -> None:
         return
 
 

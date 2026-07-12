@@ -106,11 +106,13 @@ class LocalFilesystemStorage:
         return self._object_path(bucket, f"{key}{_METADATA_SUFFIX}")
 
     def _build_url(self, key: str) -> str:
-        from adrift.services.config import RSS_BASE_URL
+        # RSS_BASE_URL: base URL for RSS enclosure links; required wherever
+        # feeds are generated -- there is no fallback endpoint.
+        rss_base_url = os.getenv("RSS_BASE_URL", "")
 
-        if not RSS_BASE_URL:
+        if not rss_base_url:
             raise RuntimeError("RSS_BASE_URL must be set to build public storage URLs")
-        return urljoin(RSS_BASE_URL, key)
+        return urljoin(rss_base_url, key)
 
 
 def _reject_traversal(*parts: str) -> None:
