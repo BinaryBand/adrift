@@ -55,6 +55,7 @@ setuptools = ">=75.0,<81"
 pyinstrument = "^5.1.2"
 maturin = "^1.8.0"
 hypothesis = "^6.153.0"
+import-linter = ">=2.0"
 
 [tool.pytest.ini_options]
 addopts = "-m 'not slow'"
@@ -97,6 +98,47 @@ output-format = "full"
 [tool.ty.rules]
 # Enforce strict typing by default.
 all = "error"
+
+[tool.importlinter]
+root_package = "adrift"
+
+# Dependency graph:
+#   User → CLI → Services → Models
+#                         → Adapters → Utils → (external)
+#          CLI → Utils
+#
+# Contract 1: CLI shell — CLI may only import from services and utils.
+# Contract 2: Layered architecture — services > models > adapters > utils.
+# Contracts 3-4: Models is a pure data layer with zero internal imports;
+#   the layer contract allows models→{adapters,utils} since they sit below,
+#   so independence contracts tighten that.
+
+[[tool.importlinter.contracts]]
+name = "cli-imports"
+type = "shell"
+shell = "adrift.cli"
+containers = ["adrift.services", "adrift.utils"]
+
+[[tool.importlinter.contracts]]
+name = "dependency-layering"
+type = "layer"
+layers = [
+    "adrift.cli",
+    "adrift.services",
+    "adrift.models",
+    "adrift.adapters",
+    "adrift.utils",
+]
+
+[[tool.importlinter.contracts]]
+name = "models-independence"
+type = "independence"
+modules = ["adrift.models", "adrift.adapters"]
+
+[[tool.importlinter.contracts]]
+name = "models-utils-independence"
+type = "independence"
+modules = ["adrift.models", "adrift.utils"]
 
 [tool.maturin]
 bindings = "pyo3"

@@ -1,0 +1,8 @@
+id: no-eval-exec
+language: python
+severity: error
+message: "Avoid using eval/exec; prefer safer alternatives."
+rule:
+  any:
+    - pattern: eval(...)
+    - pattern: exec(...)

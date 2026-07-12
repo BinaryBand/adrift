@@ -60,7 +60,7 @@ class TestCpd:
 
     @pytest.mark.parametrize(
         "config,path",
-        [("rules/jscpd.json", "."), ("rules/jscpd.tests.json", "tests")],
+        [("static/rules/jscpd.json", "."), ("static/rules/jscpd.tests.json", "tests")],
     )
     def test_cpd(self, config, path):
         """Fail if jscpd reports any copy-paste duplication."""
@@ -157,6 +157,19 @@ def _semgrep_runnable() -> bool:
     return probe.returncode == 0
 
 
+class TestImportLinter:
+    """Ensure the codebase passes import-linter dependency contracts."""
+
+    def test_import_linter(self):
+        """Fail if any import-linter contract is violated."""
+        result = run_resolved(
+            ["lint-imports", "--config", str(ROOT / "pyproject.toml")],
+            capture_output=True,
+            text=True,
+        )
+        assert result.returncode == 0, result.stdout + result.stderr
+
+
 class TestSemgrep:
     """Ensure the codebase passes the current Semgrep architecture gate."""
 
@@ -167,7 +180,7 @@ class TestSemgrep:
     def test_semgrep(self):
         """Fail if Semgrep reports any architecture or process violations."""
         result = run_resolved(
-            ["semgrep", "scan", "--config", "rules/semgrep", "--error"],
+            ["semgrep", "scan", "--config", "static/rules/semgrep", "--error"],
             capture_output=True,
             text=True,
         )

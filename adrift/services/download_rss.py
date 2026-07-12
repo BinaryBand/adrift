@@ -6,8 +6,11 @@ import logging
 from pathlib import Path
 from typing import TYPE_CHECKING
 
+import requests
+
 from adrift.models import PodcastConfig, RssChannel, RssEpisode
 from adrift.services.catalog import match, process_feeds
+from adrift.services.config import RCLONE_RC_PASSWORD, RCLONE_RC_URL, RCLONE_RC_USER
 from adrift.services.download_client import storage_prefix
 from adrift.services.files.audio import is_audio
 from adrift.services.web.rss import podcast_to_rss
@@ -18,6 +21,7 @@ if TYPE_CHECKING:
 
 logger = logging.getLogger(__name__)
 _CHANNEL_FILL_ERRORS = (OSError, RuntimeError, TypeError, ValueError)
+_RC_FORGET_ERRORS = (requests.RequestException,)
 
 
 def _build_channel(config: PodcastConfig) -> RssChannel:
@@ -80,6 +84,26 @@ def _match_to_storage(
     return _apply_pairs(files, episodes, pairs)
 
 
+def _forget_rss_cache(prefix: str) -> None:
+    """Invalidate the rclone-serve VFS cache entry for this feed, if configured.
+
+    STORAGE_ROOT is written through this app's own rclone mount, not through
+    the rclone serve http process fronting RSS_BASE_URL -- that process keeps
+    its own VFS cache and never sees writes made outside it otherwise.
+    """
+    if not RCLONE_RC_URL:
+        return
+    try:
+        requests.post(
+            f"{RCLONE_RC_URL}/vfs/forget",
+            data={"file": f"{prefix}/feed.rss"},
+            auth=(RCLONE_RC_USER, RCLONE_RC_PASSWORD),
+            timeout=10,
+        )
+    except _RC_FORGET_ERRORS as exc:
+        logger.warning("Unable to invalidate rclone RC cache for %s: %s", prefix, exc)
+
+
 def _upload_rss(bucket: str, prefix: str, rss_xml: str, ctx: AppContext) -> None:
     import tempfile as _tempfile
 
@@ -88,6 +112,7 @@ def _upload_rss(bucket: str, prefix: str, rss_xml: str, ctx: AppContext) -> None
         tmp_path = Path(f.name)
     try:
         ctx.storage.upload_file((bucket, f"{prefix}/feed.rss"), tmp_path)
+        _forget_rss_cache(prefix)
     finally:
         tmp_path.unlink(missing_ok=True)
 
