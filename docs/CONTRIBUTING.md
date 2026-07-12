@@ -15,8 +15,8 @@ poetry install --with dev
 There is no `.pre-commit-config.yaml`; quality gates run through pytest (`tests/test_lint.py`) or directly:
 
 ```bash
-.venv/bin/ruff check adrift tests typings
-.venv/bin/ruff format --check adrift tests typings
+.venv/bin/ruff check adrift tests
+.venv/bin/ruff format --check adrift tests
 .venv/bin/ty check --project .
 .venv/bin/python -m vulture adrift tests --min-confidence 80
 .venv/bin/python -m lizard adrift -x 'adrift/cli/*' -C 8 -L 30 -a 9
@@ -60,7 +60,7 @@ all = "error"
 addopts = "-m 'not slow'"
 ```
 
-Type checking is done by `ty` (strict: every rule is an error), configured under `[tool.ty.*]` in `pyproject.toml` and run via `ty check --project .`. mypy is also available as a dev dependency with its own `[tool.mypy]` config; custom type stubs live in `typings/`.
+Type checking is done by `ty` (strict: every rule is an error), configured under `[tool.ty.*]` in `pyproject.toml` and run via `ty check --project .`.
 
 Copy-paste detection (jscpd), dependency architecture (import-linter), scaffold shape checks (pytest, `tests/test_lint.py::TestScaffold`), and AST patterns (ast-grep) are configured across `pyproject.toml`, `static/rules/`, and `sgconfig.yml`.
 

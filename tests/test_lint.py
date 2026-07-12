@@ -75,13 +75,13 @@ class TestCpd:
 class TestRuff:
     """Ensure the codebase passes ruff linting and formatting checks."""
 
-    PATHS = ["adrift", "tests", "typings"]
+    PATHS = ["adrift", "tests"]
 
     def test_ruff_check(self):
         """Fail if ruff reports any lint violations."""
         _ensure_ruff_preflight(self.PATHS)
         result = run_resolved(
-            ["python", "-m", "ruff", "check", "adrift", "tests", "typings"],
+            ["python", "-m", "ruff", "check", "adrift", "tests"],
             capture_output=True,
             text=True,
         )

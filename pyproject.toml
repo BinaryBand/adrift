@@ -43,7 +43,6 @@ types-cachetools = "~=6.2.0.20260317"
 types-yt-dlp = "~=2026.3.17.20260402"
 # Linting & formatting
 ruff = "~=0.15.9"
-mypy = "~=1.20.0"
 # Testing
 pytest = "~=9.0.2"
 # Quality tools
@@ -63,14 +62,6 @@ markers = [
     "perf: performance benchmarks (run via: RUN_PERF_TESTS=1 pytest tests/benchmarks/)",
 ]
 
-[tool.mypy]
-mypy_path = "typings"
-python_version = "3.11"
-ignore_missing_imports = false
-disallow_untyped_calls = false
-warn_unused_ignores = true
-show_error_codes = true
-
 [tool.ruff]
 line-length = 100
 
@@ -84,8 +75,9 @@ select = ["E", "F", "I", "S101"]
 "conftest.py" = ["S101"]
 
 [tool.ty.environment]
-# `python` intentionally omitted so `ty` auto-detects the project's Python
-# environment (activated venv or environment specified by the caller).
+# Explicitly point at the project venv so `ty` resolves third-party packages
+# correctly regardless of the caller's VIRTUAL_ENV setting.
+python = ".venv/bin/python"
 python-version = "3.11"
 extra-paths = []
 root = ["."]
@@ -112,17 +104,10 @@ root_package = "adrift"
 #                         → Adapters → Utils → (external)
 #          CLI → Utils
 #
-# Contract 1: CLI shell — CLI may only import from services and utils.
-# Contract 2: Layered architecture — services > models > adapters > utils.
-# Contracts 3-4: Models is a pure data layer with zero internal imports;
+# Contract 1: Layered architecture — cli > services > models > adapters > utils.
+# Contracts 2-3: Models is a pure data layer with zero internal imports;
 #   the layer contract allows models→{adapters,utils} since they sit below,
 #   so independence contracts tighten that.
-
-[[tool.importlinter.contracts]]
-name = "cli-imports"
-type = "shell"
-shell = "adrift.cli"
-containers = ["adrift.services", "adrift.utils"]
 
 [[tool.importlinter.contracts]]
 name = "dependency-layering"

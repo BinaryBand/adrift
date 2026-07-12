@@ -166,8 +166,8 @@ Outputs both per-podcast stage timings and a full profiling report showing which
 poetry run pytest
 
 # Lint, format, and all other quality gates (also runnable via pytest tests/test_lint.py)
-poetry run ruff check adrift tests typings
-poetry run ruff format --check adrift tests typings
+poetry run ruff check adrift tests
+poetry run ruff format --check adrift tests
 poetry run ty check --project .
 poetry run python -m vulture adrift tests --min-confidence 80
 poetry run python -m lizard adrift -x 'adrift/cli/*' -C 8 -L 30 -a 9
