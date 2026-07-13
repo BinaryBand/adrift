@@ -43,6 +43,7 @@ types-cachetools = "~=6.2.0.20260317"
 types-yt-dlp = "~=2026.3.17.20260402"
 # Linting & formatting
 ruff = "~=0.15.9"
+ast-grep-cli = "~=0.44.1"
 # Testing
 pytest = "~=9.0.2"
 # Quality tools
