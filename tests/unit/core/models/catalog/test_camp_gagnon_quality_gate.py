@@ -67,35 +67,49 @@ def _pair_from_row(row: dict[str, str]) -> tuple[str, str, str, str, str]:
     )
 
 
+def _load_csv_pairs(
+    path: Path,
+    *,
+    classification_filter: str | None = None,
+    keep_value: str = "true",
+) -> list[tuple[str, str, str, str, str]]:
+    """Return pairs from *path*, optionally filtering on the classification column.
+
+    When *classification_filter* is given only rows whose
+    ``classification`` column matches *keep_value* (after stripping and
+    lowering) are included.
+    """
+    pairs: list[tuple[str, str, str, str, str]] = []
+    with path.open(newline="", encoding="utf-8") as fh:
+        reader = csv.DictReader(fh)
+        for row in reader:
+            if classification_filter is not None:
+                value = row.get("classification", "").strip().lower()
+                if (value == classification_filter) != (keep_value == "true"):
+                    continue
+            pairs.append(_pair_from_row(row))
+    return pairs
+
+
 def _load_confirmed_positive_pairs() -> list[tuple[str, str, str, str, str]]:
     """Return (source, ref_title, dl_title, ref_desc, dl_desc) for known positives."""
-    pairs: list[tuple[str, str, str, str, str]] = []
-
-    with SOURCE_TO_REF_CSV.open(newline="", encoding="utf-8") as fh:
-        reader = csv.DictReader(fh)
-        pairs.extend(_pair_from_row(row) for row in reader)
-
-    with FOR_REVIEW_CSV.open(newline="", encoding="utf-8") as fh:
-        reader = csv.DictReader(fh)
-        pairs.extend(
-            _pair_from_row(row)
-            for row in reader
-            if row.get("classification", "").strip().lower() != "false_positive"
+    pairs = _load_csv_pairs(SOURCE_TO_REF_CSV)
+    pairs.extend(
+        _load_csv_pairs(
+            FOR_REVIEW_CSV,
+            classification_filter="false_positive",
+            keep_value="false",
         )
+    )
     return pairs
 
 
 def _load_false_positive_pairs() -> list[tuple[str, str, str, str, str]]:
     """Return (source, ref_title, dl_title, ref_desc, dl_desc) for false positives."""
-    pairs: list[tuple[str, str, str, str, str]] = []
-    with FOR_REVIEW_CSV.open(newline="", encoding="utf-8") as fh:
-        reader = csv.DictReader(fh)
-        pairs.extend(
-            _pair_from_row(row)
-            for row in reader
-            if row.get("classification", "").strip().lower() == "false_positive"
-        )
-    return pairs
+    return _load_csv_pairs(
+        FOR_REVIEW_CSV,
+        classification_filter="false_positive",
+    )
 
 
 class TestCampGagnonQualityGate(unittest.TestCase):

@@ -19,6 +19,15 @@ logger = logging.getLogger(__name__)
 
 _EXTENSION_MODULE = "adrift_rust_alignment"
 _MANIFEST_PATH = "rust/adrift_rust_alignment/Cargo.toml"
+_MATURIN_CMD = [
+    sys.executable,
+    "-m",
+    "maturin",
+    "develop",
+    "--release",
+    "--manifest-path",
+    _MANIFEST_PATH,
+]
 
 _compile_result: bool | None = None
 
@@ -43,15 +52,7 @@ def _run_maturin_compile() -> bool:
     """Invoke maturin to build the extension; log and return the outcome."""
     try:
         result = subprocess.run(  # noqa: S603
-            [
-                sys.executable,
-                "-m",
-                "maturin",
-                "develop",
-                "--release",
-                "--manifest-path",
-                _MANIFEST_PATH,
-            ],
+            _MATURIN_CMD,
             capture_output=True,
             text=True,
             timeout=300,
