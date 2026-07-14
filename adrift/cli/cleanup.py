@@ -153,7 +153,7 @@ def _process_duplicate_audio_files(config: Any, storage: Any, dry_run: bool) -> 
 
 
 def _run_cleanup(  # noqa: PLR0913
-    configs: list[Any],  # noqa: ANN401
+    configs: list[Any],
     ctx: AppContext,
     dry_run: bool,
     refresh_sources: bool,

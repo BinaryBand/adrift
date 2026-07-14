@@ -1,3 +1,4 @@
+"""Episode alignment: fuzzy matching of references to downloads."""
 # cspell: ignore cdist
 import hashlib
 import pathlib
@@ -86,6 +87,15 @@ _TEMPORAL_METADATA_TOKENS = frozenset(
 )
 
 
+# --- Named constants for magic values used in alignment heuristics ---
+_MIN_ANCHOR_TOKENS = 2  # minimum token count for a meaningful containment check
+_MIN_DIGIT_TOKEN_LEN = 2  # minimum length for a discriminating digit token
+_MIN_ALPHA_TOKEN_LEN = 4  # minimum length for a discriminating alpha token
+_WEAK_ANCHOR_TITLE_SIM_MAX = 0.75  # title similarity below which weak anchor matches are rejected
+_MIN_PUB_DATES = 2  # minimum number of pub dates to perform a comparison
+_HTTP_OK = 200
+
+
 def _similarity_clean(ac: str, bc: str) -> float:
     """Similarity when inputs are already cleaned (lowercased, slugged)."""
     r = fuzz.ratio(ac, bc) / 100.0
@@ -95,7 +105,7 @@ def _similarity_clean(ac: str, bc: str) -> float:
 
 
 def _cdist_similarity(a: list[str], b: list[str]) -> list[list[float]]:
-    from rapidfuzz import process as rapidfuzz_process
+    from rapidfuzz import process as rapidfuzz_process  # noqa: PLC0415
 
     cdist = cast("Any", rapidfuzz_process).cdist
 
@@ -111,6 +121,7 @@ def match(
     title: str,
     callback: Callback | None = None,
 ) -> list[tuple[int, int]]:
+    """Match file names to episode titles using fuzzy similarity."""
     files_clean, episodes_clean = _prepare_match_inputs(files, episodes, title)
     return _score_match_pairs(files_clean, episodes_clean, callback)
 
@@ -287,8 +298,8 @@ class AnchorTokens:
         if not self.ref or not self.dl:
             return False
         if len(self.ref) <= len(self.dl):
-            return len(self.ref) >= 2 and self.ref.issubset(self.dl)
-        return len(self.dl) >= 2 and self.dl.issubset(self.ref)
+            return len(self.ref) >= _MIN_ANCHOR_TOKENS and self.ref.issubset(self.dl)
+        return len(self.dl) >= _MIN_ANCHOR_TOKENS and self.dl.issubset(self.ref)
 
     @property
     def subset_extra_tokens(self) -> frozenset[str] | None:
@@ -311,8 +322,8 @@ def _contains_discriminating_subset_extra_token(tokens: frozenset[str]) -> bool:
 def _contains_discriminating_overlap_token(tokens: frozenset[str]) -> bool:
     return any(
         (
-            (any(ch.isdigit() for ch in token) and len(token) >= 2)
-            or (any(ch.isalpha() for ch in token) and len(token) >= 4)
+            (any(ch.isdigit() for ch in token) and len(token) >= _MIN_DIGIT_TOKEN_LEN)
+            or (any(ch.isalpha() for ch in token) and len(token) >= _MIN_ALPHA_TOKEN_LEN)
         )
         and token not in _TEMPORAL_METADATA_TOKENS
         for token in tokens
@@ -327,7 +338,7 @@ def _should_reject_weak_anchor_match(
 ) -> bool:
     anchor_tokens = AnchorTokens.from_titles(ref.title, dl.title, runtime.stopwords)
     is_weak_overlap = anchor_tokens.overlap == 0
-    is_low_title_similarity = sims.title < 0.75
+    is_low_title_similarity = sims.title < _WEAK_ANCHOR_TITLE_SIM_MAX
     return is_weak_overlap and is_low_title_similarity
 
 
@@ -408,7 +419,9 @@ class _ScoreContext:
     include_date: bool
 
 
-def _is_sparse_title(s_id: float, has_desc: bool, s_title: float, sparse_title_min: float) -> bool:
+def _is_sparse_title(
+    s_id: float, *, has_desc: bool, s_title: float, sparse_title_min: float
+) -> bool:
     return not s_id and not has_desc and s_title < sparse_title_min
 
 
@@ -416,6 +429,7 @@ def _score(
     ref: "_AlignmentCandidate",
     dl: "_AlignmentCandidate",
     sims: "_Sims",
+    *,
     include_date: bool | None = None,
 ) -> float:
     runtime = _AlignmentRuntime(
@@ -817,14 +831,15 @@ def _thumbnail_url_exists(url: str) -> bool:
     so offline runs (and tests) keep the original URL rather than degrading it.
     """
     try:
-        return requests.head(url, timeout=5, allow_redirects=True).status_code == 200
+        return requests.head(url, timeout=5, allow_redirects=True).status_code == _HTTP_OK
     except requests.RequestException:
         return True
 
 
 def _downgrade_maxres(url: str) -> str | None:
-    """Rewrite a YouTube ``maxresdefault`` thumbnail to the always-available
-    ``hqdefault`` variant. Returns ``None`` when ``url`` is not a maxres URL.
+    """Rewrite a YouTube ``maxresdefault`` thumbnail to the always-available ``hqdefault`` variant.
+
+    Returns ``None`` when ``url`` is not a maxres URL.
     """
     downgraded, replaced = _YOUTUBE_MAXRES_RE.subn(r"\1hqdefault\2", url)
     return downgraded if replaced else None
@@ -865,7 +880,7 @@ def _choose_title(ref: RssEpisode, dl: RssEpisode) -> str:
 
 def _earliest_pub_date(ref: RssEpisode, dl: RssEpisode) -> datetime | None:
     dates = [d for d in (ref.pub_date, dl.pub_date) if d is not None]
-    if len(dates) < 2:
+    if len(dates) < _MIN_PUB_DATES:
         return dates[0] if dates else None
     a, b = _align_datetime_pair(dates[0], dates[1])
     return min(a, b)

@@ -1,3 +1,4 @@
+"""Merge CLI: align podcast references with downloads and produce output bundles."""
 from __future__ import annotations
 
 import json
@@ -19,6 +20,9 @@ from adrift.core.services.merge import MergeUseCase
 from adrift.core.util.profiler import disable_profiling, enable_profiling, print_profile_report
 
 if TYPE_CHECKING:
+    from collections.abc import Iterator
+
+    from adrift.core.models.pipeline import MergeResult
     from adrift.core.services.app_common import PodcastConfig
 from adrift.core.services.merge_service import MergeRunOptions, MergeWriters
 from adrift.core.services.merge_service import format_duration as _format_duration
@@ -28,11 +32,11 @@ from adrift.core.services.merge_service import write_report_file as service_writ
 from adrift.core.services.merge_service import write_series_outputs as service_write_series_outputs
 
 
-def _write_json(path, payload: object) -> None:
+def _write_json(path: str | Path, payload: object) -> None:
     service_write_json(path, payload)
 
 
-def _write_series_outputs(output_root, result) -> dict[str, object]:
+def _write_series_outputs(output_root: str, result: MergeResult) -> dict[str, object]:
     return service_write_series_outputs(output_root, result, write_json_func=_write_json)
 
 
@@ -53,8 +57,8 @@ def _write_report_file(output_file: str, reports: list[dict[str, object]]) -> No
     service_write_report_file(output_file, reports, write_json_func=_write_json)
 
 
-def _run_merge(configs: list[PodcastConfig], options: MergeRunOptions):
-    from adrift.core.util.run_ui import create_run_ui
+def _run_merge(configs: list[PodcastConfig], options: MergeRunOptions) -> MergeResult:
+    from adrift.core.util.run_ui import create_run_ui  # noqa: PLC0415
 
     writers = MergeWriters(
         write_json=_write_json,
@@ -66,7 +70,9 @@ def _run_merge(configs: list[PodcastConfig], options: MergeRunOptions):
         return MergeUseCase(writers=writers).run(configs, options, ui)
 
 
-def _build_stdout_output(merge_result, include_counts: bool) -> list[dict[str, object]]:
+def _build_stdout_output(
+    merge_result: MergeResult, include_counts: bool
+) -> list[dict[str, object]]:
     return [
         {
             "name": merged.config.name,
@@ -88,7 +94,7 @@ def _build_stdout_output(merge_result, include_counts: bool) -> list[dict[str, o
     ]
 
 
-def _write_unmatched_references(merge_result, output_dir: str) -> None:
+def _write_unmatched_references(merge_result: MergeResult, output_dir: str) -> None:
     try:
         unmatched_per_series: list[dict[str, object]] = []
         for merged in merge_result.value:
@@ -109,11 +115,11 @@ def _write_unmatched_references(merge_result, output_dir: str) -> None:
         if unmatched_per_series:
             outpath = Path(output_dir) / "unmatched_references.json"
             _write_json(outpath, unmatched_per_series)
-    except Exception as e:
+    except (OSError, ValueError) as e:
         sys.stderr.write(f"WARNING: _write_unmatched_references failed: {e}\n")
 
 
-def _run(
+def _run(  # noqa: PLR0913
     include: IncludeConfigsOption = None,
     skip_schedule_filter: SkipScheduleFilterOption = False,
     tags: TagsOption = None,
@@ -146,24 +152,27 @@ def _run(
         typer.Option(help="Write a pyinstrument HTML call-tree profile to this file."),
     ] = None,
 ) -> None:
-    from contextlib import contextmanager, nullcontext
+    from contextlib import contextmanager, nullcontext  # noqa: PLC0415
 
     @contextmanager
-    def _maybe_profile():
+    def _maybe_profile() -> Iterator[None]:
         if profile:
-            from pyinstrument import Profiler
+            from pyinstrument import Profiler  # noqa: PLC0415
 
             with Profiler() as p:
                 yield
-            with open(profile, "w") as f:
+            with Path(profile).open("w") as f:
                 f.write(p.output_html())
             sys.stderr.write(f"Profile written to {profile}\n")
         else:
             with nullcontext():
                 yield
 
-    from adrift.adapters import get_alignment_backend_provider, get_episode_source_factory
-    from adrift.adapters.process.alignment import ensure_rust_alignment_backend
+    from adrift.adapters import (  # noqa: PLC0415
+        get_alignment_backend_provider,
+        get_episode_source_factory,
+    )
+    from adrift.adapters.process.alignment import ensure_rust_alignment_backend  # noqa: PLC0415
 
     ensure_rust_alignment_backend()
 
