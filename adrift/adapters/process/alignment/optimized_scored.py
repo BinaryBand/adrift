@@ -1,3 +1,5 @@
+"""Optimized scored alignment adapter for lightweight A/B testing."""
+
 from __future__ import annotations
 
 from typing import cast
@@ -25,6 +27,7 @@ class OptimizedScoredAlignmentAdapter:
         *args: object,
         **kwargs: object,
     ) -> AlignmentResult:
+        """Align references and downloads, returning pairs with scores."""
         references = cast("list[RssEpisode]", args[0])
         downloads = cast("list[RssEpisode]", args[1])
         show = str(kwargs.get("show", ""))
@@ -53,7 +56,7 @@ def _normalized_descriptions(episodes: list[RssEpisode]) -> list[str]:
     return [normalize_text(episode.description or "") for episode in episodes]
 
 
-def _score_pairs(
+def _score_pairs(  # noqa: PLR0913
     references: list[RssEpisode],
     downloads: list[RssEpisode],
     ref_titles: list[str],

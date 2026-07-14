@@ -140,11 +140,12 @@ def _parse_entry_pub_date(entry: FeedParserDict) -> datetime | None:
         if not isinstance(pub_date_str, str):
             return None
         pub_date = parser.parse(pub_date_str)
+    except (ValueError, TypeError, AttributeError):
+        return None
+    else:
         if pub_date.tzinfo is None:
             return pub_date.replace(tzinfo=UTC)
         return pub_date
-    except (ValueError, TypeError, AttributeError):
-        return None
 
 
 def _parse_entry_duration(entry: FeedParserDict) -> float | None:

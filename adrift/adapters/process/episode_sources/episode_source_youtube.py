@@ -1,3 +1,5 @@
+"""YouTube episode source adapter delegating to yt-dlp metadata."""
+
 from typing_extensions import override
 
 from adrift.core.models import FeedSource, RssChannel, RssEpisode
@@ -14,7 +16,10 @@ class YouTubeEpisodeSourceAdapter(EpisodeSourcePort):
         context: EpisodeSourceFetchContext | None = None,
     ) -> list[RssEpisode]:
         """Fetch episodes from a YouTube channel."""
-        from adrift.adapters.process.youtube.metadata import YtFetchOptions, get_youtube_episodes
+        from adrift.adapters.process.youtube.metadata import (  # noqa: PLC0415
+            YtFetchOptions,
+            get_youtube_episodes,
+        )
 
         resolved_context = context or EpisodeSourceFetchContext()
         url = source.url
@@ -24,7 +29,7 @@ class YouTubeEpisodeSourceAdapter(EpisodeSourcePort):
 
         filter_regex = source.filters.to_regex() if source.filters else None
         fetch_opts = YtFetchOptions(
-            filter=filter_regex,
+            filter_regex=filter_regex,
             detailed=True,  # YouTube always needs detailed metadata for pub_date/thumbnail
             callback=resolved_context.callback,
             refresh=resolved_context.refresh,
@@ -35,7 +40,7 @@ class YouTubeEpisodeSourceAdapter(EpisodeSourcePort):
     @override
     def fetch_channel(self, source: FeedSource) -> RssChannel:
         """Fetch channel metadata from a YouTube channel."""
-        from adrift.adapters.process.youtube.metadata import get_youtube_channel
+        from adrift.adapters.process.youtube.metadata import get_youtube_channel  # noqa: PLC0415
 
         url = source.url
         if not url:

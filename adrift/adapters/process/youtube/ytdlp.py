@@ -1,4 +1,5 @@
-"""cspell: words playliststart playlistend playlistreverse
+"""cspell: words playliststart playlistend playlistreverse.
+
 YouTube Data Layer (yt-dlp) integration with typed interfaces.
 
 This module provides a clean, typed interface for fetching YouTube data via yt-dlp.
@@ -91,7 +92,7 @@ class VideoInfo(BaseModel):
 
     @field_validator("upload_date", mode="before")
     @classmethod
-    def _normalize_upload_date(cls, value: Any) -> datetime | None:
+    def _normalize_upload_date(cls, value: float | str | None) -> datetime | None:
         try:
             return parser.parse(value)
         except (TypeError, ValueError, OverflowError):
@@ -113,7 +114,7 @@ def _ydl_opts_dict(opts: YtDlpParams | dict[str, Any]) -> dict[str, Any]:
     return opts.model_dump(exclude_none=True)
 
 
-def _fetch_channel_info_raw(url: str, fetch_videos: bool = False) -> dict[str, Any] | None:
+def _fetch_channel_info_raw(url: str, *, fetch_videos: bool = False) -> dict[str, Any] | None:
     """Fetch raw channel information from yt-dlp."""
     opts: YtDlpParams = get_ydl_opts()
     opts.extract_flat = True
@@ -176,6 +177,7 @@ def _video_info_attempt_failure_message(
     video_id: str,
     attempt_label: str,
     reason: str,
+    *,
     has_more_attempts: bool,
 ) -> str:
     if has_more_attempts:
@@ -195,18 +197,19 @@ def _fetch_video_info_attempt(
     try:
         info = _extract_info(_video_info_url(video_id), attempt.build_opts())
         emit_info(f"Completed video info probe {attempt_label} for {video_id}")
-        return info, None
-    except Exception as e:
+    except Exception as e:  # noqa: BLE001
         reason = _video_info_retry_reason(e)
         emit_info(
             _video_info_attempt_failure_message(
                 video_id,
                 attempt_label,
                 reason,
-                has_more_attempts,
+                has_more_attempts=has_more_attempts,
             )
         )
         return None, reason
+    else:
+        return info, None
 
 
 def _video_info_attempts() -> list[_VideoInfoAttempt]:
@@ -258,7 +261,7 @@ def _parse_and_cache_channel(
         return None
 
     # Cache for 25-35 days
-    expire_days = random.randint(25, 35)
+    expire_days = random.randint(25, 35)  # noqa: S311
     # raw_info is typed as `dict[str, Any]` in the signature; no runtime check needed
     _CACHE.set(cache_key, _trim_channel_cache_payload(raw_info), expire=expire_days * 24 * 3600)
     return model
@@ -333,6 +336,7 @@ def _fetch_channel_videos_raw(
     url: str,
     start: int = 1,
     end: int | None = None,
+    *,
     reverse: bool = False,
 ) -> list[dict[str, Any]]:
     """Fetch video entries from a channel/playlist."""
@@ -363,7 +367,7 @@ def _utcnow() -> datetime:
     return datetime.now(UTC)
 
 
-def _parse_cached_timestamp(value: Any) -> datetime | None:
+def _parse_cached_timestamp(value: float | str) -> datetime | None:
     if not isinstance(value, str):
         return None
     try:
@@ -409,7 +413,7 @@ def _recent_episode_check_is_fresh(checked_at: datetime | None) -> bool:
 def _should_use_episode_cache_base(
     episodes: dict[str, RssEpisode],
     fetched_at: datetime | None,
-    refresh: bool,
+    refresh: bool,  # noqa: FBT001
 ) -> bool:
     return bool(episodes) and not refresh and _episode_cache_is_fresh(fetched_at)
 
@@ -418,7 +422,7 @@ def _should_handle_recent_youtube_videos(
     episodes: dict[str, RssEpisode],
     fetched_at: datetime | None,
     head_checked_at: datetime | None,
-    refresh: bool,
+    refresh: bool,  # noqa: FBT001
     *,
     require_recent_check_fresh: bool,
 ) -> bool:
@@ -480,7 +484,7 @@ def _cache_youtube_videos(
     fetched_at: datetime | None = None,
     head_checked_at: datetime | None = None,
 ) -> None:
-    expire = random.randint(25, 35) * 24 * 3600
+    expire = random.randint(25, 35) * 24 * 3600  # noqa: S311
     effective_fetched_at = fetched_at or _utcnow()
     effective_head_checked_at = head_checked_at or effective_fetched_at
     _CACHE.set(
@@ -581,8 +585,9 @@ def get_youtube_videos(
     url: str,
     author: str,
     callback: Callback | None = None,
-    refresh: bool = False,
+    refresh: bool = False,  # noqa: FBT001, FBT002
 ) -> list[RssEpisode]:
+    """Fetch YouTube videos as RssEpisode list, using cache when possible."""
     cache_key = f"get_youtube_videos:{url}:{author}"
     state = _load_episode_bundle_state(cache_key)
 

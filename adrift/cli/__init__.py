@@ -32,6 +32,7 @@ def normalize_cli_inputs(
 
 
 def make_main(app: typer.Typer) -> Callable[[], None]:
+    """Build the main CLI entrypoint callback."""
     def _main() -> None:
         app(standalone_mode=False)
 
@@ -39,6 +40,7 @@ def make_main(app: typer.Typer) -> Callable[[], None]:
 
 
 def build_cli(run_handler: Callable[..., None]) -> tuple[typer.Typer, Callable[[], None]]:
+    """Build the Typer application and return it with the main callback."""
     app = typer.Typer(add_completion=False)
     app.callback(invoke_without_command=True)(run_handler)
     return app, make_main(app)

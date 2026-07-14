@@ -1,3 +1,5 @@
+"""Rust-scored alignment adapter with optional native extension."""
+
 from __future__ import annotations
 
 from collections.abc import Callable
@@ -18,12 +20,14 @@ class RustScoredAlignmentAdapter:
     """Batch-oriented scored aligner backed by an optional Rust extension."""
 
     def __init__(self) -> None:
+        """Initialize the adapter with no loaded extension function."""
         self._align_batch_fn: _AlignBatchFn | None = None
 
     def align_batch(
         self,
         batch: AlignmentBatch,
     ) -> AlignmentResult:
+        """Run alignment on a batch using the resolved backend function."""
         return self._resolved_align_batch_fn()(batch)
 
     def _resolved_align_batch_fn(self) -> _AlignBatchFn:
@@ -57,7 +61,7 @@ def _load_extension_module() -> ModuleType:
         return _load_prototype_module(exc)
 
 
-def _load_prototype_module(cause: ModuleNotFoundError) -> ModuleType:
+def _load_prototype_module(_cause: ModuleNotFoundError) -> ModuleType:
     try:
         return import_module(_PROTOTYPE_MODULE)
     except ModuleNotFoundError as exc:

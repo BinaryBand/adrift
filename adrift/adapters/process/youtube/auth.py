@@ -1,3 +1,5 @@
+"""YouTube authentication and yt-dlp options helpers."""
+
 import importlib
 import os
 import shutil
@@ -48,7 +50,7 @@ def get_ydl_opts() -> YtDlpParams:
 
 
 def get_auth_ydl_opts(
-    use_browser_fallback: bool = False, prefer_native: bool = True
+    *, use_browser_fallback: bool = False, prefer_native: bool = True
 ) -> YtDlpParams:
     """Get yt-dlp options with cookie authentication and optional browser fallback.
 
@@ -121,7 +123,7 @@ def _apply_repo_cookiefile(opts: YtDlpParams) -> bool:
     )
 
 
-def _apply_browser_fallback(opts: YtDlpParams, prefer_native: bool) -> None:
+def _apply_browser_fallback(opts: YtDlpParams, prefer_native: bool) -> None:  # noqa: FBT001
     if prefer_native:
         opts.cookiesfrombrowser = ("firefox",)
         emit_info("Using Firefox browser cookies via yt-dlp browser fallback")
@@ -158,7 +160,7 @@ def _try_export_firefox_cookies() -> Path | None:
     return None
 
 
-def _load_firefox_cookie_jar(browser_cookie3: Any) -> Any | None:
+def _load_firefox_cookie_jar(browser_cookie3: Any) -> Any | None:  # noqa: ANN401
     try:
         return browser_cookie3.firefox(domain_name=".youtube.com")
     except TypeError as e:
@@ -176,20 +178,21 @@ def _load_firefox_cookie_jar(browser_cookie3: Any) -> Any | None:
         return None
 
 
-def _write_cookie_jar(cookies_path: Path, cookie_jar: Any) -> bool:
+def _write_cookie_jar(cookies_path: Path, cookie_jar: Any) -> bool:  # noqa: ANN401
     try:
         fd = os.open(cookies_path, os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o600)
         with os.fdopen(fd, "w", encoding="utf-8") as fh:
             fh.write("# Netscape HTTP Cookie File\n")
             for cookie in cookie_jar:
                 fh.write(_format_cookie_line(cookie))
-        return True
     except _COOKIE_WRITE_ERRORS as e:
         emit_warning(f"Failed to write cookies file: {e}")
         return False
+    else:
+        return True
 
 
-def _format_cookie_line(cookie: Any) -> str:
+def _format_cookie_line(cookie: Any) -> str:  # noqa: ANN401
     domain = _sanitize(cookie.domain)
     flag = "TRUE" if domain.startswith(".") else "FALSE"
     path = _sanitize(cookie.path or "/")

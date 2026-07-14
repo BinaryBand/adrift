@@ -55,6 +55,7 @@ def help_command(
 
 
 def main() -> None:
+    """Run the top-level adrift CLI application."""
     app()
 
 

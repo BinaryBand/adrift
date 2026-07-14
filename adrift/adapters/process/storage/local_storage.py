@@ -32,6 +32,7 @@ class LocalFilesystemStorage:
     """Filesystem-backed implementation of StoragePort."""
 
     def __init__(self, root: Path) -> None:
+        """Initialize the storage adapter with the given root directory."""
         self.root = root
 
     def upload_file(
@@ -40,6 +41,7 @@ class LocalFilesystemStorage:
         file_path: Path,
         options: UploadOptions | S3Metadata | dict[str, Any] | None = None,
     ) -> str | None:
+        """Upload a local file to storage and return the public URL."""
         bucket, key = bucket_key
         if not file_path.exists():
             msg = f"Local file not found: {file_path}"
@@ -53,7 +55,8 @@ class LocalFilesystemStorage:
 
         return self._build_url(key)
 
-    def exists(self, bucket: str, prefix: str, extension_agnostic: bool = True) -> str | None:
+    def exists(self, bucket: str, prefix: str, *, extension_agnostic: bool = True) -> str | None:
+        """Check if a file exists under the given prefix and return its name."""
         prefix = prefix.lstrip(".").rstrip("/")
         path = Path(prefix)
         parent_dir = path.parent.as_posix()
@@ -67,8 +70,9 @@ class LocalFilesystemStorage:
         return None
 
     def get_file_list(
-        self, bucket: str, prefix: str, without_extensions: bool = False
+        self, bucket: str, prefix: str, *, without_extensions: bool = False
     ) -> list[str]:
+        """Return sorted list of file names under the given prefix."""
         prefix = prefix.lstrip(".").rstrip("/")
         directory = self._object_path(bucket, prefix) if prefix else self.root / bucket
         if not directory.is_dir():
@@ -84,10 +88,12 @@ class LocalFilesystemStorage:
         return sorted(names)
 
     def get_public_urls(self, bucket: str, prefix: str) -> list[str]:
+        """Return public URLs for all files under the given prefix."""
         file_list = self.get_file_list(bucket, prefix)
         return [self._build_url(f"{prefix}/{name}" if prefix else name) for name in file_list]
 
     def get_metadata(self, bucket: str, key: str) -> MediaMetadata | None:
+        """Return validated media metadata for the given object, or None."""
         try:
             raw = json.loads(self._sidecar_path(bucket, key).read_text())
         except (OSError, json.JSONDecodeError):
@@ -98,6 +104,7 @@ class LocalFilesystemStorage:
             return None
 
     def delete(self, bucket: str, key: str) -> None:
+        """Delete a file and its metadata sidecar from storage."""
         self._object_path(bucket, key).unlink(missing_ok=True)
         self._sidecar_path(bucket, key).unlink(missing_ok=True)
 
@@ -126,7 +133,7 @@ def _reject_traversal(*parts: str) -> None:
             raise ValueError(msg)
 
 
-def _identifier_matches(name: str, identifier: str, extension_agnostic: bool) -> bool:
+def _identifier_matches(name: str, identifier: str, extension_agnostic: bool) -> bool:  # noqa: FBT001
     if extension_agnostic:
         return Path(name).with_suffix("").as_posix() == identifier
     return name == identifier
@@ -144,7 +151,7 @@ def _atomic_copy(src: Path, dest: Path, callback: Callback | None) -> None:
                 transferred += len(chunk)
                 if callback is not None:
                     callback(transferred, total)
-        os.replace(tmp_name, dest)
+        Path(tmp_name).replace(dest)
     except BaseException:
         Path(tmp_name).unlink(missing_ok=True)
         raise
@@ -156,7 +163,7 @@ def _atomic_write_json(path: Path, data: dict[str, str]) -> None:
     try:
         with os.fdopen(fd, "w") as tmp_file:
             json.dump(data, tmp_file)
-        os.replace(tmp_name, path)
+        Path(tmp_name).replace(path)
     except BaseException:
         Path(tmp_name).unlink(missing_ok=True)
         raise
@@ -173,9 +180,10 @@ def _extract_upload_options(
         return options.metadata, options.callback
     try:
         opts = UploadOptions.model_validate(options)
-        return opts.metadata, opts.callback
     except _UPLOAD_OPTIONS_ERRORS:
         return None, None
+    else:
+        return opts.metadata, opts.callback
 
 
 __all__ = ["LocalFilesystemStorage"]

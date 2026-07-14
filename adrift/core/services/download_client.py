@@ -12,6 +12,7 @@ def storage_prefix(config: PodcastConfig) -> tuple[str, str]:
 
 
 def prefixed_key(prefix: str, name: str) -> str:
+    """Return the prefixed storage key."""
     return f"{prefix}/{name}" if prefix else name
 
 

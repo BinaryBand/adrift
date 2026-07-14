@@ -1,3 +1,5 @@
+"""YouTube error classification and retry reason extraction."""
+
 from __future__ import annotations
 
 from collections.abc import Callable
@@ -21,7 +23,7 @@ def _contains_private(error_text: str, error_lower: str) -> bool:
     return "private video" in error_lower or "This video is private" in error_text
 
 
-def _contains_members_only(error_text: str, error_lower: str) -> bool:
+def _contains_members_only(_error_text: str, error_lower: str) -> bool:
     return "members-only" in error_lower or "channel members" in error_lower
 
 
@@ -57,6 +59,7 @@ _REASON_RULES: tuple[tuple[ReasonMatcher, str], ...] = (
 
 
 def yt_dlp_retry_reason(error: Exception, unavailable_message: str) -> str:
+    """Classify a yt-dlp error and return a human-readable retry reason."""
     error_text = str(error)
     error_lower = error_text.lower()
     for matcher, reason in _REASON_RULES:

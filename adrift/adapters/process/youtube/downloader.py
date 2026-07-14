@@ -1,3 +1,5 @@
+"""YouTube video downloader with yt-dlp integration and bot detection."""
+
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Literal, cast
@@ -40,6 +42,7 @@ class SkippedDownloadError(Exception):
     """
 
     def __init__(self, reason: str) -> None:
+        """Initialize with a reason string."""
         self.reason = reason
         super().__init__(reason)
 
@@ -84,7 +87,7 @@ def _is_terminal_download_reason(error: Exception) -> bool:
 _PLAYER_CLIENTS_STUB_FALLBACK = ["tv_embedded", "web"]
 _AUDIO_FORMATS_FALLBACK = "bestaudio/best"
 
-# (authenticated, player_clients, format_selector)
+# Each entry is (authenticated, player_clients, format_selector).
 # Unauthenticated attempts first: stale/mismatched browser cookies can cause
 # YouTube to serve a restricted format list even for non-age-restricted videos.
 # "Sign in" errors from unauthenticated attempts are caught and retried with auth.
@@ -114,7 +117,7 @@ def _attempt_label(attempt_index: int, attempt: _DownloadAttemptConfig) -> str:
     return f"attempt {attempt_index + 1}/{len(_DOWNLOAD_ATTEMPTS)} ({', '.join(details)})"
 
 
-def _ytdlp_download(id: str, dir: Path, callback: Callback | None = None) -> Path | None:
+def _ytdlp_download(video_id: str, dest: Path, callback: Callback | None = None) -> Path | None:
     """Download video using yt-dlp.
 
     Tries unauthenticated first (avoids cookie-induced format restrictions), then
@@ -123,22 +126,22 @@ def _ytdlp_download(id: str, dir: Path, callback: Callback | None = None) -> Pat
     for attempt, raw_attempt in enumerate(_DOWNLOAD_ATTEMPTS):
         attempt_config = _download_attempt_config(raw_attempt)
         label = _attempt_label(attempt, attempt_config)
-        emit_info(f"Starting yt-dlp {label} for {id}")
+        emit_info(f"Starting yt-dlp {label} for {video_id}")
         try:
-            result = _run_download_attempt(id, dir, callback, attempt_config)
+            result = _run_download_attempt(video_id, dest, callback, attempt_config)
         except _YTDLP_OPERATION_ERRORS as e:
             if _is_terminal_download_reason(e):
                 reason = yt_dlp_retry_reason(e, "terminal")
-                emit_warning(f"Skipping {id}: {reason}")
-                raise SkippedDownloadError(reason)
+                emit_warning(f"Skipping {video_id}: {reason}")
+                raise SkippedDownloadError(reason) from e
             if _should_retry_attempt(e, attempt):
-                emit_info(f"Retrying {id} after {label} failed: {_retry_reason(e)}")
+                emit_info(f"Retrying {video_id} after {label} failed: {_retry_reason(e)}")
                 continue
-            _raise_download_error(id, e, label)
+            _raise_download_error(video_id, e, label)
             return None
 
         if result is not None:
-            emit_info(f"Completed yt-dlp {label} for {id}")
+            emit_info(f"Completed yt-dlp {label} for {video_id}")
             return result
 
     return None
@@ -156,8 +159,8 @@ def _download_attempt_config(
 
 
 def _build_download_opts(
-    id: str,
-    dir: Path,
+    video_id: str,
+    dest: Path,
     callback: Callback | None = None,
     attempt: _DownloadAttemptConfig | None = None,
 ) -> YtDlpParams:
@@ -165,7 +168,7 @@ def _build_download_opts(
     opts: YtDlpParams = _base_download_opts(attempt_config)
     if attempt_config.format_selector is not None:
         opts.format = attempt_config.format_selector
-    opts.outtmpl = (dir / f"{id}.%(ext)s").as_posix()
+    opts.outtmpl = (dest / f"{video_id}.%(ext)s").as_posix()
     opts.postprocessors = [_audio_postprocessor()]
     if attempt_config.player_clients is not None:
         opts.extractor_args = {"youtube": {"player_client": attempt_config.player_clients}}
@@ -190,13 +193,13 @@ def _base_download_opts(attempt: _DownloadAttemptConfig) -> YtDlpParams:
 
 
 def _run_download_attempt(
-    id: str,
-    dir: Path,
+    video_id: str,
+    dest: Path,
     callback: Callback | None,
     attempt: _DownloadAttemptConfig,
 ) -> Path | None:
-    opts = _build_download_opts(id, dir, callback, attempt)
-    url = f"https://www.youtube.com/watch?v={id}"
+    opts = _build_download_opts(video_id, dest, callback, attempt)
+    url = f"https://www.youtube.com/watch?v={video_id}"
     info_dict = _extract_download_info(url, opts)
     return _resolve_download_path(info_dict)
 
@@ -216,7 +219,7 @@ def _audio_postprocessor() -> dict[str, str]:
     }
 
 
-def _make_progress_hook(callback: Callback | None = None):
+def _make_progress_hook(callback: Callback | None = None) -> Any:  # noqa: ANN401
     """Create a progress hook. Delegates to normalizer."""
     return make_progress_hook(callback)
 
@@ -328,34 +331,36 @@ def _requested_download_path(info_dict: dict[str, Any]) -> Path | None:
     return Path(downloaded_file)
 
 
-def _raise_download_error(id: str, error: Exception, attempt_label: str | None = None) -> None:
+def _raise_download_error(
+    video_id: str, error: Exception, attempt_label: str | None = None,
+) -> None:
     error_msg = str(error)
     if _is_bot_detection_error(error_msg) and PROPAGATE_BOT_DETECTION:
         raise BotDetectionError(error_msg)
     context = f" after {attempt_label}" if attempt_label else ""
-    emit_warning(f"yt-dlp download failed for {id}{context}: {error}")
+    emit_warning(f"yt-dlp download failed for {video_id}{context}: {error}")
     raise error
 
 
-def download_video(url: str, dir: Path, callback: Callback | None = None) -> Path | None:
+def download_video(url: str, dest: Path, callback: Callback | None = None) -> Path | None:
     """Download a YouTube video as audio.
 
     Args:
         url: YouTube video URL
-        dir: Output directory for downloaded file
+        dest: Output directory for downloaded file
         callback: Optional progress callback function
 
     Returns:
         Path to downloaded file, or None if download failed/skipped
     """
-    dir.mkdir(parents=True, exist_ok=True)
+    dest.mkdir(parents=True, exist_ok=True)
 
     video_id = _validated_video_id(url)
     if video_id is None:
         return None
 
     try:
-        return _ytdlp_download(video_id, dir, callback)
+        return _ytdlp_download(video_id, dest, callback)
     except BotDetectionError:
         raise
     except SkippedDownloadError:

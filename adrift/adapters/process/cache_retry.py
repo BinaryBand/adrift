@@ -35,11 +35,11 @@ class RaceAwareCacheWrapper:
         self.max_attempts = max_attempts
         self.retry_delay = retry_delay
 
-    def get(self, key: str):
+    def get(self, key: str) -> Any:  # noqa: ANN401
         """Get a value from cache with no retry (reads don't race)."""
         return self.cache.get(key)
 
-    def set(self, key: str, value, expire: int | None = None) -> None:
+    def set(self, key: str, value: Any, expire: int | None = None) -> None:  # noqa: ANN401
         """Set a value in cache with retry on FileNotFoundError.
 
         Retries if parent directories are missing, recreating them as needed.
@@ -47,13 +47,14 @@ class RaceAwareCacheWrapper:
         for attempt in range(self.max_attempts):
             try:
                 self.cache.set(key, value, expire=expire)
-                return
             except FileNotFoundError:
                 self._recreate_cache_dir()
                 if attempt + 1 < self.max_attempts:
                     time.sleep(self.retry_delay)
                     continue
                 raise
+            else:
+                return
 
     def delete(self, key: str) -> None:
         """Delete a key from cache with no retry."""

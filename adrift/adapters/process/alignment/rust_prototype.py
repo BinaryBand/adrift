@@ -1,3 +1,5 @@
+"""Prototype Rust-backed alignment implementation used as fallback."""
+
 from __future__ import annotations
 
 from typing import TYPE_CHECKING
@@ -16,6 +18,7 @@ if TYPE_CHECKING:
 def align_batch(
     batch: AlignmentBatch,
 ) -> AlignmentResult:
+    """Align a batch of episodes, returning matched pairs and scores."""
     scores = _score_pairs(batch)
     return select_alignment_pairs(scores, batch.config.match_tolerance), scores
 

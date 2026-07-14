@@ -22,6 +22,7 @@ def compile_command(
 
 
 def main() -> None:
+    """Run the schema CLI application."""
     app()
 
 

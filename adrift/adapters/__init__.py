@@ -76,7 +76,7 @@ def get_episode_source_adapter(source: FeedSource) -> EpisodeSourcePort:
 
 
 def _make_env_provider() -> SecretProviderPort:
-    from adrift.adapters.process.secrets.env_secrets import EnvironmentSecretProvider
+    from adrift.adapters.process.secrets.env_secrets import EnvironmentSecretProvider  # noqa: I001, PLC0415
 
     return EnvironmentSecretProvider()
 
@@ -113,7 +113,7 @@ def get_secret_provider_adapter(
 
 
 def _make_local_storage() -> StoragePort:
-    from adrift.adapters.process.storage.local_storage import LocalFilesystemStorage
+    from adrift.adapters.process.storage.local_storage import LocalFilesystemStorage  # noqa: I001, PLC0415
 
     # STORAGE_ROOT: root for storage writes (<root>/<bucket>/<key>); in
     # production an rclone mount point synced and served outside this app.
@@ -136,13 +136,13 @@ def get_storage_adapter(backend_name: str | None = None) -> StoragePort:
 
 
 def _make_optimized_scored_alignment_adapter() -> ScoredAlignmentPort:
-    from adrift.adapters.process.alignment import OptimizedScoredAlignmentAdapter
+    from adrift.adapters.process.alignment import OptimizedScoredAlignmentAdapter  # noqa: PLC0415
 
     return OptimizedScoredAlignmentAdapter()
 
 
 def _make_rust_scored_alignment_adapter() -> ScoredAlignmentBatchPort:
-    from adrift.adapters.process.alignment import RustScoredAlignmentAdapter
+    from adrift.adapters.process.alignment import RustScoredAlignmentAdapter  # noqa: PLC0415
 
     return RustScoredAlignmentAdapter()
 
@@ -168,7 +168,7 @@ def get_scored_alignment_adapter(
     3. Otherwise, try to load Rust backend (with auto-compile if needed).
     4. Fall back to legacy if Rust is not available.
     """
-    from adrift.adapters.process.alignment import should_use_rust_backend
+    from adrift.adapters.process.alignment import should_use_rust_backend  # noqa: PLC0415
 
     explicit_backend = backend_name or os.getenv("ADRIFT_ALIGNMENT_BACKEND", "").lower()
 
@@ -195,6 +195,7 @@ class RegistryEpisodeSourceFactory:
     """EpisodeSourceFactoryPort backed by the source registry."""
 
     def get(self, source: FeedSource) -> EpisodeSourcePort:
+        """Return the episode source adapter for the given feed source."""
         return get_episode_source_adapter(source)
 
 
@@ -204,6 +205,7 @@ class RegistryAlignmentBackendProvider:
     def get(
         self, backend_name: str | None = None
     ) -> ScoredAlignmentPort | ScoredAlignmentBatchPort | None:
+        """Return the alignment backend adapter for the given backend name."""
         return get_scored_alignment_adapter(backend_name)
 
 
@@ -211,7 +213,8 @@ class YtDlpVideoDownloader:
     """VideoDownloaderPort backed by the yt-dlp downloader."""
 
     def download(self, url: str, dest: Path, callback: Callback | None = None) -> Path | None:
-        from adrift.adapters.process.youtube.downloader import download_video
+        """Download a video from the given URL to the destination path."""
+        from adrift.adapters.process.youtube.downloader import download_video  # noqa: PLC0415
 
         return download_video(url, dest, callback=callback)
 

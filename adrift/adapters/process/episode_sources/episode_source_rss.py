@@ -1,3 +1,5 @@
+"""RSS feed episode source adapter with HTTP caching."""
+
 import hashlib
 from datetime import datetime, timedelta
 from pathlib import Path
@@ -25,6 +27,7 @@ from adrift.core.util.schedule import rrule_occurrence_exists
 _RSS_HTTP_CACHE_PREFIX = "rss:http:"
 _RSS_PARSED_CACHE_PREFIX = "rss:parsed:"
 _RSS_HTTP_CACHE_TTL_SECONDS = 30 * 24 * 3600
+_HTTP_NOT_MODIFIED = 304
 
 T = TypeVar("T")
 
@@ -89,7 +92,7 @@ def _store_cached_rss_payload(cache_key: str, feed_str: str, headers: dict[str, 
     _cache_set_with_retry(_RSS_CACHE, cache_key, payload, expire=_RSS_HTTP_CACHE_TTL_SECONDS)
 
 
-def _response_headers_dict(response: Any) -> dict[str, str]:
+def _response_headers_dict(response: Any) -> dict[str, str]:  # noqa: ANN401
     raw_headers = getattr(response, "headers", None)
     if raw_headers is None:
         return {}
@@ -106,7 +109,7 @@ def _fetch_rss_feed_str(rss_url: str, cache_key: str | None = None) -> str:
     resolved_cache_key = cache_key or _rss_http_cache_key(rss_url)
     cached_payload = _load_cached_rss_payload(resolved_cache_key)
     response = requests.get(rss_url, timeout=15, headers=_conditional_rss_headers(cached_payload))
-    if response.status_code == 304:
+    if response.status_code == _HTTP_NOT_MODIFIED:
         if cached_payload is not None:
             return cached_payload["feed_str"]
         response = requests.get(rss_url, timeout=15)
@@ -195,7 +198,7 @@ def _store_cached_episodes(parsed_key: str, episodes: list[RssEpisode]) -> None:
 
 def get_rss_episodes(
     url: str,
-    filter: str | None = "",
+    filter_regex: str | None = "",
     r_rules: list[str] | None = None,
     callback: Callback | None = None,
 ) -> list[RssEpisode]:
@@ -204,7 +207,7 @@ def get_rss_episodes(
         msg = "Invalid RSS feed url or file path"
         raise ValueError(msg)
     r_rules = r_rules or []
-    cache_key = _rss_http_cache_key(url, filter, r_rules)
+    cache_key = _rss_http_cache_key(url, filter_regex, r_rules)
     feed_str = _fetch_rss_feed_str(url, cache_key=cache_key)
     parsed_key = _parsed_episodes_cache_key(cache_key, feed_str)
     cached_episodes = _load_cached_episodes(parsed_key)
@@ -217,7 +220,7 @@ def get_rss_episodes(
     entries_list = (
         cast("list[FeedParserDict]", raw_entries) if isinstance(raw_entries, list) else []
     )
-    entries = _filter_feed_entries(entries_list, filter, r_rules)
+    entries = _filter_feed_entries(entries_list, filter_regex, r_rules)
     episodes = _parse_feed_entries(entries, callback)
     _store_cached_episodes(parsed_key, episodes)
     return episodes

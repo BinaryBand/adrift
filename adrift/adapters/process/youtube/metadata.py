@@ -1,3 +1,6 @@
+"""YouTube metadata fetching and enrichment for episode sources."""
+
+import contextlib
 import threading
 from dataclasses import dataclass, field
 from urllib.parse import urljoin
@@ -90,10 +93,8 @@ def _add_episode_metadata(episode: RssEpisode, author: str) -> RssEpisode:
 def _maybe_update_description(episode: RssEpisode, info: ytdlp.VideoInfo) -> None:
     """Update ``episode.description`` from video info when available."""
     try:
-        if desc := getattr(info, "description", None):
-            # Preserve existing description if present
-            if not episode.description:
-                episode.description = desc
+        if (desc := getattr(info, "description", None)) and not episode.description:
+            episode.description = desc
     except _EPISODE_METADATA_ERRORS:
         # Non-fatal: do not break the enrichment pipeline for description errors.
         pass
@@ -106,7 +107,7 @@ def _fetch_video_info(video_id: str) -> ytdlp.VideoInfo | None:
     except _VIDEO_INFO_FETCH_ERRORS as e:
         emit_warning(f"Failed to fetch video info for {video_id}: {e}")
         return None
-    except Exception as e:
+    except Exception as e:  # noqa: BLE001
         # yt-dlp may raise extractor-specific errors that don't inherit from
         # our local error tuple; metadata enrichment should remain best-effort.
         emit_warning(f"Failed to fetch video info for {video_id}: {e}")
@@ -115,11 +116,8 @@ def _fetch_video_info(video_id: str) -> ytdlp.VideoInfo | None:
 
 def _maybe_update_pub_date(episode: RssEpisode, info: ytdlp.VideoInfo) -> None:
     """Update `episode.pub_date` from video info if available."""
-    try:
+    with contextlib.suppress(*_EPISODE_METADATA_ERRORS):
         episode.pub_date = info.upload_date or episode.pub_date
-    except _EPISODE_METADATA_ERRORS:
-        # Be tolerant of missing fields on the returned info object
-        pass
 
 
 def _maybe_update_thumbnail(episode: RssEpisode, info: ytdlp.VideoInfo, author: str) -> None:
@@ -154,7 +152,9 @@ def _enrich_episodes(
 
 @dataclass
 class YtFetchOptions:
-    filter: str | None = ""
+    """Options controlling YouTube episode fetching behavior."""
+
+    filter_regex: str | None = ""
     detailed: bool = True
     callback: Callback | None = field(default=None)
     refresh: bool = False
@@ -172,8 +172,8 @@ def _post_process_episodes(
 ) -> list[RssEpisode]:
     emit_info(f"Fetched {len(episodes)} episodes from {url}")
 
-    if opts.filter:
-        episodes = _filter_episodes(episodes, opts.filter)
+    if opts.filter_regex:
+        episodes = _filter_episodes(episodes, opts.filter_regex)
     if opts.detailed:
         episodes = _enrich_episodes(episodes, author, opts.callback)
     if opts.callback:

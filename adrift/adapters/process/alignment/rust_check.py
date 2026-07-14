@@ -27,9 +27,10 @@ def can_load_rust_extension() -> bool:
     """Check if the Rust extension can be imported."""
     try:
         import_module(_EXTENSION_MODULE)
-        return True
     except ModuleNotFoundError:
         return False
+    else:
+        return True
 
 
 def should_skip_rust_compilation() -> bool:
@@ -41,7 +42,7 @@ def should_skip_rust_compilation() -> bool:
 def _run_maturin_compile() -> bool:
     """Invoke maturin to build the extension; log and return the outcome."""
     try:
-        result = subprocess.run(
+        result = subprocess.run(  # noqa: S603
             [
                 sys.executable,
                 "-m",
@@ -54,6 +55,7 @@ def _run_maturin_compile() -> bool:
             capture_output=True,
             text=True,
             timeout=300,
+            check=False,
         )
         succeeded = result.returncode == 0 and can_load_rust_extension()
         if not succeeded:
@@ -61,12 +63,13 @@ def _run_maturin_compile() -> bool:
                 "Rust alignment extension compile failed; falling back to Python. %s",
                 result.stderr.strip()[-2000:],
             )
-        return succeeded
     except (subprocess.TimeoutExpired, FileNotFoundError, OSError) as exc:
         logger.warning(
             "Rust alignment extension compile errored (%s); falling back to Python.", exc
         )
         return False
+    else:
+        return succeeded
 
 
 def try_compile_rust_extension() -> bool:
@@ -76,7 +79,7 @@ def try_compile_rust_extension() -> bool:
     The outcome is cached per-process so a failing compile is only attempted
     once, instead of re-running the maturin subprocess on every call.
     """
-    global _compile_result
+    global _compile_result  # noqa: PLW0603
     if _compile_result is not None:
         return _compile_result
     if can_load_rust_extension():
@@ -105,8 +108,10 @@ def should_use_rust_backend() -> bool:
 
 
 def ensure_rust_alignment_backend() -> bool:
-    """Guard called by CLI runners before the alignment stage: make sure the
-    Rust extension is compiled if possible, logging which engine will run.
+    """Guard called by CLI runners before the alignment stage.
+
+    Make sure the Rust extension is compiled if possible, logging which
+    engine will run.
 
     Returns True if Rust will be used, False if callers should expect the
     pure-Python fallback.

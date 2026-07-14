@@ -28,8 +28,8 @@ def _unmatched_indices(pairs: list[tuple[int, int]], total: int) -> list[int]:
     return [index for index in range(total) if index not in matched]
 
 
-def _matched_download_slugs(result: Any) -> set[str]:
-    from adrift.core.util.title_normalization import normalize_title
+def _matched_download_slugs(result: Any) -> set[str]:  # noqa: ANN401
+    from adrift.core.util.title_normalization import normalize_title  # noqa: PLC0415
 
     return {
         normalize_title(result.config.name, result.downloads[download_index].title)
@@ -37,7 +37,7 @@ def _matched_download_slugs(result: Any) -> set[str]:
     }
 
 
-def _resolve_storage_key(storage: Any, bucket: str, prefix: str, slug: str) -> str | None:
+def _resolve_storage_key(storage: Any, bucket: str, prefix: str, slug: str) -> str | None:  # noqa: ANN401
     key_prefix = f"{prefix}/{slug}"
     actual_name = storage.exists(bucket, key_prefix)
     if actual_name is None:
@@ -46,7 +46,7 @@ def _resolve_storage_key(storage: Any, bucket: str, prefix: str, slug: str) -> s
     return f"{parent}/{actual_name}"
 
 
-def _delete_key(storage: Any, bucket: str, key: str) -> None:
+def _delete_key(storage: Any, bucket: str, key: str) -> None:  # noqa: ANN401
     storage.delete(bucket, key)
 
 
@@ -55,7 +55,7 @@ def _audio_object_names(file_names: list[str]) -> list[str]:
 
 
 def _duplicate_audio_candidates(show: str, file_names: list[str]) -> list[str]:
-    from adrift.core.util.title_normalization import normalize_title
+    from adrift.core.util.title_normalization import normalize_title  # noqa: PLC0415
 
     by_canonical: dict[str, list[str]] = defaultdict(list)
     for name in _audio_object_names(file_names):
@@ -71,7 +71,7 @@ def _duplicate_audio_candidates(show: str, file_names: list[str]) -> list[str]:
 
 
 def _best_alignment_candidate_for_download(
-    result: Any, download_index: int
+    result: Any, download_index: int  # noqa: ANN401
 ) -> tuple[str, float, str] | None:
     best: tuple[str, float, str] | None = None
     references = getattr(result, "references", [])
@@ -90,7 +90,7 @@ def _best_alignment_candidate_for_download(
     return best
 
 
-def _write_unmatched_verbose(result: Any, download_index: int) -> None:
+def _write_unmatched_verbose(result: Any, download_index: int) -> None:  # noqa: ANN401
     download = result.downloads[download_index]
     sys.stdout.write(f"    title:  {download.title}\n")
     sys.stdout.write(f"    source: {download.content}\n")
@@ -104,13 +104,13 @@ def _write_unmatched_verbose(result: Any, download_index: int) -> None:
 
 
 def _process_unmatched(
-    result: Any,
-    storage: Any,
+    result: Any,  # noqa: ANN401
+    storage: Any,  # noqa: ANN401
     dry_run: bool,
     verbose: bool = False,
 ) -> tuple[int, int]:
-    from adrift.core.services.download_client import storage_prefix
-    from adrift.core.util.title_normalization import normalize_title
+    from adrift.core.services.download_client import storage_prefix  # noqa: PLC0415
+    from adrift.core.util.title_normalization import normalize_title  # noqa: PLC0415
 
     bucket, prefix = storage_prefix(result.config)
     indices = _unmatched_indices(result.pairs, len(result.downloads))
@@ -136,8 +136,8 @@ def _process_unmatched(
     return found, missing
 
 
-def _process_duplicate_audio_files(config: Any, storage: Any, dry_run: bool) -> int:
-    from adrift.core.services.download_client import storage_prefix
+def _process_duplicate_audio_files(config: Any, storage: Any, dry_run: bool) -> int:  # noqa: ANN401
+    from adrift.core.services.download_client import storage_prefix  # noqa: PLC0415
 
     bucket, prefix = storage_prefix(config)
     duplicates = _duplicate_audio_candidates(
@@ -152,15 +152,15 @@ def _process_duplicate_audio_files(config: Any, storage: Any, dry_run: bool) -> 
     return len(duplicates)
 
 
-def _run_cleanup(
-    configs: list[Any],
+def _run_cleanup(  # noqa: PLR0913
+    configs: list[Any],  # noqa: ANN401
     ctx: AppContext,
     dry_run: bool,
     refresh_sources: bool,
     prune_duplicates: bool,
     verbose: bool = False,
 ) -> None:
-    from adrift.core.services.catalog.merge import merge_config
+    from adrift.core.services.catalog.merge import merge_config  # noqa: PLC0415
 
     storage = cast("Any", ctx.storage)
     total_unmatched_found = 0
@@ -195,7 +195,7 @@ def _run_cleanup(
         sys.stderr.write("Run with --no-dry-run to actually delete.\n")
 
 
-def _run(
+def _run(  # noqa: PLR0913
     include: IncludeConfigsOption = None,
     skip_schedule_filter: SkipScheduleFilterOption = False,
     tags: TagsOption = None,
@@ -221,7 +221,7 @@ def _run(
         ),
     ] = False,
 ) -> None:
-    from adrift.cli.composition import build_app_context
+    from adrift.cli.composition import build_app_context  # noqa: PLC0415
 
     configs, _ = bootstrap_run_configs(include, tags, skip_schedule_filter=skip_schedule_filter)
     ctx = build_app_context()
