@@ -1,16 +1,18 @@
+"""Merge run options, output serialization, and timing helpers."""
+
 from __future__ import annotations
 
 import json
 import sys
 from collections.abc import Callable, Sequence
 from dataclasses import dataclass
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
 from typing import TYPE_CHECKING, cast
 
-from pydantic import BaseModel
-
 if TYPE_CHECKING:
+    from pydantic import BaseModel
+
     from adrift.core.models import MergeResult
     from adrift.core.ports import AlignmentBackendProviderPort, EpisodeSourceFactoryPort
 
@@ -20,6 +22,8 @@ JsonWriter = Callable[[Path, object], None]
 
 @dataclass(frozen=True)
 class MergeRunOptions:
+    """Options controlling a single merge run and its output."""
+
     include_counts: bool = False
     pretty: bool = False
     output_dir: str = "downloads"
@@ -31,15 +35,18 @@ class MergeRunOptions:
 
 
 def model_payloads(items: Sequence[BaseModel]) -> list[dict[str, object]]:
+    """Return JSON-mode dumps of each model in ``items``."""
     return [item.model_dump(mode="json") for item in items]
 
 
 def write_json(path: Path, payload: object) -> None:
+    """Write ``payload`` as indented JSON to ``path``, creating parent dirs."""
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(json.dumps(payload, indent=2) + "\n", encoding="utf-8")
 
 
 def series_output_paths(output_root: Path, slug: str) -> dict[str, Path]:
+    """Return the output paths for one podcast series under ``output_root``."""
     series_dir = output_root / slug
     feeds_dir = series_dir / "feeds"
     return {
@@ -51,15 +58,16 @@ def series_output_paths(output_root: Path, slug: str) -> dict[str, Path]:
 
 def write_series_outputs(
     output_root: Path,
-    result: "MergeResult",
+    result: MergeResult,
     write_json_func: JsonWriter = write_json,
 ) -> dict[str, object]:
-    config_payload = cast(dict[str, object], result.config.model_dump(mode="json"))
+    """Write a series' config/combined feeds and return its index entry."""
+    config_payload = cast("dict[str, object]", result.config.model_dump(mode="json"))
     slug = str(config_payload["slug"])
     paths = series_output_paths(output_root, slug)
 
     write_json_func(paths["config"], config_payload)
-    combined_payload = cast(dict[str, object], result.model_dump(mode="json"))
+    combined_payload = cast("dict[str, object]", result.model_dump(mode="json"))
     write_json_func(paths["combined"], combined_payload)
 
     return {
@@ -79,13 +87,14 @@ def write_output_bundle(
     series_entries: list[dict[str, object]],
     write_json_func: JsonWriter = write_json,
 ) -> None:
+    """Write the top-level report.json and index.json output bundle."""
     output_root = Path(output_dir)
     output_root.mkdir(parents=True, exist_ok=True)
     write_json_func(output_root / "report.json", reports)
     write_json_func(
         output_root / "index.json",
         {
-            "generated_at": datetime.now(timezone.utc).isoformat(),
+            "generated_at": datetime.now(UTC).isoformat(),
             "series": series_entries,
         },
     )
@@ -96,13 +105,16 @@ def write_report_file(
     reports: list[dict[str, object]],
     write_json_func: JsonWriter = write_json,
 ) -> None:
+    """Write ``reports`` to a single explicit ``output_file``."""
     write_json_func(Path(output_file), reports)
 
 
 @dataclass(frozen=True)
 class MergeWriters:
+    """Injectable bundle of output-writing callables used by the merge run."""
+
     write_json: JsonWriter = write_json
-    write_series_outputs: Callable[[Path, "MergeResult"], dict[str, object]] = write_series_outputs
+    write_series_outputs: Callable[[Path, MergeResult], dict[str, object]] = write_series_outputs
     write_output_bundle: Callable[[str, list[dict[str, object]], list[dict[str, object]]], None] = (
         write_output_bundle
     )
@@ -110,10 +122,12 @@ class MergeWriters:
 
 
 def format_duration(duration_seconds: float) -> str:
+    """Render ``duration_seconds`` as a millisecond string."""
     return f"{duration_seconds * 1000:.1f}ms"
 
 
 def emit_timings(config_name: str, timings: dict[str, float]) -> None:
+    """Write a one-line TIMING report for ``config_name`` to stderr."""
     ordered_keys = [
         "process_feeds",
         "process_sources",

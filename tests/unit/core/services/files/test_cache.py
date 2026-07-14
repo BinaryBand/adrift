@@ -16,19 +16,19 @@ class TestDiskCacheAdapter(unittest.TestCase):
 
     def test_get_local_hit(self):
         self.cache.set("test_key", "local_value")
-        self.assertEqual(self.cache.get("test_key"), "local_value")
+        assert self.cache.get("test_key") == "local_value"
 
     def test_get_total_miss(self):
-        self.assertEqual(self.cache.get("missing", default="fallback"), "fallback")
+        assert self.cache.get("missing", default="fallback") == "fallback"
 
     def test_delete(self):
         self.cache.set("test_key", "test_value")
         self.cache.delete("test_key")
-        self.assertIsNone(self.cache.get("test_key"))
+        assert self.cache.get("test_key") is None
 
     def test_expired_entry_returns_default(self):
         self.cache.set("expired", "value", expire=-1)
-        self.assertEqual(self.cache.get("expired", default="missing"), "missing")
+        assert self.cache.get("expired", default="missing") == "missing"
 
 
 if __name__ == "__main__":

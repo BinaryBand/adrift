@@ -31,7 +31,7 @@ def _node_path() -> str | None:
 
 
 def get_ydl_opts() -> YtDlpParams:
-    """Get basic yt-dlp options without authentication"""
+    """Get basic yt-dlp options without authentication."""
     return YtDlpParams.model_validate(
         {
             "quiet": True,

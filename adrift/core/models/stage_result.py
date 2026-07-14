@@ -8,9 +8,10 @@ and all warnings/errors encountered along the way.
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from typing import Generic, TypeVar
+from typing import TYPE_CHECKING, Generic, TypeVar
 
-from adrift.core.models.errors import PipelineError
+if TYPE_CHECKING:
+    from adrift.core.models.errors import PipelineError
 
 T = TypeVar("T")
 

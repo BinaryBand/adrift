@@ -1,6 +1,6 @@
 import json
 import sys
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
 from unittest.mock import patch
 
@@ -117,7 +117,7 @@ def test_main_updates_output_file_after_each_podcast(tmp_path: Path, capsys) -> 
                     "https://example.com/second-reference-1.mp3",
                     "https://youtube.com/watch?v=second",
                 ],
-                upload_date=datetime(2024, 1, 2, tzinfo=timezone.utc),
+                upload_date=datetime(2024, 1, 2, tzinfo=UTC),
             )
         ],
     )

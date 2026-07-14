@@ -1,3 +1,5 @@
+"""Cached regular-expression compilation helpers."""
+
 # cspell: words youtu
 
 import re
@@ -9,6 +11,7 @@ _RE_COMPILE_CACHE: LRUCache[str, re.Pattern[str]] = LRUCache(2048)
 
 @cached(_RE_COMPILE_CACHE)
 def re_compile(regex: str) -> re.Pattern[str]:
+    """Compile ``regex``, caching the result across calls."""
     return re.compile(regex)
 
 

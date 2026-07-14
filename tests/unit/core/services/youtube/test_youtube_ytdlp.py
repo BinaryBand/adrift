@@ -1,7 +1,7 @@
 """Tests for YouTube yt-dlp module with focus on caching and error handling."""
 
 import unittest
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 from unittest.mock import MagicMock, patch
 
 from adrift.adapters.process.youtube.ytdlp import (
@@ -26,7 +26,7 @@ def _cached_payload(
     fetched_at: datetime | None = None,
     head_checked_at: datetime | None = None,
 ) -> dict:
-    now = datetime.now(timezone.utc)
+    now = datetime.now(UTC)
     return {
         "fetched_at": (fetched_at or now).isoformat(),
         "head_checked_at": (head_checked_at or now).isoformat(),
@@ -52,14 +52,14 @@ class TestPydanticModels(unittest.TestCase):
 
         video = VideoInfo.model_validate(data)
 
-        self.assertEqual(video.id, "vid123")
-        self.assertEqual(video.title, "Test Video")
-        self.assertEqual(video.description, "Test description")
-        self.assertEqual(video.duration, 300.5)
-        self.assertEqual(video.upload_date, datetime(2023, 12, 18))
-        self.assertEqual(video.thumbnail, "https://example.com/thumb.jpg")
-        self.assertEqual(video.availability, "public")
-        self.assertEqual(video.url, "https://youtube.com/watch?v=vid123")
+        assert video.id == "vid123"
+        assert video.title == "Test Video"
+        assert video.description == "Test description"
+        assert video.duration == 300.5
+        assert video.upload_date == datetime(2023, 12, 18)
+        assert video.thumbnail == "https://example.com/thumb.jpg"
+        assert video.availability == "public"
+        assert video.url == "https://youtube.com/watch?v=vid123"
 
     def test_video_info_with_minimal_data(self):
         """Test VideoInfo model with only required fields."""
@@ -70,10 +70,10 @@ class TestPydanticModels(unittest.TestCase):
 
         video = VideoInfo.model_validate(data)
 
-        self.assertEqual(video.id, "vid123")
-        self.assertEqual(video.title, "Test Video")
-        self.assertIsNone(video.description)
-        self.assertIsNone(video.duration)
+        assert video.id == "vid123"
+        assert video.title == "Test Video"
+        assert video.description is None
+        assert video.duration is None
 
     def test_channel_info_model(self):
         """Test ChannelInfo model."""
@@ -88,12 +88,12 @@ class TestPydanticModels(unittest.TestCase):
 
         channel = ChannelInfo.model_validate(data)
 
-        self.assertEqual(channel.title, "Test Channel")
-        self.assertEqual(channel.uploader, "Test Uploader")
-        self.assertEqual(channel.uploader_id, "test_id")
-        self.assertEqual(channel.description, "Channel description")
+        assert channel.title == "Test Channel"
+        assert channel.uploader == "Test Uploader"
+        assert channel.uploader_id == "test_id"
+        assert channel.description == "Channel description"
         assert channel.thumbnails is not None
-        self.assertIsInstance(channel.thumbnails[0], YtDlpImage)
+        assert isinstance(channel.thumbnails[0], YtDlpImage)
 
 
 class TestCachePayloadTrimming(unittest.TestCase):
@@ -120,10 +120,10 @@ class TestCachePayloadTrimming(unittest.TestCase):
 
         trimmed = _trim_video_cache_payload(raw)
 
-        self.assertNotIn("formats", trimmed)
-        self.assertNotIn("subtitles", trimmed)
-        self.assertEqual(trimmed["id"], "vid123")
-        self.assertEqual(trimmed["view_count"], 10)
+        assert "formats" not in trimmed
+        assert "subtitles" not in trimmed
+        assert trimmed["id"] == "vid123"
+        assert trimmed["view_count"] == 10
 
     def test_trim_channel_cache_payload(self):
         raw = {
@@ -138,8 +138,8 @@ class TestCachePayloadTrimming(unittest.TestCase):
 
         trimmed = _trim_channel_cache_payload(raw)
 
-        self.assertNotIn("entries", trimmed)
-        self.assertEqual(trimmed["title"], "Channel")
+        assert "entries" not in trimmed
+        assert trimmed["title"] == "Channel"
 
 
 class TestFetchVideoInfoRaw(unittest.TestCase):
@@ -167,7 +167,7 @@ class TestFetchVideoInfoRaw(unittest.TestCase):
         result = _fetch_video_info_raw("vid123")
         assert result is not None
 
-        self.assertEqual(result["id"], "vid123")
+        assert result["id"] == "vid123"
         # Should only call unauthenticated opts
         mock_get_opts.assert_called_once()
         mock_get_auth_opts.assert_not_called()
@@ -197,12 +197,12 @@ class TestFetchVideoInfoRaw(unittest.TestCase):
         result = _fetch_video_info_raw("vid123")
         assert result is not None
 
-        self.assertEqual(result["id"], "vid123")
+        assert result["id"] == "vid123"
         # Should try both
         mock_get_opts.assert_called_once()
         mock_get_auth_opts.assert_called_once_with(use_browser_fallback=True)
         # Should have called extract_info twice
-        self.assertEqual(mock_ydl.__enter__.return_value.extract_info.call_count, 2)
+        assert mock_ydl.__enter__.return_value.extract_info.call_count == 2
 
     @patch("adrift.adapters.process.youtube.ytdlp.YoutubeDL")
     @patch("adrift.adapters.process.youtube.ytdlp.get_auth_ydl_opts")
@@ -223,7 +223,7 @@ class TestFetchVideoInfoRaw(unittest.TestCase):
 
         result = _fetch_video_info_raw("vid123")
 
-        self.assertIsNone(result)
+        assert result is None
 
     @patch("adrift.adapters.process.youtube.ytdlp.YoutubeDL")
     @patch("adrift.adapters.process.youtube.ytdlp.get_auth_ydl_opts")
@@ -248,9 +248,9 @@ class TestFetchVideoInfoRaw(unittest.TestCase):
 
         result = _fetch_video_info_raw("vid123")
 
-        self.assertIsNone(result)
+        assert result is None
         mock_get_auth_opts.assert_not_called()
-        self.assertEqual(mock_ydl.__enter__.return_value.extract_info.call_count, 1)
+        assert mock_ydl.__enter__.return_value.extract_info.call_count == 1
         mock_cache.set.assert_called_once()
 
     @patch("adrift.adapters.process.youtube.ytdlp.YoutubeDL")
@@ -280,9 +280,9 @@ class TestFetchVideoInfoRaw(unittest.TestCase):
 
         result = _fetch_video_info_raw("vid123")
 
-        self.assertIsNone(result)
+        assert result is None
         mock_get_auth_opts.assert_not_called()
-        self.assertEqual(mock_ydl.__enter__.return_value.extract_info.call_count, 1)
+        assert mock_ydl.__enter__.return_value.extract_info.call_count == 1
         mock_cache.set.assert_called_once()
 
 
@@ -301,11 +301,11 @@ class TestYtDlpOptsCompatibility(unittest.TestCase):
 
         result = _fetch_channel_videos_raw("https://www.youtube.com/@example/videos")
 
-        self.assertEqual(result, [])
-        self.assertTrue(mock_ydl_cls.called)
+        assert result == []
+        assert mock_ydl_cls.called
         opts_arg = mock_ydl_cls.call_args[0][0]
-        self.assertIsInstance(opts_arg, dict)
-        self.assertTrue(opts_arg.get("extract_flat"))
+        assert isinstance(opts_arg, dict)
+        assert opts_arg.get("extract_flat")
 
 
 class TestFetchVideoInfo(unittest.TestCase):
@@ -328,11 +328,11 @@ class TestFetchVideoInfo(unittest.TestCase):
 
         result = get_video_info("vid123")
 
-        self.assertIsInstance(result, VideoInfo)
+        assert isinstance(result, VideoInfo)
         assert result is not None
-        self.assertEqual(result.id, "vid123")
-        self.assertEqual(result.title, "Cached Video")
-        self.assertEqual(mock_cache.get.call_args_list[1].args[0], "get_video_info:vid123")
+        assert result.id == "vid123"
+        assert result.title == "Cached Video"
+        assert mock_cache.get.call_args_list[1].args[0] == "get_video_info:vid123"
         mock_fetch_raw.assert_not_called()
 
     @patch("adrift.adapters.process.youtube.ytdlp._fetch_video_info_raw")
@@ -349,7 +349,7 @@ class TestFetchVideoInfo(unittest.TestCase):
 
         result = get_video_info("vid123")
 
-        self.assertIsNone(result)
+        assert result is None
         mock_fetch_raw.assert_not_called()
 
     @patch("adrift.adapters.process.youtube.ytdlp._fetch_video_info_raw")
@@ -369,10 +369,10 @@ class TestFetchVideoInfo(unittest.TestCase):
 
         result = get_video_info("vid123")
 
-        self.assertIsInstance(result, VideoInfo)
+        assert isinstance(result, VideoInfo)
         assert result is not None
-        self.assertEqual(result.id, "vid123")
-        self.assertEqual(result.title, "Fresh Video")
+        assert result.id == "vid123"
+        assert result.title == "Fresh Video"
         mock_fetch_raw.assert_called_once_with("vid123")
         mock_cache.set.assert_called_once_with(
             "get_video_info:vid123",
@@ -392,7 +392,7 @@ class TestFetchVideoInfo(unittest.TestCase):
 
         result = get_video_info("vid123")
 
-        self.assertIsNone(result)
+        assert result is None
         mock_cache.set.assert_not_called()
 
 
@@ -417,11 +417,11 @@ class TestFetchChannelInfoRaw(unittest.TestCase):
         result = _fetch_channel_info_raw("https://youtube.com/@test", fetch_videos=False)
         assert result is not None
 
-        self.assertEqual(result["title"], "Test Channel")
+        assert result["title"] == "Test Channel"
         # Verify playlistend=0 was set
         opts = mock_get_opts.return_value
-        self.assertEqual(opts.extract_flat, True)
-        self.assertEqual(opts.playlistend, 0)
+        assert opts.extract_flat
+        assert opts.playlistend == 0
 
     @patch("adrift.adapters.process.youtube.ytdlp.YoutubeDL")
     @patch("adrift.adapters.process.youtube.ytdlp.get_ydl_opts")
@@ -438,10 +438,10 @@ class TestFetchChannelInfoRaw(unittest.TestCase):
 
         result = _fetch_channel_info_raw("https://youtube.com/@test", fetch_videos=True)
 
-        self.assertIsNotNone(result)
+        assert result is not None
         # Verify playlistend was NOT set (still None — only set when fetch_videos=False)
         opts = mock_get_opts.return_value
-        self.assertIsNone(opts.playlistend)
+        assert opts.playlistend is None
 
     @patch("adrift.adapters.process.youtube.ytdlp.YoutubeDL")
     @patch("adrift.adapters.process.youtube.ytdlp.get_ydl_opts")
@@ -455,7 +455,7 @@ class TestFetchChannelInfoRaw(unittest.TestCase):
 
         result = _fetch_channel_info_raw("https://youtube.com/@test")
 
-        self.assertIsNone(result)
+        assert result is None
 
 
 class TestFetchChannelVideosRaw(unittest.TestCase):
@@ -478,14 +478,14 @@ class TestFetchChannelVideosRaw(unittest.TestCase):
 
         result = _fetch_channel_videos_raw("https://youtube.com/@test")
 
-        self.assertEqual(len(result), 2)
-        self.assertEqual(result[0]["id"], "vid1")
+        assert len(result) == 2
+        assert result[0]["id"] == "vid1"
         # Verify default opts
         opts = mock_get_opts.return_value
-        self.assertEqual(opts.extract_flat, True)
-        self.assertEqual(opts.playlistreverse, False)
-        self.assertEqual(opts.playliststart, 1)
-        self.assertIsNone(opts.playlistend)
+        assert opts.extract_flat
+        assert not opts.playlistreverse
+        assert opts.playliststart == 1
+        assert opts.playlistend is None
 
     @patch("adrift.adapters.process.youtube.ytdlp.YoutubeDL")
     @patch("adrift.adapters.process.youtube.ytdlp.get_ydl_opts")
@@ -500,9 +500,9 @@ class TestFetchChannelVideosRaw(unittest.TestCase):
         _fetch_channel_videos_raw("https://youtube.com/@test", start=10, end=25, reverse=True)
 
         opts = mock_get_opts.return_value
-        self.assertEqual(opts.playliststart, 10)
-        self.assertEqual(opts.playlistend, 25)
-        self.assertEqual(opts.playlistreverse, True)
+        assert opts.playliststart == 10
+        assert opts.playlistend == 25
+        assert opts.playlistreverse
 
     @patch("adrift.adapters.process.youtube.ytdlp.YoutubeDL")
     @patch("adrift.adapters.process.youtube.ytdlp.get_ydl_opts")
@@ -516,7 +516,7 @@ class TestFetchChannelVideosRaw(unittest.TestCase):
 
         result = _fetch_channel_videos_raw("https://youtube.com/@test")
 
-        self.assertEqual(result, [])
+        assert result == []
 
     @patch("adrift.adapters.process.youtube.ytdlp.YoutubeDL")
     @patch("adrift.adapters.process.youtube.ytdlp.get_ydl_opts")
@@ -530,7 +530,7 @@ class TestFetchChannelVideosRaw(unittest.TestCase):
 
         result = _fetch_channel_videos_raw("https://youtube.com/@test")
 
-        self.assertEqual(result, [])
+        assert result == []
 
 
 class TestGetCachedChannelInfo(unittest.TestCase):
@@ -545,9 +545,9 @@ class TestGetCachedChannelInfo(unittest.TestCase):
 
         result = get_channel_info("https://youtube.com/@test")
 
-        self.assertIsInstance(result, ChannelInfo)
+        assert isinstance(result, ChannelInfo)
         assert result is not None
-        self.assertEqual(result.title, "Cached Channel")
+        assert result.title == "Cached Channel"
         mock_cache.get.assert_called_once_with("get_youtube_channel:https://youtube.com/@test")
         mock_fetch_raw.assert_not_called()
 
@@ -568,9 +568,9 @@ class TestGetCachedChannelInfo(unittest.TestCase):
 
         result = get_channel_info("https://youtube.com/@test")
 
-        self.assertIsInstance(result, ChannelInfo)
+        assert isinstance(result, ChannelInfo)
         assert result is not None
-        self.assertEqual(result.title, "Fresh Channel")
+        assert result.title == "Fresh Channel"
         mock_fetch_raw.assert_called_once_with("https://youtube.com/@test", fetch_videos=False)
         # Verify cache expiry is 25-35 days
         mock_random.randint.assert_called_once_with(25, 35)
@@ -590,7 +590,7 @@ class TestGetCachedChannelInfo(unittest.TestCase):
 
         result = get_channel_info("https://youtube.com/@test")
 
-        self.assertIsNone(result)
+        assert result is None
 
 
 class TestGetYoutubeVideos(unittest.TestCase):
@@ -614,7 +614,7 @@ class TestGetYoutubeVideos(unittest.TestCase):
 
         result = get_youtube_videos("https://youtube.com/@test/videos", "Test Channel")
 
-        self.assertEqual(result, [episode])
+        assert result == [episode]
         mock_fetch_batch.assert_not_called()
         mock_cache.set.assert_not_called()
 
@@ -625,8 +625,8 @@ class TestGetYoutubeVideos(unittest.TestCase):
     ):
         episode = self.episode
         mock_cache.get.return_value = {
-            "fetched_at": datetime.now(timezone.utc).isoformat(),
-            "head_checked_at": datetime.now(timezone.utc).isoformat(),
+            "fetched_at": datetime.now(UTC).isoformat(),
+            "head_checked_at": datetime.now(UTC).isoformat(),
             "episodes": {episode.id: episode},
         }
         mock_fetch_batch.side_effect = [[{"id": "vid123", "title": "Cached Video"}]]
@@ -637,7 +637,7 @@ class TestGetYoutubeVideos(unittest.TestCase):
             refresh=True,
         )
 
-        self.assertEqual(result, [episode])
+        assert result == [episode]
         mock_fetch_batch.assert_called_once_with(
             "https://youtube.com/@test/videos",
             "Test Channel",
@@ -657,12 +657,12 @@ class TestGetYoutubeVideos(unittest.TestCase):
 
         result = get_youtube_videos("https://youtube.com/@test/videos", "Test Channel")
 
-        self.assertEqual(result, [episode])
+        assert result == [episode]
         mock_fetch_batch.assert_called_once()
         cached_payload = mock_cache.set.call_args.args[1]
-        self.assertEqual(cached_payload["episodes"], {episode.id: episode})
-        self.assertIn("fetched_at", cached_payload)
-        self.assertIn("head_checked_at", cached_payload)
+        assert cached_payload["episodes"] == {episode.id: episode}
+        assert "fetched_at" in cached_payload
+        assert "head_checked_at" in cached_payload
 
     @patch("adrift.adapters.process.youtube.ytdlp._fetch_video_batch")
     @patch("adrift.adapters.process.youtube.ytdlp._CACHE")
@@ -670,7 +670,7 @@ class TestGetYoutubeVideos(unittest.TestCase):
     def test_stale_episode_bundle_triggers_refresh(
         self, mock_utcnow: MagicMock, mock_cache: MagicMock, mock_fetch_batch: MagicMock
     ):
-        fresh_time = datetime(2026, 4, 17, tzinfo=timezone.utc)
+        fresh_time = datetime(2026, 4, 17, tzinfo=UTC)
         stale_time = fresh_time - YOUTUBE_EPISODE_CACHE_FRESHNESS - timedelta(seconds=1)
         episode = self.episode
         mock_utcnow.return_value = fresh_time
@@ -689,7 +689,7 @@ class TestGetYoutubeVideos(unittest.TestCase):
     def test_recent_probe_refreshes_first_batch_without_full_refresh(
         self, mock_utcnow: MagicMock, mock_cache: MagicMock, mock_fetch_batch: MagicMock
     ):
-        now = datetime(2026, 4, 20, tzinfo=timezone.utc)
+        now = datetime(2026, 4, 20, tzinfo=UTC)
         fetched_at = now - timedelta(hours=2)
         head_checked_at = now - YOUTUBE_RECENT_EPISODE_CHECK_FRESHNESS - timedelta(seconds=1)
         episode = self.episode
@@ -701,7 +701,7 @@ class TestGetYoutubeVideos(unittest.TestCase):
 
         result = get_youtube_videos("https://youtube.com/@test/videos", "Test Channel")
 
-        self.assertEqual({item.id for item in result}, {"vid123", "vid999"})
+        assert {item.id for item in result} == {"vid123", "vid999"}
         mock_fetch_batch.assert_called_once_with(
             "https://youtube.com/@test/videos",
             "Test Channel",
@@ -709,8 +709,8 @@ class TestGetYoutubeVideos(unittest.TestCase):
             10,
         )
         cached_payload = mock_cache.set.call_args.args[1]
-        self.assertEqual(cached_payload["fetched_at"], fetched_at.isoformat())
-        self.assertEqual(cached_payload["head_checked_at"], now.isoformat())
+        assert cached_payload["fetched_at"] == fetched_at.isoformat()
+        assert cached_payload["head_checked_at"] == now.isoformat()
 
     @patch("adrift.adapters.process.youtube.ytdlp._fetch_video_batch")
     @patch("adrift.adapters.process.youtube.ytdlp._CACHE")
@@ -718,7 +718,7 @@ class TestGetYoutubeVideos(unittest.TestCase):
     def test_recent_probe_is_skipped_when_head_check_is_fresh(
         self, mock_utcnow: MagicMock, mock_cache: MagicMock, mock_fetch_batch: MagicMock
     ):
-        now = datetime(2026, 4, 20, tzinfo=timezone.utc)
+        now = datetime(2026, 4, 20, tzinfo=UTC)
         episode = self.episode
         mock_utcnow.return_value = now
         mock_cache.get.return_value = _cached_payload(
@@ -727,7 +727,7 @@ class TestGetYoutubeVideos(unittest.TestCase):
 
         result = get_youtube_videos("https://youtube.com/@test/videos", "Test Channel")
 
-        self.assertEqual(result, [episode])
+        assert result == [episode]
         mock_fetch_batch.assert_not_called()
 
 

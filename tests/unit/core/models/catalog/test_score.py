@@ -7,7 +7,7 @@ controlled by the include_date flag directly.
 """
 
 import unittest
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
 from adrift.core.models import RssEpisode
 from adrift.core.services.catalog.alignment import (
@@ -20,7 +20,7 @@ from adrift.core.services.catalog.alignment import (
 
 
 def _dt(year: int, month: int, day: int) -> datetime:
-    return datetime(year, month, day, tzinfo=timezone.utc)
+    return datetime(year, month, day, tzinfo=UTC)
 
 
 def _ep(
@@ -95,7 +95,7 @@ class TestScoreIncludeDateTrue(unittest.TestCase):
         score_no_date = _score(ref_no_date, dl_no_date, _Sims(0.8), include_date=True)
 
         # Matching date should boost the score
-        self.assertGreater(score_with_date, score_no_date)
+        assert score_with_date > score_no_date
 
     def test_far_date_lowers_score_relative_to_no_date(self):
         ref = _candidate(_ep(pub_date=_dt(2020, 1, 1)), "episode abc")
@@ -109,7 +109,7 @@ class TestScoreIncludeDateTrue(unittest.TestCase):
 
         # Date is present but far apart — score should be lower than with no date signal,
         # since a 0.0 date score dilutes the weighted average.
-        self.assertLess(score_far_date, score_no_date)
+        assert score_far_date < score_no_date
 
     def test_containment_bonus_applied(self):
         # "denise huber" tokens are a subset of "disappearance of denise huber" tokens.
@@ -124,7 +124,7 @@ class TestScoreIncludeDateTrue(unittest.TestCase):
         score_without_containment = _score(ref2, dl2, _Sims(0.8), include_date=True)
 
         # Containment bonus should increase the score
-        self.assertGreater(score_with_containment, score_without_containment)
+        assert score_with_containment > score_without_containment
         # And the increment should match the defined constant
         self.assertAlmostEqual(
             score_with_containment - score_without_containment, _CONTAINMENT_BONUS, places=4
@@ -140,7 +140,7 @@ class TestScoreIncludeDateTrue(unittest.TestCase):
         score_with_overlap = _score(ref, dl, _Sims(0.8), include_date=True)
         score_without_overlap = _score(ref2, dl2, _Sims(0.8), include_date=True)
 
-        self.assertGreater(score_with_overlap, score_without_overlap)
+        assert score_with_overlap > score_without_overlap
         self.assertAlmostEqual(
             score_with_overlap - score_without_overlap,
             _ANCHOR_OVERLAP_BONUS,
@@ -153,7 +153,7 @@ class TestScoreIncludeDateTrue(unittest.TestCase):
         dl = _candidate(_ep(id="abc", pub_date=same_date), "episode abc")
         # Perfect title, same ID, same date — should not exceed 1.0
         result = _score(ref, dl, _Sims(1.0, 1.0), include_date=True)
-        self.assertLessEqual(result, 1.0)
+        assert result <= 1.0
 
 
 if __name__ == "__main__":

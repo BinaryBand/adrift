@@ -38,11 +38,13 @@ def help_command(
         return
 
     if not isinstance(root_command, click.Group):
-        raise typer.BadParameter("This command does not support subcommands.")
+        msg = "This command does not support subcommands."
+        raise typer.BadParameter(msg)
 
     target = root_command.get_command(root_ctx, command)
     if target is None:
-        raise typer.BadParameter(f"Unknown command '{command}'.", param_hint="command")
+        msg = f"Unknown command '{command}'."
+        raise typer.BadParameter(msg, param_hint="command")
 
     target_ctx = click.Context(
         target,

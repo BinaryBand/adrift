@@ -1,3 +1,5 @@
+"""Episode collection from feed sources, with dedup and parallel fetch."""
+
 from concurrent.futures import ThreadPoolExecutor
 from dataclasses import dataclass
 from itertools import repeat
@@ -24,6 +26,8 @@ from .alignment import align_episodes, prepare_alignment_batch
 
 @dataclass(frozen=True)
 class EpisodeFetchContext:
+    """Inputs for one collection pass (role, callbacks, source factory)."""
+
     title: str
     is_reference: bool
     callback: Callback | None = None
@@ -78,7 +82,8 @@ def _collect_episodes_with_traces(
             with ThreadPoolExecutor(max_workers=max_workers) as executor:
                 albums = list(executor.map(_fetch_source_album, sources, repeat(context)))
     traces = [
-        _build_source_trace(source, context, len(album)) for source, album in zip(sources, albums)
+        _build_source_trace(source, context, len(album))
+        for source, album in zip(sources, albums, strict=False)
     ]
 
     if not albums:
@@ -98,7 +103,8 @@ def _fetch_source_episodes(
     resolved = ensure_feed_source(source)
     factory = context.source_factory
     if factory is None:
-        raise RuntimeError("EpisodeFetchContext.source_factory must be set to fetch episodes")
+        msg = "EpisodeFetchContext.source_factory must be set to fetch episodes"
+        raise RuntimeError(msg)
     return factory.get(resolved).fetch_episodes(
         resolved,
         EpisodeSourceFetchContext(
@@ -168,6 +174,7 @@ def _fetch_context(
 def process_sources(
     config: PodcastConfig,
     callback: Callback | None = None,
+    *,
     refresh_sources: bool = False,
     source_factory: EpisodeSourceFactoryPort | None = None,
 ) -> list[RssEpisode]:
@@ -189,6 +196,7 @@ def process_sources(
 def process_feeds(
     config: PodcastConfig,
     callback: Callback | None = None,
+    *,
     refresh_sources: bool = False,
     source_factory: EpisodeSourceFactoryPort | None = None,
 ) -> list[RssEpisode]:

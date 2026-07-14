@@ -6,9 +6,6 @@ from pathlib import Path
 
 if __name__ == "__main__":
     # Run all YouTube tests in this directory
-    print("\n" + "=" * 70)
-    print("Running YouTube tests...")
-    print("=" * 70 + "\n")
 
     loader = unittest.TestLoader()
     start_dir = (Path(__file__).parent).as_posix()

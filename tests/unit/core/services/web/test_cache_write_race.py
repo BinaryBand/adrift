@@ -16,7 +16,8 @@ def test_cache_set_with_retry_retries_and_recreates_dir(tmp_path):
             calls.append((key, value, expire))
             # Fail the first time to simulate the diskcache FileNotFoundError
             if len(calls) == 1:
-                raise FileNotFoundError("simulated nested write failure")
+                msg = "simulated nested write failure"
+                raise FileNotFoundError(msg)
             return True
 
     dummy = DummyCache(tmp_path / "rss")
@@ -90,7 +91,8 @@ def test_fetch_rss_feed_str_uses_conditional_headers_on_304(monkeypatch):
             return cached_payload
 
         def set(self, key, value, expire=None):
-            raise AssertionError("cache write not expected on 304")
+            msg = "cache write not expected on 304"
+            raise AssertionError(msg)
 
     class MockResponse:
         def __init__(self, status_code: int):

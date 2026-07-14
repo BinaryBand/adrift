@@ -10,7 +10,7 @@ from __future__ import annotations
 import csv
 import math
 import unittest
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
 
 import pytest
@@ -22,7 +22,7 @@ from adrift.core.services.catalog import align_episodes_impl
 REPO_ROOT = Path(__file__).resolve().parents[4]
 SOURCE_TO_REF_CSV = REPO_ROOT / "docs" / ".dev" / "source_to_ref.csv"
 FOR_REVIEW_CSV = REPO_ROOT / "docs" / ".dev" / "for_review.csv"
-FIXED_PUB_DATE = datetime(2024, 1, 1, tzinfo=timezone.utc)
+FIXED_PUB_DATE = datetime(2024, 1, 1, tzinfo=UTC)
 # Current best-achieved floor with this scorer/config family is ~95%.
 _MIN_CONFIRMED_POSITIVE_MATCH_RATE = 0.95
 
@@ -34,11 +34,14 @@ _skip_without_fixtures = pytest.mark.skipif(
 
 
 def _camp_gagnon_alignment() -> AlignmentConfig:
-    configs = load_podcasts_config([str(REPO_ROOT / "static/config" / "podcasts.toml")], True)
+    configs = load_podcasts_config(
+        [str(REPO_ROOT / "static/config" / "podcasts.toml")], skip_schedule_filter=True
+    )
     for config in configs:
         if config.slug == "camp-gagnon":
             return config.alignment
-    raise AssertionError("Camp Gagnon config not found in static/config/podcasts.toml")
+    msg = "Camp Gagnon config not found in static/config/podcasts.toml"
+    raise AssertionError(msg)
 
 
 def _episode(idx: int, title: str, description: str, *, role: str) -> RssEpisode:
@@ -99,7 +102,7 @@ class TestCampGagnonQualityGate(unittest.TestCase):
         alignment = _camp_gagnon_alignment()
         positive_pairs = _load_confirmed_positive_pairs()
 
-        self.assertGreater(len(positive_pairs), 0, "Expected at least one positive pair")
+        assert len(positive_pairs) > 0, "Expected at least one positive pair"
 
         mismatches: list[str] = []
         matches = 0
@@ -113,14 +116,10 @@ class TestCampGagnonQualityGate(unittest.TestCase):
                 mismatches.append(f"Expected match for {source}: {ref_title!r} <> {dl_title!r}")
 
         required_matches = math.ceil(len(positive_pairs) * _MIN_CONFIRMED_POSITIVE_MATCH_RATE)
-        self.assertGreaterEqual(
-            matches,
-            required_matches,
-            (
-                f"Matched {matches}/{len(positive_pairs)} positives; "
-                f"required at least {required_matches}."
-            )
-            + ("\nExamples:\n" + "\n".join(mismatches[:10]) if mismatches else ""),
+        assert matches >= required_matches, (
+            f"Matched {matches}/{len(positive_pairs)} positives; "
+            f"required at least {required_matches}."
+            + ("\nExamples:\n" + "\n".join(mismatches[:10]) if mismatches else "")
         )
 
     @_skip_without_fixtures
@@ -128,11 +127,7 @@ class TestCampGagnonQualityGate(unittest.TestCase):
         alignment = _camp_gagnon_alignment()
         false_positive_pairs = _load_false_positive_pairs()
 
-        self.assertGreater(
-            len(false_positive_pairs),
-            0,
-            "Expected at least one false_positive pair",
-        )
+        assert len(false_positive_pairs) > 0, "Expected at least one false_positive pair"
 
         mismatches: list[str] = []
         for idx, (source, ref_title, dl_title, ref_desc, dl_desc) in enumerate(
@@ -146,7 +141,7 @@ class TestCampGagnonQualityGate(unittest.TestCase):
                     f"Expected no match for false_positive {source}: {ref_title!r} <> {dl_title!r}"
                 )
 
-        self.assertEqual([], mismatches, "\n".join(mismatches))
+        assert mismatches == [], "\n".join(mismatches)
 
 
 if __name__ == "__main__":

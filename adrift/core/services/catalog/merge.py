@@ -1,7 +1,9 @@
 # pyright: reportPrivateUsage=false
+"""Merge pipeline orchestration: collection, alignment, and A/B shadow runs."""
+
 import os
 from collections.abc import Callable
-from concurrent.futures import ThreadPoolExecutor
+from concurrent.futures import Future, ThreadPoolExecutor
 from dataclasses import dataclass, replace
 from time import perf_counter
 from typing import TypedDict, TypeVar, Unpack
@@ -37,6 +39,8 @@ from .merge_adapters import (
 
 @dataclass(frozen=True)
 class MergeConfigOptions:
+    """Injectable ports and knobs for one merge-config run."""
+
     callback: Callback | None = None
     refresh_sources: bool = False
     timings: dict[str, float] | None = None
@@ -55,6 +59,8 @@ class MergeConfigOptions:
 
 
 class MergeConfigOptionOverrides(TypedDict, total=False):
+    """Partial overrides applied on top of a base ``MergeConfigOptions``."""
+
     callback: Callback | None
     refresh_sources: bool
     timings: dict[str, float] | None
@@ -96,6 +102,7 @@ def _timed_stage(key: str, fn: Callable[[], _T], options: MergeConfigOptions) ->
 def _collect_with_port(
     collector: EpisodeCollectorPort,
     config: PodcastConfig,
+    *,
     is_reference: bool,
     options: MergeConfigOptions,
 ) -> tuple[list[RssEpisode], list[SourceTrace]]:
@@ -175,30 +182,31 @@ def _collect_feed_roles_parallel(
             collector,
             candidate_collector,
             config,
-            True,
-            options,
+            is_reference=True,
+            options=options,
         )
         download_future = _submit_collect_role(
             executor,
             collector,
             candidate_collector,
             config,
-            False,
-            options,
+            is_reference=False,
+            options=options,
         )
         references, reference_traces = reference_future.result()
         downloads, download_traces = download_future.result()
     return references, downloads, reference_traces, download_traces
 
 
-def _submit_collect_role(
+def _submit_collect_role(  # noqa: PLR0913 -- internal parallel-collection helper threading fixed collaborators
     executor: ThreadPoolExecutor,
     collector: EpisodeCollectorPort,
     candidate_collector: EpisodeCollectorPort | None,
     config: PodcastConfig,
+    *,
     is_reference: bool,
     options: MergeConfigOptions,
-):
+) -> Future[tuple[list[RssEpisode], list[SourceTrace]]]:
     return executor.submit(
         _collect_role_with_optional_candidate,
         collector,
@@ -267,7 +275,7 @@ def _resolved_scored_alignment_port(
     return None
 
 
-def _run_alignment_ab_candidate(
+def _run_alignment_ab_candidate(  # noqa: PLR0913 -- internal A/B-shadow helper threading fixed collaborators
     options: MergeConfigOptions,
     references: list[RssEpisode],
     downloads: list[RssEpisode],
@@ -290,19 +298,22 @@ def _run_alignment_ab_candidate(
 def _collect_candidate_episodes(
     candidate_port: EpisodeCollectorPort,
     config: PodcastConfig,
-    is_reference: bool,
     stage: str,
     options: MergeConfigOptions,
+    *,
+    is_reference: bool,
 ) -> list[RssEpisode]:
     episodes, _traces = _timed_stage(
         stage,
-        lambda: _collect_with_port(candidate_port, config, is_reference, options),
+        lambda: _collect_with_port(
+            candidate_port, config, is_reference=is_reference, options=options
+        ),
         options,
     )
     return episodes
 
 
-def _run_candidate_stage(
+def _run_candidate_stage(  # noqa: PLR0913 -- internal A/B-shadow helper threading fixed collaborators
     candidate_port: _T | None,
     stage_key: str,
     compare_stage: str,
@@ -316,7 +327,7 @@ def _run_candidate_stage(
     _compare_ab_result(compare_stage, options, primary_result, candidate_result)
 
 
-def _collect_role_with_optional_candidate(
+def _collect_role_with_optional_candidate(  # noqa: PLR0913 -- internal A/B-shadow helper threading fixed collaborators
     collector: EpisodeCollectorPort,
     candidate_collector: EpisodeCollectorPort | None,
     config: PodcastConfig,
@@ -329,16 +340,16 @@ def _collect_role_with_optional_candidate(
 ) -> tuple[list[RssEpisode], list[SourceTrace]]:
     episodes, traces = _timed_stage(
         primary_stage,
-        lambda: _collect_with_port(collector, config, is_reference, options),
+        lambda: _collect_with_port(collector, config, is_reference=is_reference, options=options),
         options,
     )
     if candidate_collector is not None:
         candidate_episodes = _collect_candidate_episodes(
             candidate_collector,
             config,
-            is_reference,
             candidate_stage,
             options,
+            is_reference=is_reference,
         )
         _compare_ab_result(compare_stage, options, episodes, candidate_episodes)
     return episodes, traces
@@ -397,7 +408,7 @@ def _primary_alignment_runner(
     return lambda: _align_with_selected_port(options, references, downloads, config)
 
 
-def _build_match_traces_with_ab(
+def _build_match_traces_with_ab(  # noqa: PLR0913 -- internal A/B-shadow helper threading fixed collaborators
     trace_builder: MatchTraceBuilderPort,
     options: MergeConfigOptions,
     references: list[RssEpisode],
@@ -480,7 +491,8 @@ def _resolved_collector_candidate_port(options: MergeConfigOptions) -> EpisodeCo
         return None
     if backend == "legacy":
         return LegacyEpisodeCollectorAdapter()
-    raise ValueError(f"Unsupported collector candidate backend: {backend}")
+    msg = f"Unsupported collector candidate backend: {backend}"
+    raise ValueError(msg)
 
 
 def _resolved_trace_builder_candidate_port(
@@ -493,7 +505,8 @@ def _resolved_trace_builder_candidate_port(
         return None
     if backend == "legacy":
         return LegacyTraceBuilderAdapter()
-    raise ValueError(f"Unsupported trace candidate backend: {backend}")
+    msg = f"Unsupported trace candidate backend: {backend}"
+    raise ValueError(msg)
 
 
 def _resolved_episode_merger_candidate_port(
@@ -506,7 +519,8 @@ def _resolved_episode_merger_candidate_port(
         return None
     if backend == "legacy":
         return LegacyEpisodeMergerAdapter()
-    raise ValueError(f"Unsupported merger candidate backend: {backend}")
+    msg = f"Unsupported merger candidate backend: {backend}"
+    raise ValueError(msg)
 
 
 def _candidate_backend_name(env_name: str) -> str | None:
@@ -546,4 +560,4 @@ def merge_config(
     )
 
 
-__all__ = ["MergeConfigOptions", "MergeConfigOptionOverrides", "merge_config"]
+__all__ = ["MergeConfigOptionOverrides", "MergeConfigOptions", "merge_config"]

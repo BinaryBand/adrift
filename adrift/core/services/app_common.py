@@ -1,4 +1,6 @@
 # cspell: ignore-word rrulestr
+"""Config loading, scheduling, and tag filtering for pipeline bootstrap."""
+
 import glob
 import os
 import random
@@ -19,19 +21,19 @@ from adrift.core.models import (
 from adrift.core.util.schedule import align_to_tzinfo, next_occurrence_in_window
 
 __all__ = [
-    "SourceFilter",
     "FeedSource",
     "PodcastConfig",
-    "ensure_source_filter",
+    "SourceFilter",
+    "bootstrap_run_configs",
     "ensure_feed_source",
     "ensure_podcast_config",
-    "parse_podcasts_raw",
-    "load_config",
-    "load_podcasts_config",
+    "ensure_source_filter",
     "filter_podcasts_by_tags",
-    "schedule_matches_today",
+    "load_config",
     "load_podcast_configs",
-    "bootstrap_run_configs",
+    "load_podcasts_config",
+    "parse_podcasts_raw",
+    "schedule_matches_today",
 ]
 
 
@@ -52,13 +54,13 @@ def _load_config(name_or_path: str) -> list[PodcastConfig]:
         # Resolve short name → static/config/<name>.toml
         path = Path("static/config") / f"{name_or_path}.toml"
 
-    with open(path, "rb") as f:
+    with path.open("rb") as f:
         data = tomllib.load(f)
 
     podcasts_raw = data.get("podcasts", [])
     if not isinstance(podcasts_raw, list):
         return []
-    configs = parse_podcasts_raw(cast(list[PodcastConfig], podcasts_raw))
+    configs = parse_podcasts_raw(cast("list[PodcastConfig]", podcasts_raw))
     random.shuffle(configs)
     return configs
 
@@ -66,24 +68,25 @@ def _load_config(name_or_path: str) -> list[PodcastConfig]:
 def schedule_matches_today(schedule: str, title: str, today: datetime | None = None) -> bool:
     """Return True if *schedule* yields an occurrence within today's day window."""
     del title
-    current = today or datetime.now()
+    current = today or datetime.now()  # noqa: DTZ005 -- schedule day-window is local time
     day_start, day_end = _day_window(current)
 
     try:
         next_occurrence = next_occurrence_in_window(schedule, day_start)
-        if next_occurrence is None:
-            return False
-        day_end = align_to_tzinfo(next_occurrence, day_end)
-        return next_occurrence < day_end
     except (TypeError, ValueError):
         # Fail closed: if RRULE is malformed we skip this schedule.
         return False
+    if next_occurrence is None:
+        return False
+    day_end = align_to_tzinfo(next_occurrence, day_end)
+    return next_occurrence < day_end
 
 
 _schedule_matches_today = schedule_matches_today
 
 
 def load_config(name_or_path: str) -> list[PodcastConfig]:
+    """Load podcast configs from a config name or TOML path."""
     return _load_config(name_or_path)
 
 
@@ -103,7 +106,7 @@ def _schedule_filtered_configs(configs: list[PodcastConfig]) -> list[PodcastConf
 
 
 def load_podcasts_config(
-    include: list[str], skip_schedule_filter: bool = False
+    include: list[str], *, skip_schedule_filter: bool = False
 ) -> list[PodcastConfig]:
     """Load podcast configurations, optionally filtering by schedule.
 
@@ -136,10 +139,7 @@ def filter_podcasts_by_tags(configs: list[PodcastConfig], tags: list[str]) -> li
             return True
         if cfg.slug.lower() in normalized_tags:
             return True
-        for tag in getattr(cfg, "tags", []):
-            if tag.lower() in normalized_tags:
-                return True
-        return False
+        return any(tag.lower() in normalized_tags for tag in getattr(cfg, "tags", []))
 
     return [cfg for cfg in configs if _matches_tag(cfg)]
 
@@ -150,9 +150,11 @@ _DEFAULT_OUTPUT_DIR = "downloads"
 
 def load_podcast_configs(
     include: list[str],
-    skip_schedule_filter: bool,
     tags: list[str],
+    *,
+    skip_schedule_filter: bool,
 ) -> list[PodcastConfig]:
+    """Load podcast configs, apply the schedule filter, then filter by tags."""
     configs = load_podcasts_config(include=include, skip_schedule_filter=skip_schedule_filter)
     return filter_podcasts_by_tags(configs, tags)
 
@@ -160,16 +162,20 @@ def load_podcast_configs(
 def bootstrap_run_configs(
     include: list[str] | None,
     tags: list[str] | None,
+    *,
     skip_schedule_filter: bool,
     output_dir: str | None = None,
 ) -> tuple[list[PodcastConfig], str]:
-    import dotenv
+    """Load env, resolve include/tags defaults, and return configs + output dir."""
+    import dotenv  # noqa: PLC0415 -- defer python-dotenv import to CLI bootstrap
 
     normalized_include = include or _DF_TARGETS
     normalized_tags = tags or []
     normalized_output_dir = output_dir or _DEFAULT_OUTPUT_DIR
     dotenv.load_dotenv()
-    configs = load_podcast_configs(normalized_include, skip_schedule_filter, normalized_tags)
+    configs = load_podcast_configs(
+        normalized_include, normalized_tags, skip_schedule_filter=skip_schedule_filter
+    )
     return configs, normalized_output_dir
 
 
@@ -182,11 +188,12 @@ def _expand_include_targets(include: list[str]) -> list[str]:
     targets: list[str] = []
     for target in include:
         if any(ch in target for ch in ("*", "?", "[")):
-            matches = sorted(glob.glob(target))
+            # stdlib glob handles arbitrary shell-style patterns; Path.glob cannot.
+            matches = sorted(glob.glob(target))  # noqa: PTH207
             head, tail = os.path.split(target)
             if tail and not tail.startswith("."):
-                hidden_target = os.path.join(head, f".{tail}") if head else f".{tail}"
-                matches.extend(sorted(glob.glob(hidden_target)))
+                hidden_target = str(Path(head) / f".{tail}") if head else f".{tail}"
+                matches.extend(sorted(glob.glob(hidden_target)))  # noqa: PTH207
             targets.extend(list(dict.fromkeys(matches)))
         else:
             targets.append(target)

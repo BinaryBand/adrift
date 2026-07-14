@@ -1,8 +1,8 @@
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 
 from adrift.core.services.web.sponsorblock import compute_ad_segments_expiry
 
-_FETCHED_AT = datetime(2026, 6, 1, tzinfo=timezone.utc)
+_FETCHED_AT = datetime(2026, 6, 1, tzinfo=UTC)
 
 
 def test_young_video_gets_short_ttl() -> None:

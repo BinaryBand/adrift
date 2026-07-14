@@ -1,3 +1,5 @@
+"""Catalog use-cases: collection, alignment, and merge orchestration."""
+
 # pyright: reportPrivateUsage=false
 
 from .alignment import (
@@ -22,16 +24,16 @@ from .merge import (
 
 __all__ = [
     "EpisodeFetchContext",
-    "MergeConfigOptions",
     "MergeConfigOptionOverrides",
+    "MergeConfigOptions",
     "align_episodes",
     "align_episodes_impl",
     "match",
     "merge_config",
     "merge_episode",
     "merge_episode_pairs",
+    "prepare_alignment_batch",
     "process_feeds",
     "process_sources",
-    "prepare_alignment_batch",
     "sim_date",
 ]

@@ -1,3 +1,5 @@
+"""Hashing helpers (SHA-256 over strings and files)."""
+
 # cspell: words nokey noprint
 
 import hashlib

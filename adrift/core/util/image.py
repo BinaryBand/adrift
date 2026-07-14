@@ -33,7 +33,7 @@ def extract_image_from_feedparser(obj: object) -> str:
     return _str_from_mapping(obj, "href", "url") or _str_from_attrs(obj, "href", "url")
 
 
-def extract_image_from_ytdlp(value: Any) -> str:
+def extract_image_from_ytdlp(value: object) -> str:
     """Extract an image URL from a YtDlpImage model or raw dict."""
     if isinstance(value, dict):
         url_value = value.get("url")

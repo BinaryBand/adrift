@@ -22,4 +22,4 @@ def parse_duration(duration_str: str | None) -> float | None:
     if weights is None:
         logger.warning("Unrecognized duration format: %s", duration_str)
         return None
-    return sum(w * float(p) for w, p in zip(weights, parts))
+    return sum(w * float(p) for w, p in zip(weights, parts, strict=False))

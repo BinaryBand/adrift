@@ -54,47 +54,35 @@ def _assert_title_normalization_rules_valid(tc: unittest.TestCase, podcast: Podc
                 f"{podcast.name}: invalid title normalization replacement pattern "
                 f"{replacement.pattern!r}: {exc}"
             )
-        tc.assertIn(
-            replacement.target,
-            {"title", "slug"},
-            f"{podcast.name}: invalid title normalization target {replacement.target!r}",
+        assert replacement.target in {"title", "slug"}, (
+            f"{podcast.name}: invalid title normalization target {replacement.target!r}"
         )
 
 
 def _assert_schedule_rules_valid(tc: unittest.TestCase, podcast: PodcastConfig) -> None:
     for rule in podcast.schedule:
-        tc.assertIsInstance(rule, str)
-        tc.assertTrue(
-            rule.startswith("FREQ=")
-            or (
-                "DTSTART:" in rule.upper() and "RRULE:" in rule.upper() and "FREQ=" in rule.upper()
-            ),
-            f"{podcast.name}: unsupported schedule format {rule!r}",
-        )
+        assert isinstance(rule, str)
+        assert rule.startswith("FREQ=") or (
+            "DTSTART:" in rule.upper() and "RRULE:" in rule.upper() and "FREQ=" in rule.upper()
+        ), f"{podcast.name}: unsupported schedule format {rule!r}"
 
     for fs in podcast.references + podcast.downloads:
         for rule in fs.filters.r_rules:
-            tc.assertIsInstance(rule, str)
-            tc.assertTrue(
-                rule.startswith("FREQ=")
-                or (
-                    "DTSTART:" in rule.upper()
-                    and "RRULE:" in rule.upper()
-                    and "FREQ=" in rule.upper()
-                ),
-                f"{podcast.name}: invalid r_rules entry {rule!r}",
-            )
+            assert isinstance(rule, str)
+            assert rule.startswith("FREQ=") or (
+                "DTSTART:" in rule.upper() and "RRULE:" in rule.upper() and "FREQ=" in rule.upper()
+            ), f"{podcast.name}: invalid r_rules entry {rule!r}"
 
 
 def _assert_feed_source_valid(tc: unittest.TestCase, podcast: PodcastConfig) -> None:
     for fs in podcast.references:
-        tc.assertIsInstance(fs.url, str)
-        tc.assertTrue(is_valid_url(fs.url), f"Invalid reference URL: {fs.url}")
+        assert isinstance(fs.url, str)
+        assert is_valid_url(fs.url), f"Invalid reference URL: {fs.url}"
         _assert_filter_rules_valid(tc, fs.filters, f"{podcast.name} reference {fs.url} filters")
 
     for fs in podcast.downloads:
-        tc.assertIsInstance(fs.url, str)
-        tc.assertTrue(is_valid_url(fs.url), f"Invalid download URL: {fs.url}")
+        assert isinstance(fs.url, str)
+        assert is_valid_url(fs.url), f"Invalid download URL: {fs.url}"
         _assert_filter_rules_valid(tc, fs.filters, f"{podcast.name} download {fs.url} filters")
 
 
@@ -110,10 +98,10 @@ class AuditConfigs(unittest.TestCase):
         for file in all_files:
             configs.extend(load_config(file.as_posix()))  # type: ignore[name-defined]
 
-        self.assertGreater(len(configs), 0, "No podcast configs found")
+        assert len(configs) > 0, "No podcast configs found"
 
         for podcast in configs:
-            self.assertIsInstance(podcast, PodcastConfig)
+            assert isinstance(podcast, PodcastConfig)
             _assert_title_normalization_rules_valid(self, podcast)
             _assert_feed_source_valid(self, podcast)
             _assert_schedule_rules_valid(self, podcast)
@@ -131,7 +119,7 @@ class ExpandIncludeTargets(unittest.TestCase):
 
             expanded = _expand_include_targets([f"{config_dir}/*.toml"])
 
-            self.assertEqual(expanded, [visible.as_posix(), hidden.as_posix()])
+            assert expanded == [visible.as_posix(), hidden.as_posix()]
 
 
 if __name__ == "__main__":

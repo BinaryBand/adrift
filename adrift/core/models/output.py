@@ -1,3 +1,5 @@
+"""Output feed models: merged episode records and the emitted podcast feed."""
+
 from datetime import datetime
 
 from pydantic import BaseModel

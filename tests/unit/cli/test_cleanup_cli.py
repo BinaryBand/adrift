@@ -163,7 +163,7 @@ def test_process_unmatched_skips_slug_collisions_with_matched_downloads(
 
         def exists(self, bucket: str, key_prefix: str) -> str | None:
             _ = bucket
-            return f"{key_prefix.split('/')[-1]}.opus"
+            return f"{key_prefix.rsplit('/', maxsplit=1)[-1]}.opus"
 
         def delete(self, bucket: str, key: str) -> None:
             _ = bucket

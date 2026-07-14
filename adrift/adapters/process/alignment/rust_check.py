@@ -35,10 +35,7 @@ def can_load_rust_extension() -> bool:
 def should_skip_rust_compilation() -> bool:
     """Check if Rust compilation should be skipped."""
     skip_vars = ["ADRIFT_SKIP_RUST_COMPILE", "SKIP_RUST_COMPILE"]
-    for var in skip_vars:
-        if os.getenv(var, "").lower() in ("1", "true", "yes"):
-            return True
-    return False
+    return any(os.getenv(var, "").lower() in ("1", "true", "yes") for var in skip_vars)
 
 
 def _run_maturin_compile() -> bool:

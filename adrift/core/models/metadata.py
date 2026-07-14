@@ -1,8 +1,11 @@
+"""Metadata and RSS domain models (S3 sidecar metadata, channels, episodes)."""
+
 import json
 import os
 from abc import ABC, abstractmethod
+from collections.abc import Callable
 from datetime import datetime
-from typing import Any, Callable
+from typing import Any
 
 import pydantic
 from pydantic import BaseModel, ConfigDict, field_validator
@@ -18,7 +21,9 @@ class S3Metadata(pydantic.BaseModel, ABC):
     uploader: str | None = pydantic.Field(default=DEVICE, description="Device identifier")
 
     @abstractmethod
-    def to_dict(self) -> dict[str, str]: ...
+    def to_dict(self) -> dict[str, str]:
+        """Return the metadata as a flat string-keyed dict for storage."""
+        ...
 
 
 class CacheMetadata(S3Metadata):
@@ -55,7 +60,7 @@ class MediaMetadata(S3Metadata):
 
     @field_validator("ad_segments", mode="before")
     @classmethod
-    def _parse_ad_segments(cls, value: Any) -> Any:
+    def _parse_ad_segments(cls, value: Any) -> Any:  # noqa: ANN401 -- pydantic validator input is raw
         if isinstance(value, str):
             return json.loads(value) if value else []
         return value
@@ -109,6 +114,8 @@ class YtDlpParams(BaseModel):
 
 
 class RssChannel(BaseModel):
+    """Channel-level metadata for a podcast feed."""
+
     title: str
     author: str
     subtitle: str
@@ -118,6 +125,8 @@ class RssChannel(BaseModel):
 
 
 class RssEpisode(BaseModel):
+    """A single podcast episode from a reference or download source."""
+
     id: str
     title: str
     author: str

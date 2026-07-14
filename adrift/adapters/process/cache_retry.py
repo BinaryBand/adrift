@@ -4,9 +4,10 @@ from __future__ import annotations
 
 import time
 from pathlib import Path
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
-from adrift.core.ports import CachePort
+if TYPE_CHECKING:
+    from adrift.core.ports import CachePort
 
 _CACHE_RECREATE_ERRORS = (AttributeError, OSError, RuntimeError, TypeError, ValueError)
 
@@ -20,7 +21,9 @@ class RaceAwareCacheWrapper:
     recreation.
     """
 
-    def __init__(self, cache: CachePort[Any], max_attempts: int = 3, retry_delay: float = 0.05):
+    def __init__(
+        self, cache: CachePort[Any], max_attempts: int = 3, retry_delay: float = 0.05
+    ) -> None:
         """Initialize the wrapper.
 
         Args:

@@ -45,7 +45,8 @@ def _normalize_youtube_link(url: str) -> str:
     if YOUTUBE_PLAYLIST_URL.match(url) is not None:
         return url
 
-    raise ValueError("Invalid YouTube channel or playlist URL")
+    msg = "Invalid YouTube channel or playlist URL"
+    raise ValueError(msg)
 
 
 def _channel_to_rss(channel_info: ytdlp.ChannelInfo, url: str) -> RssChannel:
@@ -56,10 +57,10 @@ def _channel_to_rss(channel_info: ytdlp.ChannelInfo, url: str) -> RssChannel:
 def _get_youtube_channel(url: str) -> RssChannel:
     """Fetch YouTube channel and return as RssChannel."""
     if (channel_info := ytdlp.get_channel_info(url)) is not None:
-        channel = _channel_to_rss(channel_info, url)
-        return channel
+        return _channel_to_rss(channel_info, url)
 
-    raise ValueError(f"Failed to fetch YouTube channel info from {url}")
+    msg = f"Failed to fetch YouTube channel info from {url}"
+    raise ValueError(msg)
 
 
 def get_youtube_channel(url: str, author: str) -> RssChannel:
@@ -100,7 +101,6 @@ def _maybe_update_description(episode: RssEpisode, info: ytdlp.VideoInfo) -> Non
 
 def _fetch_video_info(video_id: str) -> ytdlp.VideoInfo | None:
     """Wrapper around ytdlp.get_video_info with centralized error handling."""
-
     try:
         return ytdlp.get_video_info(video_id)
     except _VIDEO_INFO_FETCH_ERRORS as e:

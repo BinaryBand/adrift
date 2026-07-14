@@ -1,3 +1,5 @@
+"""Per-podcast title and slug normalization rules."""
+
 # cspell: words creepcast darknet gladwell smosh
 import pathlib
 import tomllib
@@ -33,7 +35,7 @@ class _ShowRule:
     replacements: tuple[_RegexReplacement, ...] = ()
 
 
-def _coerce_replacement_rules(value: Any) -> tuple[_RegexReplacement, ...]:
+def _coerce_replacement_rules(value: object) -> tuple[_RegexReplacement, ...]:
     if not isinstance(value, list):
         return ()
     rules: list[_RegexReplacement] = []
@@ -48,7 +50,7 @@ def _coerce_replacement_rules(value: Any) -> tuple[_RegexReplacement, ...]:
     return tuple(rules)
 
 
-def _coerce_str_tuple(value: Any) -> tuple[str, ...]:
+def _coerce_str_tuple(value: object) -> tuple[str, ...]:
     if not isinstance(value, list):
         return ()
     return tuple(str(item) for item in value)
@@ -91,7 +93,7 @@ _CONFIG_PATH = pathlib.Path("static/config") / "podcasts.toml"
 
 def _load_show_rules() -> dict[str, _ShowRule]:
     try:
-        with open(_CONFIG_PATH, "rb") as f:
+        with _CONFIG_PATH.open("rb") as f:
             config = tomllib.load(f)
     except FileNotFoundError:
         return {}
@@ -164,6 +166,7 @@ def _strip_slug_suffixes(show: str, slug: str) -> str:
 
 @lru_cache(maxsize=2048)
 def normalize_title(show: str, episode: str) -> str:
+    """Return the normalized episode title for ``show`` (memoized on disk)."""
     key = (show, episode)
     cached: str | None = _TITLE_DISK_CACHE.get(key)
     if cached is not None:

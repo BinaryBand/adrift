@@ -1,5 +1,5 @@
 import hashlib
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
 from types import SimpleNamespace
 
@@ -56,9 +56,9 @@ def _ctx_with_storage(storage: object) -> AppContext:
 def test_build_download_queue_prioritizes_missing_then_newest(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    newest_missing = _episode("Newest Missing", datetime(2026, 4, 20, tzinfo=timezone.utc))
-    older_missing = _episode("Older Missing", datetime(2026, 4, 10, tzinfo=timezone.utc))
-    newest_existing = _episode("Newest Existing", datetime(2026, 4, 21, tzinfo=timezone.utc))
+    newest_missing = _episode("Newest Missing", datetime(2026, 4, 20, tzinfo=UTC))
+    older_missing = _episode("Older Missing", datetime(2026, 4, 10, tzinfo=UTC))
+    newest_existing = _episode("Newest Existing", datetime(2026, 4, 21, tzinfo=UTC))
 
     existing_titles = {"Newest Existing"}
 
@@ -88,7 +88,7 @@ def test_build_download_queue_prioritizes_missing_then_newest(
 def test_build_download_queue_preserves_unknown_dates_after_dated_missing(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    dated_missing = _episode("Dated Missing", datetime(2026, 4, 20, tzinfo=timezone.utc))
+    dated_missing = _episode("Dated Missing", datetime(2026, 4, 20, tzinfo=UTC))
     undated_missing = _episode("Undated Missing")
 
     def _always_missing(ep: DownloadEpisode, config: PodcastConfig, ctx: AppContext) -> bool:
@@ -119,7 +119,7 @@ def test_episode_exists_in_storage_matches_existing_youtube_video_id(
             title="New YouTube Title",
             author="CreepCast",
             content="https://youtube.com/watch?v=stable-video-id",
-            pub_date=datetime(2026, 4, 20, tzinfo=timezone.utc),
+            pub_date=datetime(2026, 4, 20, tzinfo=UTC),
         ),
         sponsor_segments=[],
         video_id="stable-video-id",
@@ -132,7 +132,7 @@ def test_episode_exists_in_storage_matches_existing_youtube_video_id(
     fake.get_metadata = lambda bucket, key: MediaMetadata(
         duration=1.0,
         source="https://youtube.com/watch?v=stable-video-id",
-        upload_date=datetime(2026, 4, 19, tzinfo=timezone.utc),
+        upload_date=datetime(2026, 4, 19, tzinfo=UTC),
     )
     assert episode_exists_in_storage(episode, config, _ctx_with_storage(fake)) is True
 
@@ -146,7 +146,7 @@ def test_episode_exists_in_storage_matches_existing_direct_source_url(
             title="Renamed Direct Source",
             author="Test Show",
             content="https://cdn.example.com/audio/episode.mp3",
-            pub_date=datetime(2026, 4, 20, tzinfo=timezone.utc),
+            pub_date=datetime(2026, 4, 20, tzinfo=UTC),
         ),
         sponsor_segments=[],
         video_id=None,
@@ -164,7 +164,7 @@ def test_episode_exists_in_storage_matches_existing_direct_source_url(
     fake.get_metadata = lambda bucket, key: MediaMetadata(
         duration=1.0,
         source="https://cdn.example.com/audio/episode.mp3",
-        upload_date=datetime(2026, 4, 19, tzinfo=timezone.utc),
+        upload_date=datetime(2026, 4, 19, tzinfo=UTC),
     )
     assert episode_exists_in_storage(episode, config, _ctx_with_storage(fake)) is True
 
@@ -178,7 +178,7 @@ def test_episode_exists_in_storage_matches_cleaned_existing_filename(
             title="Ann & Billy Woodward",
             author="Morbid",
             content="https://youtube.com/watch?v=woodward-video",
-            pub_date=datetime(2026, 4, 20, tzinfo=timezone.utc),
+            pub_date=datetime(2026, 4, 20, tzinfo=UTC),
         ),
         sponsor_segments=[],
         video_id="woodward-video",
@@ -250,7 +250,7 @@ def test_process_in_tmpdir_reports_upload_progress(
         captured["file_path"] = file_path
         captured["options"] = options
         assert options is not None
-        assert getattr(options, "callback") is not None
+        assert options.callback is not None
         # mypy/pyright can't infer the callable shape here; call dynamically
         options.callback(3, 10)  # type: ignore[union-attr]
 
@@ -286,7 +286,7 @@ def test_process_in_tmpdir_reports_upload_progress(
 def test_process_in_tmpdir_sets_ad_segments_expiry_when_segments_found(
     monkeypatch: pytest.MonkeyPatch, tmp_path: Path
 ) -> None:
-    episode = _episode("Sponsor Segments", pub_date=datetime(2020, 1, 1, tzinfo=timezone.utc))
+    episode = _episode("Sponsor Segments", pub_date=datetime(2020, 1, 1, tzinfo=UTC))
     episode.sponsor_segments = [(0.0, 30.0)]
     config = _config()
     audio_path = tmp_path / "audio.m4a"
@@ -326,4 +326,4 @@ def test_process_in_tmpdir_sets_ad_segments_expiry_when_segments_found(
     assert isinstance(metadata, MediaMetadata)
     assert metadata.ad_segments == [(0.0, 30.0)]
     assert metadata.ad_segments_expires_at is not None
-    assert metadata.ad_segments_expires_at > datetime.now(tz=timezone.utc)
+    assert metadata.ad_segments_expires_at > datetime.now(tz=UTC)

@@ -39,7 +39,7 @@ class SkippedDownloadError(Exception):
     E.g., members-only, private, removed, geo-restricted, etc.
     """
 
-    def __init__(self, reason: str):
+    def __init__(self, reason: str) -> None:
         self.reason = reason
         super().__init__(reason)
 
@@ -235,9 +235,9 @@ def _ydl_opts_dict(opts: YtDlpParams | dict[str, Any]) -> dict[str, Any]:
 
 
 def _extract_download_info(url: str, opts: YtDlpParams | dict[str, Any]) -> dict[str, Any]:
-    with yt_dlp.YoutubeDL(cast(Any, _ydl_opts_dict(opts))) as ydl:
+    with yt_dlp.YoutubeDL(cast("Any", _ydl_opts_dict(opts))) as ydl:
         info = ydl.extract_info(url, download=True)
-    return cast(dict[str, Any], info)
+    return cast("dict[str, Any]", info)
 
 
 def _is_unavailable_format_error(error: Exception) -> bool:
@@ -260,7 +260,7 @@ def _retry_reason(error: Exception) -> str:
 
 
 def _log_stub_format(path: Path, size: int, info_dict: dict[str, Any]) -> None:
-    dl = cast(dict[str, Any], (info_dict.get("requested_downloads") or [{}])[0])
+    dl = cast("dict[str, Any]", (info_dict.get("requested_downloads") or [{}])[0])
     fmt = dl.get("format") or info_dict.get("format", "unknown")
     acodec = dl.get("acodec") or info_dict.get("acodec", "?")
     vcodec = dl.get("vcodec") or info_dict.get("vcodec", "?")
@@ -377,4 +377,3 @@ def _handle_download_failure(url: str, error: Exception) -> None:
     if _is_bot_detection_error(error_msg) and PROPAGATE_BOT_DETECTION:
         raise BotDetectionError(error_msg)
     emit_warning(f"download failed for {url}: {error}")
-    return None

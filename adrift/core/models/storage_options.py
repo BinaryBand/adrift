@@ -1,8 +1,10 @@
+"""Options model for storage uploads."""
+
 from __future__ import annotations
 
 from pydantic import BaseModel, ConfigDict
 
-from adrift.core.models import S3Metadata
+from adrift.core.models.metadata import S3Metadata
 from adrift.core.util.progress import Callback
 
 

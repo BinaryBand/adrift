@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import tempfile
 from dataclasses import dataclass
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
 from typing import TYPE_CHECKING
 
@@ -29,11 +29,14 @@ from adrift.core.util.crypto import sha256_file
 from adrift.core.util.title_normalization import normalize_title
 
 if TYPE_CHECKING:
+    from adrift.core.ports import Callback
     from adrift.core.services.context import AppContext
 
 
 @dataclass(frozen=True)
 class DownloadQueueItem:
+    """A queued episode plus whether it already exists in storage."""
+
     episode: DownloadEpisode
     exists_in_storage: bool
 
@@ -43,6 +46,7 @@ def _episode_slug(config: PodcastConfig, ep: DownloadEpisode) -> str:
 
 
 def episode_exists_in_storage(ep: DownloadEpisode, config: PodcastConfig, ctx: AppContext) -> bool:
+    """Return True if ``ep`` is already uploaded for ``config``."""
     bucket, prefix = storage_prefix(config)
     cleaned_slug = _episode_slug(config, ep)
     key_prefix = f"{prefix}/{cleaned_slug}"
@@ -54,6 +58,7 @@ def episode_exists_in_storage(ep: DownloadEpisode, config: PodcastConfig, ctx: A
 def build_download_queue(
     episodes: list[DownloadEpisode], config: PodcastConfig, ctx: AppContext
 ) -> list[DownloadQueueItem]:
+    """Build the queue of episodes, flagging those already in storage."""
     queue = [
         DownloadQueueItem(
             episode=episode,
@@ -75,9 +80,9 @@ def _download_queue_sort_key(item: DownloadQueueItem) -> tuple[bool, float, str]
 
 def _episode_sort_timestamp(pub_date: datetime | None) -> float:
     if pub_date is None:
-        return datetime.min.replace(tzinfo=timezone.utc).timestamp()
+        return datetime.min.replace(tzinfo=UTC).timestamp()
     if pub_date.tzinfo is None:
-        pub_date = pub_date.replace(tzinfo=timezone.utc)
+        pub_date = pub_date.replace(tzinfo=UTC)
     return pub_date.timestamp()
 
 
@@ -104,6 +109,7 @@ def process_in_tmpdir(
     tmp: Path,
     ctx: AppContext,
 ) -> bool:
+    """Download, convert, and upload ``ep`` using ``tmp`` as scratch space."""
     bucket, prefix = storage_prefix(config)
     key_prefix = f"{prefix}/{_episode_slug(config, ep)}"
     audio = _download_episode_audio(ep, tmp, ctx)
@@ -144,7 +150,7 @@ def _upload_and_publish_completion(
     return True
 
 
-def _progress_callback(ctx: AppContext):
+def _progress_callback(ctx: AppContext) -> Callback:
     def callback(current: int, total: int | None) -> None:
         ctx.event_bus.publish(ProgressUpdated(current=current, total=total))
 
@@ -155,7 +161,8 @@ def _download_audio(ep: DownloadEpisode, dest: Path, ctx: AppContext) -> Path | 
     callback = _progress_callback(ctx)
     if ep.video_id:
         if ctx.video_downloader is None:
-            raise RuntimeError("AppContext.video_downloader must be set to download video sources")
+            msg = "AppContext.video_downloader must be set to download video sources"
+            raise RuntimeError(msg)
         return ctx.video_downloader.download(ep.episode.content, dest, callback=callback)
     return download_direct(ep.episode.content, dest)
 
@@ -171,9 +178,9 @@ def _prepare_upload_audio(ep: DownloadEpisode, audio: Path, ctx: AppContext) -> 
 
 
 def _build_metadata(ep: DownloadEpisode, opus: Path, duration: float | None) -> MediaMetadata:
-    pub_date = ep.episode.pub_date or datetime.now(tz=timezone.utc)
-    now = datetime.now(tz=timezone.utc)
-    video_age_days = (now - pub_date.replace(tzinfo=pub_date.tzinfo or timezone.utc)).days
+    pub_date = ep.episode.pub_date or datetime.now(tz=UTC)
+    now = datetime.now(tz=UTC)
+    video_age_days = (now - pub_date.replace(tzinfo=pub_date.tzinfo or UTC)).days
     return MediaMetadata(
         duration=duration or 0.0,
         source=ep.episode.content,
@@ -189,7 +196,7 @@ def _build_metadata(ep: DownloadEpisode, opus: Path, duration: float | None) -> 
 __all__ = [
     "DownloadQueueItem",
     "build_download_queue",
-    "episode_exists_in_storage",
     "download_and_upload",
+    "episode_exists_in_storage",
     "process_in_tmpdir",
 ]

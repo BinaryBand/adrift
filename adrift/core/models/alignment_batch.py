@@ -1,3 +1,5 @@
+"""Immutable value objects describing a prepared alignment batch."""
+
 from __future__ import annotations
 
 from dataclasses import dataclass

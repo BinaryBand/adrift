@@ -173,7 +173,7 @@ def _run(
         with _maybe_profile():
             load_start = perf_counter()
             configs, output_dir = bootstrap_run_configs(
-                include, tags, skip_schedule_filter, output_dir
+                include, tags, skip_schedule_filter=skip_schedule_filter, output_dir=output_dir
             )
             load_duration = perf_counter() - load_start
             if timings:

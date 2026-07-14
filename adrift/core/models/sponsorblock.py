@@ -1,3 +1,5 @@
+"""SponsorBlock segment models and category/action literals."""
+
 from typing import Literal
 
 from pydantic import BaseModel, ConfigDict, Field
@@ -9,7 +11,7 @@ Category = Literal[
 
 
 class SponsorSegment(BaseModel):
-    """https://wiki.sponsor.ajay.app/w/API_Docs#GET_/api/skipSegments"""
+    """https://wiki.sponsor.ajay.app/w/API_Docs#GET_/api/skipSegments."""
 
     segment: tuple[float, float]
     uuid: str = Field(alias="UUID")

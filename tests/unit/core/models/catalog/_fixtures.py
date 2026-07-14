@@ -2,7 +2,7 @@
 
 import csv
 from dataclasses import dataclass
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
@@ -12,7 +12,7 @@ from adrift.core.services.catalog import align_episodes_impl
 
 def dt(year: int, month: int, day: int) -> datetime:
     """Return a timezone-aware UTC datetime."""
-    return datetime(year, month, day, tzinfo=timezone.utc)
+    return datetime(year, month, day, tzinfo=UTC)
 
 
 def ep(

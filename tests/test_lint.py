@@ -6,9 +6,12 @@ import os
 import subprocess
 from pathlib import Path
 from shutil import which
-from typing import Any, Iterable
+from typing import TYPE_CHECKING, Any
 
 import pytest
+
+if TYPE_CHECKING:
+    from collections.abc import Iterable
 
 ROOT: Path = Path(__file__).resolve().parents[1]
 VENV_BIN = ROOT / ".venv" / "bin"
@@ -59,7 +62,7 @@ class TestCpd:
     """Ensure the codebase passes copy-paste detection checks."""
 
     @pytest.mark.parametrize(
-        "config,path",
+        ("config", "path"),
         [("static/rules/jscpd.json", "."), ("static/rules/jscpd.tests.json", "tests")],
     )
     def test_cpd(self, config, path):

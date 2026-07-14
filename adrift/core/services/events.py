@@ -3,8 +3,10 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+from typing import TYPE_CHECKING
 
-from adrift.core.models import RssEpisode
+if TYPE_CHECKING:
+    from adrift.core.models import RssEpisode
 
 
 @dataclass(frozen=True)
@@ -41,8 +43,8 @@ class DownloadFailed:
 
 
 __all__ = [
-    "OperationStarted",
-    "ProgressUpdated",
     "DownloadCompleted",
     "DownloadFailed",
+    "OperationStarted",
+    "ProgressUpdated",
 ]

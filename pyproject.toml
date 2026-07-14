@@ -75,20 +75,37 @@ markers = [
 line-length = 100
 
 [tool.ruff.lint]
-# S101 bans bare `assert` outside tests; use explicit exceptions since
-# assertions can be disabled with -O.
-# NOTE: intentionally not yet `select = ["ALL"]` per docs/.PLAN.md Phase 1 --
-# the pydocstyle/mccabe/pylint config below is staged ahead of that flip so
-# Phase 3 only needs to change `select` and pay down the resulting findings.
-select = ["E", "F", "I", "S101"]
+# Strict by default: enable every stable rule, then subtract only the rules
+# that conflict with each other, conflict with the formatter, or that we have
+# a deliberate policy reason to drop. Every ignore below is justified inline so
+# the ruleset is auditable and identical across projects.
+select = ["ALL"]
+ignore = [
+    # Docstring rules that conflict with the google convention set below.
+    "D203",   # one-blank-line-before-class (conflicts with D211)
+    "D213",   # multi-line-summary-second-line (conflicts with D212)
+    # Rules that conflict with `ruff format`.
+    "COM812", # missing-trailing-comma
+    "ISC001", # single-line-implicit-string-concatenation
+    # Deliberate policy opt-outs.
+    "CPY001", # missing-copyright-notice -- not wanted on internal projects
+]
 
 [tool.ruff.lint.per-file-ignores]
-# The tail entries in each list (beyond S101) are inert today -- they only
-# take effect once `select` flips to `ALL` in Phase 3 -- and are staged here
-# so that flip does not require touching this table.
-"tests/**" = ["S101", "S", "PLR2004", "ANN", "D", "INP001", "SLF001"]
-"conftest.py" = ["S101"]
+# Tests legitimately assert, shell out, touch private members, use magic
+# values, and skip docstrings/annotations.
+"tests/**" = ["S", "PLR2004", "ANN", "D", "INP001", "SLF001"]
+# The CLI layer is the one place print() is a legitimate output channel, and
+# Typer's idioms are intentional: callables as argument/option defaults (B008)
+# and boolean flags as parameters (FBT001/FBT002).
 "adrift/cli/**" = ["T20", "B008", "FBT001", "FBT002"]
+
+[tool.ruff.lint.flake8-type-checking]
+# adrift's domain models are pydantic; with `from __future__ import annotations`
+# pydantic resolves field annotations at runtime (model_rebuild), so imports
+# used only in those annotations must NOT be hoisted into `TYPE_CHECKING`.
+# Marking BaseModel as runtime-evaluated stops TC001-3 from breaking them.
+runtime-evaluated-base-classes = ["pydantic.BaseModel"]
 
 [tool.ruff.lint.pydocstyle]
 convention = "google"

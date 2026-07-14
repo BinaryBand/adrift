@@ -4,9 +4,10 @@ Place small fake providers and helpers here to avoid repeating identical
 test scaffolding across many test modules.
 """
 
-from datetime import datetime, timezone
+from collections.abc import Callable
+from datetime import UTC, datetime
 from types import SimpleNamespace
-from typing import Any, Callable
+from typing import Any
 
 from adrift.core.models import (
     EpisodeData,
@@ -113,7 +114,7 @@ def _rss_episode(identifier: str, title: str, content: str) -> RssEpisode:
         author="Example Author",
         content=content,
         description=f"Description for {title}",
-        pub_date=datetime(2024, 1, 1, tzinfo=timezone.utc),
+        pub_date=datetime(2024, 1, 1, tzinfo=UTC),
     )
 
 
@@ -123,7 +124,7 @@ def _merged_episode() -> EpisodeData:
         title="Merged Episode",
         description="Merged description",
         source=["https://example.com/reference-1.mp3", "https://youtube.com/watch?v=abc123"],
-        upload_date=datetime(2024, 1, 1, tzinfo=timezone.utc),
+        upload_date=datetime(2024, 1, 1, tzinfo=UTC),
     )
 
 
@@ -149,7 +150,7 @@ def make_capture_ui(
     """Return a UI that appends messages to `emitted` and operations to `operations`."""
     return make_fake_ui(
         emit_cb=lambda level, message: emitted.append((level, message)),
-        set_operation_cb=lambda op: operations.append(op),
+        set_operation_cb=operations.append,
         clear_operation_cb=lambda: operations.append(clear_marker),
         operation_callback_cb=lambda current, total: None,
     )

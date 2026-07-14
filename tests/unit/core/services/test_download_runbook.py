@@ -1,7 +1,6 @@
 from types import SimpleNamespace
-from typing import Any, cast
+from typing import TYPE_CHECKING, Any, cast
 
-from adrift.core.models import PodcastConfig
 from adrift.core.services.download import DownloadRunOptions
 from tests.unit._fixtures import (
     _config,
@@ -12,12 +11,15 @@ from tests.unit._fixtures import (
     make_ui_emit_only,
 )
 
+if TYPE_CHECKING:
+    from adrift.core.models import PodcastConfig
+
 
 def test_download_episodes_skips_existing_and_counts_new_uploads() -> None:
     emitted: list[tuple[Any, str]] = []
     operations: list[str] = []
     ui = make_capture_ui(emitted, operations)
-    config = cast(PodcastConfig, SimpleNamespace(name="CreepCast"))
+    config = cast("PodcastConfig", SimpleNamespace(name="CreepCast"))
 
     queue = [
         _queue_item(True, "Old 1"),
@@ -69,7 +71,7 @@ def test_download_episodes_skips_existing_and_counts_new_uploads() -> None:
 def test_download_episodes_reports_nonfatal_errors_and_continues() -> None:
     emitted: list[tuple[Any, str]] = []
     ui = make_ui_emit_only(emitted)
-    config = cast(PodcastConfig, SimpleNamespace(name="CreepCast"))
+    config = cast("PodcastConfig", SimpleNamespace(name="CreepCast"))
 
     queue = [
         _queue_item(False, "Broken"),
@@ -82,7 +84,8 @@ def test_download_episodes_reports_nonfatal_errors_and_continues() -> None:
         del cfg
         assert ctx is not None
         if download_episode.episode.title == "Broken":
-            raise ValueError("boom")
+            msg = "boom"
+            raise ValueError(msg)
         return True
 
     ctx = SimpleNamespace(event_bus=SimpleNamespace(publish=lambda event: None))

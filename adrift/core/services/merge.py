@@ -3,8 +3,9 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, field
+from pathlib import Path
 from time import perf_counter
-from typing import TYPE_CHECKING, Callable
+from typing import TYPE_CHECKING
 
 from adrift.core.models.errors import PipelineError
 from adrift.core.models.stage_result import StageResult
@@ -16,8 +17,11 @@ from adrift.core.services.merge_service import (
     model_payloads,
 )
 from adrift.core.util.profiler import profile
+from adrift.core.util.run_ui import build_merge_callbacks
 
 if TYPE_CHECKING:
+    from collections.abc import Callable
+
     from adrift.core.models import MergeResult, PodcastConfig
     from adrift.core.util.run_ui import BaseRunUI
 
@@ -59,6 +63,7 @@ class MergeUseCase:
     """Application-level merge orchestration with StageResult error accumulation."""
 
     def __init__(self, writers: MergeWriters | None = None) -> None:
+        """Store the injectable output writers (defaults to ``MergeWriters()``)."""
         self._writers = writers or MergeWriters()
 
     @profile
@@ -68,8 +73,7 @@ class MergeUseCase:
         options: MergeRunOptions,
         ui: BaseRunUI,
     ) -> StageResult[list[MergeResult]]:
-        from adrift.core.util.run_ui import build_merge_callbacks
-
+        """Merge each config, write outputs, and return accumulated results."""
         state = _MergeUseCaseState()
         on_stage, callback = build_merge_callbacks(ui)
         errors: list[PipelineError] = []
@@ -128,7 +132,7 @@ class MergeUseCase:
         frame.runtime.ui.set_stage("done")
         frame.runtime.state.results.append(result)
         frame.runtime.state.reports.append(
-            self._build_report(result, frame.runtime.options.include_counts)
+            self._build_report(result, include_counts=frame.runtime.options.include_counts)
         )
 
         write_start = perf_counter()
@@ -140,7 +144,7 @@ class MergeUseCase:
             emit_timings(frame.config.name, frame.timings)
 
     @staticmethod
-    def _build_report(result: MergeResult, include_counts: bool) -> dict[str, object]:
+    def _build_report(result: MergeResult, *, include_counts: bool) -> dict[str, object]:
         report: dict[str, object] = {
             "name": result.config.name,
             "merged_count": len(result.episodes),
@@ -159,8 +163,6 @@ class MergeUseCase:
         state: _MergeUseCaseState,
     ) -> None:
         if options.output_dir:
-            from pathlib import Path
-
             output_root = Path(options.output_dir)
             state.series_entries.append(self._writers.write_series_outputs(output_root, result))
             self._writers.write_output_bundle(

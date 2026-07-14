@@ -1,15 +1,24 @@
+"""Progress-bar run UIs (tqdm and rich) for the merge/download pipelines."""
+
 from __future__ import annotations
 
 import importlib.util
 import sys
 from contextlib import AbstractContextManager
-from typing import Any, Callable
+from typing import TYPE_CHECKING
 
 from tqdm import tqdm
 from typing_extensions import override
 
-from adrift.core.util.progress import Callback
 from adrift.core.util.terminal import Level, format_terminal_message, using_terminal_emitter
+
+if TYPE_CHECKING:
+    from collections.abc import Callable
+    from types import TracebackType
+
+    from rich.progress import Progress
+
+    from adrift.core.util.progress import Callback
 
 _PROGRESS_META_WIDTH = 38
 
@@ -28,7 +37,10 @@ def _fit_progress_description(description: str, console_width: int) -> str:
 
 
 class BaseRunUI(AbstractContextManager["BaseRunUI"]):
+    """Base run UI: tracks the current podcast/stage/operation labels."""
+
     def __init__(self, total: int, label: str) -> None:
+        """Initialize the UI for ``total`` items under ``label``."""
         self.total = total
         self.label = label
         self.current_name = label
@@ -36,54 +48,74 @@ class BaseRunUI(AbstractContextManager["BaseRunUI"]):
         self.current_operation: str | None = None
 
     def stage_callback(self, stage: str) -> None:
+        """Callback adapter forwarding a stage change to ``set_stage``."""
         self.set_stage(stage)
 
     def progress_callback(self, current: int, total: int | None) -> None:
+        """Callback adapter forwarding progress to ``update_progress``."""
         self.update_progress(current, total)
 
     def operation_callback(self, current: int, total: int | None) -> None:
+        """Callback adapter forwarding operation progress."""
         self.update_operation_progress(current, total)
 
-    def output_context(self):
+    def output_context(self) -> AbstractContextManager[None]:
+        """Return a context manager routing terminal output through ``emit``."""
         return using_terminal_emitter(self.emit)
 
     def set_podcast(self, name: str) -> None:
+        """Set the current podcast name and reset the stage."""
         self.current_name = name
         self.current_stage = None
 
     def set_stage(self, stage: str) -> None:
+        """Set the current pipeline stage label."""
         self.current_stage = stage
 
     def set_operation(self, operation: str) -> None:
+        """Set the current fine-grained operation label."""
         self.current_operation = operation
 
     def clear_operation(self) -> None:
+        """Clear the current operation label."""
         self.current_operation = None
 
     def update_progress(self, current: int, total: int | None) -> None:
+        """Update overall progress (no-op in the base UI)."""
         del current, total
 
     def update_operation_progress(self, current: int, total: int | None) -> None:
+        """Update operation progress (no-op in the base UI)."""
         del current, total
 
     def advance(self) -> None:
+        """Advance the overall progress by one item."""
         raise NotImplementedError
 
     def emit(self, level: Level, message: str) -> None:
+        """Emit ``message`` at ``level`` to the UI's output channel."""
         raise NotImplementedError
 
     def close(self) -> None:
+        """Release any UI resources."""
         return
 
     @override
-    def __exit__(self, _exc_type: Any, exc: Any, _tb: Any) -> None:
+    def __exit__(
+        self,
+        _exc_type: type[BaseException] | None,
+        exc: BaseException | None,
+        _tb: TracebackType | None,
+    ) -> None:
         del exc
         self.close()
-        return None
 
 
 class TqdmRunUI(BaseRunUI):
+    """Run UI backed by a tqdm progress bar (fallback when rich is absent)."""
+
     def __init__(self, total: int, label: str) -> None:
+        """Initialize a tqdm bar for ``total`` items under ``label``."""
         super().__init__(total, label)
         self._bar = tqdm(total=total, desc=label, unit="podcast", file=sys.stderr)
 
@@ -122,7 +154,10 @@ class TqdmRunUI(BaseRunUI):
 
 
 class RichRunUI(BaseRunUI):
+    """Run UI backed by a rich multi-task progress display."""
+
     def __init__(self, total: int, label: str) -> None:
+        """Initialize the rich progress tasks for ``total`` items."""
         super().__init__(total, label)
         self._progress = _build_rich_progress()
         self._progress.start()
@@ -223,6 +258,7 @@ class RichRunUI(BaseRunUI):
 
 
 def create_run_ui(total: int, label: str) -> BaseRunUI:
+    """Return a rich run UI when available, else a tqdm fallback."""
     if not _rich_is_available():
         return TqdmRunUI(total, label)
     return RichRunUI(total, label)
@@ -232,9 +268,10 @@ def _rich_is_available() -> bool:
     return importlib.util.find_spec("rich") is not None
 
 
-def _build_rich_progress():
-    from rich.console import Console
-    from rich.progress import (
+def _build_rich_progress() -> Progress:
+    # rich is an optional dependency; import lazily so the module loads without it.
+    from rich.console import Console  # noqa: PLC0415
+    from rich.progress import (  # noqa: PLC0415
         BarColumn,
         MofNCompleteColumn,
         Progress,
@@ -243,7 +280,7 @@ def _build_rich_progress():
         TextColumn,
         TimeElapsedColumn,
     )
-    from rich.table import Column
+    from rich.table import Column  # noqa: PLC0415
 
     return Progress(
         SpinnerColumn(style="cyan"),
@@ -259,4 +296,5 @@ def _build_rich_progress():
 
 
 def build_merge_callbacks(ui: BaseRunUI) -> tuple[Callable[[str], None], Callback]:
+    """Return the (stage, progress) callback pair bound to ``ui``."""
     return ui.stage_callback, ui.progress_callback

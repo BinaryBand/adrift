@@ -1,10 +1,11 @@
+"""String helpers: slugs, control-char stripping, filename cleanup."""
+
 import pathlib
 from functools import lru_cache
 
 from diskcache import Cache
 from unidecode import unidecode
 
-# from adrift.core.services.app_common import load_static_config
 from adrift.core.util.regex import (
     YOUTUBE_PLAYLIST_SHORTHAND_REGEX,
     YOUTUBE_PLAYLIST_URL,
@@ -12,8 +13,6 @@ from adrift.core.util.regex import (
     YT_CHANNEL_SHORTHAND,
     re_compile,
 )
-
-# _CHAR_REPLACEMENTS = load_static_config("character_replacements.json")
 
 _LIGATURE_REPLACEMENTS = {
     "ﬁ": "fi",
@@ -107,6 +106,7 @@ _ROMAN_NUMERALS = {
 
 
 def remove_file_extension(filename: str) -> str:
+    """Return ``filename`` with a trailing audio/media extension removed."""
     return re_compile(r"(?i)\.[a-z34]+$").sub("", filename)
 
 
@@ -120,12 +120,12 @@ def remove_control_chars(text: str | None) -> str:
     if not text:
         return ""
     # Remove control characters except tab (0x09), newline (0x0A), carriage return (0x0D)
-    text = re_compile(r"[\x00-\x08\x0B\x0C\x0E-\x1F\x7F]").sub("", text)
-    return text
+    return re_compile(r"[\x00-\x08\x0B\x0C\x0E-\x1F\x7F]").sub("", text)
 
 
 @lru_cache(maxsize=1000)
 def create_slug(title: str) -> str:
+    """Return a URL-safe ASCII slug derived from ``title``."""
     # Convert non-English characters to their nearest English equivalents
     _title = remove_file_extension(title)
     slug = unidecode(_title).lower()
@@ -172,6 +172,7 @@ def _apply_ligatures(text: str) -> str:
 
 @lru_cache(maxsize=1000)
 def normalize_text(text: str) -> str:
+    """Return the normalized form of ``text`` (memoized on disk)."""
     cached: str | None = _TEXT_DISK_CACHE.get(text)
     if cached is not None:
         return cached

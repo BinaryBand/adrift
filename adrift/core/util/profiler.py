@@ -4,32 +4,34 @@ from __future__ import annotations
 
 import functools
 import sys
+from collections.abc import Callable, Generator
 from contextlib import contextmanager
 from time import perf_counter
-from typing import Any, Callable, Generator, TypeVar
+from typing import TYPE_CHECKING, Any, TypeVar, cast
+
+if TYPE_CHECKING:
+    from typing import TextIO
 
 F = TypeVar("F", bound=Callable[..., Any])
 
-# Global registry for collecting profiling data (dev-only)
+# Global registry for collecting profiling data (dev-only). ``enabled`` lives in
+# a mutable holder so the toggles below mutate rather than rebind a global.
 _profiler_registry: dict[str, list[float]] = {}
-_profiler_enabled: bool = False
+_profiler_state: dict[str, bool] = {"enabled": False}
 
 
 def enable_profiling() -> None:
     """Enable profiling across all @profile decorated functions and context managers."""
-    global _profiler_enabled
-    _profiler_enabled = True
+    _profiler_state["enabled"] = True
 
 
 def disable_profiling() -> None:
     """Disable profiling."""
-    global _profiler_enabled
-    _profiler_enabled = False
+    _profiler_state["enabled"] = False
 
 
 def get_profile_report() -> dict[str, dict[str, float]]:
-    """
-    Get a summary report of all profiled functions/blocks.
+    """Get a summary report of all profiled functions/blocks.
 
     Returns dict mapping names to {"total_ms", "count", "avg_ms", "min_ms", "max_ms"}
     """
@@ -56,7 +58,7 @@ def get_profile_report() -> dict[str, dict[str, float]]:
     return dict(sorted(report.items(), key=lambda x: x[1]["total_ms"], reverse=True))
 
 
-def print_profile_report(file=sys.stderr) -> None:
+def print_profile_report(file: TextIO = sys.stderr) -> None:
     """Print a formatted profiling report to stderr (or specified file)."""
     report = get_profile_report()
     if not report:
@@ -68,16 +70,15 @@ def print_profile_report(file=sys.stderr) -> None:
     )
     file.write("-" * 90 + "\n")
 
-    for name, stats in report.items():
-        file.write(
-            f"{name:<40} {stats['total_ms']:<12.1f} {stats['count']:<8} "
-            f"{stats['avg_ms']:<10.1f} {stats['min_ms']:.1f}/{stats['max_ms']:.1f}\n"
-        )
+    file.writelines(
+        f"{name:<40} {stats['total_ms']:<12.1f} {stats['count']:<8} "
+        f"{stats['avg_ms']:<10.1f} {stats['min_ms']:.1f}/{stats['max_ms']:.1f}\n"
+        for name, stats in report.items()
+    )
 
 
 def profile(func: F) -> F:
-    """
-    Decorator to profile a function's execution time (dev-only).
+    """Decorator to profile a function's execution time (dev-only).
 
     Usage:
         @profile
@@ -89,8 +90,8 @@ def profile(func: F) -> F:
     """
 
     @functools.wraps(func)
-    def wrapper(*args: Any, **kwargs: Any) -> Any:
-        if not _profiler_enabled:
+    def wrapper(*args: Any, **kwargs: Any) -> Any:  # noqa: ANN401 -- transparent passthrough wrapper
+        if not _profiler_state["enabled"]:
             return func(*args, **kwargs)
 
         start = perf_counter()
@@ -104,13 +105,12 @@ def profile(func: F) -> F:
                 _profiler_registry[name] = []
             _profiler_registry[name].append(duration)
 
-    return wrapper  # type: ignore
+    return cast("F", wrapper)
 
 
 @contextmanager
 def profile_block(name: str) -> Generator[None, None, None]:
-    """
-    Context manager to profile a code block (dev-only).
+    """Context manager to profile a code block (dev-only).
 
     Usage:
         with profile_block("my_operation"):
@@ -119,7 +119,7 @@ def profile_block(name: str) -> Generator[None, None, None]:
     Enable with: profiler.enable_profiling()
     Get results: profiler.print_profile_report()
     """
-    if not _profiler_enabled:
+    if not _profiler_state["enabled"]:
         yield
         return
 
@@ -135,5 +135,4 @@ def profile_block(name: str) -> Generator[None, None, None]:
 
 def reset() -> None:
     """Clear all profiling data."""
-    global _profiler_registry
     _profiler_registry.clear()

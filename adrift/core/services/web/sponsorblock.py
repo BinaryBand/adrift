@@ -1,9 +1,8 @@
-"""
-SponsorBlock API integration for fetching sponsored segments.
-"""
+"""SponsorBlock API integration for fetching sponsored segments."""
 
 import logging
 from datetime import datetime, timedelta
+from http import HTTPStatus
 from typing import Any, cast
 
 import requests
@@ -36,11 +35,12 @@ def _fetch_sponsor_segments(video_id: str) -> list[SponsorSegment]:
         raw_segments = _fetch_segment_payload(video_id)
         segments = _validate_segments(raw_segments)
         _cache_segments(video_id, segments)
-        return segments
     except requests.RequestException as e:
         logger.warning("Network error fetching segments for %s: %s", video_id, e)
     except (TypeError, ValueError, KeyError) as e:
         logger.warning("Error fetching segments for %s: %s", video_id, e)
+    else:
+        return segments
 
     return []
 
@@ -49,7 +49,7 @@ def _cached_segments(video_id: str) -> list[SponsorSegment] | None:
     cached = _CACHE.get(video_id)
     if cached is None:
         return None
-    return cast(list[SponsorSegment], cached) if isinstance(cached, list) else []
+    return cast("list[SponsorSegment]", cached) if isinstance(cached, list) else []
 
 
 def _fetch_segment_payload(video_id: str) -> list[dict[str, Any]]:
@@ -63,9 +63,9 @@ def _segment_api_url(video_id: str) -> str:
 
 
 def _parse_segment_payload(video_id: str, response: requests.Response) -> list[dict[str, Any]]:
-    if response.status_code == 404:
+    if response.status_code == HTTPStatus.NOT_FOUND:
         return []
-    if response.status_code != 200:
+    if response.status_code != HTTPStatus.OK:
         response.raise_for_status()
         return []
 
@@ -73,13 +73,13 @@ def _parse_segment_payload(video_id: str, response: requests.Response) -> list[d
     if not isinstance(raw_data, list):
         logger.warning("Unexpected API response for %s: not a list", video_id)
         return []
-    return _unwrap_segment_payload(cast(list[dict[str, Any]], raw_data))
+    return _unwrap_segment_payload(cast("list[dict[str, Any]]", raw_data))
 
 
 def _unwrap_segment_payload(raw_data: list[dict[str, Any]]) -> list[dict[str, Any]]:
     if raw_data and "segments" in raw_data[0]:
         nested = raw_data[0].get("segments", [])
-        return cast(list[dict[str, Any]], nested) if isinstance(nested, list) else []
+        return cast("list[dict[str, Any]]", nested) if isinstance(nested, list) else []
     return raw_data
 
 
@@ -97,8 +97,8 @@ def fetch_sponsor_segments(video_id: str) -> list[tuple[float, float]]:
     try:
         segments = _fetch_sponsor_segments(video_id)
         return [seg.segment for seg in segments]
-    except (requests.RequestException, TypeError, ValueError, KeyError) as e:
-        logger.error("Error fetching segments for %s: %s", video_id, e)
+    except (requests.RequestException, TypeError, ValueError, KeyError):
+        logger.exception("Error fetching segments for %s", video_id)
         return []
 
 

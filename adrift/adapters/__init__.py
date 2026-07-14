@@ -33,7 +33,8 @@ from adrift.core.util.text import is_youtube_channel
 def _require_source_url(source: FeedSource) -> str:
     url = source.url
     if not url:
-        raise ValueError("FeedSource URL is required")
+        msg = "FeedSource URL is required"
+        raise ValueError(msg)
     return url
 
 
@@ -93,7 +94,8 @@ def _build_selected_provider(provider_name: str | None) -> tuple[str, SecretProv
     selected = _selected_provider_name(provider_name)
     factory = _SECRET_PROVIDER_REGISTRY.get(selected)
     if factory is None:
-        raise ValueError(f"Unsupported secret provider: {selected}")
+        msg = f"Unsupported secret provider: {selected}"
+        raise ValueError(msg)
     return selected, factory()
 
 
@@ -128,7 +130,8 @@ def get_storage_adapter(backend_name: str | None = None) -> StoragePort:
     selected = (backend_name or os.getenv("ADRIFT_STORAGE_BACKEND") or "local").lower()
     factory = _STORAGE_REGISTRY.get(selected)
     if factory is None:
-        raise ValueError(f"Unsupported storage backend: {selected}")
+        msg = f"Unsupported storage backend: {selected}"
+        raise ValueError(msg)
     return factory()
 
 
@@ -178,7 +181,8 @@ def get_scored_alignment_adapter(
 
     factory = _SCORED_ALIGNMENT_REGISTRY.get(selected)
     if factory is None:
-        raise ValueError(f"Unsupported alignment backend: {selected}")
+        msg = f"Unsupported alignment backend: {selected}"
+        raise ValueError(msg)
     return factory()
 
 

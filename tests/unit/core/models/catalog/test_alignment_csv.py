@@ -30,7 +30,7 @@ def _episode_from_row(row: dict[str, str]) -> RssEpisode:
 
 def _load_episode_rows(filename: str, index_field: str) -> dict[str, list[RssEpisode]]:
     grouped: dict[str, list[tuple[int, RssEpisode]]] = {}
-    with open(FIXTURE_DIR / filename, "r", encoding="utf-8", newline="") as f:
+    with open(FIXTURE_DIR / filename, encoding="utf-8", newline="") as f:
         reader = csv.DictReader(f)
         for row in reader:
             scenario = row["scenario"]
@@ -46,7 +46,7 @@ def _load_episode_rows(filename: str, index_field: str) -> dict[str, list[RssEpi
 
 def _load_expected_pairs() -> dict[str, list[tuple[int, int]]]:
     grouped: dict[str, list[tuple[int, int]]] = {}
-    with open(FIXTURE_DIR / "expected_pairs.csv", "r", encoding="utf-8", newline="") as f:
+    with open(FIXTURE_DIR / "expected_pairs.csv", encoding="utf-8", newline="") as f:
         reader = csv.DictReader(f)
         for row in reader:
             scenario = row["scenario"]
@@ -78,12 +78,12 @@ def _load_scenarios() -> dict[
 class TestAlignmentCsvFixtures(unittest.TestCase):
     def test_alignment_pairs_match_expected_from_csv(self):
         scenarios = _load_scenarios()
-        self.assertGreater(len(scenarios), 0, "CSV scenarios should not be empty")
+        assert len(scenarios) > 0, "CSV scenarios should not be empty"
 
         for name, (refs, dls, expected_pairs) in scenarios.items():
             with self.subTest(scenario=name):
                 actual_pairs = align_episodes(refs, dls, "Financial Audit")
-                self.assertEqual(sorted(actual_pairs), sorted(expected_pairs))
+                assert sorted(actual_pairs) == sorted(expected_pairs)
 
     def test_financial_audit_sparse_vs_enriched_behavior(self):
         scenarios = _load_scenarios()
@@ -91,8 +91,8 @@ class TestAlignmentCsvFixtures(unittest.TestCase):
         sparse_refs, sparse_dls, _ = scenarios["financial_audit_sparse_mismatch"]
         enriched_refs, enriched_dls, _ = scenarios["financial_audit_enriched_match"]
 
-        self.assertEqual(align_episodes(sparse_refs, sparse_dls, "Financial Audit"), [(0, 0)])
-        self.assertEqual(align_episodes(enriched_refs, enriched_dls, "Financial Audit"), [(0, 0)])
+        assert align_episodes(sparse_refs, sparse_dls, "Financial Audit") == [(0, 0)]
+        assert align_episodes(enriched_refs, enriched_dls, "Financial Audit") == [(0, 0)]
 
 
 if __name__ == "__main__":

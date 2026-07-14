@@ -1,12 +1,16 @@
 from __future__ import annotations
 
-from adrift.core.models.alignment_batch import AlignmentBatch, AlignmentEpisodeRecord
+from typing import TYPE_CHECKING
+
 from adrift.core.util.alignment_pairs import (
     AlignmentResult,
     AlignmentScores,
     score_alignment_pairs,
     select_alignment_pairs,
 )
+
+if TYPE_CHECKING:
+    from adrift.core.models.alignment_batch import AlignmentBatch, AlignmentEpisodeRecord
 
 
 def align_batch(

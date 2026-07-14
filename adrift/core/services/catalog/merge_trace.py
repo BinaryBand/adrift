@@ -1,3 +1,5 @@
+"""Reference/download match-trace construction for merge diagnostics."""
+
 # pyright: reportPrivateUsage=false
 from dataclasses import dataclass
 from typing import Literal

@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import logging
+import tempfile
 from pathlib import Path
 from typing import TYPE_CHECKING
 
@@ -104,9 +105,7 @@ def _forget_rss_cache(prefix: str) -> None:
 
 
 def _upload_rss(bucket: str, prefix: str, rss_xml: str, ctx: AppContext) -> None:
-    import tempfile as _tempfile
-
-    with _tempfile.NamedTemporaryFile(suffix=".rss", delete=False) as f:
+    with tempfile.NamedTemporaryFile(suffix=".rss", delete=False) as f:
         f.write(rss_xml.encode())
         tmp_path = Path(f.name)
     try:
@@ -117,9 +116,11 @@ def _upload_rss(bucket: str, prefix: str, rss_xml: str, ctx: AppContext) -> None
 
 
 def update_rss(config: PodcastConfig, ctx: AppContext) -> None:
+    """Regenerate and upload the combined RSS feed for ``config``."""
     source_factory = ctx.episode_source_factory
     if source_factory is None:
-        raise RuntimeError("AppContext.episode_source_factory must be set to update RSS feeds")
+        msg = "AppContext.episode_source_factory must be set to update RSS feeds"
+        raise RuntimeError(msg)
     bucket, prefix = storage_prefix(config)
     channel = _build_channel(config, source_factory)
     ref_episodes = process_feeds(config, source_factory=source_factory)

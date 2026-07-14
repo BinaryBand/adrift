@@ -3,6 +3,8 @@
 import unittest
 from unittest.mock import MagicMock, patch
 
+import pytest
+
 from adrift.adapters.process.youtube.metadata import YtFetchOptions, get_youtube_episodes
 from adrift.core.models import RssEpisode
 
@@ -41,9 +43,9 @@ class TestGetYoutubeVideosCache(unittest.TestCase):
         result = get_youtube_episodes(
             "https://youtube.com/@test", "test_author", YtFetchOptions(detailed=False)
         )
-        self.assertEqual(len(result), 2)
-        self.assertEqual(result[0].id, "dQw4w9WgXcQ")
-        self.assertEqual(result[1].id, "XqZsoesa55w")
+        assert len(result) == 2
+        assert result[0].id == "dQw4w9WgXcQ"
+        assert result[1].id == "XqZsoesa55w"
 
     @patch("adrift.adapters.process.youtube.metadata._normalize_youtube_link")
     @patch("adrift.adapters.process.youtube.ytdlp.get_youtube_videos")
@@ -58,8 +60,8 @@ class TestGetYoutubeVideosCache(unittest.TestCase):
         # Verify get_youtube_videos was called with normalized URL and author
         mock_get_videos.assert_called_once()
         call_args = mock_get_videos.call_args
-        self.assertEqual(call_args[0][0], normalized_url)
-        self.assertEqual(call_args[0][1], "test_author")
+        assert call_args[0][0] == normalized_url
+        assert call_args[0][1] == "test_author"
 
     @patch("adrift.adapters.process.youtube.metadata._normalize_youtube_link")
     @patch("adrift.adapters.process.youtube.ytdlp.get_youtube_videos")
@@ -74,7 +76,7 @@ class TestGetYoutubeVideosCache(unittest.TestCase):
             YtFetchOptions(detailed=False, refresh=True),
         )
 
-        self.assertEqual(mock_get_videos.call_args.kwargs["refresh"], True)
+        assert mock_get_videos.call_args.kwargs["refresh"]
 
 
 class TestGetYoutubeVideosEarlyTermination(unittest.TestCase):
@@ -96,7 +98,7 @@ class TestGetYoutubeVideosEarlyTermination(unittest.TestCase):
         )
 
         # Should return empty list
-        self.assertEqual(result, [])
+        assert result == []
 
     @patch("adrift.adapters.process.youtube.metadata._normalize_youtube_link")
     @patch("adrift.adapters.process.youtube.ytdlp.get_youtube_videos")
@@ -120,8 +122,8 @@ class TestGetYoutubeVideosEarlyTermination(unittest.TestCase):
             YtFetchOptions(detailed=False),
         )
 
-        self.assertEqual(len(result), 1)
-        self.assertEqual(result[0].id, "dQw4w9WgXcQ")
+        assert len(result) == 1
+        assert result[0].id == "dQw4w9WgXcQ"
 
 
 class TestGetYoutubeVideosCompleteness(unittest.TestCase):
@@ -166,9 +168,9 @@ class TestGetYoutubeVideosCompleteness(unittest.TestCase):
         )
 
         # Should fetch all videos
-        self.assertEqual(len(result), 10)
-        self.assertEqual(result[0].id, "RgKAFK5djSk")
-        self.assertEqual(result[9].id, "JGwWNGJdvx8")
+        assert len(result) == 10
+        assert result[0].id == "RgKAFK5djSk"
+        assert result[9].id == "JGwWNGJdvx8"
 
 
 class TestGetYoutubeVideosFilter(unittest.TestCase):
@@ -221,9 +223,9 @@ class TestGetYoutubeVideosFilter(unittest.TestCase):
         )
 
         # Should only include videos with "test" in title
-        self.assertEqual(len(result), 2)
-        self.assertEqual(result[0].id, "dQw4w9WgXcQ")
-        self.assertEqual(result[1].id, "kJQP7kiw5Fk")
+        assert len(result) == 2
+        assert result[0].id == "dQw4w9WgXcQ"
+        assert result[1].id == "kJQP7kiw5Fk"
 
 
 class TestGetYoutubeVideosDetailed(unittest.TestCase):
@@ -254,7 +256,7 @@ class TestGetYoutubeVideosDetailed(unittest.TestCase):
         )
 
         # Should call _add_episode_metadata for each episode
-        self.assertEqual(len(result), 1)
+        assert len(result) == 1
         mock_add_metadata.assert_called_once_with(mock_episode, "test_author")
 
     @patch("adrift.adapters.process.youtube.metadata._normalize_youtube_link")
@@ -276,8 +278,8 @@ class TestGetYoutubeVideosDetailed(unittest.TestCase):
         result = get_youtube_episodes(
             "https://youtube.com/@test", "test_author", YtFetchOptions(detailed=False)
         )
-        self.assertEqual(len(result), 1)
-        self.assertEqual(result[0].id, "e_04ZrNroTo")
+        assert len(result) == 1
+        assert result[0].id == "e_04ZrNroTo"
 
 
 class TestGetYoutubeVideosEdgeCases(unittest.TestCase):
@@ -294,7 +296,7 @@ class TestGetYoutubeVideosEdgeCases(unittest.TestCase):
 
         result = get_youtube_episodes("https://youtube.com/@test", "test_author")
 
-        self.assertEqual(result, [])
+        assert result == []
 
     @patch("adrift.adapters.process.youtube.metadata._normalize_youtube_link")
     @patch("adrift.adapters.process.youtube.ytdlp.get_youtube_videos")
@@ -306,10 +308,10 @@ class TestGetYoutubeVideosEdgeCases(unittest.TestCase):
         mock_get_videos.side_effect = Exception("Network error")
 
         # Should raise exception when underlying call fails
-        with self.assertRaises(Exception) as context:
+        with pytest.raises(Exception) as context:
             get_youtube_episodes("https://youtube.com/@test", "test_author")
 
-        self.assertEqual(str(context.exception), "Network error")
+        assert str(context.value) == "Network error"
 
 
 class TestConcurrentChannelFetch(unittest.TestCase):
@@ -350,7 +352,7 @@ class TestConcurrentChannelFetch(unittest.TestCase):
             for future in futures:
                 future.result()
 
-        self.assertEqual(max_active, 1)
+        assert max_active == 1
 
 
 if __name__ == "__main__":

@@ -11,7 +11,7 @@ class EnvironmentSecretProvider(SecretProviderPort):
 
     source_name = "env"
 
-    def __init__(self, load_dotenv_file: bool = True):
+    def __init__(self, load_dotenv_file: bool = True) -> None:
         if load_dotenv_file:
             load_dotenv(find_dotenv())
 

@@ -25,8 +25,8 @@ class OptimizedScoredAlignmentAdapter:
         *args: object,
         **kwargs: object,
     ) -> AlignmentResult:
-        references = cast(list[RssEpisode], args[0])
-        downloads = cast(list[RssEpisode], args[1])
+        references = cast("list[RssEpisode]", args[0])
+        downloads = cast("list[RssEpisode]", args[1])
         show = str(kwargs.get("show", ""))
         alignment = _resolve_alignment(kwargs.get("alignment"))
         ref_titles = _normalized_titles(references, show)

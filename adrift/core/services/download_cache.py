@@ -6,12 +6,12 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import TYPE_CHECKING
 
-from adrift.core.models import MediaMetadata
 from adrift.core.services.download_client import prefixed_key
 from adrift.core.util.regex import YOUTUBE_VIDEO_REGEX
 from adrift.core.util.title_normalization import normalize_title
 
 if TYPE_CHECKING:
+    from adrift.core.models import MediaMetadata
     from adrift.core.services.context import AppContext
 
 
@@ -38,7 +38,7 @@ def _existing_media_sources(
     source_urls: set[str] = set()
     youtube_video_ids: set[str] = set()
 
-    for name in ctx.storage.get_file_list(bucket, prefix, False):
+    for name in ctx.storage.get_file_list(bucket, prefix, without_extensions=False):
         cleaned_slugs.add(normalize_title(show, Path(name).stem))
         metadata: MediaMetadata | None = ctx.storage.get_metadata(
             bucket, prefixed_key(prefix, name)
@@ -59,4 +59,4 @@ def _existing_media_sources(
     )
 
 
-__all__ = ["_existing_media_sources", "_ExistingMediaSources"]
+__all__ = ["_ExistingMediaSources", "_existing_media_sources"]

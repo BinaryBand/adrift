@@ -56,9 +56,9 @@ class TestFeedFilter(unittest.TestCase):
         # Filter for "Episode" in title
         result = get_rss_episodes("https://example.com/feed.xml", filter="Episode")
 
-        self.assertEqual(len(result), 2)
-        self.assertEqual(result[0].title, "Episode 001: Introduction")
-        self.assertEqual(result[1].title, "Episode 002: Deep Dive")
+        assert len(result) == 2
+        assert result[0].title == "Episode 001: Introduction"
+        assert result[1].title == "Episode 002: Deep Dive"
 
     @patch("adrift.adapters.process.episode_sources.episode_source_rss._RSS_CACHE")
     @patch("adrift.adapters.process.episode_sources.episode_source_rss.requests.get")
@@ -77,8 +77,8 @@ class TestFeedFilter(unittest.TestCase):
             "https://example.com/feed.xml", filter="^(?!.*Overtime)(?!.*Trivia).*$"
         )
 
-        self.assertEqual(len(result), 1)
-        self.assertEqual(result[0].title, "Regular Episode")
+        assert len(result) == 1
+        assert result[0].title == "Regular Episode"
 
     @patch("adrift.adapters.process.episode_sources.episode_source_rss._RSS_CACHE")
     @patch("adrift.adapters.process.episode_sources.episode_source_rss.requests.get")
@@ -93,9 +93,9 @@ class TestFeedFilter(unittest.TestCase):
         # Case-insensitive filter for "special"
         result = get_rss_episodes("https://example.com/feed.xml", filter="(?i)special")
 
-        self.assertEqual(len(result), 2)
-        self.assertIn("SPECIAL", result[0].title)
-        self.assertIn("special", result[1].title)
+        assert len(result) == 2
+        assert "SPECIAL" in result[0].title
+        assert "special" in result[1].title
 
     @patch("adrift.adapters.process.episode_sources.episode_source_rss._RSS_CACHE")
     @patch("adrift.adapters.process.episode_sources.episode_source_rss.requests.get")
@@ -110,7 +110,7 @@ class TestFeedFilter(unittest.TestCase):
 
         result = get_rss_episodes("https://example.com/feed.xml", filter="")
 
-        self.assertEqual(len(result), 2)
+        assert len(result) == 2
 
     @patch("adrift.adapters.process.episode_sources.episode_source_rss._RSS_CACHE")
     @patch("adrift.adapters.process.episode_sources.episode_source_rss.requests.get")
@@ -123,7 +123,7 @@ class TestFeedFilter(unittest.TestCase):
 
         result = get_rss_episodes("https://example.com/feed.xml", filter=None)
 
-        self.assertEqual(len(result), 2)
+        assert len(result) == 2
 
 
 class TestDayOfWeekFilter(unittest.TestCase):
@@ -155,9 +155,9 @@ class TestDayOfWeekFilter(unittest.TestCase):
             ],
         )
 
-        self.assertEqual(len(result), 2)
-        self.assertEqual(result[0].title, "Monday Episode")
-        self.assertEqual(result[1].title, "Friday Episode")
+        assert len(result) == 2
+        assert result[0].title == "Monday Episode"
+        assert result[1].title == "Friday Episode"
 
     @patch("adrift.adapters.process.episode_sources.episode_source_rss._RSS_CACHE")
     @patch("adrift.adapters.process.episode_sources.episode_source_rss.requests.get")
@@ -175,9 +175,9 @@ class TestDayOfWeekFilter(unittest.TestCase):
             r_rules=["FREQ=WEEKLY;BYDAY=SA", "FREQ=WEEKLY;BYDAY=SU"],
         )
 
-        self.assertEqual(len(result), 2)
-        self.assertEqual(result[0].title, "Sunday Episode")
-        self.assertEqual(result[1].title, "Saturday Episode")
+        assert len(result) == 2
+        assert result[0].title == "Sunday Episode"
+        assert result[1].title == "Saturday Episode"
 
     @patch("adrift.adapters.process.episode_sources.episode_source_rss._RSS_CACHE")
     @patch("adrift.adapters.process.episode_sources.episode_source_rss.requests.get")
@@ -193,8 +193,8 @@ class TestDayOfWeekFilter(unittest.TestCase):
         # Filter for Wednesday only
         result = get_rss_episodes("https://example.com/feed.xml", r_rules=["FREQ=WEEKLY;BYDAY=WE"])
 
-        self.assertEqual(len(result), 1)
-        self.assertEqual(result[0].title, "Wednesday Episode")
+        assert len(result) == 1
+        assert result[0].title == "Wednesday Episode"
 
     @patch("adrift.adapters.process.episode_sources.episode_source_rss._RSS_CACHE")
     @patch("adrift.adapters.process.episode_sources.episode_source_rss.requests.get")
@@ -209,7 +209,7 @@ class TestDayOfWeekFilter(unittest.TestCase):
 
         result = get_rss_episodes("https://example.com/feed.xml", r_rules=[])
 
-        self.assertEqual(len(result), 2)
+        assert len(result) == 2
 
     @patch("adrift.adapters.process.episode_sources.episode_source_rss._RSS_CACHE")
     @patch("adrift.adapters.process.episode_sources.episode_source_rss.requests.get")
@@ -224,7 +224,7 @@ class TestDayOfWeekFilter(unittest.TestCase):
 
         result = get_rss_episodes("https://example.com/feed.xml", r_rules=None)
 
-        self.assertEqual(len(result), 2)
+        assert len(result) == 2
 
     @patch("adrift.adapters.process.episode_sources.episode_source_rss._RSS_CACHE")
     @patch("adrift.adapters.process.episode_sources.episode_source_rss.requests.get")
@@ -238,8 +238,8 @@ class TestDayOfWeekFilter(unittest.TestCase):
         result = get_rss_episodes("https://example.com/feed.xml", r_rules=["FREQ=WEEKLY;BYDAY=MO"])
 
         # Only the valid entry should be returned (missing date is excluded)
-        self.assertEqual(len(result), 1)
-        self.assertEqual(result[0].title, "Valid Episode")
+        assert len(result) == 1
+        assert result[0].title == "Valid Episode"
 
     @patch("adrift.adapters.process.episode_sources.episode_source_rss._RSS_CACHE")
     @patch("adrift.adapters.process.episode_sources.episode_source_rss.requests.get")
@@ -253,8 +253,8 @@ class TestDayOfWeekFilter(unittest.TestCase):
         result = get_rss_episodes("https://example.com/feed.xml", r_rules=["FREQ=WEEKLY;BYDAY=MO"])
 
         # Only the valid entry should be returned (invalid date is excluded)
-        self.assertEqual(len(result), 1)
-        self.assertEqual(result[0].title, "Valid Episode")
+        assert len(result) == 1
+        assert result[0].title == "Valid Episode"
 
 
 class TestCombinedFilters(unittest.TestCase):
@@ -288,9 +288,9 @@ class TestCombinedFilters(unittest.TestCase):
         )
 
         # Only episodes that match BOTH filters should be returned
-        self.assertEqual(len(result), 2)
-        self.assertEqual(result[0].title, "Episode 001")
-        self.assertEqual(result[1].title, "Episode 003")
+        assert len(result) == 2
+        assert result[0].title == "Episode 001"
+        assert result[1].title == "Episode 003"
 
     @patch("adrift.adapters.process.episode_sources.episode_source_rss._RSS_CACHE")
     @patch("adrift.adapters.process.episode_sources.episode_source_rss.requests.get")
@@ -319,9 +319,9 @@ class TestCombinedFilters(unittest.TestCase):
             ],
         )
 
-        self.assertEqual(len(result), 2)
-        self.assertEqual(result[0].title, "Main Show")
-        self.assertEqual(result[1].title, "Main Show")
+        assert len(result) == 2
+        assert result[0].title == "Main Show"
+        assert result[1].title == "Main Show"
 
     # re-uses top-level `_create_mock_entry` helper
 
@@ -353,7 +353,7 @@ class TestCacheKeyGeneration(unittest.TestCase):
 
         # Verify cache.get was called with a key that includes the r_rules
         call_args = mock_cache.get.call_args[0][0]
-        self.assertIn("FREQ=WEEKLY;BYDAY=FR", call_args)
+        assert "FREQ=WEEKLY;BYDAY=FR" in call_args
 
     @patch("adrift.adapters.process.episode_sources.episode_source_rss._RSS_CACHE")
     @patch("adrift.adapters.process.episode_sources.episode_source_rss.requests.get")
@@ -372,7 +372,7 @@ class TestCacheKeyGeneration(unittest.TestCase):
         )
 
         # Should complete without error
-        self.assertEqual(len(result), 1)
+        assert len(result) == 1
 
 
 if __name__ == "__main__":

@@ -30,9 +30,9 @@ class TestMorbidBenchmark(unittest.TestCase):
 
                 msg = f"Row {idx}: {ref_title!r} <> {dl_title!r}"
                 if should_match:
-                    self.assertEqual(pairs, [(0, 0)], f"Expected match: {msg}")
+                    assert pairs == [(0, 0)], f"Expected match: {msg}"
                 else:
-                    self.assertEqual(pairs, [], f"Expected no match: {msg}")
+                    assert pairs == [], f"Expected no match: {msg}"
 
 
 if __name__ == "__main__":

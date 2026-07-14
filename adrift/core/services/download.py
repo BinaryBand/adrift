@@ -2,8 +2,9 @@
 
 from __future__ import annotations
 
+from collections.abc import Callable
 from dataclasses import dataclass
-from typing import TYPE_CHECKING, Callable
+from typing import TYPE_CHECKING
 
 from adrift.core.models import DownloadEpisode, PodcastConfig
 from adrift.core.models.errors import PipelineError
@@ -34,6 +35,8 @@ _DOWNLOAD_OPERATION_ERRORS = (OSError, RuntimeError, ValueError)
 
 @dataclass(frozen=True)
 class DownloadRunOptions:
+    """Flags and limits controlling one download-pipeline run."""
+
     skip_download: bool = False
     skip_update: bool = False
     max_downloads: int = 10
@@ -49,6 +52,8 @@ class _MergeCallbacks:
 
 @dataclass(frozen=True)
 class DownloadPipelineRuntime:
+    """Runtime collaborators (context, UI, options) for the download pipeline."""
+
     ctx: AppContext
     ui: BaseRunUI
     options: DownloadRunOptions
@@ -56,6 +61,8 @@ class DownloadPipelineRuntime:
 
 @dataclass(frozen=True)
 class DownloadPipelineDeps:
+    """Injected pipeline-stage callables for the download pipeline."""
+
     merge_config: Callable[[PodcastConfig, MergeConfigOptions], MergeResult]
     merge_options_factory: Callable[[bool, Callable[[str], None], Callback], MergeConfigOptions]
     enrich_with_sponsors: Callable[[MergeResult], list[DownloadEpisode]]
@@ -70,11 +77,13 @@ class DownloadPipeline:
     """Application pipeline for merge -> enrich -> download -> RSS update."""
 
     def __init__(self, runtime: DownloadPipelineRuntime, deps: DownloadPipelineDeps) -> None:
+        """Store the pipeline runtime and injected stage dependencies."""
         self._runtime = runtime
         self._deps = deps
         self._events_subscribed = False
 
     def run(self, configs: list[PodcastConfig]) -> StageResult[int]:
+        """Run the full pipeline over ``configs`` and return the total downloaded."""
         self._subscribe_download_events()
         on_stage, progress = self._deps.build_merge_callbacks(self._runtime.ui)
         callbacks = _MergeCallbacks(on_stage=on_stage, progress=progress)
@@ -212,8 +221,8 @@ class DownloadPipeline:
 
 
 __all__ = [
-    "DownloadRunOptions",
-    "DownloadPipelineRuntime",
-    "DownloadPipelineDeps",
     "DownloadPipeline",
+    "DownloadPipelineDeps",
+    "DownloadPipelineRuntime",
+    "DownloadRunOptions",
 ]

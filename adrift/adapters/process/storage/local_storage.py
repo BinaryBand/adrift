@@ -11,14 +11,16 @@ import json
 import os
 import tempfile
 from pathlib import Path
-from typing import Any
+from typing import TYPE_CHECKING, Any
 from urllib.parse import urljoin
 
 from pydantic import ValidationError
 
 from adrift.core.models import MediaMetadata, S3Metadata
 from adrift.core.models.storage_options import UploadOptions
-from adrift.core.util.progress import Callback
+
+if TYPE_CHECKING:
+    from adrift.core.util.progress import Callback
 
 _METADATA_SUFFIX = ".meta.json"
 _CHUNK_SIZE = 1024 * 1024
@@ -40,7 +42,8 @@ class LocalFilesystemStorage:
     ) -> str | None:
         bucket, key = bucket_key
         if not file_path.exists():
-            raise FileNotFoundError(f"Local file not found: {file_path}")
+            msg = f"Local file not found: {file_path}"
+            raise FileNotFoundError(msg)
 
         metadata, callback = _extract_upload_options(options)
         dest = self._object_path(bucket, key)
@@ -58,7 +61,7 @@ class LocalFilesystemStorage:
             parent_dir = ""
         identifier = path.stem if extension_agnostic else path.name
 
-        for name in self.get_file_list(bucket, parent_dir, False):
+        for name in self.get_file_list(bucket, parent_dir, without_extensions=False):
             if _identifier_matches(name, identifier, extension_agnostic):
                 return name
         return None
@@ -111,14 +114,16 @@ class LocalFilesystemStorage:
         rss_base_url = os.getenv("RSS_BASE_URL", "")
 
         if not rss_base_url:
-            raise RuntimeError("RSS_BASE_URL must be set to build public storage URLs")
+            msg = "RSS_BASE_URL must be set to build public storage URLs"
+            raise RuntimeError(msg)
         return urljoin(rss_base_url, key)
 
 
 def _reject_traversal(*parts: str) -> None:
     for part in parts:
         if ".." in Path(part).parts:
-            raise ValueError(f"Path traversal is not allowed: {part!r}")
+            msg = f"Path traversal is not allowed: {part!r}"
+            raise ValueError(msg)
 
 
 def _identifier_matches(name: str, identifier: str, extension_agnostic: bool) -> bool:

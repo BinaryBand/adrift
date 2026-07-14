@@ -1,3 +1,5 @@
+"""Podcast configuration models and TOML input coercion helpers."""
+
 import json
 import re
 from functools import lru_cache
@@ -54,6 +56,7 @@ class SourceFilter(BaseModel):
         return parts
 
     def to_regex(self) -> str | None:
+        """Return a combined include/exclude regex, or None if unfiltered."""
         if not (self.include or self.exclude):
             return None
         return "".join(self._regex_parts())
@@ -144,6 +147,7 @@ class PodcastConfig(_PodcastConfigBase):
     @computed_field(return_type=str)
     @property
     def slug(self) -> str:
+        """Return the URL-safe slug derived from the podcast name."""
         return _slug(self.name)
 
 
@@ -161,43 +165,51 @@ class PodcastsTomlConfig(BaseModel):
     podcasts: list[PodcastConfigInput] = Field(default_factory=list)
 
 
-def _ensure_model(value: Any, cls: type[_ModelT], **defaults: Any) -> _ModelT:
+def _ensure_model(value: object, cls: type[_ModelT], **defaults: Any) -> _ModelT:  # noqa: ANN401 -- heterogeneous field defaults
     if isinstance(value, cls):
         return value
     if value is None:
         return cls.model_validate(defaults)
     if isinstance(value, dict):
         return cls.model_validate({**defaults, **value})
-    raise TypeError(f"value must be {cls.__name__}, dict, or None")
+    msg = f"value must be {cls.__name__}, dict, or None"
+    raise TypeError(msg)
 
 
 def ensure_source_filter(filters: SourceFilter | dict[str, Any] | None) -> SourceFilter:
+    """Coerce ``filters`` (model, dict, or None) into a ``SourceFilter``."""
     return _ensure_model(filters, SourceFilter)
 
 
 def ensure_feed_source(source: FeedSource | dict[str, Any]) -> FeedSource:
+    """Coerce ``source`` (model or dict) into a ``FeedSource``."""
     if isinstance(source, FeedSource):
         return source
     if not isinstance(source, dict):
-        raise TypeError("source must be FeedSource or dict")
+        msg = "source must be FeedSource or dict"
+        raise TypeError(msg)
     payload = dict(source)
     payload["filters"] = ensure_source_filter(payload.get("filters"))
     return _ensure_model(payload, FeedSource)
 
 
 def ensure_podcast_config(podcast: PodcastConfig | dict[str, Any]) -> PodcastConfig:
-    def _ensure_sources_list(raw_sources: Any) -> list[FeedSource]:
+    """Coerce ``podcast`` (model or dict) into a validated ``PodcastConfig``."""
+
+    def _ensure_sources_list(raw_sources: object) -> list[FeedSource]:
         if raw_sources is None:
             return []
         if not isinstance(raw_sources, list):
-            raise TypeError("references/downloads must be a list")
-        typed_sources = cast(list[FeedSource | dict[str, Any]], raw_sources)
+            msg = "references/downloads must be a list"
+            raise TypeError(msg)
+        typed_sources = cast("list[FeedSource | dict[str, Any]]", raw_sources)
         return [ensure_feed_source(item) for item in typed_sources]
 
     if isinstance(podcast, PodcastConfig):
         return podcast
     if not isinstance(podcast, dict):
-        raise TypeError("podcast must be PodcastConfig or dict")
+        msg = "podcast must be PodcastConfig or dict"
+        raise TypeError(msg)
     payload = dict(podcast)
     payload["references"] = _ensure_sources_list(payload.get("references"))
     payload["downloads"] = _ensure_sources_list(payload.get("downloads"))
@@ -208,6 +220,7 @@ def ensure_podcast_config(podcast: PodcastConfig | dict[str, Any]) -> PodcastCon
 
 
 def parse_podcasts_raw(raw: list[PodcastConfig]) -> list[PodcastConfig]:
+    """Coerce a list of raw podcast entries into validated configs."""
     return [ensure_podcast_config(entry) for entry in raw]
 
 
@@ -219,7 +232,7 @@ def podcast_toml_json_schema() -> dict[str, Any]:
 
 
 def compile_podcast_toml_schema(
-    output_path: str | Path = "adrift/models/podcasts.schema.json",
+    output_path: str | Path = "adrift/core/models/podcasts.schema.json",
 ) -> Path:
     """Compile and write TOML JSON Schema used by Even Better TOML."""
     out = Path(output_path)

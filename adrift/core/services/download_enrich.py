@@ -22,4 +22,4 @@ def enrich_with_sponsors(result: MergeResult) -> list[DownloadEpisode]:
     return episodes
 
 
-__all__ = ["enrich_with_sponsors", "_extract_video_id"]
+__all__ = ["_extract_video_id", "enrich_with_sponsors"]

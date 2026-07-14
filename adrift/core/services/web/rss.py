@@ -1,3 +1,5 @@
+"""RSS feed serialization and direct-URL audio download helpers."""
+
 import mimetypes
 import shutil
 import uuid
@@ -98,7 +100,7 @@ def _append_episode_image(item: ET.Element, episode: RssEpisode) -> None:
 
 def _serialize_rss(rss: ET.Element) -> str:
     rough_string = ET.tostring(rss, "utf-8")
-    re_parsed = minidom.parseString(rough_string)
+    re_parsed = minidom.parseString(rough_string)  # noqa: S318 -- parses our own generated XML
     return re_parsed.toprettyxml(indent="\t")
 
 
@@ -112,7 +114,7 @@ def download_direct(url: str, dest: Path) -> Path:
         dest.mkdir(parents=True, exist_ok=True)
         staging_file = dest / f"{uuid.uuid4().hex}{ext}"
         response.raw.decode_content = True
-        with open(staging_file, "wb") as f:
+        with staging_file.open("wb") as f:
             shutil.copyfileobj(response.raw, f)
     return staging_file
 

@@ -121,8 +121,7 @@ def get_rss_channel(rss_url: str) -> RssChannel:
     feed_str = _fetch_rss_feed_str(rss_url)
     feed: FeedParserDict = feedparser.parse(feed_str)
     if feed.bozo and hasattr(feed, "bozo_exception"):
-        issue = feed.get("bozo_exception")
-        print(f"WARNING: RSS feed may have issues: {issue}")
+        feed.get("bozo_exception")
     return channel_from_feedparser(feed.feed)
 
 
@@ -202,7 +201,8 @@ def get_rss_episodes(
 ) -> list[RssEpisode]:
     """Parse RSS feed and extract episode information for a podcast."""
     if not LINK_REGEX.match(url):
-        raise ValueError("Invalid RSS feed url or file path")
+        msg = "Invalid RSS feed url or file path"
+        raise ValueError(msg)
     r_rules = r_rules or []
     cache_key = _rss_http_cache_key(url, filter, r_rules)
     feed_str = _fetch_rss_feed_str(url, cache_key=cache_key)
@@ -214,7 +214,9 @@ def get_rss_episodes(
         return cached_episodes
     parsed = feedparser.parse(feed_str)
     raw_entries = getattr(parsed, "entries", [])
-    entries_list = cast(list[FeedParserDict], raw_entries) if isinstance(raw_entries, list) else []
+    entries_list = (
+        cast("list[FeedParserDict]", raw_entries) if isinstance(raw_entries, list) else []
+    )
     entries = _filter_feed_entries(entries_list, filter, r_rules)
     episodes = _parse_feed_entries(entries, callback)
     _store_cached_episodes(parsed_key, episodes)
@@ -234,7 +236,8 @@ class RssEpisodeSourceAdapter(EpisodeSourcePort):
         resolved_context = context or EpisodeSourceFetchContext()
         url = source.url
         if not url:
-            raise ValueError("FeedSource URL is required for RSS episode fetching")
+            msg = "FeedSource URL is required for RSS episode fetching"
+            raise ValueError(msg)
 
         filter_regex = source.filters.to_regex() if source.filters else None
         r_rules = source.filters.r_rules if source.filters else None
@@ -245,5 +248,6 @@ class RssEpisodeSourceAdapter(EpisodeSourcePort):
         """Fetch channel metadata from an RSS feed."""
         url = source.url
         if not url:
-            raise ValueError("FeedSource URL is required for RSS channel fetching")
+            msg = "FeedSource URL is required for RSS channel fetching"
+            raise ValueError(msg)
         return get_rss_channel(url)

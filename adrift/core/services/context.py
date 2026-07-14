@@ -10,9 +10,11 @@ Testing is trivial: construct an AppContext with mock ports.
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from typing import TYPE_CHECKING, Any, Callable
+from typing import TYPE_CHECKING, Any
 
 if TYPE_CHECKING:
+    from collections.abc import Callable
+
     from adrift.core.ports import (
         AlignmentBackendProviderPort,
         CachePort,

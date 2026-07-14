@@ -137,7 +137,7 @@ def _run(
 
     ensure_rust_alignment_backend()
 
-    configs, _ = bootstrap_run_configs(include, tags, skip_schedule_filter)
+    configs, _ = bootstrap_run_configs(include, tags, skip_schedule_filter=skip_schedule_filter)
     ctx = build_app_context()
     pipeline_options = _build_pipeline_options(
         dry_run,

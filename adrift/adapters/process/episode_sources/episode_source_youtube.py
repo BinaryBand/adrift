@@ -19,7 +19,8 @@ class YouTubeEpisodeSourceAdapter(EpisodeSourcePort):
         resolved_context = context or EpisodeSourceFetchContext()
         url = source.url
         if not url:
-            raise ValueError("FeedSource URL is required for YouTube episode fetching")
+            msg = "FeedSource URL is required for YouTube episode fetching"
+            raise ValueError(msg)
 
         filter_regex = source.filters.to_regex() if source.filters else None
         fetch_opts = YtFetchOptions(
@@ -38,6 +39,7 @@ class YouTubeEpisodeSourceAdapter(EpisodeSourcePort):
 
         url = source.url
         if not url:
-            raise ValueError("FeedSource URL is required for YouTube channel fetching")
+            msg = "FeedSource URL is required for YouTube channel fetching"
+            raise ValueError(msg)
         title = source.filters.to_regex() if source.filters else ""
         return get_youtube_channel(url, title or "")

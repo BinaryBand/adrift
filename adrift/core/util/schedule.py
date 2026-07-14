@@ -1,3 +1,5 @@
+"""Schedule/recurrence helpers over dateutil rrules."""
+
 from datetime import datetime, timedelta
 
 from dateutil.rrule import rrulestr

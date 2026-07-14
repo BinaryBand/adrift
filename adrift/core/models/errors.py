@@ -21,6 +21,7 @@ class AdriftError(Exception):
     message: str
 
     def __init__(self, message: str = "") -> None:
+        """Initialize the error with an optional ``message``."""
         self.message = message
         super().__init__(message)
 
@@ -109,11 +110,11 @@ class CacheError(AdriftError):
 
 __all__ = [
     "AdriftError",
-    "PipelineError",
-    "FetchError",
     "AlignmentError",
-    "DownloadError",
     "BotDetectionError",
-    "StorageError",
     "CacheError",
+    "DownloadError",
+    "FetchError",
+    "PipelineError",
+    "StorageError",
 ]

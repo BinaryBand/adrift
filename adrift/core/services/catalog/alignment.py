@@ -4,7 +4,7 @@ import pathlib
 import re
 from collections.abc import Callable
 from dataclasses import dataclass
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from typing import Any, NamedTuple, cast
 
 import requests
@@ -97,7 +97,7 @@ def _similarity_clean(ac: str, bc: str) -> float:
 def _cdist_similarity(a: list[str], b: list[str]) -> list[list[float]]:
     from rapidfuzz import process as rapidfuzz_process
 
-    cdist = cast(Any, rapidfuzz_process).cdist
+    cdist = cast("Any", rapidfuzz_process).cdist
 
     ratio_scores = cdist(a, b, scorer=fuzz.ratio, workers=-1) / 100.0
     token_sort_scores = cdist(a, b, scorer=fuzz.token_sort_ratio, workers=-1) / 100.0
@@ -736,8 +736,8 @@ def _unix_seconds(value: datetime | None) -> int | None:
     if value is None:
         return None
     if value.tzinfo is None:
-        value = value.replace(tzinfo=timezone.utc)
-    return int(value.astimezone(timezone.utc).timestamp())
+        value = value.replace(tzinfo=UTC)
+    return int(value.astimezone(UTC).timestamp())
 
 
 def _select_matches_from_scores(
@@ -824,7 +824,8 @@ def _thumbnail_url_exists(url: str) -> bool:
 
 def _downgrade_maxres(url: str) -> str | None:
     """Rewrite a YouTube ``maxresdefault`` thumbnail to the always-available
-    ``hqdefault`` variant. Returns ``None`` when ``url`` is not a maxres URL."""
+    ``hqdefault`` variant. Returns ``None`` when ``url`` is not a maxres URL.
+    """
     downgraded, replaced = _YOUTUBE_MAXRES_RE.subn(r"\1hqdefault\2", url)
     return downgraded if replaced else None
 
@@ -867,7 +868,7 @@ def _earliest_pub_date(ref: RssEpisode, dl: RssEpisode) -> datetime | None:
     if len(dates) < 2:
         return dates[0] if dates else None
     a, b = _align_datetime_pair(dates[0], dates[1])
-    return a if a <= b else b
+    return min(a, b)
 
 
 def _choose_description(ref: RssEpisode, dl: RssEpisode) -> str:
@@ -903,6 +904,9 @@ def merge_episode_pairs(
 
 __all__ = [
     "StringSimilarityFn",
+    "_best_thumbnail",
+    "_build_alignment_scores",
+    "_normalized_alignment_title",
     "align_episodes",
     "align_episodes_impl",
     "match",
@@ -910,7 +914,4 @@ __all__ = [
     "merge_episode_pairs",
     "prepare_alignment_batch",
     "sim_date",
-    "_best_thumbnail",
-    "_build_alignment_scores",
-    "_normalized_alignment_title",
 ]

@@ -15,4 +15,4 @@ def prefixed_key(prefix: str, name: str) -> str:
     return f"{prefix}/{name}" if prefix else name
 
 
-__all__ = ["storage_prefix", "prefixed_key"]
+__all__ = ["prefixed_key", "storage_prefix"]

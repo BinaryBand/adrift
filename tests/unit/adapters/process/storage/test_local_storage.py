@@ -1,4 +1,4 @@
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
 
 import pytest
@@ -21,10 +21,10 @@ def _metadata() -> MediaMetadata:
     return MediaMetadata(
         duration=12.5,
         source="https://youtube.com/watch?v=abc123",
-        upload_date=datetime(2026, 4, 20, tzinfo=timezone.utc),
+        upload_date=datetime(2026, 4, 20, tzinfo=UTC),
         audio_hash="deadbeef",
         ad_segments=[(0.0, 15.0), (120.5, 145.25)],
-        ad_segments_expires_at=datetime(2026, 6, 1, tzinfo=timezone.utc),
+        ad_segments_expires_at=datetime(2026, 6, 1, tzinfo=UTC),
     )
 
 

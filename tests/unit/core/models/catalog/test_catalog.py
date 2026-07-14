@@ -32,11 +32,15 @@ _FACTORY = RegistryEpisodeSourceFactory()
 
 
 def process_feeds(config, callback=None, refresh_sources=False):
-    return _process_feeds(config, callback, refresh_sources, source_factory=_FACTORY)
+    return _process_feeds(
+        config, callback, refresh_sources=refresh_sources, source_factory=_FACTORY
+    )
 
 
 def process_sources(config, callback=None, refresh_sources=False):
-    return _process_sources(config, callback, refresh_sources, source_factory=_FACTORY)
+    return _process_sources(
+        config, callback, refresh_sources=refresh_sources, source_factory=_FACTORY
+    )
 
 
 def _rss_source(
@@ -111,7 +115,7 @@ class TestCollectEpisodes(unittest.TestCase):
         mock_rss.return_value = eps
         context = EpisodeFetchContext(title="Test Show", is_reference=True, source_factory=_FACTORY)
         result = _collect_episodes([_rss_source()], context)
-        self.assertEqual(len(result), 3)
+        assert len(result) == 3
 
     @patch("adrift.adapters.process.episode_sources.episode_source_rss.get_rss_episodes")
     def test_two_sources_deduplicates_overlap(self, mock_rss: MagicMock):
@@ -129,8 +133,8 @@ class TestCollectEpisodes(unittest.TestCase):
             context,
         )
         titles = [ep.title for ep in result]
-        self.assertEqual(len(result), 3)
-        self.assertEqual(titles.count("Episode Two"), 1)
+        assert len(result) == 3
+        assert titles.count("Episode Two") == 1
 
     @patch("adrift.adapters.process.episode_sources.episode_source_rss.get_rss_episodes")
     def test_two_sources_no_overlap(self, mock_rss: MagicMock):
@@ -146,12 +150,12 @@ class TestCollectEpisodes(unittest.TestCase):
             ],
             context,
         )
-        self.assertEqual(len(result), 2)
+        assert len(result) == 2
 
     def test_empty_sources_returns_empty(self):
         context = EpisodeFetchContext(title="Test Show", is_reference=True, source_factory=_FACTORY)
         result = _collect_episodes([], context)
-        self.assertEqual(result, [])
+        assert result == []
 
 
 # ---------------------------------------------------------------------------
@@ -165,7 +169,7 @@ class TestProcessFeeds(unittest.TestCase):
         eps = [_ep(str(i), f"Ep {i}") for i in range(5)]
         mock_rss.return_value = eps
         result = process_feeds(_config(references=[_rss_source()]))
-        self.assertEqual(len(result), 5)
+        assert len(result) == 5
 
     @patch("adrift.adapters.process.episode_sources.episode_source_rss.get_rss_episodes")
     def test_r_rules_forwarded_to_get_rss_episodes(self, mock_rss: MagicMock):
@@ -175,14 +179,14 @@ class TestProcessFeeds(unittest.TestCase):
         process_feeds(_config(references=[_rss_source(r_rules=rules)]))
         # get_rss_episodes is now called via adapter with positional args
         # get_rss_episodes(url, filter_regex, r_rules, callback)
-        self.assertEqual(mock_rss.call_args[0][2], rules)
+        assert mock_rss.call_args[0][2] == rules
 
     @patch("adrift.adapters.process.youtube.metadata.get_youtube_episodes")
     def test_youtube_source_returns_all(self, mock_yt: MagicMock):
         eps = [_ep("yt1", "YT Ep 1"), _ep("yt2", "YT Ep 2"), _ep("yt3", "YT Ep 3")]
         mock_yt.return_value = eps
         result = process_feeds(_config(references=[_yt_source()]))
-        self.assertEqual(len(result), 3)
+        assert len(result) == 3
 
     @patch("adrift.adapters.process.episode_sources.episode_source_rss.get_rss_episodes")
     @patch("adrift.adapters.process.youtube.metadata.get_youtube_episodes")
@@ -190,11 +194,11 @@ class TestProcessFeeds(unittest.TestCase):
         mock_rss.return_value = [_ep("r1", "RSS Ep 1"), _ep("r2", "RSS Ep 2")]
         mock_yt.return_value = [_ep("yt1", "YT Ep 3")]
         result = process_feeds(_config(references=[_rss_source(), _yt_source()]))
-        self.assertEqual(len(result), 3)
+        assert len(result) == 3
 
     def test_no_references_returns_empty(self):
         result = process_feeds(_config(references=[]))
-        self.assertEqual(result, [])
+        assert result == []
 
 
 # ---------------------------------------------------------------------------
@@ -207,11 +211,11 @@ class TestProcessSources(unittest.TestCase):
     def test_returns_youtube_episodes(self, mock_yt: MagicMock):
         mock_yt.return_value = [_ep("yt1", "YT Ep A"), _ep("yt2", "YT Ep B")]
         result = process_sources(_config(downloads=[_yt_source()]))
-        self.assertEqual(len(result), 2)
+        assert len(result) == 2
 
     def test_empty_downloads_returns_empty(self):
         result = process_sources(_config(downloads=[]))
-        self.assertEqual(result, [])
+        assert result == []
 
 
 # ---------------------------------------------------------------------------
@@ -237,11 +241,11 @@ class TestFullPipeline(unittest.TestCase):
         config = _config(references=[_rss_source()], downloads=[_yt_source()])
         survived = _align_from_config(config)
 
-        self.assertEqual(len(survived), 2)
+        assert len(survived) == 2
         survived_titles = {ep.title for ep in survived}
-        self.assertIn("The Show: Episode 101", survived_titles)
-        self.assertIn("The Show: Episode 102", survived_titles)
-        self.assertNotIn("Science Quarterly: Quantum Tunneling", survived_titles)
+        assert "The Show: Episode 101" in survived_titles
+        assert "The Show: Episode 102" in survived_titles
+        assert "Science Quarterly: Quantum Tunneling" not in survived_titles
 
     @patch("adrift.adapters.process.episode_sources.episode_source_rss.get_rss_episodes")
     @patch("adrift.adapters.process.youtube.metadata.get_youtube_episodes")
@@ -268,14 +272,14 @@ class TestFullPipeline(unittest.TestCase):
             ),
         )
 
-        self.assertEqual(len(result.source_traces), 2)
+        assert len(result.source_traces) == 2
         reference_trace = next(trace for trace in result.source_traces if trace.role == "reference")
         download_trace = next(trace for trace in result.source_traces if trace.role == "download")
-        self.assertTrue(reference_trace.has_filters)
-        self.assertEqual(reference_trace.episode_count, 1)
-        self.assertEqual(reference_trace.source_type, "rss")
-        self.assertFalse(download_trace.has_filters)
-        self.assertEqual(download_trace.source_type, "youtube")
+        assert reference_trace.has_filters
+        assert reference_trace.episode_count == 1
+        assert reference_trace.source_type == "rss"
+        assert not download_trace.has_filters
+        assert download_trace.source_type == "youtube"
 
     @patch("adrift.adapters.process.episode_sources.episode_source_rss.get_rss_episodes")
     @patch("adrift.adapters.process.youtube.metadata.get_youtube_episodes")
@@ -317,9 +321,9 @@ class TestFullPipeline(unittest.TestCase):
             MergeConfigOptions(episode_source_factory=_FACTORY, alignment_provider=provider),
         )
 
-        self.assertTrue(provider.calls)
-        self.assertTrue(all(backend is None for backend in provider.calls))
-        self.assertEqual(result.pairs, [(0, 0)])
+        assert provider.calls
+        assert all(backend is None for backend in provider.calls)
+        assert result.pairs == [(0, 0)]
 
     @patch("adrift.adapters.process.episode_sources.episode_source_rss.get_rss_episodes")
     @patch("adrift.adapters.process.youtube.metadata.get_youtube_episodes")
@@ -334,9 +338,9 @@ class TestFullPipeline(unittest.TestCase):
             MergeConfigOptions(episode_source_factory=_FACTORY, scored_alignment_port=fake_port),
         )
 
-        self.assertTrue(fake_port.called)
-        self.assertEqual(result.pairs, [(0, 0)])
-        self.assertEqual(result.match_traces[0].matched_download_index, 0)
+        assert fake_port.called
+        assert result.pairs == [(0, 0)]
+        assert result.match_traces[0].matched_download_index == 0
 
     @patch("adrift.adapters.process.episode_sources.episode_source_rss.get_rss_episodes")
     @patch("adrift.adapters.process.youtube.metadata.get_youtube_episodes")
@@ -360,8 +364,8 @@ class TestFullPipeline(unittest.TestCase):
             MergeConfigOptions(episode_source_factory=_FACTORY, scored_alignment_port=fake_port),
         )
 
-        self.assertTrue(fake_port.called)
-        self.assertEqual(result.pairs, [(0, 0)])
+        assert fake_port.called
+        assert result.pairs == [(0, 0)]
 
     @patch("adrift.adapters.process.episode_sources.episode_source_rss.get_rss_episodes")
     @patch("adrift.adapters.process.youtube.metadata.get_youtube_episodes")
@@ -392,10 +396,8 @@ class TestFullPipeline(unittest.TestCase):
             ),
         )
 
-        self.assertTrue(candidate.called)
-        self.assertTrue(
-            any("align_episodes.scores A/B mismatch" in warning for warning in warnings)
-        )
+        assert candidate.called
+        assert any("align_episodes.scores A/B mismatch" in warning for warning in warnings)
 
     @patch("adrift.adapters.process.episode_sources.episode_source_rss.get_rss_episodes")
     @patch("adrift.adapters.process.youtube.metadata.get_youtube_episodes")
@@ -443,9 +445,9 @@ class TestFullPipeline(unittest.TestCase):
             ),
         )
 
-        self.assertTrue(candidate_port.called)
-        self.assertEqual(result.episodes[0].id, "primary")
-        self.assertTrue(any("merge_episodes A/B mismatch" in warning for warning in warnings))
+        assert candidate_port.called
+        assert result.episodes[0].id == "primary"
+        assert any("merge_episodes A/B mismatch" in warning for warning in warnings)
 
     @patch("adrift.adapters.process.episode_sources.episode_source_rss.get_rss_episodes")
     @patch("adrift.adapters.process.youtube.metadata.get_youtube_episodes")
@@ -491,12 +493,10 @@ class TestFullPipeline(unittest.TestCase):
         )
         survived = _align_from_config(config)
 
-        self.assertEqual(len(survived), 5)
+        assert len(survived) == 5
         for ep in survived:
-            self.assertIsNotNone(ep.pub_date)
-            self.assertGreaterEqual(
-                ep.pub_date, _dt(2024, 1, 1), f"Old episode slipped through: {ep.title}"
-            )
+            assert ep.pub_date is not None
+            assert ep.pub_date >= _dt(2024, 1, 1), f"Old episode slipped through: {ep.title}"
 
     @patch("adrift.adapters.process.youtube.metadata.get_youtube_episodes")
     def test_no_references_keeps_all_downloads(self, mock_yt: MagicMock):
@@ -513,7 +513,7 @@ class TestFullPipeline(unittest.TestCase):
         else:
             survived = downloads  # fallback branch from _download_series
 
-        self.assertEqual(len(survived), 2)
+        assert len(survived) == 2
 
     @patch("adrift.adapters.process.episode_sources.episode_source_rss.get_rss_episodes")
     @patch("adrift.adapters.process.youtube.metadata.get_youtube_episodes")
@@ -531,7 +531,7 @@ class TestFullPipeline(unittest.TestCase):
         config = _config(references=[_rss_source()], downloads=[_yt_source()])
         pairs = _pairs_from_config(config)
 
-        self.assertEqual(pairs, [])
+        assert pairs == []
 
     @patch("adrift.adapters.process.episode_sources.episode_source_rss.get_rss_episodes")
     @patch("adrift.adapters.process.youtube.metadata.get_youtube_episodes")
@@ -549,7 +549,7 @@ class TestFullPipeline(unittest.TestCase):
         survived = [process_sources(config)[d_idx] for _, d_idx in pairs]
 
         survived_titles = {ep.title for ep in survived}
-        self.assertNotIn("Download Only: Bonus Footage", survived_titles)
+        assert "Download Only: Bonus Footage" not in survived_titles
 
 
 if __name__ == "__main__":

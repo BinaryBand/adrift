@@ -1,6 +1,7 @@
+"""Audio inspection and opus conversion helpers wrapping ffmpeg/ffprobe."""
+
 import json
 import logging
-import os
 import subprocess
 from dataclasses import dataclass
 from pathlib import Path
@@ -15,6 +16,8 @@ _FFMPEG_BASE = ["ffmpeg", "-hide_banner", "-loglevel", "error"]
 
 
 class OpusConversionKwargs(TypedDict, total=False):
+    """Keyword options accepted by the opus conversion helpers."""
+
     target_bitrate_kbps: int | None
     force_bitrate: bool
     application: str
@@ -38,7 +41,7 @@ def _run_ffprobe(file: Path) -> str:
         "-show_streams",
         str(file),
     ]
-    res = subprocess.run(
+    res = subprocess.run(  # noqa: S603 -- fixed ffprobe argv, no shell
         cmd,
         capture_output=True,
         text=True,
@@ -47,7 +50,8 @@ def _run_ffprobe(file: Path) -> str:
         check=True,
     )
     if not res.stdout:
-        raise ValueError("ffprobe returned no output")
+        msg = "ffprobe returned no output"
+        raise ValueError(msg)
     return res.stdout
 
 
@@ -55,13 +59,15 @@ def _parse_ffprobe_duration(stdout: str) -> float:
     data = json.loads(stdout)
     duration = data.get("format", {}).get("duration")
     if duration is None:
-        raise ValueError("No duration in ffprobe output")
+        msg = "No duration in ffprobe output"
+        raise ValueError(msg)
     return float(duration)
 
 
 def handle_subprocess_error(
     e: subprocess.CalledProcessError, cmd: list[str], file: Path
 ) -> RuntimeError:
+    """Build a descriptive ``RuntimeError`` from a failed ffmpeg invocation."""
     stderr = e.stderr.decode("utf-8", errors="replace") if e.stderr else "No error"
     return RuntimeError(
         f"ffmpeg failed to extract audio features from {file}\n"
@@ -72,13 +78,16 @@ def handle_subprocess_error(
 
 
 def is_audio(filename: Path | str) -> bool:
+    """Return True if ``filename`` has a known audio extension."""
     ext = Path(filename).suffix.lower()
     return ext in AUDIO_EXTENSIONS
 
 
 def get_duration(file: Path) -> float | None:
-    if not os.path.exists(file):
-        raise FileNotFoundError(f"File not found: {file}")
+    """Return the media duration in seconds, or None if ffprobe fails."""
+    if not file.exists():
+        msg = f"File not found: {file}"
+        raise FileNotFoundError(msg)
 
     try:
         return _parse_ffprobe_duration(_run_ffprobe(file))
@@ -100,12 +109,8 @@ def _normalize_streams(data: dict[str, Any]) -> list[dict[str, Any]]:
     streams_raw = data.get("streams")
     if not isinstance(streams_raw, list):
         return []
-    contents = cast(list[Any], streams_raw)
-    normalized: list[dict[str, Any]] = []
-    for item in contents:
-        if isinstance(item, dict):
-            normalized.append(cast(dict[str, Any], item))
-    return normalized
+    contents = cast("list[Any]", streams_raw)
+    return [cast("dict[str, Any]", item) for item in contents if isinstance(item, dict)]
 
 
 def _find_audio_stream(streams: list[dict[str, Any]]) -> dict[str, Any] | None:
@@ -127,28 +132,31 @@ def _ensure_audio_stream(check_file: Path) -> str:
     ffprobe_out = _run_ffprobe(check_file)
     raw = json.loads(ffprobe_out)
     if not isinstance(raw, dict):
-        raise RuntimeError(f"ffprobe did not return JSON dict for {check_file}")
-    data = cast(dict[str, Any], raw)
+        msg = f"ffprobe did not return JSON dict for {check_file}"
+        raise RuntimeError(msg)  # noqa: TRY004 -- ffprobe output failure is a runtime error
+    data = cast("dict[str, Any]", raw)
     streams = _normalize_streams(data)
     audio_stream = _find_audio_stream(streams)
     if audio_stream is None:
-        raise RuntimeError(f"No audio stream found in {check_file}")
+        msg = f"No audio stream found in {check_file}"
+        raise RuntimeError(msg)
     return ffprobe_out
 
 
 def _run_ffmpeg_convert(cmd: list[str], file: Path, ffprobe_out: str) -> None:
     """Run ffmpeg conversion command and raise a RuntimeError with stderr on failure."""
     try:
-        subprocess.run(cmd, check=True, capture_output=True)
+        subprocess.run(cmd, check=True, capture_output=True)  # noqa: S603 -- fixed ffmpeg argv, no shell
     except subprocess.CalledProcessError as e:
         stderr = e.stderr.decode("utf-8", errors="replace") if e.stderr else "No error"
-        raise RuntimeError(
+        msg = (
             f"ffmpeg failed to convert {file} to opus\n"
             f"Command: {' '.join(cmd)}\n"
             f"Exit code: {e.returncode}\n"
             f"Error output: {stderr}\n"
-            f"ffprobe: {ffprobe_out if ffprobe_out else 'no ffprobe output'}"
-        ) from e
+            f"ffprobe: {ffprobe_out or 'no ffprobe output'}"
+        )
+        raise RuntimeError(msg) from e
 
 
 def _run_ffmpeg_convert_with_progress(
@@ -157,20 +165,21 @@ def _run_ffmpeg_convert_with_progress(
     ffprobe_out: str,
     callback: Callback,
 ) -> None:
-    progress_cmd = _FFMPEG_BASE + ["-progress", "pipe:1", "-nostats", *cmd[len(_FFMPEG_BASE) :]]
+    progress_cmd = [*_FFMPEG_BASE, "-progress", "pipe:1", "-nostats", *cmd[len(_FFMPEG_BASE) :]]
     total_duration = _parse_ffprobe_duration(ffprobe_out)
     total_seconds = max(int(total_duration), 1)
     return_code, stderr = _run_ffmpeg_progress_process(progress_cmd, total_seconds, callback)
 
     callback(total_seconds, total_seconds)
     if return_code != 0:
-        raise RuntimeError(
+        msg = (
             f"ffmpeg failed to convert {file} to opus\n"
             f"Command: {' '.join(progress_cmd)}\n"
             f"Exit code: {return_code}\n"
             f"Error output: {stderr or 'No error'}\n"
-            f"ffprobe: {ffprobe_out if ffprobe_out else 'no ffprobe output'}"
+            f"ffprobe: {ffprobe_out or 'no ffprobe output'}"
         )
+        raise RuntimeError(msg)
 
 
 def _run_ffmpeg_progress_process(
@@ -178,8 +187,7 @@ def _run_ffmpeg_progress_process(
     total_seconds: int,
     callback: Callback,
 ) -> tuple[int, str]:
-
-    with subprocess.Popen(
+    with subprocess.Popen(  # noqa: S603 -- fixed ffmpeg argv, no shell
         progress_cmd,
         stdout=subprocess.PIPE,
         stderr=subprocess.PIPE,
@@ -188,7 +196,8 @@ def _run_ffmpeg_progress_process(
         errors="ignore",
     ) as process:
         if process.stdout is None:
-            raise RuntimeError("ffmpeg progress stream not available")
+            msg = "ffmpeg progress stream not available"
+            raise RuntimeError(msg)
         for raw_line in process.stdout:
             _maybe_report_ffmpeg_progress(raw_line, total_seconds, callback)
 
@@ -214,7 +223,7 @@ def _maybe_report_ffmpeg_progress(
 
 def _build_opus_copy_cmd(src: Path, dest: Path) -> list[str]:
     """Return an ffmpeg command to remux an already-Opus stream into an Ogg container."""
-    return _FFMPEG_BASE + ["-i", str(src), "-vn", "-map", "0:a", "-c:a", "copy", "-y", str(dest)]
+    return [*_FFMPEG_BASE, "-i", str(src), "-vn", "-map", "0:a", "-c:a", "copy", "-y", str(dest)]
 
 
 def _build_opus_cmd(
@@ -224,7 +233,8 @@ def _build_opus_cmd(
     application: str = "audio",
 ) -> list[str]:
     """Return an ffmpeg command list for converting src to Opus at dest."""
-    cmd = _FFMPEG_BASE + [
+    cmd = [
+        *_FFMPEG_BASE,
         "-i",
         str(src),
         "-vn",
@@ -246,21 +256,21 @@ def _build_opus_cmd(
 def _parse_ffprobe_json(ffprobe_out: str) -> dict[str, Any] | None:
     try:
         raw = json.loads(ffprobe_out)
-        if isinstance(raw, dict):
-            return cast(dict[str, Any], raw)
-        return None
     except (json.JSONDecodeError, TypeError, ValueError):
         return None
+    if isinstance(raw, dict):
+        return cast("dict[str, Any]", raw)
+    return None
 
 
-def _kbps_from_br(br: Any) -> int | None:
+def _kbps_from_br(br: Any) -> int | None:  # noqa: ANN401 -- raw ffprobe field value
     if br is None:
         return None
     try:
-        result = int(round(int(br) / 1000))
-        return result if result > 0 else None
+        result = round(int(br) / 1000)
     except (TypeError, ValueError, OverflowError):
         return None
+    return result if result > 0 else None
 
 
 def _get_bitrate_from_streams(streams: list[dict[str, Any]]) -> int | None:
@@ -283,7 +293,7 @@ def _get_bitrate_from_data(data: dict[str, Any] | None) -> int | None:
         return kbps
 
     fmt_raw = data.get("format")
-    fmt = cast(dict[str, Any], fmt_raw) if isinstance(fmt_raw, dict) else {}
+    fmt = cast("dict[str, Any]", fmt_raw) if isinstance(fmt_raw, dict) else {}
     return _kbps_from_br(fmt.get("bit_rate"))
 
 
@@ -293,7 +303,7 @@ def _extract_stream_bitrate_kbps(ffprobe_out: str) -> int | None:
 
 
 def _decide_final_bitrate(
-    src_kbps: int | None, target_bitrate_kbps: int | None, force_bitrate: bool
+    src_kbps: int | None, target_bitrate_kbps: int | None, *, force_bitrate: bool
 ) -> int | None:
     if target_bitrate_kbps is None:
         return None
@@ -302,15 +312,18 @@ def _decide_final_bitrate(
     return target_bitrate_kbps
 
 
+_BYTES_PER_UNIT = 1024.0
+
+
 def _format_bytes(num: int) -> str:
     try:
         n = float(num)
     except (TypeError, ValueError):
         return "0B"
     for unit in ("B", "KB", "MB", "GB", "TB"):
-        if n < 1024.0:
+        if n < _BYTES_PER_UNIT:
             return f"{n:.1f}{unit}"
-        n /= 1024.0
+        n /= _BYTES_PER_UNIT
     return f"{n:.1f}PB"
 
 
@@ -357,7 +370,7 @@ def _prepare_opus_conversion(
     final_bitrate = _decide_final_bitrate(
         src_kbps,
         settings.target_bitrate_kbps,
-        settings.force_bitrate,
+        force_bitrate=settings.force_bitrate,
     )
     cmd = _build_opus_cmd(file, output, final_bitrate, settings.application)
     return output, cmd, ffprobe_out

@@ -25,34 +25,34 @@ _MORBID_ALIGNMENT = AlignmentConfig(extra_stopwords=["morbid"])
 
 class TestSimDate(unittest.TestCase):
     def test_none_inputs_return_zero(self):
-        self.assertEqual(sim_date(None, None), 0.0)
-        self.assertEqual(sim_date(_dt(2024, 1, 1), None), 0.0)
-        self.assertEqual(sim_date(None, _dt(2024, 1, 1)), 0.0)
+        assert sim_date(None, None) == 0.0
+        assert sim_date(_dt(2024, 1, 1), None) == 0.0
+        assert sim_date(None, _dt(2024, 1, 1)) == 0.0
 
     def test_same_date(self):
         d = _dt(2024, 6, 15)
-        self.assertEqual(sim_date(d, d), 1.00)
+        assert sim_date(d, d) == 1.0
 
     def test_within_2_days(self):
-        self.assertEqual(sim_date(_dt(2024, 1, 1), _dt(2024, 1, 3)), 1.00)
-        self.assertEqual(sim_date(_dt(2024, 1, 3), _dt(2024, 1, 1)), 1.00)
+        assert sim_date(_dt(2024, 1, 1), _dt(2024, 1, 3)) == 1.0
+        assert sim_date(_dt(2024, 1, 3), _dt(2024, 1, 1)) == 1.0
 
     def test_within_10_days(self):
-        self.assertEqual(sim_date(_dt(2024, 1, 1), _dt(2024, 1, 8)), 0.70)
-        self.assertEqual(sim_date(_dt(2024, 1, 1), _dt(2024, 1, 11)), 0.70)
+        assert sim_date(_dt(2024, 1, 1), _dt(2024, 1, 8)) == 0.7
+        assert sim_date(_dt(2024, 1, 1), _dt(2024, 1, 11)) == 0.7
 
     def test_within_35_days(self):
-        self.assertEqual(sim_date(_dt(2024, 1, 1), _dt(2024, 1, 20)), 0.15)
-        self.assertEqual(sim_date(_dt(2024, 1, 1), _dt(2024, 2, 5)), 0.15)
+        assert sim_date(_dt(2024, 1, 1), _dt(2024, 1, 20)) == 0.15
+        assert sim_date(_dt(2024, 1, 1), _dt(2024, 2, 5)) == 0.15
 
     def test_beyond_35_days(self):
-        self.assertEqual(sim_date(_dt(2024, 1, 1), _dt(2024, 3, 1)), 0.00)
+        assert sim_date(_dt(2024, 1, 1), _dt(2024, 3, 1)) == 0.0
 
     def test_mixed_naive_and_aware_dates(self):
         aware = _dt(2024, 1, 1)
         naive = datetime(2024, 1, 2)
-        self.assertEqual(sim_date(aware, naive), 1.00)
-        self.assertEqual(sim_date(naive, aware), 1.00)
+        assert sim_date(aware, naive) == 1.0
+        assert sim_date(naive, aware) == 1.0
 
 
 # ---------------------------------------------------------------------------
@@ -65,14 +65,14 @@ class TestAlignEpisodes(unittest.TestCase):
         ref = _ep(id="abc", title="Ep 1: Great Stuff", pub_date=_dt(2024, 1, 5))
         dl = _ep(id="xyz", title="Ep 1: Great Stuff", pub_date=_dt(2024, 1, 5))
         pairs = align_episodes([ref], [dl])
-        self.assertEqual(pairs, [(0, 0)])
+        assert pairs == [(0, 0)]
 
     def test_same_id_match(self):
         """Identical IDs boost score even with a moderate date offset."""
         ref = _ep(id="same_id", title="Episode", pub_date=_dt(2024, 1, 1))
         dl = _ep(id="same_id", title="Episode", pub_date=_dt(2024, 1, 1))
         pairs = align_episodes([ref], [dl])
-        self.assertEqual(pairs, [(0, 0)])
+        assert pairs == [(0, 0)]
 
     def test_no_match_below_threshold(self):
         """Completely unrelated episodes should not match."""
@@ -83,7 +83,7 @@ class TestAlignEpisodes(unittest.TestCase):
         )
         dl = _ep(id="b", title="Cooking Show: Best Pasta Recipes", pub_date=_dt(2024, 6, 1))
         pairs = align_episodes([ref], [dl])
-        self.assertEqual(pairs, [])
+        assert pairs == []
 
     def test_greedy_prefers_best_pair(self):
         """The highest-scoring pair is committed first; the second-best gets leftovers."""
@@ -94,8 +94,8 @@ class TestAlignEpisodes(unittest.TestCase):
         dl2 = _ep(id="d2", title="Weekly Show Episode 2", pub_date=_dt(2024, 1, 14))
 
         pairs = align_episodes([ref1, ref2], [dl1, dl2])
-        self.assertIn((0, 0), pairs)
-        self.assertIn((1, 1), pairs)
+        assert (0, 0) in pairs
+        assert (1, 1) in pairs
 
     def test_no_double_use(self):
         """Each episode may appear in at most one matched pair."""
@@ -105,7 +105,7 @@ class TestAlignEpisodes(unittest.TestCase):
 
         pairs = align_episodes([ref1, ref2], [dl])
         dl_indices = [d for _, d in pairs]
-        self.assertEqual(len(dl_indices), len(set(dl_indices)), "Download episode used twice")
+        assert len(dl_indices) == len(set(dl_indices)), "Download episode used twice"
 
     def test_normalized_titles_are_precomputed_once_per_episode(self):
         refs = [
@@ -124,7 +124,7 @@ class TestAlignEpisodes(unittest.TestCase):
             mocked_title.side_effect = lambda show, episode: episode.title.lower()
             align_episodes(refs, dls, "Example Show")
 
-        self.assertEqual(mocked_title.call_count, len(refs) + len(dls))
+        assert mocked_title.call_count == len(refs) + len(dls)
 
     def test_listener_tales_number_mismatch_rejected(self):
         ref = _ep(
@@ -139,7 +139,7 @@ class TestAlignEpisodes(unittest.TestCase):
             description="listener story batch",
             pub_date=_dt(2024, 2, 1),
         )
-        self.assertEqual(align_episodes_impl([ref], [dl], "Morbid", _MORBID_ALIGNMENT), [])
+        assert align_episodes_impl([ref], [dl], "Morbid", _MORBID_ALIGNMENT) == []
 
     def test_listener_tales_number_exact_match_allowed(self):
         ref = _ep(
@@ -154,10 +154,7 @@ class TestAlignEpisodes(unittest.TestCase):
             description="listener story batch",
             pub_date=_dt(2024, 2, 1),
         )
-        self.assertEqual(
-            align_episodes_impl([ref], [dl], "Morbid", _MORBID_ALIGNMENT),
-            [(0, 0)],
-        )
+        assert align_episodes_impl([ref], [dl], "Morbid", _MORBID_ALIGNMENT) == [(0, 0)]
 
     def test_part_number_mismatch_rejected(self):
         ref = _ep(
@@ -172,7 +169,7 @@ class TestAlignEpisodes(unittest.TestCase):
             description="historic case",
             pub_date=_dt(2024, 2, 1),
         )
-        self.assertEqual(align_episodes_impl([ref], [dl], "Morbid", _MORBID_ALIGNMENT), [])
+        assert align_episodes_impl([ref], [dl], "Morbid", _MORBID_ALIGNMENT) == []
 
     def test_volume_number_mismatch_rejected(self):
         ref = _ep(
@@ -187,7 +184,7 @@ class TestAlignEpisodes(unittest.TestCase):
             description="spooky segment",
             pub_date=_dt(2024, 2, 1),
         )
-        self.assertEqual(align_episodes_impl([ref], [dl], "Morbid", _MORBID_ALIGNMENT), [])
+        assert align_episodes_impl([ref], [dl], "Morbid", _MORBID_ALIGNMENT) == []
 
     def test_volume_number_mismatch_rejected_with_compact_dot_notation(self):
         ref = _ep(
@@ -202,7 +199,7 @@ class TestAlignEpisodes(unittest.TestCase):
             description="spooky segment",
             pub_date=_dt(2024, 2, 1),
         )
-        self.assertEqual(align_episodes_impl([ref], [dl], "Morbid", _MORBID_ALIGNMENT), [])
+        assert align_episodes_impl([ref], [dl], "Morbid", _MORBID_ALIGNMENT) == []
 
     def test_episode_number_mismatch_rejected(self):
         ref = _ep(
@@ -217,7 +214,7 @@ class TestAlignEpisodes(unittest.TestCase):
             description="second",
             pub_date=_dt(2024, 2, 1),
         )
-        self.assertEqual(align_episodes_impl([ref], [dl], "Morbid", _MORBID_ALIGNMENT), [])
+        assert align_episodes_impl([ref], [dl], "Morbid", _MORBID_ALIGNMENT) == []
 
     def test_certainty_path_matches_despite_large_date_gap(self):
         """Near-perfect titles match even with a 200-day date difference (YouTube backfill)."""
@@ -233,10 +230,7 @@ class TestAlignEpisodes(unittest.TestCase):
             description="a case description",
             pub_date=_dt(2023, 1, 5),  # 218 days later
         )
-        self.assertEqual(
-            align_episodes_impl([ref], [dl], "Morbid", _MORBID_ALIGNMENT),
-            [(0, 0)],
-        )
+        assert align_episodes_impl([ref], [dl], "Morbid", _MORBID_ALIGNMENT) == [(0, 0)]
 
     def test_containment_bonus_helps_near_threshold_pair(self):
         """Shorter title fully contained in longer title gets a boost over MATCH_TOLERANCE."""
@@ -252,10 +246,7 @@ class TestAlignEpisodes(unittest.TestCase):
             description="cold case",
             pub_date=_dt(2023, 1, 2),
         )
-        self.assertEqual(
-            align_episodes_impl([ref], [dl], "Morbid", _MORBID_ALIGNMENT),
-            [(0, 0)],
-        )
+        assert align_episodes_impl([ref], [dl], "Morbid", _MORBID_ALIGNMENT) == [(0, 0)]
 
     def test_low_anchor_overlap_rejected(self):
         ref = _ep(
@@ -270,7 +261,7 @@ class TestAlignEpisodes(unittest.TestCase):
             description="same date and description should not force unrelated title match",
             pub_date=_dt(2024, 2, 1),
         )
-        self.assertEqual(align_episodes_impl([ref], [dl], "Morbid", _MORBID_ALIGNMENT), [])
+        assert align_episodes_impl([ref], [dl], "Morbid", _MORBID_ALIGNMENT) == []
 
     def test_anchor_overlap_allows_match(self):
         ref = _ep(
@@ -285,10 +276,7 @@ class TestAlignEpisodes(unittest.TestCase):
             description="haunted house case",
             pub_date=_dt(2024, 2, 1),
         )
-        self.assertEqual(
-            align_episodes_impl([ref], [dl], "Morbid", _MORBID_ALIGNMENT),
-            [(0, 0)],
-        )
+        assert align_episodes_impl([ref], [dl], "Morbid", _MORBID_ALIGNMENT) == [(0, 0)]
 
 
 # ---------------------------------------------------------------------------
@@ -301,53 +289,53 @@ class TestMergeEpisode(unittest.TestCase):
         ref = _ep(id="https://example.com/ep1")
         dl = _ep(id="yt_abc123")
         result = merge_episode(ref, dl)
-        self.assertEqual(result.id, "yt_abc123")
+        assert result.id == "yt_abc123"
 
     def test_id_keeps_ref_when_not_url(self):
         ref = _ep(id="short_id")
         dl = _ep(id="https://example.com/dl1")
         result = merge_episode(ref, dl)
-        self.assertEqual(result.id, "short_id")
+        assert result.id == "short_id"
 
     def test_id_prefers_dl_when_both_non_url(self):
         """Download side (YouTube video ID) beats ref side (RSS GUID) per spec."""
         ref = _ep(id="rss-guid-abc")
         dl = _ep(id="dQw4w9WgXcQ")
         result = merge_episode(ref, dl)
-        self.assertEqual(result.id, "dQw4w9WgXcQ")
+        assert result.id == "dQw4w9WgXcQ"
 
     def test_title_longest_wins(self):
         ref = _ep(title="Episode 1")
         dl = _ep(title="Episode 1: The Full Title With More Words")
         result = merge_episode(ref, dl)
-        self.assertEqual(result.title, "Episode 1: The Full Title With More Words")
+        assert result.title == "Episode 1: The Full Title With More Words"
 
     def test_upload_date_earliest_wins(self):
         ref = _ep(pub_date=_dt(2024, 1, 5))
         dl = _ep(pub_date=_dt(2024, 1, 1))
         result = merge_episode(ref, dl)
-        self.assertEqual(result.upload_date, _dt(2024, 1, 1))
+        assert result.upload_date == _dt(2024, 1, 1)
 
     def test_description_longest_wins(self):
         ref = _ep(description="Short description.")
         dl = _ep(description="This is a much longer description with more detail and context.")
         result = merge_episode(ref, dl)
-        self.assertEqual(result.description, dl.description)
+        assert result.description == dl.description
 
     def test_source_is_union(self):
         ref = _ep(content="https://rss.example.com/ep1.mp3")
         dl = _ep(content="https://yt.example.com/watch?v=abc")
         result = merge_episode(ref, dl)
-        self.assertEqual(len(result.source), 2)
-        self.assertIn("https://rss.example.com/ep1.mp3", result.source)
-        self.assertIn("https://yt.example.com/watch?v=abc", result.source)
+        assert len(result.source) == 2
+        assert "https://rss.example.com/ep1.mp3" in result.source
+        assert "https://yt.example.com/watch?v=abc" in result.source
 
     def test_source_deduplicates(self):
         same_url = "https://example.com/ep.mp3"
         ref = _ep(content=same_url)
         dl = _ep(content=same_url)
         result = merge_episode(ref, dl)
-        self.assertEqual(len(result.source), 1)
+        assert len(result.source) == 1
 
 
 # ---------------------------------------------------------------------------
@@ -358,31 +346,25 @@ class TestMergeEpisode(unittest.TestCase):
 @patch("adrift.core.services.catalog.alignment._thumbnail_url_exists", return_value=True)
 class TestBestThumbnail(unittest.TestCase):
     def test_none_inputs(self, _exists):
-        self.assertIsNone(_best_thumbnail(None, None))
-        self.assertEqual(
-            _best_thumbnail("https://ex.com/thumb.jpg", None),
-            "https://ex.com/thumb.jpg",
-        )
-        self.assertEqual(
-            _best_thumbnail(None, "https://ex.com/thumb.jpg"),
-            "https://ex.com/thumb.jpg",
-        )
+        assert _best_thumbnail(None, None) is None
+        assert _best_thumbnail("https://ex.com/thumb.jpg", None) == "https://ex.com/thumb.jpg"
+        assert _best_thumbnail(None, "https://ex.com/thumb.jpg") == "https://ex.com/thumb.jpg"
 
     def test_maxres_beats_hq(self, _exists):
         a = "https://img.youtube.com/vi/abc/maxresdefault.jpg"
         b = "https://img.youtube.com/vi/abc/hqdefault.jpg"
-        self.assertEqual(_best_thumbnail(a, b), a)
-        self.assertEqual(_best_thumbnail(b, a), a)
+        assert _best_thumbnail(a, b) == a
+        assert _best_thumbnail(b, a) == a
 
     def test_hq_beats_mq(self, _exists):
         a = "https://img.youtube.com/vi/abc/hqdefault.jpg"
         b = "https://img.youtube.com/vi/abc/mqdefault.jpg"
-        self.assertEqual(_best_thumbnail(a, b), a)
+        assert _best_thumbnail(a, b) == a
 
     def test_equal_rank_returns_first(self, _exists):
         a = "https://img.youtube.com/vi/abc/hqdefault.jpg"
         b = "https://img.youtube.com/vi/xyz/hqdefault.jpg"
-        self.assertEqual(_best_thumbnail(a, b), a)
+        assert _best_thumbnail(a, b) == a
 
 
 class TestBestThumbnailFragileMaxres(unittest.TestCase):
@@ -393,17 +375,17 @@ class TestBestThumbnailFragileMaxres(unittest.TestCase):
 
     @patch("adrift.core.services.catalog.alignment._thumbnail_url_exists", return_value=False)
     def test_broken_maxres_prefers_stable_rss_cover(self, _exists):
-        self.assertEqual(_best_thumbnail(self._RSS, self._MAXRES), self._RSS)
+        assert _best_thumbnail(self._RSS, self._MAXRES) == self._RSS
 
     @patch("adrift.core.services.catalog.alignment._thumbnail_url_exists", return_value=False)
     def test_broken_maxres_falls_back_to_hqdefault(self, _exists):
         hq = "https://img.youtube.com/vi/abc/hqdefault.jpg"
         # Only YouTube candidates available -> downgrade rather than break.
-        self.assertEqual(_best_thumbnail(self._MAXRES, hq), hq)
+        assert _best_thumbnail(self._MAXRES, hq) == hq
 
     @patch("adrift.core.services.catalog.alignment._thumbnail_url_exists", return_value=True)
     def test_existing_maxres_is_kept(self, _exists):
-        self.assertEqual(_best_thumbnail(self._RSS, self._MAXRES), self._MAXRES)
+        assert _best_thumbnail(self._RSS, self._MAXRES) == self._MAXRES
 
 
 if __name__ == "__main__":

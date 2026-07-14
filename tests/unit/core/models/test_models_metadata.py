@@ -1,5 +1,5 @@
 import unittest
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
 from adrift.adapters.process.youtube.normalizer import rss_episode_from_ytdlp
 from adrift.core.models import YtDlpImage, YtDlpVideo
@@ -15,10 +15,7 @@ class TestRssEpisodeFromYtdlp(unittest.TestCase):
             },
             "tester",
         )
-        self.assertEqual(
-            episode.pub_date,
-            datetime.fromtimestamp(1710806400, tz=timezone.utc),
-        )
+        assert episode.pub_date == datetime.fromtimestamp(1710806400, tz=UTC)
 
     def test_populates_pub_date_from_upload_date(self):
         episode = rss_episode_from_ytdlp(
@@ -29,10 +26,7 @@ class TestRssEpisodeFromYtdlp(unittest.TestCase):
             },
             "tester",
         )
-        self.assertEqual(
-            episode.pub_date,
-            datetime(2024, 3, 19, tzinfo=timezone.utc),
-        )
+        assert episode.pub_date == datetime(2024, 3, 19, tzinfo=UTC)
 
     def test_missing_date_fields_keeps_pub_date_none(self):
         episode = rss_episode_from_ytdlp(
@@ -42,7 +36,7 @@ class TestRssEpisodeFromYtdlp(unittest.TestCase):
             },
             "tester",
         )
-        self.assertIsNone(episode.pub_date)
+        assert episode.pub_date is None
 
 
 class TestYtDlpNestedModels(unittest.TestCase):
@@ -57,12 +51,12 @@ class TestYtDlpNestedModels(unittest.TestCase):
             }
         )
 
-        self.assertIsNotNone(model.thumbnails)
-        self.assertIsNotNone(model.avatar)
-        self.assertIsInstance(model.thumbnails[0], YtDlpImage)
-        self.assertIsInstance(model.avatar[0], YtDlpImage)
         assert model.thumbnails is not None
-        self.assertEqual(model.thumbnails[0].url, "https://example.com/thumb.jpg")
+        assert model.avatar is not None
+        assert isinstance(model.thumbnails[0], YtDlpImage)
+        assert isinstance(model.avatar[0], YtDlpImage)
+        assert model.thumbnails is not None
+        assert model.thumbnails[0].url == "https://example.com/thumb.jpg"
 
     def test_rss_episode_from_typed_ytdlp_model(self):
         model = YtDlpVideo.model_validate(
@@ -74,8 +68,8 @@ class TestYtDlpNestedModels(unittest.TestCase):
             }
         )
         episode = rss_episode_from_ytdlp(model, "tester")
-        self.assertEqual(episode.id, "typed1")
-        self.assertEqual(episode.title, "Typed Video")
+        assert episode.id == "typed1"
+        assert episode.title == "Typed Video"
 
 
 if __name__ == "__main__":

@@ -11,9 +11,10 @@ def test_download_video_skips_members_only_download_error(
 ) -> None:
     def _raise_members_only(*args: object, **kwargs: object) -> None:
         del args, kwargs
-        raise YtDlpDownloadError(
+        msg = (
             "ERROR: [youtube] 2-eSmGYUz30: Join this channel to get access to members-only content"
         )
+        raise YtDlpDownloadError(msg)
 
     monkeypatch.setattr(downloader, "_run_download_attempt", _raise_members_only)
     result = downloader.download_video(
@@ -34,9 +35,8 @@ def test_download_video_retries_after_http_403(
         del args, kwargs
         calls.append(1)
         if len(calls) == 1:
-            raise YtDlpDownloadError(
-                "ERROR: unable to download video data: HTTP Error 403: Forbidden"
-            )
+            msg = "ERROR: unable to download video data: HTTP Error 403: Forbidden"
+            raise YtDlpDownloadError(msg)
         return audio_path
 
     monkeypatch.setattr(downloader, "_run_download_attempt", _forbidden_then_success)
@@ -57,7 +57,8 @@ def test_download_video_exhausts_attempts_on_persistent_403(
     def _always_forbidden(*args: object, **kwargs: object) -> None:
         del args, kwargs
         calls.append(1)
-        raise YtDlpDownloadError("ERROR: unable to download video data: HTTP Error 403: Forbidden")
+        msg = "ERROR: unable to download video data: HTTP Error 403: Forbidden"
+        raise YtDlpDownloadError(msg)
 
     monkeypatch.setattr(downloader, "_run_download_attempt", _always_forbidden)
     result = downloader.download_video(

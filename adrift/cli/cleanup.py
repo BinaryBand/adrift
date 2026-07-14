@@ -141,7 +141,7 @@ def _process_duplicate_audio_files(config: Any, storage: Any, dry_run: bool) -> 
 
     bucket, prefix = storage_prefix(config)
     duplicates = _duplicate_audio_candidates(
-        config.name, storage.get_file_list(bucket, prefix, False)
+        config.name, storage.get_file_list(bucket, prefix, without_extensions=False)
     )
     for name in duplicates:
         key = f"{prefix}/{name}"
@@ -162,7 +162,7 @@ def _run_cleanup(
 ) -> None:
     from adrift.core.services.catalog.merge import merge_config
 
-    storage = cast(Any, ctx.storage)
+    storage = cast("Any", ctx.storage)
     total_unmatched_found = 0
     total_missing = 0
     total_duplicates = 0
@@ -223,7 +223,7 @@ def _run(
 ) -> None:
     from adrift.cli.composition import build_app_context
 
-    configs, _ = bootstrap_run_configs(include, tags, skip_schedule_filter)
+    configs, _ = bootstrap_run_configs(include, tags, skip_schedule_filter=skip_schedule_filter)
     ctx = build_app_context()
     _run_cleanup(
         configs,

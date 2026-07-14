@@ -2,17 +2,17 @@
 
 from __future__ import annotations
 
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from typing import TYPE_CHECKING, Any
 
 from adrift.core.util.image import extract_image_from_ytdlp, extract_image_from_ytdlp_list
-from adrift.core.util.progress import Callback
 
 extract_image_url = extract_image_from_ytdlp
 extract_image_from_list = extract_image_from_ytdlp_list
 
 if TYPE_CHECKING:
     from adrift.core.models import RssChannel, RssEpisode, YtDlpVideo
+    from adrift.core.util.progress import Callback
 
 _PROGRESS_HOOK_ERRORS = (OSError, RuntimeError, TypeError, ValueError)
 
@@ -24,9 +24,9 @@ _PROGRESS_HOOK_ERRORS = (OSError, RuntimeError, TypeError, ValueError)
 def unix_timestamp_to_datetime(raw: Any) -> datetime | None:
     """Convert unix timestamp (int, float, or numeric string) to datetime."""
     if isinstance(raw, (int, float)):
-        return datetime.fromtimestamp(float(raw), tz=timezone.utc)
+        return datetime.fromtimestamp(float(raw), tz=UTC)
     if isinstance(raw, str) and raw.isdigit():
-        return datetime.fromtimestamp(float(raw), tz=timezone.utc)
+        return datetime.fromtimestamp(float(raw), tz=UTC)
     return None
 
 
@@ -35,7 +35,7 @@ def parse_upload_date_string(raw: Any) -> datetime | None:
     if not isinstance(raw, str) or len(raw) != 8 or not raw.isdigit():
         return None
     try:
-        return datetime.strptime(raw, "%Y%m%d").replace(tzinfo=timezone.utc)
+        return datetime.strptime(raw, "%Y%m%d").replace(tzinfo=UTC)
     except ValueError:
         return None
 
@@ -60,10 +60,7 @@ def ytdlp_pub_date(data: YtDlpVideo | dict[str, Any]) -> datetime | None:
     from adrift.core.models import YtDlpVideo as YtDlpVideoModel
 
     mapping: dict[str, Any]
-    if isinstance(data, YtDlpVideoModel):
-        mapping = data.model_dump()
-    else:
-        mapping = data
+    mapping = data.model_dump() if isinstance(data, YtDlpVideoModel) else data
 
     for key in ("timestamp", "release_timestamp"):
         if dt := unix_timestamp_to_datetime(mapping.get(key)):
@@ -181,7 +178,7 @@ def _extract_channel_image(data: Any) -> str:
     return extract_image_url(data)
 
 
-def rss_channel_from_ytdlp(data: "YtDlpVideo | dict[str, Any]", url: str) -> "RssChannel":
+def rss_channel_from_ytdlp(data: YtDlpVideo | dict[str, Any], url: str) -> RssChannel:
     """Create RssChannel from a yt-dlp extract_info response or raw dict."""
     from adrift.core.models import RssChannel
 
@@ -199,7 +196,7 @@ def rss_channel_from_ytdlp(data: "YtDlpVideo | dict[str, Any]", url: str) -> "Rs
     )
 
 
-def rss_episode_from_ytdlp(data: "YtDlpVideo | dict[str, Any]", author: str) -> "RssEpisode":
+def rss_episode_from_ytdlp(data: YtDlpVideo | dict[str, Any], author: str) -> RssEpisode:
     """Create RssEpisode from a yt-dlp video entry dict or model."""
     from adrift.core.models import RssEpisode
 

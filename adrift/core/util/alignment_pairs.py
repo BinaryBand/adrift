@@ -1,7 +1,11 @@
+"""Alignment-pair scoring and greedy one-to-one selection (hot path)."""
+
 from __future__ import annotations
 
-from collections.abc import Callable, Sequence
-from typing import TypeVar
+from typing import TYPE_CHECKING, TypeVar
+
+if TYPE_CHECKING:
+    from collections.abc import Callable, Sequence
 
 AlignmentPair = tuple[int, int]
 AlignmentPairs = list[AlignmentPair]
@@ -17,6 +21,7 @@ def score_alignment_pairs(
     right_items: Sequence[_R],
     score_pair: Callable[[_L, _R], float],
 ) -> AlignmentScores:
+    """Score every (left, right) pair via ``score_pair``."""
     scores: AlignmentScores = {}
     for left_index, left_item in enumerate(left_items):
         for right_index, right_item in enumerate(right_items):
@@ -28,6 +33,7 @@ def select_alignment_pairs(
     scores: AlignmentScores,
     tolerance: float,
 ) -> AlignmentPairs:
+    """Greedily select one-to-one pairs above ``tolerance``, highest score first."""
     used_left: set[int] = set()
     used_right: set[int] = set()
     selected: AlignmentPairs = []
