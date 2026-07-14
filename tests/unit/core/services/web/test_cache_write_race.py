@@ -43,7 +43,7 @@ def test_get_rss_episodes_calls_cache_set(tmp_path, monkeypatch):
         def get(self, _key):
             return None
 
-        def set(self, _key, _value, expire=None):
+        def set(self, _key, _value, _expire=None):
             self.set_called = True
 
     dummy = DummyCache()
@@ -90,7 +90,7 @@ def test_fetch_rss_feed_str_uses_conditional_headers_on_304(monkeypatch):
         def get(self, _key):
             return cached_payload
 
-        def set(self, _key, _value, expire=None):
+        def set(self, _key, _value, _expire=None):
             msg = "cache write not expected on 304"
             raise AssertionError(msg)
 

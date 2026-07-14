@@ -154,7 +154,7 @@ def _enrich_episodes(
 class YtFetchOptions:
     """Options controlling YouTube episode fetching behavior."""
 
-    filter: str | None = ""  # noqa: A002
+    filter: str | None = ""
     detailed: bool = True
     callback: Callback | None = field(default=None)
     refresh: bool = False
