@@ -6,7 +6,7 @@ import time
 from pathlib import Path
 from typing import Any
 
-from adrift.models.ports import CachePort
+from adrift.core.ports import CachePort
 
 _CACHE_RECREATE_ERRORS = (AttributeError, OSError, RuntimeError, TypeError, ValueError)
 

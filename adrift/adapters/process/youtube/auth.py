@@ -4,8 +4,8 @@ import shutil
 from pathlib import Path
 from typing import Any
 
-from adrift.models import YtDlpParams
-from adrift.utils.terminal import emit_info, emit_warning
+from adrift.core.models import YtDlpParams
+from adrift.core.util.terminal import emit_info, emit_warning
 
 
 class _QuietYtDlpLogger:

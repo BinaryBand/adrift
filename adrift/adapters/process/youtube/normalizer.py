@@ -5,14 +5,14 @@ from __future__ import annotations
 from datetime import datetime, timezone
 from typing import TYPE_CHECKING, Any
 
-from adrift.utils.image import extract_image_from_ytdlp, extract_image_from_ytdlp_list
-from adrift.utils.progress import Callback
+from adrift.core.util.image import extract_image_from_ytdlp, extract_image_from_ytdlp_list
+from adrift.core.util.progress import Callback
 
 extract_image_url = extract_image_from_ytdlp
 extract_image_from_list = extract_image_from_ytdlp_list
 
 if TYPE_CHECKING:
-    from adrift.models import RssChannel, RssEpisode, YtDlpVideo
+    from adrift.core.models import RssChannel, RssEpisode, YtDlpVideo
 
 _PROGRESS_HOOK_ERRORS = (OSError, RuntimeError, TypeError, ValueError)
 
@@ -57,7 +57,7 @@ def ytdlp_pub_date(data: YtDlpVideo | dict[str, Any]) -> datetime | None:
     Accepts either a validated YtDlpVideo model or a raw dict; attempts
     to parse timestamp, release_timestamp, or upload_date in that order.
     """
-    from adrift.models import YtDlpVideo as YtDlpVideoModel
+    from adrift.core.models import YtDlpVideo as YtDlpVideoModel
 
     mapping: dict[str, Any]
     if isinstance(data, YtDlpVideoModel):
@@ -73,7 +73,7 @@ def ytdlp_pub_date(data: YtDlpVideo | dict[str, Any]) -> datetime | None:
 
 def ensure_ytdlp_model(data: YtDlpVideo | dict[str, Any]) -> YtDlpVideo:
     """Ensure data is a YtDlpVideo model; convert dict if needed."""
-    from adrift.models import YtDlpVideo as YtDlpVideoModel
+    from adrift.core.models import YtDlpVideo as YtDlpVideoModel
 
     if isinstance(data, YtDlpVideoModel):
         return data
@@ -183,7 +183,7 @@ def _extract_channel_image(data: Any) -> str:
 
 def rss_channel_from_ytdlp(data: "YtDlpVideo | dict[str, Any]", url: str) -> "RssChannel":
     """Create RssChannel from a yt-dlp extract_info response or raw dict."""
-    from adrift.models import RssChannel
+    from adrift.core.models import RssChannel
 
     model = ensure_ytdlp_model(data)
     return RssChannel(
@@ -201,7 +201,7 @@ def rss_channel_from_ytdlp(data: "YtDlpVideo | dict[str, Any]", url: str) -> "Rs
 
 def rss_episode_from_ytdlp(data: "YtDlpVideo | dict[str, Any]", author: str) -> "RssEpisode":
     """Create RssEpisode from a yt-dlp video entry dict or model."""
-    from adrift.models import RssEpisode
+    from adrift.core.models import RssEpisode
 
     model = ensure_ytdlp_model(data)
     video_id = coerce_str(model.id)

@@ -1,7 +1,7 @@
 from typing_extensions import override
 
-from adrift.models import FeedSource, RssChannel, RssEpisode
-from adrift.models.ports import EpisodeSourceFetchContext, EpisodeSourcePort
+from adrift.core.models import FeedSource, RssChannel, RssEpisode
+from adrift.core.ports import EpisodeSourceFetchContext, EpisodeSourcePort
 
 
 class YouTubeEpisodeSourceAdapter(EpisodeSourcePort):

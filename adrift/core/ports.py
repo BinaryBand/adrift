@@ -1,0 +1,218 @@
+from __future__ import annotations
+
+from collections.abc import Callable, Sequence
+from dataclasses import dataclass
+from pathlib import Path
+from typing import Generic, Protocol, TypeVar, runtime_checkable
+
+from adrift.core.models import (
+    AlignmentConfig,
+    FeedSource,
+    MediaMetadata,
+    PodcastConfig,
+    RssChannel,
+    RssEpisode,
+    S3Metadata,
+)
+from adrift.core.models.alignment_batch import AlignmentBatch
+from adrift.core.models.output import EpisodeData
+from adrift.core.models.pipeline import ReferenceMatchTrace, SourceTrace
+from adrift.core.models.storage_options import UploadOptions
+
+AlignmentResult = tuple[list[tuple[int, int]], dict[tuple[int, int], float]]
+
+Callback = Callable[[int, int | None], None]
+
+T = TypeVar("T")
+
+
+@dataclass(frozen=True)
+class EpisodeSourceFetchContext:
+    title: str = ""
+    detailed: bool = True
+    callback: Callback | None = None
+    refresh: bool = False
+
+
+@runtime_checkable
+class AlignmentPort(Protocol):
+    def align_episodes(
+        self,
+        references: list[RssEpisode],
+        downloads: list[RssEpisode],
+        alignment: AlignmentConfig | None = None,
+    ) -> list[tuple[int, int]]: ...
+
+
+@runtime_checkable
+class ScoredAlignmentPort(Protocol):
+    def align_with_scores(
+        self,
+        references: list[RssEpisode],
+        downloads: list[RssEpisode],
+        **kwargs: object,
+    ) -> AlignmentResult: ...
+
+
+@runtime_checkable
+class ScoredAlignmentBatchPort(Protocol):
+    def align_batch(
+        self,
+        batch: AlignmentBatch,
+    ) -> AlignmentResult: ...
+
+
+@runtime_checkable
+class EpisodeCollectorPort(Protocol):
+    def collect(
+        self,
+        config: PodcastConfig,
+        *,
+        is_reference: bool,
+        callback: Callable[[int, int | None], None] | None = None,
+        refresh_sources: bool = False,
+    ) -> tuple[list[RssEpisode], list[SourceTrace]]: ...
+
+
+@runtime_checkable
+class MatchTraceBuilderPort(Protocol):
+    def build(
+        self,
+        references: list[RssEpisode],
+        downloads: list[RssEpisode],
+        pairs: list[tuple[int, int]],
+        show: str,
+        scores: dict[tuple[int, int], float],
+    ) -> list[ReferenceMatchTrace]: ...
+
+
+@runtime_checkable
+class EpisodeMergerPort(Protocol):
+    def merge(
+        self,
+        references: list[RssEpisode],
+        downloads: list[RssEpisode],
+        pairs: list[tuple[int, int]],
+    ) -> list[EpisodeData]: ...
+
+
+@runtime_checkable
+class EpisodeSourcePort(Protocol):
+    def fetch_episodes(
+        self,
+        source: FeedSource,
+        context: EpisodeSourceFetchContext | None = None,
+    ) -> list[RssEpisode]: ...
+
+    def fetch_channel(self, source: FeedSource) -> RssChannel: ...
+
+
+@runtime_checkable
+class EpisodeSourceFactoryPort(Protocol):
+    """Resolves the concrete episode-source adapter for a given FeedSource.
+
+    The composition root (cli) supplies the implementation; core use-cases
+    depend only on this port so they never import the adapters layer.
+    """
+
+    def get(self, source: FeedSource) -> EpisodeSourcePort: ...
+
+
+@runtime_checkable
+class AlignmentBackendProviderPort(Protocol):
+    """Provides the scored-alignment backend (or None for the legacy path)."""
+
+    def get(
+        self, backend_name: str | None = None
+    ) -> ScoredAlignmentPort | ScoredAlignmentBatchPort | None: ...
+
+
+@runtime_checkable
+class VideoDownloaderPort(Protocol):
+    """Downloads a video URL to a local audio file."""
+
+    def download(self, url: str, dest: Path, callback: Callback | None = None) -> Path | None: ...
+
+
+@runtime_checkable
+class SecretProviderPort(Protocol):
+    source_name: str
+
+    def get(self, key: str, default: str = "") -> str: ...
+
+
+@runtime_checkable
+class StoragePort(Protocol):
+    def upload_file(
+        self,
+        bucket_key: tuple[str, str],
+        file_path: Path,
+        options: UploadOptions | S3Metadata | dict[str, object] | None = None,
+    ) -> str | None: ...
+
+    def exists(self, bucket: str, prefix: str, extension_agnostic: bool = True) -> str | None: ...
+
+    def get_file_list(
+        self, bucket: str, prefix: str, without_extensions: bool = False
+    ) -> list[str]: ...
+
+    def get_public_urls(self, bucket: str, prefix: str) -> list[str]: ...
+
+    def get_metadata(self, bucket: str, key: str) -> MediaMetadata | None: ...
+
+    def delete(self, bucket: str, key: str) -> None: ...
+
+
+class CachePort(Protocol[T]):
+    def get(self, key: str, default: T | None = None) -> T | None: ...
+
+    def set(self, key: str, value: T, expire: int | None = None) -> None: ...
+
+    def delete(self, key: str) -> None: ...
+
+
+class DiskCacheAdapter(Generic[T]):
+    def __init__(self, cache_dir: str) -> None:
+        import diskcache
+
+        self._cache: diskcache.Cache = diskcache.Cache(cache_dir)
+
+    def get(self, key: str, default: T | None = None) -> T | None:
+        return self._cache.get(key, default)
+
+    def set(self, key: str, value: T, expire: int | None = None) -> None:
+        self._cache.set(key, value, expire=expire)
+
+    def delete(self, key: str) -> None:
+        del self._cache[key]
+
+
+class InMemoryCache(Generic[T]):
+    def __init__(self) -> None:
+        self._store: dict[str, T] = {}
+
+    def get(self, key: str, default: T | None = None) -> T | None:
+        return self._store.get(key, default)
+
+    def set(self, key: str, value: T, expire: int | None = None) -> None:
+        del expire
+        self._store[key] = value
+
+    def delete(self, key: str) -> None:
+        if key in self._store:
+            del self._store[key]
+
+
+def require_secrets(provider: SecretProviderPort, keys: Sequence[str]) -> dict[str, str]:
+    values = {key: provider.get(key, "") for key in keys}
+    missing = [key for key, value in values.items() if _is_missing_or_placeholder(key, value)]
+    if missing:
+        raise RuntimeError(f"Missing required environment variables: {', '.join(missing)}")
+    return values
+
+
+def _is_missing_or_placeholder(key: str, value: str) -> bool:
+    stripped = value.strip()
+    if not stripped:
+        return True
+    return stripped in {key, f"${key}", f"${{{key}}}"}

@@ -183,11 +183,11 @@ def _stray_files(base: Path, allowed_dirs: set[str], allowed_files: set[str]) ->
 class TestScaffold:
     """Keep the package and test-tree shape aligned with the scaffold policy."""
 
-    LAYERS = {"adapters", "cli", "models", "services", "utils"}
+    LAYERS = {"adapters", "cli", "core"}
 
     def test_adrift_top_level_shape(self):
-        """Only the declared layers (plus __init__.py) may sit under adrift/."""
-        stray = _stray_files(ROOT / "adrift", self.LAYERS, {"__init__.py"})
+        """Only the declared layers (plus dunder modules) may sit under adrift/."""
+        stray = _stray_files(ROOT / "adrift", self.LAYERS, {"__init__.py", "__main__.py"})
         assert not stray, f"Unexpected modules under adrift/: {stray}"
 
     def test_tests_unit_mirror_shape(self):

@@ -12,8 +12,9 @@ from adrift.cli import (
     bootstrap_run_configs,
     build_cli,
 )
-from adrift.services.context import AppContext
-from adrift.services.download import (
+from adrift.cli.composition import build_app_context
+from adrift.core.services.context import AppContext
+from adrift.core.services.download import (
     DownloadPipeline,
     DownloadPipelineDeps,
     DownloadPipelineRuntime,
@@ -29,15 +30,15 @@ def _build_pipeline(
     ui,
     pipeline_options: DownloadRunOptions,
 ) -> DownloadPipeline:
-    from adrift.services.catalog import MergeConfigOptions, merge_config
-    from adrift.services.download_enrich import enrich_with_sponsors
-    from adrift.services.download_process import (
-        BotDetectionError,
+    from adrift.adapters.process.youtube.downloader import BotDetectionError
+    from adrift.core.services.catalog import MergeConfigOptions, merge_config
+    from adrift.core.services.download_enrich import enrich_with_sponsors
+    from adrift.core.services.download_process import (
         build_download_queue,
         download_and_upload,
     )
-    from adrift.services.download_rss import update_rss
-    from adrift.utils.run_ui import build_merge_callbacks
+    from adrift.core.services.download_rss import update_rss
+    from adrift.core.util.run_ui import build_merge_callbacks
 
     # greedy one-to-one bipartite matching
     runtime = DownloadPipelineRuntime(ctx=ctx, ui=ui, options=pipeline_options)
@@ -47,6 +48,8 @@ def _build_pipeline(
             refresh_sources=refresh,
             on_stage=on_stage,
             callback=callback,
+            episode_source_factory=ctx.episode_source_factory,
+            alignment_provider=ctx.alignment_provider,
         ),
         enrich_with_sponsors=enrich_with_sponsors,
         build_download_queue=build_download_queue,
@@ -63,7 +66,7 @@ def _run_pipeline(
     ctx: AppContext,
     pipeline_options: DownloadRunOptions,
 ) -> int:
-    from adrift.utils.run_ui import create_run_ui
+    from adrift.core.util.run_ui import create_run_ui
 
     with create_run_ui(len(configs), "Downloading") as ui, ui.output_context():
         pipeline = _build_pipeline(ctx, ui, pipeline_options)
@@ -99,7 +102,7 @@ def _run_with_bot_detection(
     pipeline_options: DownloadRunOptions,
     bot_cooldown: int,
 ) -> int:
-    from adrift.services.download_process import BotDetectionError
+    from adrift.adapters.process.youtube.downloader import BotDetectionError
 
     try:
         return _run_pipeline(configs, ctx, pipeline_options)
@@ -130,12 +133,12 @@ def _run(
         bool, typer.Option(help="Bypass fresh source caches and refetch source data.")
     ] = False,
 ) -> None:
-    from adrift.services.catalog import ensure_rust_alignment_backend
+    from adrift.adapters.process.alignment import ensure_rust_alignment_backend
 
     ensure_rust_alignment_backend()
 
     configs, _ = bootstrap_run_configs(include, tags, skip_schedule_filter)
-    ctx = AppContext.from_env()
+    ctx = build_app_context()
     pipeline_options = _build_pipeline_options(
         dry_run,
         skip_download,

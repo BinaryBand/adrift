@@ -8,10 +8,10 @@ from typing import cast
 from dateutil import parser
 from feedparser import FeedParserDict
 
-from adrift.models import RssChannel, RssEpisode
-from adrift.utils.image import extract_image_from_feedparser
-from adrift.utils.media import AUDIO_EXTENSIONS, parse_duration
-from adrift.utils.regex import LINK_REGEX
+from adrift.core.models import RssChannel, RssEpisode
+from adrift.core.util.image import extract_image_from_feedparser
+from adrift.core.util.media import AUDIO_EXTENSIONS, parse_duration
+from adrift.core.util.regex import LINK_REGEX
 
 
 def _getattr_multi(obj: object, *fields: str, default: object = "") -> object:

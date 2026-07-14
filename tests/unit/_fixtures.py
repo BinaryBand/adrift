@@ -8,14 +8,14 @@ from datetime import datetime, timezone
 from types import SimpleNamespace
 from typing import Any, Callable
 
-from adrift.models import (
+from adrift.core.models import (
     EpisodeData,
     FeedSource,
     MergeResult,
     PodcastConfig,
     RssEpisode,
 )
-from adrift.services.download import (
+from adrift.core.services.download import (
     DownloadPipeline,
     DownloadPipelineDeps,
     DownloadPipelineRuntime,

@@ -176,7 +176,9 @@ def test_process_unmatched_skips_slug_collisions_with_matched_downloads(
             "_resolve_storage_key",
             lambda storage, bucket, prefix, slug: f"{prefix}/{slug}.opus",
         ),
-        patch("adrift.services.download_client.storage_prefix", return_value=("bucket", "prefix")),
+        patch(
+            "adrift.core.services.download_client.storage_prefix", return_value=("bucket", "prefix")
+        ),
     ):
         found, missing = cleanup_mod._process_unmatched(result, storage, dry_run=False)
 

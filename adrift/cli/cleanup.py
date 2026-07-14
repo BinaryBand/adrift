@@ -5,7 +5,7 @@ from __future__ import annotations
 import sys
 from collections import defaultdict
 from pathlib import Path
-from typing import Annotated, Any, cast
+from typing import TYPE_CHECKING, Annotated, Any, cast
 
 import typer
 
@@ -17,6 +17,9 @@ from adrift.cli import (
     build_cli,
 )
 
+if TYPE_CHECKING:
+    from adrift.core.services.context import AppContext
+
 _AUDIO_EXTENSIONS = frozenset({".mp3", ".opus"})
 
 
@@ -26,7 +29,7 @@ def _unmatched_indices(pairs: list[tuple[int, int]], total: int) -> list[int]:
 
 
 def _matched_download_slugs(result: Any) -> set[str]:
-    from adrift.utils.title_normalization import normalize_title
+    from adrift.core.util.title_normalization import normalize_title
 
     return {
         normalize_title(result.config.name, result.downloads[download_index].title)
@@ -52,7 +55,7 @@ def _audio_object_names(file_names: list[str]) -> list[str]:
 
 
 def _duplicate_audio_candidates(show: str, file_names: list[str]) -> list[str]:
-    from adrift.utils.title_normalization import normalize_title
+    from adrift.core.util.title_normalization import normalize_title
 
     by_canonical: dict[str, list[str]] = defaultdict(list)
     for name in _audio_object_names(file_names):
@@ -106,8 +109,8 @@ def _process_unmatched(
     dry_run: bool,
     verbose: bool = False,
 ) -> tuple[int, int]:
-    from adrift.services.download_client import storage_prefix
-    from adrift.utils.title_normalization import normalize_title
+    from adrift.core.services.download_client import storage_prefix
+    from adrift.core.util.title_normalization import normalize_title
 
     bucket, prefix = storage_prefix(result.config)
     indices = _unmatched_indices(result.pairs, len(result.downloads))
@@ -134,7 +137,7 @@ def _process_unmatched(
 
 
 def _process_duplicate_audio_files(config: Any, storage: Any, dry_run: bool) -> int:
-    from adrift.services.download_client import storage_prefix
+    from adrift.core.services.download_client import storage_prefix
 
     bucket, prefix = storage_prefix(config)
     duplicates = _duplicate_audio_candidates(
@@ -151,19 +154,25 @@ def _process_duplicate_audio_files(config: Any, storage: Any, dry_run: bool) -> 
 
 def _run_cleanup(
     configs: list[Any],
-    storage: Any,
+    ctx: AppContext,
     dry_run: bool,
     refresh_sources: bool,
     prune_duplicates: bool,
     verbose: bool = False,
 ) -> None:
-    from adrift.services.catalog.merge import merge_config
+    from adrift.core.services.catalog.merge import merge_config
 
+    storage = cast(Any, ctx.storage)
     total_unmatched_found = 0
     total_missing = 0
     total_duplicates = 0
     for config in configs:
-        result = merge_config(config, refresh_sources=refresh_sources)
+        result = merge_config(
+            config,
+            refresh_sources=refresh_sources,
+            episode_source_factory=ctx.episode_source_factory,
+            alignment_provider=ctx.alignment_provider,
+        )
         unmatched = _unmatched_indices(result.pairs, len(result.downloads))
         sys.stdout.write(f"\n{config.name}: {len(unmatched)} unmatched download(s)\n")
         if unmatched:
@@ -212,13 +221,13 @@ def _run(
         ),
     ] = False,
 ) -> None:
-    from adrift.services.context import AppContext
+    from adrift.cli.composition import build_app_context
 
     configs, _ = bootstrap_run_configs(include, tags, skip_schedule_filter)
-    ctx = AppContext.from_env()
+    ctx = build_app_context()
     _run_cleanup(
         configs,
-        cast(Any, ctx.storage),
+        ctx,
         dry_run,
         refresh_sources,
         prune_duplicates,

@@ -18,10 +18,10 @@ from yt_dlp import YoutubeDL
 from adrift.adapters.process.youtube.auth import get_auth_ydl_opts, get_ydl_opts
 from adrift.adapters.process.youtube.error_utils import yt_dlp_retry_reason
 from adrift.adapters.process.youtube.normalizer import rss_episode_from_ytdlp
-from adrift.models import RssEpisode, YtDlpImage, YtDlpParams
-from adrift.models.ports import DiskCacheAdapter
-from adrift.utils.progress import Callback
-from adrift.utils.terminal import emit_error, emit_info, emit_warning
+from adrift.core.models import RssEpisode, YtDlpImage, YtDlpParams
+from adrift.core.ports import DiskCacheAdapter
+from adrift.core.util.progress import Callback
+from adrift.core.util.terminal import emit_error, emit_info, emit_warning
 
 # Constants
 _CACHE = DiskCacheAdapter(".cache/yt-dlp")

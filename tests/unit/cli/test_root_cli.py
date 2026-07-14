@@ -2,7 +2,7 @@ import re
 
 from typer.testing import CliRunner
 
-from adrift.cli.root import app
+from adrift.cli.main import app
 
 _ANSI_RE = re.compile(r"\x1b\[[0-9;]*m")
 

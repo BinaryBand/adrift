@@ -15,17 +15,17 @@ from adrift.cli import (
     bootstrap_run_configs,
     build_cli,
 )
-from adrift.services.merge import MergeUseCase
-from adrift.utils.profiler import disable_profiling, enable_profiling, print_profile_report
+from adrift.core.services.merge import MergeUseCase
+from adrift.core.util.profiler import disable_profiling, enable_profiling, print_profile_report
 
 if TYPE_CHECKING:
-    from adrift.services.app_common import PodcastConfig
-from adrift.services.merge_service import MergeRunOptions, MergeWriters
-from adrift.services.merge_service import format_duration as _format_duration
-from adrift.services.merge_service import write_json as service_write_json
-from adrift.services.merge_service import write_output_bundle as service_write_output_bundle
-from adrift.services.merge_service import write_report_file as service_write_report_file
-from adrift.services.merge_service import write_series_outputs as service_write_series_outputs
+    from adrift.core.services.app_common import PodcastConfig
+from adrift.core.services.merge_service import MergeRunOptions, MergeWriters
+from adrift.core.services.merge_service import format_duration as _format_duration
+from adrift.core.services.merge_service import write_json as service_write_json
+from adrift.core.services.merge_service import write_output_bundle as service_write_output_bundle
+from adrift.core.services.merge_service import write_report_file as service_write_report_file
+from adrift.core.services.merge_service import write_series_outputs as service_write_series_outputs
 
 
 def _write_json(path, payload: object) -> None:
@@ -54,7 +54,7 @@ def _write_report_file(output_file: str, reports: list[dict[str, object]]) -> No
 
 
 def _run_merge(configs: list[PodcastConfig], options: MergeRunOptions):
-    from adrift.utils.run_ui import create_run_ui
+    from adrift.core.util.run_ui import create_run_ui
 
     writers = MergeWriters(
         write_json=_write_json,
@@ -162,7 +162,8 @@ def _run(
             with nullcontext():
                 yield
 
-    from adrift.services.catalog import ensure_rust_alignment_backend
+    from adrift.adapters import get_alignment_backend_provider, get_episode_source_factory
+    from adrift.adapters.process.alignment import ensure_rust_alignment_backend
 
     ensure_rust_alignment_backend()
 
@@ -184,6 +185,8 @@ def _run(
                 output_file=output_file,
                 refresh_sources=refresh_sources,
                 timings_enabled=timings,
+                episode_source_factory=get_episode_source_factory(),
+                alignment_provider=get_alignment_backend_provider(),
             )
             merge_result = _run_merge(configs, options)
             _write_unmatched_references(merge_result, output_dir)

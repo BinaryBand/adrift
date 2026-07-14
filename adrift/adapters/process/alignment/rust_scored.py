@@ -4,8 +4,8 @@ from importlib import import_module
 from types import ModuleType
 from typing import Callable, cast
 
-from adrift.models.alignment_batch import AlignmentBatch
-from adrift.utils.alignment_pairs import AlignmentResult
+from adrift.core.models.alignment_batch import AlignmentBatch
+from adrift.core.util.alignment_pairs import AlignmentResult
 
 _EXTENSION_MODULE = "adrift_rust_alignment"
 _PROTOTYPE_MODULE = "adrift.adapters.process.alignment.rust_prototype"

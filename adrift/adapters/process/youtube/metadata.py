@@ -4,16 +4,16 @@ from urllib.parse import urljoin
 
 from adrift.adapters.process.youtube import ytdlp
 from adrift.adapters.process.youtube.normalizer import rss_channel_from_ytdlp
-from adrift.models import RssChannel, RssEpisode
-from adrift.utils.progress import Callback
-from adrift.utils.regex import (
+from adrift.core.models import RssChannel, RssEpisode
+from adrift.core.util.progress import Callback
+from adrift.core.util.regex import (
     YOUTUBE_PLAYLIST_SHORTHAND_REGEX,
     YOUTUBE_PLAYLIST_URL,
     YT_CHANNEL,
     YT_CHANNEL_SHORTHAND,
     re_compile,
 )
-from adrift.utils.terminal import emit_info, emit_warning
+from adrift.core.util.terminal import emit_info, emit_warning
 
 _EPISODE_METADATA_ERRORS = (AttributeError, TypeError, ValueError)
 _VIDEO_INFO_FETCH_ERRORS = (OSError, RuntimeError, ValueError)

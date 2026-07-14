@@ -3,7 +3,7 @@
 Lazy imports inside factory functions prevent circular imports for adapters
 whose dependencies may import back into this package (alignment, secrets).
 Episode-source adapters are safe to import eagerly -- they only depend on
-adrift.models -- and MUST be eager so that ThreadPoolExecutor workers never
+adrift.core.models -- and MUST be eager so that ThreadPoolExecutor workers never
 race on Python's per-module _ModuleLock.
 """
 
@@ -15,15 +15,19 @@ from adrift.adapters.process.episode_sources.episode_source_rss import RssEpisod
 from adrift.adapters.process.episode_sources.episode_source_youtube import (
     YouTubeEpisodeSourceAdapter,
 )
-from adrift.models import FeedSource
-from adrift.models.ports import (
+from adrift.core.models import FeedSource
+from adrift.core.ports import (
+    AlignmentBackendProviderPort,
+    Callback,
+    EpisodeSourceFactoryPort,
     EpisodeSourcePort,
     ScoredAlignmentBatchPort,
     ScoredAlignmentPort,
     SecretProviderPort,
     StoragePort,
+    VideoDownloaderPort,
 )
-from adrift.utils.text import is_youtube_channel
+from adrift.core.util.text import is_youtube_channel
 
 
 def _require_source_url(source: FeedSource) -> str:
@@ -176,3 +180,48 @@ def get_scored_alignment_adapter(
     if factory is None:
         raise ValueError(f"Unsupported alignment backend: {selected}")
     return factory()
+
+
+# --- Injectable factory/provider adapters -----------------------------------
+# These wrap the registry accessors above as port implementations so core
+# use-cases can receive them via injection instead of importing this package.
+
+
+class RegistryEpisodeSourceFactory:
+    """EpisodeSourceFactoryPort backed by the source registry."""
+
+    def get(self, source: FeedSource) -> EpisodeSourcePort:
+        return get_episode_source_adapter(source)
+
+
+class RegistryAlignmentBackendProvider:
+    """AlignmentBackendProviderPort backed by the alignment registry."""
+
+    def get(
+        self, backend_name: str | None = None
+    ) -> ScoredAlignmentPort | ScoredAlignmentBatchPort | None:
+        return get_scored_alignment_adapter(backend_name)
+
+
+class YtDlpVideoDownloader:
+    """VideoDownloaderPort backed by the yt-dlp downloader."""
+
+    def download(self, url: str, dest: Path, callback: Callback | None = None) -> Path | None:
+        from adrift.adapters.process.youtube.downloader import download_video
+
+        return download_video(url, dest, callback=callback)
+
+
+def get_episode_source_factory() -> EpisodeSourceFactoryPort:
+    """Return the injectable episode-source factory port."""
+    return RegistryEpisodeSourceFactory()
+
+
+def get_alignment_backend_provider() -> AlignmentBackendProviderPort:
+    """Return the injectable alignment-backend provider port."""
+    return RegistryAlignmentBackendProvider()
+
+
+def get_video_downloader() -> VideoDownloaderPort:
+    """Return the injectable video-downloader port."""
+    return YtDlpVideoDownloader()

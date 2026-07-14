@@ -4,8 +4,8 @@ from pathlib import Path
 import pytest
 
 from adrift.adapters.process.storage.local_storage import LocalFilesystemStorage
-from adrift.models import MediaMetadata
-from adrift.models.storage_options import UploadOptions
+from adrift.core.models import MediaMetadata
+from adrift.core.models.storage_options import UploadOptions
 
 
 @pytest.fixture(autouse=True)

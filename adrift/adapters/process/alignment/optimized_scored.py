@@ -4,15 +4,15 @@ from typing import cast
 
 from rapidfuzz import fuzz
 
-from adrift.models import AlignmentConfig, RssEpisode
-from adrift.utils.alignment_pairs import (
+from adrift.core.models import AlignmentConfig, RssEpisode
+from adrift.core.util.alignment_pairs import (
     AlignmentResult,
     AlignmentScores,
     score_alignment_pairs,
     select_alignment_pairs,
 )
-from adrift.utils.text import normalize_text
-from adrift.utils.title_normalization import normalize_title
+from adrift.core.util.text import normalize_text
+from adrift.core.util.title_normalization import normalize_title
 
 _DEFAULT_ALIGNMENT = AlignmentConfig()
 

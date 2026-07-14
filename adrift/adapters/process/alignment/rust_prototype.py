@@ -1,7 +1,7 @@
 from __future__ import annotations
 
-from adrift.models.alignment_batch import AlignmentBatch, AlignmentEpisodeRecord
-from adrift.utils.alignment_pairs import (
+from adrift.core.models.alignment_batch import AlignmentBatch, AlignmentEpisodeRecord
+from adrift.core.util.alignment_pairs import (
     AlignmentResult,
     AlignmentScores,
     score_alignment_pairs,

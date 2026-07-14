@@ -16,9 +16,9 @@ from urllib.parse import urljoin
 
 from pydantic import ValidationError
 
-from adrift.models import MediaMetadata, S3Metadata
-from adrift.models.storage_options import UploadOptions
-from adrift.utils.progress import Callback
+from adrift.core.models import MediaMetadata, S3Metadata
+from adrift.core.models.storage_options import UploadOptions
+from adrift.core.util.progress import Callback
 
 _METADATA_SUFFIX = ".meta.json"
 _CHUNK_SIZE = 1024 * 1024

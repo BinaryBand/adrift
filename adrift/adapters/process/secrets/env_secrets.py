@@ -3,7 +3,7 @@ import os
 from dotenv import find_dotenv, load_dotenv
 from typing_extensions import override
 
-from adrift.models.ports import SecretProviderPort
+from adrift.core.ports import SecretProviderPort
 
 
 class EnvironmentSecretProvider(SecretProviderPort):

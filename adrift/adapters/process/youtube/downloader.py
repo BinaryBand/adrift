@@ -11,9 +11,9 @@ from adrift.adapters.process.youtube.normalizer import (
     extract_progress_update,
     make_progress_hook,
 )
-from adrift.utils.progress import Callback
-from adrift.utils.regex import YOUTUBE_VIDEO_REGEX
-from adrift.utils.terminal import emit_info, emit_warning
+from adrift.core.util.progress import Callback
+from adrift.core.util.regex import YOUTUBE_VIDEO_REGEX
+from adrift.core.util.terminal import emit_info, emit_warning
 
 # Terminal error reasons that indicate the video cannot be downloaded and should not be retried
 _TERMINAL_DOWNLOAD_REASONS = frozenset(

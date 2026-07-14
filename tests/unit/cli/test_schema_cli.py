@@ -2,7 +2,7 @@ import json
 
 from typer.testing import CliRunner
 
-from adrift.cli.root import app
+from adrift.cli.main import app
 
 
 def test_schema_compile_writes_json_schema(tmp_path) -> None:

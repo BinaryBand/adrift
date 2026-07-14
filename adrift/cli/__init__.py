@@ -5,8 +5,8 @@ from typing import Annotated
 
 import typer
 
-from adrift.services.app_common import bootstrap_run_configs as bootstrap_run_configs
-from adrift.services.app_common import load_podcast_configs as load_podcast_configs
+from adrift.core.services.app_common import bootstrap_run_configs as bootstrap_run_configs
+from adrift.core.services.app_common import load_podcast_configs as load_podcast_configs
 
 DF_TARGETS = ["static/config/*.toml"]
 DEFAULT_OUTPUT_DIR = "downloads"

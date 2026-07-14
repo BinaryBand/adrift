@@ -5,7 +5,7 @@ import pytest
 
 from adrift.adapters import get_scored_alignment_adapter
 from adrift.adapters.process.alignment import RustScoredAlignmentAdapter
-from adrift.models.alignment_batch import AlignmentBatch, AlignmentBatchConfig
+from adrift.core.models.alignment_batch import AlignmentBatch, AlignmentBatchConfig
 
 
 def _empty_batch() -> AlignmentBatch:

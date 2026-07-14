@@ -34,7 +34,7 @@ dependencies = [
 ]
 
 [project.scripts]
-adrift = "adrift.cli.root:main"
+adrift = "adrift.cli.main:main"
 adrift-cleanup = "adrift.cli.cleanup:main"
 adrift-download = "adrift.cli.download:main"
 adrift-merge = "adrift.cli.merge:main"
@@ -131,25 +131,22 @@ min_confidence = 80
 [tool.importlinter]
 root_package = "adrift"
 
-# Dependency graph:
-#   User → CLI → Services → Models
-#                         → Adapters → Utils → (external)
-#          CLI → Utils
-#
-# Contract: Layered architecture — cli > services > adapters > models > utils.
-# Higher layers may import lower ones only; adapters read env config
-# directly (os.getenv) rather than importing services.config.
+# Contract: exhaustive three-layer architecture -- cli > adapters > core.
+# Higher layers may import lower ones only. `exhaustive` requires every
+# top-level module under `adrift/` to belong to one of the declared layers
+# (or be listed in exhaustive_ignores).
 
 [[tool.importlinter.contracts]]
 name = "dependency-layering"
 type = "layers"
+containers = ["adrift"]
 layers = [
-    "adrift.cli",
-    "adrift.services",
-    "adrift.adapters",
-    "adrift.models",
-    "adrift.utils",
+    "cli",
+    "adapters",
+    "core",
 ]
+exhaustive = true
+exhaustive_ignores = ["__main__"]
 
 [tool.maturin]
 bindings = "pyo3"
