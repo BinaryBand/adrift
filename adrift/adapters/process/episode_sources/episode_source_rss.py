@@ -198,7 +198,7 @@ def _store_cached_episodes(parsed_key: str, episodes: list[RssEpisode]) -> None:
 
 def get_rss_episodes(
     url: str,
-    filter_regex: str | None = "",
+    filter: str | None = "",  # noqa: A002
     r_rules: list[str] | None = None,
     callback: Callback | None = None,
 ) -> list[RssEpisode]:
@@ -207,7 +207,7 @@ def get_rss_episodes(
         msg = "Invalid RSS feed url or file path"
         raise ValueError(msg)
     r_rules = r_rules or []
-    cache_key = _rss_http_cache_key(url, filter_regex, r_rules)
+    cache_key = _rss_http_cache_key(url, filter, r_rules)
     feed_str = _fetch_rss_feed_str(url, cache_key=cache_key)
     parsed_key = _parsed_episodes_cache_key(cache_key, feed_str)
     cached_episodes = _load_cached_episodes(parsed_key)
@@ -220,7 +220,7 @@ def get_rss_episodes(
     entries_list = (
         cast("list[FeedParserDict]", raw_entries) if isinstance(raw_entries, list) else []
     )
-    entries = _filter_feed_entries(entries_list, filter_regex, r_rules)
+    entries = _filter_feed_entries(entries_list, filter, r_rules)
     episodes = _parse_feed_entries(entries, callback)
     _store_cached_episodes(parsed_key, episodes)
     return episodes

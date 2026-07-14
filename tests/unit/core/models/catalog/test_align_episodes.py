@@ -345,23 +345,23 @@ class TestMergeEpisode(unittest.TestCase):
 
 @patch("adrift.core.services.catalog.alignment._thumbnail_url_exists", return_value=True)
 class TestBestThumbnail(unittest.TestCase):
-    def test_none_inputs(self):
+    def test_none_inputs(self, _exists):  # noqa: PT019
         assert _best_thumbnail(None, None) is None
         assert _best_thumbnail("https://ex.com/thumb.jpg", None) == "https://ex.com/thumb.jpg"
         assert _best_thumbnail(None, "https://ex.com/thumb.jpg") == "https://ex.com/thumb.jpg"
 
-    def test_maxres_beats_hq(self):
+    def test_maxres_beats_hq(self, _exists):  # noqa: PT019
         a = "https://img.youtube.com/vi/abc/maxresdefault.jpg"
         b = "https://img.youtube.com/vi/abc/hqdefault.jpg"
         assert _best_thumbnail(a, b) == a
         assert _best_thumbnail(b, a) == a
 
-    def test_hq_beats_mq(self):
+    def test_hq_beats_mq(self, _exists):  # noqa: PT019
         a = "https://img.youtube.com/vi/abc/hqdefault.jpg"
         b = "https://img.youtube.com/vi/abc/mqdefault.jpg"
         assert _best_thumbnail(a, b) == a
 
-    def test_equal_rank_returns_first(self):
+    def test_equal_rank_returns_first(self, _exists):  # noqa: PT019
         a = "https://img.youtube.com/vi/abc/hqdefault.jpg"
         b = "https://img.youtube.com/vi/xyz/hqdefault.jpg"
         assert _best_thumbnail(a, b) == a
@@ -374,17 +374,17 @@ class TestBestThumbnailFragileMaxres(unittest.TestCase):
     _RSS = "https://image.simplecastcdn.com/images/show/cover.jpg"
 
     @patch("adrift.core.services.catalog.alignment._thumbnail_url_exists", return_value=False)
-    def test_broken_maxres_prefers_stable_rss_cover(self):
+    def test_broken_maxres_prefers_stable_rss_cover(self, _exists):  # noqa: PT019
         assert _best_thumbnail(self._RSS, self._MAXRES) == self._RSS
 
     @patch("adrift.core.services.catalog.alignment._thumbnail_url_exists", return_value=False)
-    def test_broken_maxres_falls_back_to_hqdefault(self):
+    def test_broken_maxres_falls_back_to_hqdefault(self, _exists):  # noqa: PT019
         hq = "https://img.youtube.com/vi/abc/hqdefault.jpg"
         # Only YouTube candidates available -> downgrade rather than break.
         assert _best_thumbnail(self._MAXRES, hq) == hq
 
     @patch("adrift.core.services.catalog.alignment._thumbnail_url_exists", return_value=True)
-    def test_existing_maxres_is_kept(self):
+    def test_existing_maxres_is_kept(self, _exists):  # noqa: PT019
         assert _best_thumbnail(self._RSS, self._MAXRES) == self._MAXRES
 
 

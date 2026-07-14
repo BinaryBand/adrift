@@ -29,7 +29,7 @@ class YouTubeEpisodeSourceAdapter(EpisodeSourcePort):
 
         filter_regex = source.filters.to_regex() if source.filters else None
         fetch_opts = YtFetchOptions(
-            filter_regex=filter_regex,
+            filter=filter_regex,
             detailed=True,  # YouTube always needs detailed metadata for pub_date/thumbnail
             callback=resolved_context.callback,
             refresh=resolved_context.refresh,

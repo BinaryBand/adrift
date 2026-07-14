@@ -154,7 +154,7 @@ def _enrich_episodes(
 class YtFetchOptions:
     """Options controlling YouTube episode fetching behavior."""
 
-    filter_regex: str | None = ""
+    filter: str | None = ""  # noqa: A002
     detailed: bool = True
     callback: Callback | None = field(default=None)
     refresh: bool = False
@@ -172,8 +172,8 @@ def _post_process_episodes(
 ) -> list[RssEpisode]:
     emit_info(f"Fetched {len(episodes)} episodes from {url}")
 
-    if opts.filter_regex:
-        episodes = _filter_episodes(episodes, opts.filter_regex)
+    if opts.filter:
+        episodes = _filter_episodes(episodes, opts.filter)
     if opts.detailed:
         episodes = _enrich_episodes(episodes, author, opts.callback)
     if opts.callback:

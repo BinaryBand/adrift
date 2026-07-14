@@ -125,8 +125,8 @@ def test_episode_exists_in_storage_matches_existing_youtube_video_id() -> None:
     config = _config()
 
     fake = SimpleNamespace()
-    fake.exists = lambda _bucket, _key, _extension_agnostic=True: None
-    fake.get_file_list = lambda _bucket, _prefix, _without_extensions=False: ["old-title.opus"]
+    fake.exists = lambda _bucket, _key, **_kwargs: None
+    fake.get_file_list = lambda _bucket, _prefix, **_kwargs: ["old-title.opus"]
     fake.get_metadata = lambda _bucket, _key: MediaMetadata(
         duration=1.0,
         source="https://youtube.com/watch?v=stable-video-id",
@@ -155,8 +155,8 @@ def test_episode_exists_in_storage_matches_existing_direct_source_url() -> None:
     )
 
     fake = SimpleNamespace()
-    fake.exists = lambda _bucket, _key, _extension_agnostic=True: None
-    fake.get_file_list = lambda _bucket, _prefix, _without_extensions=False: [
+    fake.exists = lambda _bucket, _key, **_kwargs: None
+    fake.get_file_list = lambda _bucket, _prefix, **_kwargs: [
         "old-direct-title.opus"
     ]
     fake.get_metadata = lambda _bucket, _key: MediaMetadata(
@@ -187,8 +187,8 @@ def test_episode_exists_in_storage_matches_cleaned_existing_filename() -> None:
     )
 
     fake = SimpleNamespace()
-    fake.exists = lambda _bucket, _key, _extension_agnostic=True: None
-    fake.get_file_list = lambda _bucket, _prefix, _without_extensions=False: [
+    fake.exists = lambda _bucket, _key, **_kwargs: None
+    fake.get_file_list = lambda _bucket, _prefix, **_kwargs: [
         "ann-billy-woodward-morbid-podcast.opus"
     ]
     fake.get_metadata = lambda _bucket, _key: None
@@ -215,7 +215,7 @@ def test_process_in_tmpdir_reports_upload_progress(  # noqa: PLR0915
     def _download_audio_fn(_ep: DownloadEpisode, _dest: Path, _ctx: object | None = None) -> Path:
         return audio_path
 
-    def _convert_to_opus_fn(_audio: Path, _callback: object | None = None) -> Path:
+    def _convert_to_opus_fn(_audio: Path, callback: object | None = None) -> Path:
         return opus_path
 
     def _get_duration_fn(_path: Path) -> float:
@@ -300,7 +300,7 @@ def test_process_in_tmpdir_sets_ad_segments_expiry_when_segments_found(
     )
     monkeypatch.setattr(
         "adrift.core.services.download_process.convert_to_opus",
-        lambda _audio, _callback=None: opus_path,
+        lambda _audio, callback=None: opus_path,
     )
     monkeypatch.setattr(
         "adrift.core.services.download_process.get_duration",
