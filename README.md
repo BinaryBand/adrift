@@ -22,7 +22,7 @@ uv sync --all-groups
 ### 3. Run Your First Merge
 
 ```bash
-uv run adrift-merge --include 'config/podcasts.toml' --pretty
+uv run adrift-merge --include 'static/config/podcasts.toml' --pretty
 ```
 
 That's it! The output is JSON printed to stdout. Add `--output-dir downloads` to save results to disk.
@@ -47,7 +47,7 @@ Result:    -> Merged as one episode with both metadata sources
 
 ## Configuration
 
-Create TOML files in `config/`:
+Create TOML files in `static/config/`:
 
 ```toml
 [[podcasts]]
@@ -71,7 +71,7 @@ url = "yt://@MyChannel"                          # Download sources (files)
 | `FREQ=WEEKLY;BYDAY=WE,FR` | Every Wed & Fri |
 | *(omitted)* | Every run |
 
-See `config/podcasts.toml` and `config/youtube.toml` for examples.
+See `static/config/podcasts.toml` and `static/config/youtube.toml` for examples.
 
 ---
 
@@ -79,19 +79,19 @@ See `config/podcasts.toml` and `config/youtube.toml` for examples.
 
 ```bash
 # Basic merge, pretty-printed
-uv run adrift-merge --include 'config/*.toml' --pretty
+uv run adrift-merge --include 'static/config/*.toml' --pretty
 
 # Include episode counts
-uv run adrift-merge --include 'config/podcasts.toml' --include-counts
+uv run adrift-merge --include 'static/config/podcasts.toml' --include-counts
 
 # Save output to files (creates downloads/ directory)
-uv run adrift-merge --include 'config/*.toml' --output-dir downloads
+uv run adrift-merge --include 'static/config/*.toml' --output-dir downloads
 
 # Output performance metrics
-uv run adrift-merge --include 'config/*.toml' --timings
+uv run adrift-merge --include 'static/config/*.toml' --timings
 
 # Download episodes (not just merge)
-uv run adrift-download --include 'config/*.toml' --max-downloads 5
+uv run adrift-download --include 'static/config/*.toml' --max-downloads 5
 ```
 
 ---
@@ -105,7 +105,7 @@ adrift/
 |-- models/          # Data structures
 |-- adapters/        # RSS & YouTube fetchers
 `-- utils/           # Helpers (profiler, cache, progress)
-config/              # Your podcast configs (TOML)
+static/config/              # Your podcast configs (TOML)
 tests/               # Unit tests
 ```
 
@@ -152,7 +152,7 @@ uv lock --upgrade && uv sync --all-groups
 Enable function-level timing to find bottlenecks:
 
 ```bash
-uv run adrift-merge --include 'config/*.toml' --timings
+uv run adrift-merge --include 'static/config/*.toml' --timings
 ```
 
 Outputs both per-podcast stage timings and a full profiling report showing which functions took the most time.

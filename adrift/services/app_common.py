@@ -44,13 +44,13 @@ def _load_config(name_or_path: str) -> list[PodcastConfig]:
     """Load podcast configurations from a TOML file.
 
     Accepts either a bare config name (e.g. ``"podcasts"``) which is
-    resolved to ``config/<name>.toml`` relative to the project root, or
+    resolved to ``static/config/<name>.toml`` relative to the project root, or
     a full/relative file path ending in ``.toml``.
     """
     path = Path(name_or_path)
     if not path.suffix:
-        # Resolve short name → config/<name>.toml
-        path = Path("config") / f"{name_or_path}.toml"
+        # Resolve short name → static/config/<name>.toml
+        path = Path("static/config") / f"{name_or_path}.toml"
 
     with open(path, "rb") as f:
         data = tomllib.load(f)
@@ -144,7 +144,7 @@ def filter_podcasts_by_tags(configs: list[PodcastConfig], tags: list[str]) -> li
     return [cfg for cfg in configs if _matches_tag(cfg)]
 
 
-_DF_TARGETS = ["config/*.toml"]
+_DF_TARGETS = ["static/config/*.toml"]
 _DEFAULT_OUTPUT_DIR = "downloads"
 
 

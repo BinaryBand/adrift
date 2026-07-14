@@ -16,7 +16,7 @@ def compile_command(
         typer.Option("--output", "-o", help="Output JSON schema path."),
     ] = "adrift/models/podcasts.schema.json",
 ) -> None:
-    """Compile JSON Schema for config/*.toml and write it to disk."""
+    """Compile JSON Schema for static/config/*.toml and write it to disk."""
     out = compile_config_schema(output)
     typer.echo(f"Wrote schema: {out}")
 

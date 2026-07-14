@@ -56,7 +56,7 @@ def test_main_writes_bundle_and_stdout(tmp_path: Path, capsys) -> None:
     argv = [
         "adrift-merge",
         "--include",
-        "config/youtube.toml",
+        "static/config/youtube.toml",
         "--output-dir",
         tmp_path.as_posix(),
         "--include-counts",
@@ -131,7 +131,7 @@ def test_main_updates_output_file_after_each_podcast(tmp_path: Path, capsys) -> 
     argv = [
         "adrift-merge",
         "--include",
-        "config/youtube.toml",
+        "static/config/youtube.toml",
         "--output-dir",
         (tmp_path / "bundles").as_posix(),
         "--output-file",
@@ -163,7 +163,7 @@ def test_main_defaults_output_dir_to_downloads(tmp_path: Path, capsys) -> None:
     argv = [
         "adrift-merge",
         "--include",
-        "config/youtube.toml",
+        "static/config/youtube.toml",
     ]
 
     with (
@@ -201,7 +201,7 @@ def test_main_emits_timings_to_stderr(tmp_path: Path, capsys) -> None:
     argv = [
         "adrift-merge",
         "--include",
-        "config/youtube.toml",
+        "static/config/youtube.toml",
         "--output-dir",
         tmp_path.as_posix(),
         "--timings",

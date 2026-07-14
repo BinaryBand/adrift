@@ -34,11 +34,11 @@ _skip_without_fixtures = pytest.mark.skipif(
 
 
 def _camp_gagnon_alignment() -> AlignmentConfig:
-    configs = load_podcasts_config([str(REPO_ROOT / "config" / "podcasts.toml")], True)
+    configs = load_podcasts_config([str(REPO_ROOT / "static/config" / "podcasts.toml")], True)
     for config in configs:
         if config.slug == "camp-gagnon":
             return config.alignment
-    raise AssertionError("Camp Gagnon config not found in config/podcasts.toml")
+    raise AssertionError("Camp Gagnon config not found in static/config/podcasts.toml")
 
 
 def _episode(idx: int, title: str, description: str, *, role: str) -> RssEpisode:

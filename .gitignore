@@ -223,7 +223,7 @@ cookies.txt
 # User specific configs
 .vscode/bookmarks.json
 .vscode/schemas/*.json
-config/**/.*.toml
+static/config/**/.*.toml
 docs/*.*
 .dev
 CLAUDE.md

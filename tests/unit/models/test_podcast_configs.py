@@ -105,7 +105,7 @@ class AuditConfigs(unittest.TestCase):
 
         from adrift.services.app_common import load_config  # type: ignore[attr-defined]
 
-        all_files = Path(find_dotenv()).parent.glob("config/*.toml")
+        all_files = Path(find_dotenv()).parent.glob("static/config/*.toml")
         configs: list[PodcastConfig] = []
         for file in all_files:
             configs.extend(load_config(file.as_posix()))  # type: ignore[name-defined]

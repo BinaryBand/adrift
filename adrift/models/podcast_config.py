@@ -212,7 +212,7 @@ def parse_podcasts_raw(raw: list[PodcastConfig]) -> list[PodcastConfig]:
 
 
 def podcast_toml_json_schema() -> dict[str, Any]:
-    """Return JSON Schema for config/*.toml validation in editors and CI tooling."""
+    """Return JSON Schema for static/config/*.toml validation in editors and CI tooling."""
     schema = PodcastsTomlConfig.model_json_schema(mode="validation")
     schema["$schema"] = "https://json-schema.org/draft/2020-12/schema"
     return schema

@@ -8,7 +8,7 @@ import typer
 from adrift.services.app_common import bootstrap_run_configs as bootstrap_run_configs
 from adrift.services.app_common import load_podcast_configs as load_podcast_configs
 
-DF_TARGETS = ["config/*.toml"]
+DF_TARGETS = ["static/config/*.toml"]
 DEFAULT_OUTPUT_DIR = "downloads"
 
 IncludeConfigsOption = Annotated[list[str] | None, typer.Option(help="Config files to include")]
