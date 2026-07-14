@@ -86,7 +86,7 @@ def _parse_single_podcast(podcast: dict[str, Any], rules: dict[str, _ShowRule]) 
     )
 
 
-_CONFIG_PATH = pathlib.Path("config") / "podcasts.toml"
+_CONFIG_PATH = pathlib.Path("static/config") / "podcasts.toml"
 
 
 def _load_show_rules() -> dict[str, _ShowRule]:
