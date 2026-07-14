@@ -24,6 +24,7 @@ from adrift.core.util.alignment_pairs import (
     AlignmentScores,
     select_alignment_pairs,
 )
+from adrift.core.util.cache import safe_cache_get
 from adrift.core.util.profiler import profile, profile_block
 from adrift.core.util.progress import Callback
 from adrift.core.util.text import normalize_text
@@ -701,7 +702,7 @@ def prepare_alignment_batch(
             _episode_list_fingerprint(references),
             _episode_list_fingerprint(downloads),
         )
-        cached: AlignmentBatch | None = _ALIGNMENT_BATCH_CACHE.get(cache_key)
+        cached: AlignmentBatch | None = safe_cache_get(_ALIGNMENT_BATCH_CACHE, cache_key)
         if cached is not None:
             return cached
 

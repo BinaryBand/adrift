@@ -20,6 +20,7 @@ from adrift.adapters.process.episode_sources.rss_normalizer import (
 )
 from adrift.core.models import FeedSource, RssChannel, RssEpisode
 from adrift.core.ports import EpisodeSourceFetchContext, EpisodeSourcePort
+from adrift.core.util.cache import safe_cache_get
 from adrift.core.util.progress import Callback
 from adrift.core.util.regex import LINK_REGEX, re_compile
 from adrift.core.util.schedule import rrule_occurrence_exists
@@ -188,7 +189,7 @@ def _parsed_episodes_cache_key(http_cache_key: str, feed_str: str) -> str:
 
 
 def _load_cached_episodes(parsed_key: str) -> list[RssEpisode] | None:
-    cached = _RSS_CACHE.get(parsed_key)
+    cached = safe_cache_get(_RSS_CACHE, parsed_key)
     return cached if isinstance(cached, list) else None
 
 

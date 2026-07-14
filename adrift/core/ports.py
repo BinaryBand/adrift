@@ -12,6 +12,8 @@ from collections.abc import Callable, Sequence
 from dataclasses import dataclass
 from typing import TYPE_CHECKING, Generic, Protocol, TypeVar, runtime_checkable
 
+from adrift.core.util.cache import UNPICKLE_ERRORS
+
 if TYPE_CHECKING:
     from pathlib import Path
 
@@ -256,7 +258,12 @@ class DiskCacheAdapter(Generic[T]):
 
     def get(self, key: str, default: T | None = None) -> T | None:
         """Return the cached value for ``key`` or ``default``."""
-        return self._cache.get(key, default)
+        try:
+            return self._cache.get(key, default)
+        except UNPICKLE_ERRORS:
+            # Entry pickled by a since-renamed/removed module; drop it and miss.
+            del self._cache[key]
+            return default
 
     def set(self, key: str, value: T, expire: int | None = None) -> None:
         """Store ``value`` under ``key`` with an optional TTL."""
