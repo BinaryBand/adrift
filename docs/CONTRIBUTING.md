@@ -9,7 +9,7 @@ Bounded constraints for contributors. The goal is a solution space tight enough 
 WSL with base Debian compatibility is the development target.
 
 ```bash
-poetry install --with dev
+uv sync --all-groups
 ```
 
 There is no `.pre-commit-config.yaml`; quality gates run through pytest (`tests/test_lint.py`) or directly:
@@ -27,7 +27,7 @@ ast-grep scan --config sgconfig.yml
 The optional Rust alignment extension is built with maturin (see the `rust-align:` tasks in `.vscode/tasks.json`):
 
 ```bash
-poetry run maturin develop --manifest-path rust/adrift_rust_alignment/Cargo.toml
+uv run maturin develop --manifest-path rust/adrift_rust_alignment/Cargo.toml
 ```
 
 Open in VS Code from inside WSL:
@@ -109,7 +109,7 @@ Note: by default `tests/test_lint.py` runs `ruff check --fix` and `ruff format` 
 ## Contribution Workflow
 
 ```text
-0. After cloning:              poetry install --with dev
+0. After cloning:              uv sync --all-groups
 1. Branch from main
 2. Run quality checks:         pytest tests/test_lint.py
                                (or the direct tooling commands listed under Setup)

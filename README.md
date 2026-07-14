@@ -6,23 +6,23 @@ adrift aligns your reference episodes (what you want) with your download sources
 
 ## 5-Minute Quickstart
 
-### 1. Install Python & Poetry
+### 1. Install Python & uv
 
 - **Python 3.11+**: [python.org](https://www.python.org/)
-- **Poetry**: `curl -sSL https://install.python-poetry.org | python3 -`
+- **uv**: `curl -LsSf https://astral.sh/uv/install.sh | sh`
 
 ### 2. Clone & Set Up
 
 ```bash
 git clone <repo>
 cd adrift
-poetry install --with dev
+uv sync --all-groups
 ```
 
 ### 3. Run Your First Merge
 
 ```bash
-poetry run adrift-merge --include 'config/podcasts.toml' --pretty
+uv run adrift-merge --include 'config/podcasts.toml' --pretty
 ```
 
 That's it! The output is JSON printed to stdout. Add `--output-dir downloads` to save results to disk.
@@ -79,19 +79,19 @@ See `config/podcasts.toml` and `config/youtube.toml` for examples.
 
 ```bash
 # Basic merge, pretty-printed
-poetry run adrift-merge --include 'config/*.toml' --pretty
+uv run adrift-merge --include 'config/*.toml' --pretty
 
 # Include episode counts
-poetry run adrift-merge --include 'config/podcasts.toml' --include-counts
+uv run adrift-merge --include 'config/podcasts.toml' --include-counts
 
 # Save output to files (creates downloads/ directory)
-poetry run adrift-merge --include 'config/*.toml' --output-dir downloads
+uv run adrift-merge --include 'config/*.toml' --output-dir downloads
 
 # Output performance metrics
-poetry run adrift-merge --include 'config/*.toml' --timings
+uv run adrift-merge --include 'config/*.toml' --timings
 
 # Download episodes (not just merge)
-poetry run adrift-download --include 'config/*.toml' --max-downloads 5
+uv run adrift-download --include 'config/*.toml' --max-downloads 5
 ```
 
 ---
@@ -126,25 +126,25 @@ sudo apt install -y nodejs
 
 **Windows:** Download from [nodejs.org](https://nodejs.org/) or `choco install nodejs`
 
-### Working with Poetry
+### Working with uv
 
 ```bash
 # Install dependencies
-poetry install --with dev
+uv sync --all-groups
 
 # Run command directly
-poetry run adrift-merge --help
+uv run adrift-merge --help
 
 # Activate venv for shell
 source .venv/bin/activate  # Linux/Mac
 .venv\Scripts\activate     # Windows
 
 # Add a dependency
-poetry add some-package
-poetry add --group dev some-dev-package
+uv add some-package
+uv add --group dev some-dev-package
 
 # Update packages
-poetry update
+uv lock --upgrade && uv sync --all-groups
 ```
 
 ### Profiling
@@ -152,7 +152,7 @@ poetry update
 Enable function-level timing to find bottlenecks:
 
 ```bash
-poetry run adrift-merge --include 'config/*.toml' --timings
+uv run adrift-merge --include 'config/*.toml' --timings
 ```
 
 Outputs both per-podcast stage timings and a full profiling report showing which functions took the most time.
@@ -163,14 +163,14 @@ Outputs both per-podcast stage timings and a full profiling report showing which
 
 ```bash
 # Run tests
-poetry run pytest
+uv run pytest
 
 # Lint, format, and all other quality gates (also runnable via pytest tests/test_lint.py)
-poetry run ruff check adrift tests
-poetry run ruff format --check adrift tests
-poetry run ty check --project .
-poetry run python -m vulture adrift tests --min-confidence 80
-poetry run python -m lizard adrift -x 'adrift/cli/*' -C 8 -L 30 -a 9
+uv run ruff check adrift tests
+uv run ruff format --check adrift tests
+uv run ty check --project .
+uv run python -m vulture adrift tests --min-confidence 80
+uv run python -m lizard adrift -x 'adrift/cli/*' -C 8 -L 30 -a 9
 ```
 
 ### Performance benchmarks
@@ -190,13 +190,13 @@ Baselines are stored as CPU-normalized values in
 
 ```bash
 # Record baselines (run once on your machine after a performance change):
-RECORD_PERF_BASELINE=1 poetry run pytest tests/benchmarks/
+RECORD_PERF_BASELINE=1 uv run pytest tests/benchmarks/
 
 # Enforce baselines -- fails if any benchmark exceeds 2x its recorded median:
-RUN_PERF_TESTS=1 poetry run pytest tests/benchmarks/
+RUN_PERF_TESTS=1 uv run pytest tests/benchmarks/
 
 # Relax the threshold (e.g. on a slower CI machine):
-PERF_TOLERANCE=3.0 RUN_PERF_TESTS=1 poetry run pytest tests/benchmarks/
+PERF_TOLERANCE=3.0 RUN_PERF_TESTS=1 uv run pytest tests/benchmarks/
 ```
 
 ---

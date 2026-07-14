@@ -1,10 +1,10 @@
 # cspell: words creepcast darknet gladwell smosh
 import pathlib
+import tomllib
 from dataclasses import dataclass
 from functools import lru_cache
 from typing import Any
 
-import tomllib
 from diskcache import Cache
 
 from adrift.utils.regex import re_compile
