@@ -98,7 +98,8 @@ def profile(func: F) -> F:
             return func(*args, **kwargs)
         finally:
             duration = perf_counter() - start
-            name = f"{func.__module__}.{func.__qualname__}"
+            qualname = getattr(func, "__qualname__", func.__class__.__name__)
+            name = f"{func.__module__}.{qualname}"
             if name not in _profiler_registry:
                 _profiler_registry[name] = []
             _profiler_registry[name].append(duration)

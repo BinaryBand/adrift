@@ -1,6 +1,7 @@
 import os
 
 from dotenv import find_dotenv, load_dotenv
+from typing_extensions import override
 
 from adrift.models.ports import SecretProviderPort
 
@@ -14,5 +15,6 @@ class EnvironmentSecretProvider(SecretProviderPort):
         if load_dotenv_file:
             load_dotenv(find_dotenv())
 
+    @override
     def get(self, key: str, default: str = "") -> str:
         return os.getenv(key, default)

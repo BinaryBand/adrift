@@ -8,6 +8,8 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
+from typing_extensions import override
+
 
 class AdriftError(Exception):
     """Base error for all Adrift domain operations.
@@ -36,6 +38,7 @@ class PipelineError(AdriftError):
     fatal: bool = True
     cause: Exception | None = None
 
+    @override
     def __str__(self) -> str:
         s = f"{self.label}: {self.message}"
         if self.cause:

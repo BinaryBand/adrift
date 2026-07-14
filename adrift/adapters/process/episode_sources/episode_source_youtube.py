@@ -1,3 +1,5 @@
+from typing_extensions import override
+
 from adrift.models import FeedSource, RssChannel, RssEpisode
 from adrift.models.ports import EpisodeSourceFetchContext, EpisodeSourcePort
 
@@ -5,6 +7,7 @@ from adrift.models.ports import EpisodeSourceFetchContext, EpisodeSourcePort
 class YouTubeEpisodeSourceAdapter(EpisodeSourcePort):
     """Adapter for fetching episodes from YouTube channels."""
 
+    @override
     def fetch_episodes(
         self,
         source: FeedSource,
@@ -28,6 +31,7 @@ class YouTubeEpisodeSourceAdapter(EpisodeSourcePort):
 
         return get_youtube_episodes(url, resolved_context.title, fetch_opts)
 
+    @override
     def fetch_channel(self, source: FeedSource) -> RssChannel:
         """Fetch channel metadata from a YouTube channel."""
         from adrift.adapters.process.youtube.metadata import get_youtube_channel

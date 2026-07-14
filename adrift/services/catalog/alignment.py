@@ -835,7 +835,7 @@ def _best_thumbnail(a: str | None, b: str | None) -> str | None:
     candidates = [url for url in (a, b) if url]
     if not candidates:
         return None
-    best = cast(str, max(candidates, key=_thumbnail_rank))
+    best = max(candidates, key=_thumbnail_rank)
     return _resolve_fragile_thumbnail(best, candidates)
 
 

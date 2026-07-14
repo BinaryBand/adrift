@@ -6,6 +6,7 @@ from contextlib import AbstractContextManager
 from typing import Any, Callable
 
 from tqdm import tqdm
+from typing_extensions import override
 
 from adrift.utils.progress import Callback
 from adrift.utils.terminal import Level, format_terminal_message, using_terminal_emitter
@@ -74,6 +75,7 @@ class BaseRunUI(AbstractContextManager["BaseRunUI"]):
     def close(self) -> None:
         return
 
+    @override
     def __exit__(self, _exc_type: Any, exc: Any, _tb: Any) -> None:
         del exc
         self.close()
@@ -85,29 +87,36 @@ class TqdmRunUI(BaseRunUI):
         super().__init__(total, label)
         self._bar = tqdm(total=total, desc=label, unit="podcast", file=sys.stderr)
 
+    @override
     def set_podcast(self, name: str) -> None:
         super().set_podcast(name)
         self._bar.set_description(name)
         self._bar.set_postfix_str("")
 
+    @override
     def set_stage(self, stage: str) -> None:
         super().set_stage(stage)
         self._bar.set_postfix_str(stage)
 
+    @override
     def set_operation(self, operation: str) -> None:
         super().set_operation(operation)
         self._bar.set_postfix_str(f"{self.current_stage or ''} {operation}".strip())
 
+    @override
     def clear_operation(self) -> None:
         super().clear_operation()
         self._bar.set_postfix_str(self.current_stage or "")
 
+    @override
     def emit(self, level: Level, message: str) -> None:
         self._bar.write(format_terminal_message(level, message))
 
+    @override
     def advance(self) -> None:
         self._bar.update(1)
 
+    @override
     def close(self) -> None:
         self._bar.close()
 
@@ -124,6 +133,7 @@ class RichRunUI(BaseRunUI):
     def _fit(self, description: str) -> str:
         return _fit_progress_description(description, self._progress.console.width)
 
+    @override
     def set_podcast(self, name: str) -> None:
         super().set_podcast(name)
         self._progress.update(
@@ -135,6 +145,7 @@ class RichRunUI(BaseRunUI):
         )
         self._progress.update(self._operation_task, visible=False, total=None, completed=0)
 
+    @override
     def set_stage(self, stage: str) -> None:
         super().set_stage(stage)
         self._progress.update(
@@ -142,6 +153,7 @@ class RichRunUI(BaseRunUI):
             description=self._fit(f"{self.current_name} {stage}"),
         )
 
+    @override
     def update_progress(self, current: int, total: int | None) -> None:
         description = _render_stage_description(self.current_name, self.current_stage)
         self._progress.update(
@@ -152,6 +164,7 @@ class RichRunUI(BaseRunUI):
             visible=True,
         )
 
+    @override
     def set_operation(self, operation: str) -> None:
         super().set_operation(operation)
         self._progress.update(
@@ -162,10 +175,12 @@ class RichRunUI(BaseRunUI):
             visible=True,
         )
 
+    @override
     def clear_operation(self) -> None:
         super().clear_operation()
         self._progress.update(self._operation_task, visible=False, total=None, completed=0)
 
+    @override
     def update_operation_progress(self, current: int, total: int | None) -> None:
         self._progress.update(
             self._operation_task,
@@ -183,6 +198,7 @@ class RichRunUI(BaseRunUI):
             description = f"{description} {self.current_operation}"
         return self._fit(description)
 
+    @override
     def emit(self, level: Level, message: str) -> None:
         style = {
             "info": "white",
@@ -196,10 +212,12 @@ class RichRunUI(BaseRunUI):
         }[level]
         self._progress.console.print(f"[{style}]{prefix}{message}[/{style}]")
 
+    @override
     def advance(self) -> None:
         self._progress.advance(self._overall_task)
         self._progress.update(self._detail_task, total=None, completed=0)
 
+    @override
     def close(self) -> None:
         self._progress.stop()
 

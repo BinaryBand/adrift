@@ -6,6 +6,7 @@ from typing import Any, Callable
 
 import pydantic
 from pydantic import BaseModel, ConfigDict, field_validator
+from typing_extensions import override
 
 DEVICE = os.getenv("DEVICE", "UnknownDevice")
 PROJECT = os.getenv("PROJECT", "UnknownProject")
@@ -26,6 +27,7 @@ class CacheMetadata(S3Metadata):
     created_at: datetime = pydantic.Field(description="Creation timestamp")
     expires_at: datetime | None = pydantic.Field(default=None, description="Expiration timestamp")
 
+    @override
     def to_dict(self) -> dict[str, str]:
         result: dict[str, str] = {"created_at": self.created_at.isoformat()}
         if self.expires_at is not None:
@@ -58,6 +60,7 @@ class MediaMetadata(S3Metadata):
             return json.loads(value) if value else []
         return value
 
+    @override
     def to_dict(self) -> dict[str, str]:
         result = {
             "duration": str(self.duration),

@@ -7,6 +7,7 @@ import feedparser
 import requests
 from diskcache import Cache
 from feedparser import FeedParserDict
+from typing_extensions import override
 
 from adrift.adapters.process.cache_retry import RaceAwareCacheWrapper
 from adrift.adapters.process.episode_sources.rss_normalizer import (
@@ -223,6 +224,7 @@ def get_rss_episodes(
 class RssEpisodeSourceAdapter(EpisodeSourcePort):
     """Adapter for fetching episodes from RSS feeds."""
 
+    @override
     def fetch_episodes(
         self,
         source: FeedSource,
@@ -238,6 +240,7 @@ class RssEpisodeSourceAdapter(EpisodeSourcePort):
         r_rules = source.filters.r_rules if source.filters else None
         return get_rss_episodes(url, filter_regex, r_rules, resolved_context.callback)
 
+    @override
     def fetch_channel(self, source: FeedSource) -> RssChannel:
         """Fetch channel metadata from an RSS feed."""
         url = source.url

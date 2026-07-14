@@ -58,8 +58,8 @@ class AppContext:
 
     storage: StoragePort
     secrets: SecretProviderPort
-    rss_cache: CachePort
-    yt_cache: CachePort
+    rss_cache: CachePort[Any]
+    yt_cache: CachePort[Any]
     event_bus: EventBus
 
     @classmethod

@@ -1,4 +1,9 @@
 [build-system]
+# Sanctioned divergence from the scaffold standard's `uv_build`: adrift ships
+# an in-process PyO3 extension (rust/adrift_rust_alignment/) compiled via
+# maturin. uv_build is pure Python and cannot compile native code, so it
+# cannot replace hatchling here without giving up the in-process fast path.
+# See docs/.PLAN.md D3a.
 requires = ["hatchling"]
 build-backend = "hatchling.build"
 
@@ -25,6 +30,7 @@ dependencies = [
     "python-dateutil~=2.9.0.post0",
     "rich~=15.0.0",
     "typer>=0.24.1,<0.25.0",
+    "typing-extensions~=4.16.0",
 ]
 
 [project.scripts]
@@ -40,20 +46,22 @@ dev = [
     "types-tqdm~=4.67.3.20260402",
     "types-cachetools~=6.2.0.20260317",
     "types-yt-dlp~=2026.3.17.20260402",
-    # Linting & formatting
-    "ruff~=0.15.9",
+    # Linting & formatting -- pinned to the scaffold framework series (see
+    # docs/.PLAN.md Phase 1) so this project lints identically to a freshly
+    # scaffolded one.
+    "ruff==0.15.*",
+    "ty==0.0.59",
+    "pytest==9.1.*",
+    "import-linter==2.13.*",
+    "vulture==2.16.*",
+    # ast-grep-cli/lizard are kept until Phase 3 replaces tests/test_lint.py
+    # (which still shells out to both); D4/D5 retire them at that point.
     "ast-grep-cli~=0.44.1",
-    # Testing
-    "pytest~=9.0.2",
-    # Quality tools
-    "ty>=0.0.32,<0.0.33",
     "lizard~=1.21.3",
-    "vulture~=2.16",
-    "setuptools>=75.0,<81",
+    # Intentional extras retained per docs/.PLAN.md D3/D6.
     "pyinstrument>=5.1.2,<6.0.0",
     "maturin>=1.8.0,<2.0.0",
     "hypothesis>=6.153.0,<7.0.0",
-    "import-linter>=2.0",
 ]
 
 [tool.pytest.ini_options]
@@ -69,11 +77,30 @@ line-length = 100
 [tool.ruff.lint]
 # S101 bans bare `assert` outside tests; use explicit exceptions since
 # assertions can be disabled with -O.
+# NOTE: intentionally not yet `select = ["ALL"]` per docs/.PLAN.md Phase 1 --
+# the pydocstyle/mccabe/pylint config below is staged ahead of that flip so
+# Phase 3 only needs to change `select` and pay down the resulting findings.
 select = ["E", "F", "I", "S101"]
 
 [tool.ruff.lint.per-file-ignores]
-"tests/**" = ["S101"]
+# The tail entries in each list (beyond S101) are inert today -- they only
+# take effect once `select` flips to `ALL` in Phase 3 -- and are staged here
+# so that flip does not require touching this table.
+"tests/**" = ["S101", "S", "PLR2004", "ANN", "D", "INP001", "SLF001"]
 "conftest.py" = ["S101"]
+"adrift/cli/**" = ["T20", "B008", "FBT001", "FBT002"]
+
+[tool.ruff.lint.pydocstyle]
+convention = "google"
+
+[tool.ruff.lint.mccabe]
+max-complexity = 8
+
+[tool.ruff.lint.pylint]
+max-args = 5
+max-branches = 10
+max-returns = 5
+max-statements = 40
 
 [tool.ty.environment]
 # Explicitly point at the project venv so `ty` resolves third-party packages
