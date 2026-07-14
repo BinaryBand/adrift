@@ -1,11 +1,12 @@
 """Merge CLI: align podcast references with downloads and produce output bundles."""
+
 from __future__ import annotations
 
 import json
 import sys
 from pathlib import Path
 from time import perf_counter
-from typing import TYPE_CHECKING, Annotated
+from typing import TYPE_CHECKING, Annotated, Any
 
 import typer
 
@@ -22,7 +23,6 @@ from adrift.core.util.profiler import disable_profiling, enable_profiling, print
 if TYPE_CHECKING:
     from collections.abc import Iterator
 
-    from adrift.core.models.pipeline import MergeResult
     from adrift.core.services.app_common import PodcastConfig
 from adrift.core.services.merge_service import MergeRunOptions, MergeWriters
 from adrift.core.services.merge_service import format_duration as _format_duration
@@ -32,11 +32,11 @@ from adrift.core.services.merge_service import write_report_file as service_writ
 from adrift.core.services.merge_service import write_series_outputs as service_write_series_outputs
 
 
-def _write_json(path: str | Path, payload: object) -> None:
+def _write_json(path: Path, payload: object) -> None:
     service_write_json(path, payload)
 
 
-def _write_series_outputs(output_root: str, result: MergeResult) -> dict[str, object]:
+def _write_series_outputs(output_root: Path, result: Any) -> dict[str, object]:  # noqa: ANN401
     return service_write_series_outputs(output_root, result, write_json_func=_write_json)
 
 
@@ -57,7 +57,7 @@ def _write_report_file(output_file: str, reports: list[dict[str, object]]) -> No
     service_write_report_file(output_file, reports, write_json_func=_write_json)
 
 
-def _run_merge(configs: list[PodcastConfig], options: MergeRunOptions) -> MergeResult:
+def _run_merge(configs: list[PodcastConfig], options: MergeRunOptions) -> Any:  # noqa: ANN401
     from adrift.core.util.run_ui import create_run_ui  # noqa: PLC0415
 
     writers = MergeWriters(
@@ -70,9 +70,7 @@ def _run_merge(configs: list[PodcastConfig], options: MergeRunOptions) -> MergeR
         return MergeUseCase(writers=writers).run(configs, options, ui)
 
 
-def _build_stdout_output(
-    merge_result: MergeResult, include_counts: bool
-) -> list[dict[str, object]]:
+def _build_stdout_output(merge_result: Any, include_counts: bool) -> list[dict[str, object]]:  # noqa: ANN401
     return [
         {
             "name": merged.config.name,
@@ -94,7 +92,7 @@ def _build_stdout_output(
     ]
 
 
-def _write_unmatched_references(merge_result: MergeResult, output_dir: str) -> None:
+def _write_unmatched_references(merge_result: Any, output_dir: str) -> None:  # noqa: ANN401
     try:
         unmatched_per_series: list[dict[str, object]] = []
         for merged in merge_result.value:

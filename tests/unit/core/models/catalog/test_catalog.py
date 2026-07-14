@@ -31,13 +31,13 @@ from tests.unit.core.models.catalog._fixtures import ep as _ep
 _FACTORY = RegistryEpisodeSourceFactory()
 
 
-def process_feeds(config, callback=None, refresh_sources=False):
+def process_feeds(config, callback=None, *, refresh_sources=False):
     return _process_feeds(
         config, callback, refresh_sources=refresh_sources, source_factory=_FACTORY
     )
 
 
-def process_sources(config, callback=None, refresh_sources=False):
+def process_sources(config, callback=None, *, refresh_sources=False):
     return _process_sources(
         config, callback, refresh_sources=refresh_sources, source_factory=_FACTORY
     )
@@ -84,7 +84,7 @@ def _single_episode_config(mock_yt: MagicMock, mock_rss: MagicMock) -> PodcastCo
 
 
 class _FakeScoredAlignmentPort:
-    def __init__(self, score: float = 0.99, track_calls: bool = False) -> None:
+    def __init__(self, score: float = 0.99, *, track_calls: bool = False) -> None:
         self._score = score
         self._track_calls = track_calls
         self.called = False
@@ -177,8 +177,6 @@ class TestProcessFeeds(unittest.TestCase):
         mock_rss.return_value = []
         rules = ["DTSTART:20240124T000000Z\nRRULE:FREQ=WEEKLY;BYDAY=TU"]
         process_feeds(_config(references=[_rss_source(r_rules=rules)]))
-        # get_rss_episodes is now called via adapter with positional args
-        # get_rss_episodes(url, filter_regex, r_rules, callback)
         assert mock_rss.call_args[0][2] == rules
 
     @patch("adrift.adapters.process.youtube.metadata.get_youtube_episodes")
@@ -263,7 +261,7 @@ class TestFullPipeline(unittest.TestCase):
             downloads=[_yt_source()],
         )
 
-        from adrift.core.services.catalog import MergeConfigOptions
+        from adrift.core.services.catalog import MergeConfigOptions  # noqa: PLC0415
 
         result = merge_config(
             config,
@@ -314,7 +312,7 @@ class TestFullPipeline(unittest.TestCase):
         provider = FakeAlignmentProvider()
         config = _config(references=[_rss_source()], downloads=[_yt_source()])
 
-        from adrift.core.services.catalog import MergeConfigOptions
+        from adrift.core.services.catalog import MergeConfigOptions  # noqa: PLC0415
 
         result = merge_config(
             config,

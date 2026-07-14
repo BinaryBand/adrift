@@ -73,15 +73,15 @@ def _load_confirmed_positive_pairs() -> list[tuple[str, str, str, str, str]]:
 
     with SOURCE_TO_REF_CSV.open(newline="", encoding="utf-8") as fh:
         reader = csv.DictReader(fh)
-        for row in reader:
-            pairs.append(_pair_from_row(row))
+        pairs.extend(_pair_from_row(row) for row in reader)
 
     with FOR_REVIEW_CSV.open(newline="", encoding="utf-8") as fh:
         reader = csv.DictReader(fh)
-        for row in reader:
-            if row.get("classification", "").strip().lower() != "false_positive":
-                pairs.append(_pair_from_row(row))
-
+        pairs.extend(
+            _pair_from_row(row)
+            for row in reader
+            if row.get("classification", "").strip().lower() != "false_positive"
+        )
     return pairs
 
 
@@ -90,9 +90,11 @@ def _load_false_positive_pairs() -> list[tuple[str, str, str, str, str]]:
     pairs: list[tuple[str, str, str, str, str]] = []
     with FOR_REVIEW_CSV.open(newline="", encoding="utf-8") as fh:
         reader = csv.DictReader(fh)
-        for row in reader:
-            if row.get("classification", "").strip().lower() == "false_positive":
-                pairs.append(_pair_from_row(row))
+        pairs.extend(
+            _pair_from_row(row)
+            for row in reader
+            if row.get("classification", "").strip().lower() == "false_positive"
+        )
     return pairs
 
 

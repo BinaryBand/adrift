@@ -6,7 +6,7 @@ from unittest.mock import Mock, patch
 from adrift.adapters.process.episode_sources.episode_source_rss import get_rss_episodes
 
 
-def _create_mock_entry(id: str, title: str, pub_date: str) -> Mock:
+def _create_mock_entry(id: str, title: str, pub_date: str) -> Mock:  # noqa: A002
     """Create a mock RSS entry for testing."""
     entry = Mock()
     entry.id = id

@@ -22,11 +22,11 @@ def test_download_episodes_skips_existing_and_counts_new_uploads() -> None:
     config = cast("PodcastConfig", SimpleNamespace(name="CreepCast"))
 
     queue = [
-        _queue_item(True, "Old 1"),
-        _queue_item(True, "Old 2"),
-        _queue_item(False, "New 1"),
-        _queue_item(False, "New 2"),
-        _queue_item(False, "New 3"),
+        _queue_item(exists_in_storage=True, title="Old 1"),
+        _queue_item(exists_in_storage=True, title="Old 2"),
+        _queue_item(exists_in_storage=False, title="New 1"),
+        _queue_item(exists_in_storage=False, title="New 2"),
+        _queue_item(exists_in_storage=False, title="New 3"),
     ]
     uploaded_titles: list[str] = []
 
@@ -74,8 +74,8 @@ def test_download_episodes_reports_nonfatal_errors_and_continues() -> None:
     config = cast("PodcastConfig", SimpleNamespace(name="CreepCast"))
 
     queue = [
-        _queue_item(False, "Broken"),
-        _queue_item(False, "Working"),
+        _queue_item(exists_in_storage=False, title="Broken"),
+        _queue_item(exists_in_storage=False, title="Working"),
     ]
 
     build_fn = make_build_download_queue_from_queue(queue)
@@ -88,7 +88,7 @@ def test_download_episodes_reports_nonfatal_errors_and_continues() -> None:
             raise ValueError(msg)
         return True
 
-    ctx = SimpleNamespace(event_bus=SimpleNamespace(publish=lambda event: None))
+    ctx = SimpleNamespace(event_bus=SimpleNamespace(publish=lambda _event: None))
 
     added = _make_pipeline(
         ui=ui,
@@ -108,9 +108,9 @@ def test_plan_downloads_emits_would_download_file_paths() -> None:
     config = _config(name="Morbid", path="/media/podcasts/morbid")
 
     queue = [
-        _queue_item(True, "Already There"),
-        _queue_item(False, "Part One: Haunted Mansion"),
-        _queue_item(False, "Part Two: Haunted Mansion"),
+        _queue_item(exists_in_storage=True, title="Already There"),
+        _queue_item(exists_in_storage=False, title="Part One: Haunted Mansion"),
+        _queue_item(exists_in_storage=False, title="Part Two: Haunted Mansion"),
     ]
 
     pipeline = _make_pipeline(
@@ -142,8 +142,8 @@ def test_plan_downloads_respects_global_max_download_cap() -> None:
     config = _config(name="Morbid", path="/media/podcasts/morbid")
 
     queue = [
-        _queue_item(False, "Episode A"),
-        _queue_item(False, "Episode B"),
+        _queue_item(exists_in_storage=False, title="Episode A"),
+        _queue_item(exists_in_storage=False, title="Episode B"),
     ]
 
     pipeline = _make_pipeline(

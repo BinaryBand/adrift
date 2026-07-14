@@ -308,7 +308,7 @@ class TestGetYoutubeVideosEdgeCases(unittest.TestCase):
         mock_get_videos.side_effect = Exception("Network error")
 
         # Should raise exception when underlying call fails
-        with pytest.raises(Exception) as context:
+        with pytest.raises(Exception, match="Network error") as context:
             get_youtube_episodes("https://youtube.com/@test", "test_author")
 
         assert str(context.value) == "Network error"
@@ -323,8 +323,8 @@ class TestConcurrentChannelFetch(unittest.TestCase):
         self, mock_get_videos: MagicMock, mock_normalize: MagicMock
     ):
         """Two threads fetching one channel (reference + download roles) serialize."""
-        import threading
-        from concurrent.futures import ThreadPoolExecutor
+        import threading  # noqa: PLC0415
+        from concurrent.futures import ThreadPoolExecutor  # noqa: PLC0415
 
         mock_normalize.return_value = "https://youtube.com/@test/videos"
         active = 0

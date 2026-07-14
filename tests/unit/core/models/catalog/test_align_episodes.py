@@ -50,7 +50,7 @@ class TestSimDate(unittest.TestCase):
 
     def test_mixed_naive_and_aware_dates(self):
         aware = _dt(2024, 1, 1)
-        naive = datetime(2024, 1, 2)
+        naive = datetime(2024, 1, 2)  # noqa: DTZ001 - intentionally naive
         assert sim_date(aware, naive) == 1.0
         assert sim_date(naive, aware) == 1.0
 
@@ -121,7 +121,7 @@ class TestAlignEpisodes(unittest.TestCase):
         with patch(
             "adrift.core.services.catalog.alignment._normalized_alignment_title"
         ) as mocked_title:
-            mocked_title.side_effect = lambda show, episode: episode.title.lower()
+            mocked_title.side_effect = lambda _show, episode: episode.title.lower()
             align_episodes(refs, dls, "Example Show")
 
         assert mocked_title.call_count == len(refs) + len(dls)
@@ -345,23 +345,23 @@ class TestMergeEpisode(unittest.TestCase):
 
 @patch("adrift.core.services.catalog.alignment._thumbnail_url_exists", return_value=True)
 class TestBestThumbnail(unittest.TestCase):
-    def test_none_inputs(self, _exists):
+    def test_none_inputs(self):
         assert _best_thumbnail(None, None) is None
         assert _best_thumbnail("https://ex.com/thumb.jpg", None) == "https://ex.com/thumb.jpg"
         assert _best_thumbnail(None, "https://ex.com/thumb.jpg") == "https://ex.com/thumb.jpg"
 
-    def test_maxres_beats_hq(self, _exists):
+    def test_maxres_beats_hq(self):
         a = "https://img.youtube.com/vi/abc/maxresdefault.jpg"
         b = "https://img.youtube.com/vi/abc/hqdefault.jpg"
         assert _best_thumbnail(a, b) == a
         assert _best_thumbnail(b, a) == a
 
-    def test_hq_beats_mq(self, _exists):
+    def test_hq_beats_mq(self):
         a = "https://img.youtube.com/vi/abc/hqdefault.jpg"
         b = "https://img.youtube.com/vi/abc/mqdefault.jpg"
         assert _best_thumbnail(a, b) == a
 
-    def test_equal_rank_returns_first(self, _exists):
+    def test_equal_rank_returns_first(self):
         a = "https://img.youtube.com/vi/abc/hqdefault.jpg"
         b = "https://img.youtube.com/vi/xyz/hqdefault.jpg"
         assert _best_thumbnail(a, b) == a
@@ -374,17 +374,17 @@ class TestBestThumbnailFragileMaxres(unittest.TestCase):
     _RSS = "https://image.simplecastcdn.com/images/show/cover.jpg"
 
     @patch("adrift.core.services.catalog.alignment._thumbnail_url_exists", return_value=False)
-    def test_broken_maxres_prefers_stable_rss_cover(self, _exists):
+    def test_broken_maxres_prefers_stable_rss_cover(self):
         assert _best_thumbnail(self._RSS, self._MAXRES) == self._RSS
 
     @patch("adrift.core.services.catalog.alignment._thumbnail_url_exists", return_value=False)
-    def test_broken_maxres_falls_back_to_hqdefault(self, _exists):
+    def test_broken_maxres_falls_back_to_hqdefault(self):
         hq = "https://img.youtube.com/vi/abc/hqdefault.jpg"
         # Only YouTube candidates available -> downgrade rather than break.
         assert _best_thumbnail(self._MAXRES, hq) == hq
 
     @patch("adrift.core.services.catalog.alignment._thumbnail_url_exists", return_value=True)
-    def test_existing_maxres_is_kept(self, _exists):
+    def test_existing_maxres_is_kept(self):
         assert _best_thumbnail(self._RSS, self._MAXRES) == self._MAXRES
 
 

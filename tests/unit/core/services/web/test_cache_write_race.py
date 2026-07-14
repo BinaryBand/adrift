@@ -40,10 +40,10 @@ def test_get_rss_episodes_calls_cache_set(tmp_path, monkeypatch):
             Path(self.directory).mkdir(parents=True, exist_ok=True)
             self.set_called = False
 
-        def get(self, key):
+        def get(self, _key):
             return None
 
-        def set(self, key, value, expire=None):
+        def set(self, _key, _value, _expire=None):
             self.set_called = True
 
     dummy = DummyCache()
@@ -68,7 +68,7 @@ def test_get_rss_episodes_calls_cache_set(tmp_path, monkeypatch):
 
     monkeypatch.setattr(rss, "requests", SimpleNamespace(get=fake_get))
     monkeypatch.setattr(
-        rss, "feedparser", SimpleNamespace(parse=lambda s: SimpleNamespace(entries=[]))
+        rss, "feedparser", SimpleNamespace(parse=lambda _s: SimpleNamespace(entries=[]))
     )
 
     # Call the function under test
@@ -87,10 +87,10 @@ def test_fetch_rss_feed_str_uses_conditional_headers_on_304(monkeypatch):
     requested_headers: list[dict[str, str]] = []
 
     class DummyCache:
-        def get(self, key):
+        def get(self, _key):
             return cached_payload
 
-        def set(self, key, value, expire=None):
+        def set(self, _key, _value, _expire=None):
             msg = "cache write not expected on 304"
             raise AssertionError(msg)
 

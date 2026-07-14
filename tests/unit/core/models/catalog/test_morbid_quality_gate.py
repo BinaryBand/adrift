@@ -37,7 +37,7 @@ def _dt(year: int, month: int, day: int) -> datetime:
 
 
 def _ep(
-    id: str,
+    id: str,  # noqa: A002
     title: str,
     description: str = "",
     pub_date: datetime | None = None,

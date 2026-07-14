@@ -32,7 +32,7 @@ class _FakeProvider:
         return self._values.get(key, default)
 
 
-def make_fake_ui(
+def make_fake_ui(  # noqa: C901
     emit_cb: Callable[[Any, str], None] | None = None,
     set_operation_cb: Callable[[str], None] | None = None,
     clear_operation_cb: Callable[[], None] | None = None,
@@ -64,14 +64,14 @@ def make_fake_ui(
     return _FakeUI()
 
 
-def _queue_item(exists_in_storage: bool, title: str) -> SimpleNamespace:
+def _queue_item(*, exists_in_storage: bool, title: str) -> SimpleNamespace:
     return SimpleNamespace(
         exists_in_storage=exists_in_storage,
         episode=SimpleNamespace(episode=SimpleNamespace(title=title)),
     )
 
 
-def _make_pipeline(
+def _make_pipeline(  # noqa: PLR0913
     *,
     ui: Any,
     ctx: Any,
@@ -86,8 +86,8 @@ def _make_pipeline(
         options=options or DownloadRunOptions(max_downloads=max_downloads),
     )
     deps = DownloadPipelineDeps(
-        merge_config=lambda config, options: None,
-        merge_options_factory=lambda refresh, on_stage, callback: None,
+        merge_config=lambda _config, _options: None,
+        merge_options_factory=lambda _refresh, _on_stage, _callback: None,
         enrich_with_sponsors=lambda _merge_result: [],
         build_download_queue=build_download_queue,
         download_and_upload=download_and_upload,
@@ -152,7 +152,7 @@ def make_capture_ui(
         emit_cb=lambda level, message: emitted.append((level, message)),
         set_operation_cb=operations.append,
         clear_operation_cb=lambda: operations.append(clear_marker),
-        operation_callback_cb=lambda current, total: None,
+        operation_callback_cb=lambda _current, _total: None,
     )
 
 
@@ -160,9 +160,9 @@ def make_ui_emit_only(emitted: list[tuple[Any, str]]) -> Any:
     """Return a UI that only captures `emit` calls and no-ops the rest."""
     return make_fake_ui(
         emit_cb=lambda level, message: emitted.append((level, message)),
-        set_operation_cb=lambda op: None,
+        set_operation_cb=lambda _op: None,
         clear_operation_cb=lambda: None,
-        operation_callback_cb=lambda current, total: None,
+        operation_callback_cb=lambda _current, _total: None,
     )
 
 

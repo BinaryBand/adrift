@@ -59,7 +59,7 @@ def _assert_title_normalization_rules_valid(tc: unittest.TestCase, podcast: Podc
         )
 
 
-def _assert_schedule_rules_valid(tc: unittest.TestCase, podcast: PodcastConfig) -> None:
+def _assert_schedule_rules_valid(_tc: unittest.TestCase, podcast: PodcastConfig) -> None:
     for rule in podcast.schedule:
         assert isinstance(rule, str)
         assert rule.startswith("FREQ=") or (
@@ -89,9 +89,11 @@ def _assert_feed_source_valid(tc: unittest.TestCase, podcast: PodcastConfig) -> 
 class AuditConfigs(unittest.TestCase):
     def test_audit_podcast_configs(self):
         """Test that all podcast configs parsed from TOML are structurally valid."""
-        from dotenv import find_dotenv
+        from dotenv import find_dotenv  # noqa: PLC0415
 
-        from adrift.core.services.app_common import load_config  # type: ignore[attr-defined]
+        from adrift.core.services.app_common import (  # noqa: PLC0415
+            load_config,  # type: ignore[attr-defined]
+        )
 
         all_files = Path(find_dotenv()).parent.glob("static/config/*.toml")
         configs: list[PodcastConfig] = []

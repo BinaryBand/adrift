@@ -367,7 +367,7 @@ def _utcnow() -> datetime:
     return datetime.now(UTC)
 
 
-def _parse_cached_timestamp(value: float | str) -> datetime | None:
+def _parse_cached_timestamp(value: object) -> datetime | None:
     if not isinstance(value, str):
         return None
     try:

@@ -3,6 +3,8 @@
 import logging
 import unittest
 
+import pytest
+
 from adrift.core.util.media import AUDIO_EXTENSIONS, parse_duration
 
 
@@ -14,19 +16,19 @@ class TestParseDuration(unittest.TestCase):
         assert parse_duration("") is None
 
     def test_seconds_only(self):
-        self.assertAlmostEqual(parse_duration("30"), 30.0)
+        assert parse_duration("30") == pytest.approx(30.0)
 
     def test_minutes_and_seconds(self):
-        self.assertAlmostEqual(parse_duration("1:30"), 90.0)
+        assert parse_duration("1:30") == pytest.approx(90.0)
 
     def test_hours_minutes_seconds(self):
-        self.assertAlmostEqual(parse_duration("1:30:00"), 5400.0)
+        assert parse_duration("1:30:00") == pytest.approx(5400.0)
 
     def test_fractional_seconds(self):
-        self.assertAlmostEqual(parse_duration("0:01:30.5"), 90.5)
+        assert parse_duration("0:01:30.5") == pytest.approx(90.5)
 
     def test_zero_duration(self):
-        self.assertAlmostEqual(parse_duration("0:00"), 0.0)
+        assert parse_duration("0:00") == pytest.approx(0.0)
 
     def test_unrecognised_format_returns_none_and_warns(self):
         with self.assertLogs("adrift.core.util.media", level=logging.WARNING) as ctx:

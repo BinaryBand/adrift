@@ -3,7 +3,7 @@
 import importlib
 import re
 import unittest
-from datetime import datetime
+from datetime import UTC, datetime
 
 app_common = importlib.import_module("adrift.core.services.app_common")
 SourceFilter = app_common.SourceFilter
@@ -86,7 +86,7 @@ class TestFilterRulesToRegex(unittest.TestCase):
             self.fail(f"to_regex() produced invalid regex: {exc}")
 
     def test_multiple_include_alternatives(self):
-        """include acts as an OR – any matching pattern admits the episode."""
+        """include acts as an OR - any matching pattern admits the episode."""
         rules = SourceFilter(include=["Episode One", "Episode Two"])
         regex_str = rules.to_regex()
         assert regex_str is not None
@@ -105,7 +105,7 @@ class TestScheduleMatchesToday(unittest.TestCase):
         result = _schedule_matches_today(
             "FREQ=WEEKLY;BYDAY=WE,FR",
             "Some Show",
-            datetime(2026, 4, 1),  # Wednesday
+            datetime(2026, 4, 1, tzinfo=UTC),  # Wednesday
         )
         assert result
 
@@ -114,27 +114,29 @@ class TestScheduleMatchesToday(unittest.TestCase):
         result = _schedule_matches_today(
             "FREQ=WEEKLY;BYDAY=WE,FR",
             "Some Show",
-            datetime(2026, 3, 30),  # Monday
+            datetime(2026, 3, 30, tzinfo=UTC),  # Monday
         )
         assert not result
 
     def test_no_byday_uses_rrule_defaults(self):
         """FREQ=WEEKLY without BYDAY is evaluated directly by dateutil RRULE."""
-        result = _schedule_matches_today("FREQ=WEEKLY", "Coffeezilla", datetime(2026, 4, 1))
+        result = _schedule_matches_today(
+            "FREQ=WEEKLY", "Coffeezilla", datetime(2026, 4, 1, tzinfo=UTC)
+        )
         assert result
 
     def test_single_byday(self):
         result = _schedule_matches_today(
             "FREQ=WEEKLY;BYDAY=MO",
             "Alyssa Grenfell",
-            datetime(2026, 3, 30),
+            datetime(2026, 3, 30, tzinfo=UTC),
         )
         assert result
 
         result = _schedule_matches_today(
             "FREQ=WEEKLY;BYDAY=MO",
             "Alyssa Grenfell",
-            datetime(2026, 3, 31),
+            datetime(2026, 3, 31, tzinfo=UTC),
         )
         assert not result
 
@@ -143,15 +145,19 @@ class TestScheduleMatchesToday(unittest.TestCase):
         result = _schedule_matches_today(
             "FREQ=DAILY;INTERVAL=2",
             "Any Show",
-            datetime(2026, 4, 1),
+            datetime(2026, 4, 1, tzinfo=UTC),
         )
         assert result
 
     def test_dtstart_plus_rrule_supported(self):
         """RFC5545 DTSTART+RRULE strings should evaluate schedule windows."""
         schedule = "DTSTART:20240124T000000Z\nRRULE:FREQ=WEEKLY;BYDAY=MO"
-        assert _schedule_matches_today(schedule, "The Daily Show", datetime(2026, 3, 30))
-        assert not _schedule_matches_today(schedule, "The Daily Show", datetime(2026, 3, 31))
+        assert _schedule_matches_today(
+            schedule, "The Daily Show", datetime(2026, 3, 30, tzinfo=UTC)
+        )
+        assert not _schedule_matches_today(
+            schedule, "The Daily Show", datetime(2026, 3, 31, tzinfo=UTC)
+        )
 
 
 class TestSourceFilterRRules(unittest.TestCase):

@@ -56,7 +56,7 @@ class TestPydanticModels(unittest.TestCase):
         assert video.title == "Test Video"
         assert video.description == "Test description"
         assert video.duration == 300.5
-        assert video.upload_date == datetime(2023, 12, 18)
+        assert video.upload_date == datetime(2023, 12, 18)  # noqa: DTZ001
         assert video.thumbnail == "https://example.com/thumb.jpg"
         assert video.availability == "public"
         assert video.url == "https://youtube.com/watch?v=vid123"

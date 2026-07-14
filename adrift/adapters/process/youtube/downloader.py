@@ -332,7 +332,9 @@ def _requested_download_path(info_dict: dict[str, Any]) -> Path | None:
 
 
 def _raise_download_error(
-    video_id: str, error: Exception, attempt_label: str | None = None,
+    video_id: str,
+    error: Exception,
+    attempt_label: str | None = None,
 ) -> None:
     error_msg = str(error)
     if _is_bot_detection_error(error_msg) and PROPAGATE_BOT_DETECTION:

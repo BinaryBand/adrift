@@ -55,7 +55,7 @@ def test_rust_adapter_raises_helpful_error_when_no_backend_is_available() -> Non
 
 def test_rust_adapter_uses_extension_align_batch_callable() -> None:
     expected = ([(0, 0)], {(0, 0): 0.99})
-    fake_module = SimpleNamespace(align_batch=lambda batch: expected)
+    fake_module = SimpleNamespace(align_batch=lambda _batch: expected)
     adapter = RustScoredAlignmentAdapter()
     with patch("adrift.adapters.process.alignment.rust_scored.import_module") as mocked_import:
         mocked_import.return_value = fake_module

@@ -15,8 +15,8 @@ def dt(year: int, month: int, day: int) -> datetime:
     return datetime(year, month, day, tzinfo=UTC)
 
 
-def ep(
-    id: str = "ep1",
+def ep(  # noqa: PLR0913
+    id: str = "ep1",  # noqa: A002
     title: str = "Episode 1",
     description: str = "",
     pub_date: datetime | None = None,

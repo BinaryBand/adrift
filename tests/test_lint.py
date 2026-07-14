@@ -6,7 +6,7 @@ import os
 import subprocess
 from pathlib import Path
 from shutil import which
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, ClassVar
 
 import pytest
 
@@ -27,7 +27,7 @@ def run_resolved(cmd: Iterable[str], /, **kwargs: Any) -> subprocess.CompletedPr
         argv[0] = local_executable.as_posix()
     elif which(executable) is not None:
         argv[0] = which(executable) or executable
-    return subprocess.run(argv, cwd=ROOT, check=False, **kwargs)  # type: ignore
+    return subprocess.run(argv, cwd=ROOT, check=False, **kwargs)  # type: ignore[return-value]
 
 
 def _ruff_autofix_enabled() -> bool:
@@ -37,7 +37,7 @@ def _ruff_autofix_enabled() -> bool:
 
 
 def _ensure_ruff_preflight(paths: Iterable[str]) -> None:
-    global _RUFF_PREP_DONE
+    global _RUFF_PREP_DONE  # noqa: PLW0603
     if _RUFF_PREP_DONE or not _ruff_autofix_enabled():
         return
 
@@ -78,7 +78,7 @@ class TestCpd:
 class TestRuff:
     """Ensure the codebase passes ruff linting and formatting checks."""
 
-    PATHS = ["adrift", "tests"]
+    PATHS: ClassVar[list[str]] = ["adrift", "tests"]
 
     def test_ruff_check(self):
         """Fail if ruff reports any lint violations."""
@@ -186,7 +186,7 @@ def _stray_files(base: Path, allowed_dirs: set[str], allowed_files: set[str]) ->
 class TestScaffold:
     """Keep the package and test-tree shape aligned with the scaffold policy."""
 
-    LAYERS = {"adapters", "cli", "core"}
+    LAYERS: ClassVar[set[str]] = {"adapters", "cli", "core"}
 
     def test_adrift_top_level_shape(self):
         """Only the declared layers (plus dunder modules) may sit under adrift/."""
@@ -209,7 +209,7 @@ class TestScaffold:
 class TestVulture:
     """Ensure the codebase passes the current Vulture dead-code gate."""
 
-    PATHS = ["adrift", "tests"]
+    PATHS: ClassVar[list[str]] = ["adrift", "tests"]
 
     def test_vulture(self):
         """Fail if Vulture reports unused code at or above 80% confidence."""

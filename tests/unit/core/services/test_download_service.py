@@ -46,7 +46,7 @@ def _ctx() -> AppContext:
 def _ctx_with_storage(storage: object) -> AppContext:
     return AppContext(
         storage=storage,
-        secrets=SimpleNamespace(source_name="test", get=lambda key, default="": default),
+        secrets=SimpleNamespace(source_name="test", get=lambda _key, default="": default),
         rss_cache=InMemoryCache(),
         yt_cache=InMemoryCache(),
         event_bus=EventBus(),
@@ -110,9 +110,7 @@ def test_build_download_queue_preserves_unknown_dates_after_dated_missing(
     ]
 
 
-def test_episode_exists_in_storage_matches_existing_youtube_video_id(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
+def test_episode_exists_in_storage_matches_existing_youtube_video_id() -> None:
     episode = DownloadEpisode(
         episode=RssEpisode(
             id="new-title",
@@ -127,9 +125,9 @@ def test_episode_exists_in_storage_matches_existing_youtube_video_id(
     config = _config()
 
     fake = SimpleNamespace()
-    fake.exists = lambda bucket, key, extension_agnostic=True: None
-    fake.get_file_list = lambda bucket, prefix, without_extensions=False: ["old-title.opus"]
-    fake.get_metadata = lambda bucket, key: MediaMetadata(
+    fake.exists = lambda _bucket, _key, _extension_agnostic=True: None
+    fake.get_file_list = lambda _bucket, _prefix, _without_extensions=False: ["old-title.opus"]
+    fake.get_metadata = lambda _bucket, _key: MediaMetadata(
         duration=1.0,
         source="https://youtube.com/watch?v=stable-video-id",
         upload_date=datetime(2026, 4, 19, tzinfo=UTC),
@@ -137,9 +135,7 @@ def test_episode_exists_in_storage_matches_existing_youtube_video_id(
     assert episode_exists_in_storage(episode, config, _ctx_with_storage(fake)) is True
 
 
-def test_episode_exists_in_storage_matches_existing_direct_source_url(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
+def test_episode_exists_in_storage_matches_existing_direct_source_url() -> None:
     episode = DownloadEpisode(
         episode=RssEpisode(
             id="direct-id",
@@ -159,9 +155,11 @@ def test_episode_exists_in_storage_matches_existing_direct_source_url(
     )
 
     fake = SimpleNamespace()
-    fake.exists = lambda bucket, key, extension_agnostic=True: None
-    fake.get_file_list = lambda bucket, prefix, without_extensions=False: ["old-direct-title.opus"]
-    fake.get_metadata = lambda bucket, key: MediaMetadata(
+    fake.exists = lambda _bucket, _key, _extension_agnostic=True: None
+    fake.get_file_list = lambda _bucket, _prefix, _without_extensions=False: [
+        "old-direct-title.opus"
+    ]
+    fake.get_metadata = lambda _bucket, _key: MediaMetadata(
         duration=1.0,
         source="https://cdn.example.com/audio/episode.mp3",
         upload_date=datetime(2026, 4, 19, tzinfo=UTC),
@@ -169,9 +167,7 @@ def test_episode_exists_in_storage_matches_existing_direct_source_url(
     assert episode_exists_in_storage(episode, config, _ctx_with_storage(fake)) is True
 
 
-def test_episode_exists_in_storage_matches_cleaned_existing_filename(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
+def test_episode_exists_in_storage_matches_cleaned_existing_filename() -> None:
     episode = DownloadEpisode(
         episode=RssEpisode(
             id="morbid-title",
@@ -191,15 +187,15 @@ def test_episode_exists_in_storage_matches_cleaned_existing_filename(
     )
 
     fake = SimpleNamespace()
-    fake.exists = lambda bucket, key, extension_agnostic=True: None
-    fake.get_file_list = lambda bucket, prefix, without_extensions=False: [
+    fake.exists = lambda _bucket, _key, _extension_agnostic=True: None
+    fake.get_file_list = lambda _bucket, _prefix, _without_extensions=False: [
         "ann-billy-woodward-morbid-podcast.opus"
     ]
-    fake.get_metadata = lambda bucket, key: None
+    fake.get_metadata = lambda _bucket, _key: None
     assert episode_exists_in_storage(episode, config, _ctx_with_storage(fake)) is True
 
 
-def test_process_in_tmpdir_reports_upload_progress(
+def test_process_in_tmpdir_reports_upload_progress(  # noqa: PLR0915
     monkeypatch: pytest.MonkeyPatch, tmp_path: Path
 ) -> None:
     episode = _episode("Upload Progress")
@@ -213,16 +209,16 @@ def test_process_in_tmpdir_reports_upload_progress(
     updates: list[tuple[int, int | None]] = []
     completions: list[str] = []
 
-    def _storage_prefix_fn(cfg: PodcastConfig) -> tuple[str, str]:
+    def _storage_prefix_fn(_cfg: PodcastConfig) -> tuple[str, str]:
         return ("bucket", "podcasts/creepcast")
 
-    def _download_audio_fn(ep: DownloadEpisode, dest: Path, ctx: object | None = None) -> Path:
+    def _download_audio_fn(_ep: DownloadEpisode, _dest: Path, _ctx: object | None = None) -> Path:
         return audio_path
 
-    def _convert_to_opus_fn(audio: Path, callback: object | None = None) -> Path:
+    def _convert_to_opus_fn(_audio: Path, _callback: object | None = None) -> Path:
         return opus_path
 
-    def _get_duration_fn(path: Path) -> float:
+    def _get_duration_fn(_path: Path) -> float:
         return 42.0
 
     monkeypatch.setattr(
@@ -296,24 +292,26 @@ def test_process_in_tmpdir_sets_ad_segments_expiry_when_segments_found(
 
     monkeypatch.setattr(
         "adrift.core.services.download_process.storage_prefix",
-        lambda cfg: ("bucket", "podcasts/creepcast"),
+        lambda _cfg: ("bucket", "podcasts/creepcast"),
     )
     monkeypatch.setattr(
         "adrift.core.services.download_process._download_audio",
-        lambda ep, dest, ctx=None: audio_path,
+        lambda _ep, _dest, _ctx=None: audio_path,
     )
     monkeypatch.setattr(
         "adrift.core.services.download_process.convert_to_opus",
-        lambda audio, callback=None: opus_path,
+        lambda _audio, _callback=None: opus_path,
     )
     monkeypatch.setattr(
         "adrift.core.services.download_process.get_duration",
-        lambda path: 42.0,
+        lambda _path: 42.0,
     )
 
     captured: dict[str, object] = {}
 
-    def _upload_file(bucket_key: tuple[str, str], file_path: Path, options: object | None) -> None:
+    def _upload_file(
+        _bucket_key: tuple[str, str], _file_path: Path, options: object | None
+    ) -> None:
         captured["options"] = options
 
     fake = SimpleNamespace()

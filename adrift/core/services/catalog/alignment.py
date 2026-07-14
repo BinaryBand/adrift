@@ -1,4 +1,5 @@
 """Episode alignment: fuzzy matching of references to downloads."""
+
 # cspell: ignore cdist
 import hashlib
 import pathlib
@@ -557,7 +558,12 @@ def _score_low_certainty(
 ) -> float:
     s_id = _id_similarity(ref.episode, dl.episode)
     has_desc = _has_description_signal(ref, dl)
-    if _is_sparse_title(s_id, has_desc, sims.title, runtime.config.sparse_title_min):
+    if _is_sparse_title(
+        s_id,
+        has_desc=has_desc,
+        s_title=sims.title,
+        sparse_title_min=runtime.config.sparse_title_min,
+    ):
         return 0.0
     if _should_reject_metadata_subset_rescue(ref, dl, sims, runtime):
         return 0.0

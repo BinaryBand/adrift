@@ -9,6 +9,8 @@ controlled by the include_date flag directly.
 import unittest
 from datetime import UTC, datetime
 
+import pytest
+
 from adrift.core.models import RssEpisode
 from adrift.core.services.catalog.alignment import (
     _ANCHOR_OVERLAP_BONUS,
@@ -24,7 +26,7 @@ def _dt(year: int, month: int, day: int) -> datetime:
 
 
 def _ep(
-    id: str = "x",
+    id: str = "x",  # noqa: A002
     title: str = "Episode",
     description: str = "",
     pub_date: datetime | None = None,
@@ -59,7 +61,7 @@ class TestScoreIncludeDateFalse(unittest.TestCase):
 
         score_with_dates = _score(ref, dl, _Sims(1.0), include_date=False)
         score_without_dates = _score(ref_no_date, dl_no_date, _Sims(1.0), include_date=False)
-        self.assertAlmostEqual(score_with_dates, score_without_dates, places=6)
+        assert score_with_dates == pytest.approx(score_without_dates, abs=1e-6)
 
     def test_containment_bonus_not_applied_when_include_date_false(self):
         # "Denise Huber" is fully contained in "Disappearance of Denise Huber".
@@ -77,7 +79,7 @@ class TestScoreIncludeDateFalse(unittest.TestCase):
         dl2 = _candidate(_ep(), "episode def")
         score_no_containment = _score(ref2, dl2, _Sims(0.8), include_date=False)
 
-        self.assertAlmostEqual(score_no_date, score_no_containment, places=6)
+        assert score_no_date == pytest.approx(score_no_containment, abs=1e-6)
 
 
 class TestScoreIncludeDateTrue(unittest.TestCase):
@@ -126,8 +128,8 @@ class TestScoreIncludeDateTrue(unittest.TestCase):
         # Containment bonus should increase the score
         assert score_with_containment > score_without_containment
         # And the increment should match the defined constant
-        self.assertAlmostEqual(
-            score_with_containment - score_without_containment, _CONTAINMENT_BONUS, places=4
+        assert score_with_containment - score_without_containment == pytest.approx(
+            _CONTAINMENT_BONUS, abs=1e-4
         )
 
     def test_partial_anchor_overlap_bonus_applied(self):
@@ -141,10 +143,9 @@ class TestScoreIncludeDateTrue(unittest.TestCase):
         score_without_overlap = _score(ref2, dl2, _Sims(0.8), include_date=True)
 
         assert score_with_overlap > score_without_overlap
-        self.assertAlmostEqual(
-            score_with_overlap - score_without_overlap,
+        assert score_with_overlap - score_without_overlap == pytest.approx(
             _ANCHOR_OVERLAP_BONUS,
-            places=4,
+            abs=1e-4,
         )
 
     def test_score_capped_at_one(self):

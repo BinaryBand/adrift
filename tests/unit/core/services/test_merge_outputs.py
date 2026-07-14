@@ -188,7 +188,7 @@ def test_main_emits_timings_to_stderr(tmp_path: Path, capsys) -> None:
     config = _config()
     result = sample_merge_result(config)
 
-    def _merge_config_with_timings(*args, **kwargs) -> MergeResult:
+    def _merge_config_with_timings(*_args, **kwargs) -> MergeResult:
         timings = kwargs.get("timings")
         if isinstance(timings, dict):
             timings.update(

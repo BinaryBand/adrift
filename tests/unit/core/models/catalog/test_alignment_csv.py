@@ -30,7 +30,7 @@ def _episode_from_row(row: dict[str, str]) -> RssEpisode:
 
 def _load_episode_rows(filename: str, index_field: str) -> dict[str, list[RssEpisode]]:
     grouped: dict[str, list[tuple[int, RssEpisode]]] = {}
-    with open(FIXTURE_DIR / filename, encoding="utf-8", newline="") as f:
+    with (FIXTURE_DIR / filename).open(encoding="utf-8", newline="") as f:
         reader = csv.DictReader(f)
         for row in reader:
             scenario = row["scenario"]
@@ -46,14 +46,14 @@ def _load_episode_rows(filename: str, index_field: str) -> dict[str, list[RssEpi
 
 def _load_expected_pairs() -> dict[str, list[tuple[int, int]]]:
     grouped: dict[str, list[tuple[int, int]]] = {}
-    with open(FIXTURE_DIR / "expected_pairs.csv", encoding="utf-8", newline="") as f:
+    with (FIXTURE_DIR / "expected_pairs.csv").open(encoding="utf-8", newline="") as f:
         reader = csv.DictReader(f)
         for row in reader:
             scenario = row["scenario"]
             pair = (int(row["ref_idx"]), int(row["dl_idx"]))
             grouped.setdefault(scenario, []).append(pair)
-    for scenario in grouped:
-        grouped[scenario].sort()
+    for pairs in grouped.values():
+        pairs.sort()
     return grouped
 
 

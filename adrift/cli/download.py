@@ -1,4 +1,5 @@
 """Download CLI: fetch and upload podcast episodes."""
+
 from __future__ import annotations
 
 import random

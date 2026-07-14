@@ -146,7 +146,7 @@ def test_best_alignment_candidate_for_download_returns_none_without_candidate() 
 def test_process_unmatched_skips_slug_collisions_with_matched_downloads(
     titles: list[str], matched_indices: st.DataObject
 ) -> None:
-    from adrift.cli import cleanup as cleanup_mod
+    from adrift.cli import cleanup as cleanup_mod  # noqa: PLC0415
 
     size = len(titles)
     matched = matched_indices.draw(st.sets(st.integers(min_value=0, max_value=size - 1)))
@@ -174,7 +174,7 @@ def test_process_unmatched_skips_slug_collisions_with_matched_downloads(
         patch.object(
             cleanup_mod,
             "_resolve_storage_key",
-            lambda storage, bucket, prefix, slug: f"{prefix}/{slug}.opus",
+            lambda _storage, _bucket, prefix, slug: f"{prefix}/{slug}.opus",
         ),
         patch(
             "adrift.core.services.download_client.storage_prefix", return_value=("bucket", "prefix")

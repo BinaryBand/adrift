@@ -33,6 +33,7 @@ def normalize_cli_inputs(
 
 def make_main(app: typer.Typer) -> Callable[[], None]:
     """Build the main CLI entrypoint callback."""
+
     def _main() -> None:
         app(standalone_mode=False)
 

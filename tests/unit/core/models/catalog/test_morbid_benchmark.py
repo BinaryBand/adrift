@@ -1,5 +1,6 @@
 import csv
 import unittest
+from pathlib import Path
 
 from adrift.core.models import AlignmentConfig
 from adrift.core.services.catalog import align_episodes_impl
@@ -12,7 +13,7 @@ _MORBID_ALIGNMENT = AlignmentConfig(extra_stopwords=["morbid"])
 class TestMorbidBenchmark(unittest.TestCase):
     def test_benchmark_pairs(self):
         path = "tests/resources/alignment/morbid_benchmark.csv"
-        with open(path, newline="", encoding="utf-8") as fh:
+        with Path(path).open(newline="", encoding="utf-8") as fh:
             reader = csv.DictReader(fh)
             for idx, row in enumerate(reader):
                 label = row["label"].strip().lower()

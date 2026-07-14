@@ -23,7 +23,7 @@ _PROGRESS_HOOK_ERRORS = (OSError, RuntimeError, TypeError, ValueError)
 # ============================================================================
 
 
-def unix_timestamp_to_datetime(raw: float | str) -> datetime | None:
+def unix_timestamp_to_datetime(raw: Any) -> datetime | None:  # noqa: ANN401
     """Convert unix timestamp (int, float, or numeric string) to datetime."""
     if isinstance(raw, (int, float)):
         return datetime.fromtimestamp(float(raw), tz=UTC)
@@ -174,7 +174,7 @@ def _finished_progress_update(download: dict[str, Any]) -> tuple[int, int] | Non
 # ============================================================================
 
 
-def _extract_channel_image(data: str | list) -> str:
+def _extract_channel_image(data: Any) -> str:  # noqa: ANN401
     """Extract image URL from avatar/thumbnail data (list or string)."""
     if not data:
         return ""

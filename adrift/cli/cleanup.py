@@ -71,7 +71,8 @@ def _duplicate_audio_candidates(show: str, file_names: list[str]) -> list[str]:
 
 
 def _best_alignment_candidate_for_download(
-    result: Any, download_index: int  # noqa: ANN401
+    result: Any,  # noqa: ANN401
+    download_index: int,
 ) -> tuple[str, float, str] | None:
     best: tuple[str, float, str] | None = None
     references = getattr(result, "references", [])
