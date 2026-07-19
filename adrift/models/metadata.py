@@ -1,10 +1,11 @@
+import json
 import os
 from abc import ABC, abstractmethod
 from datetime import datetime
 from typing import Any, Callable
 
 import pydantic
-from pydantic import BaseModel, ConfigDict
+from pydantic import BaseModel, ConfigDict, field_validator
 
 DEVICE = os.getenv("DEVICE", "UnknownDevice")
 PROJECT = os.getenv("PROJECT", "UnknownProject")
@@ -40,18 +41,36 @@ class MediaMetadata(S3Metadata):
     duration: float = pydantic.Field(description="Duration in seconds")
     source: str = pydantic.Field(description="Source URL of the media")
     upload_date: datetime = pydantic.Field(description="Date the media was uploaded")
-    sponsors_removed: bool | None = pydantic.Field(
-        default=False, description="Whether ads were removed"
+    audio_hash: str | None = pydantic.Field(
+        default=None, description="SHA-256 hash of the uploaded audio file bytes"
+    )
+    ad_segments: list[tuple[float, float]] = pydantic.Field(
+        default_factory=list, description="Known ad segments as (start, end) second offsets"
+    )
+    ad_segments_expires_at: datetime | None = pydantic.Field(
+        default=None, description="When ad_segments should be considered stale"
     )
 
+    @field_validator("ad_segments", mode="before")
+    @classmethod
+    def _parse_ad_segments(cls, value: Any) -> Any:
+        if isinstance(value, str):
+            return json.loads(value) if value else []
+        return value
+
     def to_dict(self) -> dict[str, str]:
-        return {
+        result = {
             "duration": str(self.duration),
             "source": self.source,
             "upload_date": self.upload_date.isoformat(),
-            "sponsors_removed": "true" if self.sponsors_removed else "false",
+            "ad_segments": json.dumps(self.ad_segments),
             "uploader": self.uploader if self.uploader is not None else "unknown",
         }
+        if self.audio_hash is not None:
+            result["audio_hash"] = self.audio_hash
+        if self.ad_segments_expires_at is not None:
+            result["ad_segments_expires_at"] = self.ad_segments_expires_at.isoformat()
+        return result
 
 
 class YtDlpParams(BaseModel):

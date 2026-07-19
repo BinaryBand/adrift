@@ -1,11 +1,11 @@
-"""Cleanup CLI: remove unmatched download audio files from S3."""
+"""Cleanup CLI: remove unmatched download audio files from storage."""
 
 from __future__ import annotations
 
 import sys
 from collections import defaultdict
 from pathlib import Path
-from typing import Annotated, Any, cast
+from typing import TYPE_CHECKING, Annotated, Any, cast
 
 import typer
 
@@ -17,6 +17,9 @@ from adrift.cli import (
     build_cli,
 )
 
+if TYPE_CHECKING:
+    from adrift.core.services.context import AppContext
+
 _AUDIO_EXTENSIONS = frozenset({".mp3", ".opus"})
 
 
@@ -25,8 +28,8 @@ def _unmatched_indices(pairs: list[tuple[int, int]], total: int) -> list[int]:
     return [index for index in range(total) if index not in matched]
 
 
-def _matched_download_slugs(result: Any) -> set[str]:
-    from adrift.utils.title_normalization import normalize_title
+def _matched_download_slugs(result: Any) -> set[str]:  # noqa: ANN401
+    from adrift.core.util.title_normalization import normalize_title  # noqa: PLC0415
 
     return {
         normalize_title(result.config.name, result.downloads[download_index].title)
@@ -34,18 +37,17 @@ def _matched_download_slugs(result: Any) -> set[str]:
     }
 
 
-def _resolve_s3_key(s3: Any, bucket: str, prefix: str, slug: str) -> str | None:
+def _resolve_storage_key(storage: Any, bucket: str, prefix: str, slug: str) -> str | None:  # noqa: ANN401
     key_prefix = f"{prefix}/{slug}"
-    actual_name = s3.exists(bucket, key_prefix)
+    actual_name = storage.exists(bucket, key_prefix)
     if actual_name is None:
         return None
     parent = Path(key_prefix).parent.as_posix()
     return f"{parent}/{actual_name}"
 
 
-def _delete_key(s3: Any, bucket: str, key: str) -> None:
-    s3.get_client().delete_object(Bucket=bucket, Key=key)
-    s3.invalidate_file_map_cache(bucket, key)
+def _delete_key(storage: Any, bucket: str, key: str) -> None:  # noqa: ANN401
+    storage.delete(bucket, key)
 
 
 def _audio_object_names(file_names: list[str]) -> list[str]:
@@ -53,7 +55,7 @@ def _audio_object_names(file_names: list[str]) -> list[str]:
 
 
 def _duplicate_audio_candidates(show: str, file_names: list[str]) -> list[str]:
-    from adrift.utils.title_normalization import normalize_title
+    from adrift.core.util.title_normalization import normalize_title  # noqa: PLC0415
 
     by_canonical: dict[str, list[str]] = defaultdict(list)
     for name in _audio_object_names(file_names):
@@ -69,7 +71,8 @@ def _duplicate_audio_candidates(show: str, file_names: list[str]) -> list[str]:
 
 
 def _best_alignment_candidate_for_download(
-    result: Any, download_index: int
+    result: Any,  # noqa: ANN401
+    download_index: int,
 ) -> tuple[str, float, str] | None:
     best: tuple[str, float, str] | None = None
     references = getattr(result, "references", [])
@@ -88,7 +91,7 @@ def _best_alignment_candidate_for_download(
     return best
 
 
-def _write_unmatched_verbose(result: Any, download_index: int) -> None:
+def _write_unmatched_verbose(result: Any, download_index: int) -> None:  # noqa: ANN401
     download = result.downloads[download_index]
     sys.stdout.write(f"    title:  {download.title}\n")
     sys.stdout.write(f"    source: {download.content}\n")
@@ -102,15 +105,15 @@ def _write_unmatched_verbose(result: Any, download_index: int) -> None:
 
 
 def _process_unmatched(
-    result: Any,
-    s3: Any,
+    result: Any,  # noqa: ANN401
+    storage: Any,  # noqa: ANN401
     dry_run: bool,
     verbose: bool = False,
 ) -> tuple[int, int]:
-    from adrift.services.download_client import s3_prefix
-    from adrift.utils.title_normalization import normalize_title
+    from adrift.core.services.download_client import storage_prefix  # noqa: PLC0415
+    from adrift.core.util.title_normalization import normalize_title  # noqa: PLC0415
 
-    bucket, prefix = s3_prefix(result.config)
+    bucket, prefix = storage_prefix(result.config)
     indices = _unmatched_indices(result.pairs, len(result.downloads))
     matched_slugs = _matched_download_slugs(result)
     found = 0
@@ -120,7 +123,7 @@ def _process_unmatched(
         slug = normalize_title(result.config.name, download.title)
         if slug in matched_slugs:
             continue
-        key = _resolve_s3_key(s3, bucket, prefix, slug)
+        key = _resolve_storage_key(storage, bucket, prefix, slug)
         if key is None:
             missing += 1
             continue
@@ -129,48 +132,56 @@ def _process_unmatched(
         if verbose:
             _write_unmatched_verbose(result, index)
         if not dry_run:
-            _delete_key(s3, bucket, key)
+            _delete_key(storage, bucket, key)
         found += 1
     return found, missing
 
 
-def _process_duplicate_audio_files(config: Any, s3: Any, dry_run: bool) -> int:
-    from adrift.services.download_client import s3_prefix
+def _process_duplicate_audio_files(config: Any, storage: Any, dry_run: bool) -> int:  # noqa: ANN401
+    from adrift.core.services.download_client import storage_prefix  # noqa: PLC0415
 
-    bucket, prefix = s3_prefix(config)
-    duplicates = _duplicate_audio_candidates(config.name, s3.get_file_list(bucket, prefix, False))
+    bucket, prefix = storage_prefix(config)
+    duplicates = _duplicate_audio_candidates(
+        config.name, storage.get_file_list(bucket, prefix, without_extensions=False)
+    )
     for name in duplicates:
         key = f"{prefix}/{name}"
         label = "would delete duplicate" if dry_run else "deleted duplicate"
         sys.stdout.write(f"  {label}: {bucket}/{key}\n")
         if not dry_run:
-            _delete_key(s3, bucket, key)
+            _delete_key(storage, bucket, key)
     return len(duplicates)
 
 
-def _run_cleanup(
+def _run_cleanup(  # noqa: PLR0913
     configs: list[Any],
-    s3: Any,
+    ctx: AppContext,
     dry_run: bool,
     refresh_sources: bool,
     prune_duplicates: bool,
     verbose: bool = False,
 ) -> None:
-    from adrift.services.catalog.merge import merge_config
+    from adrift.core.services.catalog.merge import merge_config  # noqa: PLC0415
 
+    storage = cast("Any", ctx.storage)
     total_unmatched_found = 0
     total_missing = 0
     total_duplicates = 0
     for config in configs:
-        result = merge_config(config, refresh_sources=refresh_sources)
+        result = merge_config(
+            config,
+            refresh_sources=refresh_sources,
+            episode_source_factory=ctx.episode_source_factory,
+            alignment_provider=ctx.alignment_provider,
+        )
         unmatched = _unmatched_indices(result.pairs, len(result.downloads))
         sys.stdout.write(f"\n{config.name}: {len(unmatched)} unmatched download(s)\n")
         if unmatched:
-            found, missing = _process_unmatched(result, s3, dry_run, verbose=verbose)
+            found, missing = _process_unmatched(result, storage, dry_run, verbose=verbose)
             total_unmatched_found += found
             total_missing += missing
         if prune_duplicates:
-            duplicate_count = _process_duplicate_audio_files(config, s3, dry_run)
+            duplicate_count = _process_duplicate_audio_files(config, storage, dry_run)
             total_duplicates += duplicate_count
             if duplicate_count:
                 sys.stdout.write(f"  duplicate object(s): {duplicate_count}\n")
@@ -179,13 +190,13 @@ def _run_cleanup(
     total_removed = total_unmatched_found + total_duplicates
     sys.stderr.write(
         f"\n{summary} {total_removed} file(s): {total_unmatched_found} unmatched, "
-        f"{total_duplicates} duplicate. {total_missing} not found on S3.\n"
+        f"{total_duplicates} duplicate. {total_missing} not found in storage.\n"
     )
     if dry_run and total_removed > 0:
         sys.stderr.write("Run with --no-dry-run to actually delete.\n")
 
 
-def _run(
+def _run(  # noqa: PLR0913
     include: IncludeConfigsOption = None,
     skip_schedule_filter: SkipScheduleFilterOption = False,
     tags: TagsOption = None,
@@ -211,13 +222,13 @@ def _run(
         ),
     ] = False,
 ) -> None:
-    from adrift.services.context import AppContext
+    from adrift.cli.composition import build_app_context  # noqa: PLC0415
 
-    configs, _ = bootstrap_run_configs(include, tags, skip_schedule_filter)
-    ctx = AppContext.from_env()
+    configs, _ = bootstrap_run_configs(include, tags, skip_schedule_filter=skip_schedule_filter)
+    ctx = build_app_context()
     _run_cleanup(
         configs,
-        cast(Any, ctx.s3),
+        ctx,
         dry_run,
         refresh_sources,
         prune_duplicates,

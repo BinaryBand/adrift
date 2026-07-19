@@ -1,4 +1,5 @@
 {
+  "python.defaultInterpreterPath": "/home/nator/Documents/Dev/adrift/adrift/.venv/bin/python",
   "files.exclude": {
     "**/__pycache__": true,
     "**/.cache": true,

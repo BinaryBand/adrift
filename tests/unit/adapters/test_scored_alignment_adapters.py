@@ -5,7 +5,7 @@ import pytest
 
 from adrift.adapters import get_scored_alignment_adapter
 from adrift.adapters.process.alignment import RustScoredAlignmentAdapter
-from adrift.models.alignment_batch import AlignmentBatch, AlignmentBatchConfig
+from adrift.core.models.alignment_batch import AlignmentBatch, AlignmentBatchConfig
 
 
 def _empty_batch() -> AlignmentBatch:
@@ -43,12 +43,14 @@ def test_rust_adapter_uses_prototype_when_extension_missing() -> None:
 
 def test_rust_adapter_raises_helpful_error_when_no_backend_is_available() -> None:
     adapter = RustScoredAlignmentAdapter()
-    with patch(
-        "adrift.adapters.process.alignment.rust_scored.import_module",
-        side_effect=ModuleNotFoundError("missing"),
+    with (
+        patch(
+            "adrift.adapters.process.alignment.rust_scored.import_module",
+            side_effect=ModuleNotFoundError("missing"),
+        ),
+        pytest.raises(RuntimeError, match="adrift_rust_alignment"),
     ):
-        with pytest.raises(RuntimeError, match="adrift_rust_alignment"):
-            adapter.align_batch(_empty_batch())
+        adapter.align_batch(_empty_batch())
 
 
 def test_rust_adapter_uses_extension_align_batch_callable() -> None:

@@ -4,11 +4,11 @@ from __future__ import annotations
 
 import logging
 from pathlib import Path
-from typing import TYPE_CHECKING, Any, cast
+from typing import TYPE_CHECKING
 
 from adrift.models import PodcastConfig, RssChannel, RssEpisode
 from adrift.services.catalog import match, process_feeds
-from adrift.services.download_client import s3_prefix
+from adrift.services.download_client import storage_prefix
 from adrift.services.files.audio import is_audio
 from adrift.services.web.rss import podcast_to_rss
 
@@ -64,14 +64,13 @@ def _apply_pairs(
     return matched
 
 
-def _match_to_s3(
+def _match_to_storage(
     config: PodcastConfig,
     episodes: list[RssEpisode],
     ctx: AppContext,
 ) -> list[RssEpisode]:
-    bucket, prefix = s3_prefix(config)
-    s3 = cast(Any, ctx.s3)
-    files = _audio_files(s3.get_s3_files(bucket, prefix))
+    bucket, prefix = storage_prefix(config)
+    files = _audio_files(ctx.storage.get_public_urls(bucket, prefix))
     if not files:
         return []
 
@@ -88,16 +87,16 @@ def _upload_rss(bucket: str, prefix: str, rss_xml: str, ctx: AppContext) -> None
         f.write(rss_xml.encode())
         tmp_path = Path(f.name)
     try:
-        cast(Any, ctx.s3).upload_file((bucket, f"{prefix}/feed.rss"), tmp_path)
+        ctx.storage.upload_file((bucket, f"{prefix}/feed.rss"), tmp_path)
     finally:
         tmp_path.unlink(missing_ok=True)
 
 
 def update_rss(config: PodcastConfig, ctx: AppContext) -> None:
-    bucket, prefix = s3_prefix(config)
+    bucket, prefix = storage_prefix(config)
     channel = _build_channel(config)
     ref_episodes = process_feeds(config)
-    matched = _match_to_s3(config, ref_episodes, ctx)
+    matched = _match_to_storage(config, ref_episodes, ctx)
     if not matched:
         # A transient source-fetch failure produces an empty build (no episodes,
         # often no channel image). Publishing it would overwrite a previously

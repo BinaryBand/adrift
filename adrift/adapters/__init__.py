@@ -3,31 +3,38 @@
 Lazy imports inside factory functions prevent circular imports for adapters
 whose dependencies may import back into this package (alignment, secrets).
 Episode-source adapters are safe to import eagerly -- they only depend on
-adrift.models -- and MUST be eager so that ThreadPoolExecutor workers never
+adrift.core.models -- and MUST be eager so that ThreadPoolExecutor workers never
 race on Python's per-module _ModuleLock.
 """
 
 import os
 from collections.abc import Callable
+from pathlib import Path
 
 from adrift.adapters.process.episode_sources.episode_source_rss import RssEpisodeSourceAdapter
 from adrift.adapters.process.episode_sources.episode_source_youtube import (
     YouTubeEpisodeSourceAdapter,
 )
-from adrift.models import FeedSource
-from adrift.models.ports import (
+from adrift.core.models import FeedSource
+from adrift.core.ports import (
+    AlignmentBackendProviderPort,
+    Callback,
+    EpisodeSourceFactoryPort,
     EpisodeSourcePort,
     ScoredAlignmentBatchPort,
     ScoredAlignmentPort,
     SecretProviderPort,
+    StoragePort,
+    VideoDownloaderPort,
 )
-from adrift.utils.text import is_youtube_channel
+from adrift.core.util.text import is_youtube_channel
 
 
 def _require_source_url(source: FeedSource) -> str:
     url = source.url
     if not url:
-        raise ValueError("FeedSource URL is required")
+        msg = "FeedSource URL is required"
+        raise ValueError(msg)
     return url
 
 
@@ -87,7 +94,8 @@ def _build_selected_provider(provider_name: str | None) -> tuple[str, SecretProv
     selected = _selected_provider_name(provider_name)
     factory = _SECRET_PROVIDER_REGISTRY.get(selected)
     if factory is None:
-        raise ValueError(f"Unsupported secret provider: {selected}")
+        msg = f"Unsupported secret provider: {selected}"
+        raise ValueError(msg)
     return selected, factory()
 
 
@@ -97,6 +105,34 @@ def get_secret_provider_adapter(
     """Return the configured secret provider adapter instance."""
     _selected, provider = _build_selected_provider(provider_name)
     return provider
+
+
+# --- Storage registry ---------------------------------------------------
+# Maps backend name → factory function.  Adding a new backend = one new
+# entry here; get_storage_adapter is never modified.
+
+
+def _make_local_storage() -> StoragePort:
+    from adrift.adapters.process.storage.local_storage import LocalFilesystemStorage
+
+    # STORAGE_ROOT: root for storage writes (<root>/<bucket>/<key>); in
+    # production an rclone mount point synced and served outside this app.
+    return LocalFilesystemStorage(Path(os.getenv("STORAGE_ROOT", "./storage")))
+
+
+_STORAGE_REGISTRY: dict[str, Callable[[], StoragePort]] = {
+    "local": _make_local_storage,
+}
+
+
+def get_storage_adapter(backend_name: str | None = None) -> StoragePort:
+    """Return the configured storage adapter instance."""
+    selected = (backend_name or os.getenv("ADRIFT_STORAGE_BACKEND") or "local").lower()
+    factory = _STORAGE_REGISTRY.get(selected)
+    if factory is None:
+        msg = f"Unsupported storage backend: {selected}"
+        raise ValueError(msg)
+    return factory()
 
 
 def _make_optimized_scored_alignment_adapter() -> ScoredAlignmentPort:
@@ -145,5 +181,51 @@ def get_scored_alignment_adapter(
 
     factory = _SCORED_ALIGNMENT_REGISTRY.get(selected)
     if factory is None:
-        raise ValueError(f"Unsupported alignment backend: {selected}")
+        msg = f"Unsupported alignment backend: {selected}"
+        raise ValueError(msg)
     return factory()
+
+
+# --- Injectable factory/provider adapters -----------------------------------
+# These wrap the registry accessors above as port implementations so core
+# use-cases can receive them via injection instead of importing this package.
+
+
+class RegistryEpisodeSourceFactory:
+    """EpisodeSourceFactoryPort backed by the source registry."""
+
+    def get(self, source: FeedSource) -> EpisodeSourcePort:
+        return get_episode_source_adapter(source)
+
+
+class RegistryAlignmentBackendProvider:
+    """AlignmentBackendProviderPort backed by the alignment registry."""
+
+    def get(
+        self, backend_name: str | None = None
+    ) -> ScoredAlignmentPort | ScoredAlignmentBatchPort | None:
+        return get_scored_alignment_adapter(backend_name)
+
+
+class YtDlpVideoDownloader:
+    """VideoDownloaderPort backed by the yt-dlp downloader."""
+
+    def download(self, url: str, dest: Path, callback: Callback | None = None) -> Path | None:
+        from adrift.adapters.process.youtube.downloader import download_video
+
+        return download_video(url, dest, callback=callback)
+
+
+def get_episode_source_factory() -> EpisodeSourceFactoryPort:
+    """Return the injectable episode-source factory port."""
+    return RegistryEpisodeSourceFactory()
+
+
+def get_alignment_backend_provider() -> AlignmentBackendProviderPort:
+    """Return the injectable alignment-backend provider port."""
+    return RegistryAlignmentBackendProvider()
+
+
+def get_video_downloader() -> VideoDownloaderPort:
+    """Return the injectable video-downloader port."""
+    return YtDlpVideoDownloader()

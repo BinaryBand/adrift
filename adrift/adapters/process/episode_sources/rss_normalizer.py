@@ -2,16 +2,18 @@
 
 from __future__ import annotations
 
-from datetime import datetime, timezone
-from typing import cast
+from datetime import UTC, datetime
+from typing import TYPE_CHECKING, cast
 
 from dateutil import parser
-from feedparser import FeedParserDict
 
-from adrift.models import RssChannel, RssEpisode
-from adrift.utils.image import extract_image_from_feedparser
-from adrift.utils.media import AUDIO_EXTENSIONS, parse_duration
-from adrift.utils.regex import LINK_REGEX
+from adrift.core.models import RssChannel, RssEpisode
+from adrift.core.util.image import extract_image_from_feedparser
+from adrift.core.util.media import AUDIO_EXTENSIONS, parse_duration
+from adrift.core.util.regex import LINK_REGEX
+
+if TYPE_CHECKING:
+    from feedparser import FeedParserDict
 
 
 def _getattr_multi(obj: object, *fields: str, default: object = "") -> object:
@@ -39,7 +41,8 @@ def episode_from_feedparser(entry: FeedParserDict) -> RssEpisode:
     episode_id, title, author, description = _entry_basic_fields(entry)
     content = _extract_content_url(entry)
     if content is None:
-        raise ValueError("No valid audio content URL found")
+        msg = "No valid audio content URL found"
+        raise ValueError(msg)
 
     return RssEpisode(
         id=episode_id,
@@ -65,10 +68,10 @@ def entry_pub_date_from_feedparser(entry: FeedParserDict) -> datetime | None:
 
 
 def _extract_image_url(channel: FeedParserDict) -> str:
-    val = extract_image_from_feedparser(cast(object, channel.get("image")))
+    val = extract_image_from_feedparser(cast("object", channel.get("image")))
     if val:
         return val
-    return extract_image_from_feedparser(cast(object, channel.get("itunes_image")))
+    return extract_image_from_feedparser(cast("object", channel.get("itunes_image")))
 
 
 def _pick_channel_field(channel: FeedParserDict, *names: str) -> str:
@@ -107,7 +110,7 @@ def _collect_enclosure_strings(entry: FeedParserDict) -> list[str]:
 
 def _extract_urls_from_enclosures(content: object) -> list[str]:
     urls: list[str] = []
-    enclosures = cast(list[object], content) if isinstance(content, list) else []
+    enclosures = cast("list[object]", content) if isinstance(content, list) else []
     for enclosure in enclosures:
         urls.extend(LINK_REGEX.findall(_enclosure_value(enclosure)))
     return urls
@@ -137,11 +140,12 @@ def _parse_entry_pub_date(entry: FeedParserDict) -> datetime | None:
         if not isinstance(pub_date_str, str):
             return None
         pub_date = parser.parse(pub_date_str)
-        if pub_date.tzinfo is None:
-            return pub_date.replace(tzinfo=timezone.utc)
-        return pub_date
     except (ValueError, TypeError, AttributeError):
         return None
+    else:
+        if pub_date.tzinfo is None:
+            return pub_date.replace(tzinfo=UTC)
+        return pub_date
 
 
 def _parse_entry_duration(entry: FeedParserDict) -> float | None:
@@ -170,7 +174,7 @@ def _parse_entry_image(entry: FeedParserDict) -> str | None:
 
 __all__ = [
     "channel_from_feedparser",
-    "episode_from_feedparser",
     "entry_pub_date_from_feedparser",
     "entry_title_from_feedparser",
+    "episode_from_feedparser",
 ]

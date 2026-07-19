@@ -19,7 +19,7 @@
 
 [[podcasts]]
 name = "Alyssa Grenfell"
-path = "/media/podcasts/alyssa-grenfell"
+path = "/Podcasts/alyssa-grenfell"
 schedule = ["FREQ=WEEKLY;BYDAY=FR,WE,MO"]
 tags = ["youtube", "alyssa-grenfell"]
 
@@ -32,7 +32,7 @@ url = "yt://@alyssadgrenfell"
 
 [[podcasts]]
 name = "Coffeezilla"
-path = "/media/podcasts/coffeezilla"
+path = "/Podcasts/coffeezilla"
 schedule = ["FREQ=WEEKLY;BYDAY=MO,TH,WE"]
 tags = ["youtube", "coffeezilla"]
 
@@ -45,7 +45,7 @@ url = "yt://@Coffeezilla"
 
 [[podcasts]]
 name = "Heather Cox Richardson"
-path = "/media/podcasts/heather-cox-richardson"
+path = "/Podcasts/heather-cox-richardson"
 schedule = ["FREQ=WEEKLY;BYDAY=FR,SA"]
 tags = ["youtube", "heather-cox-richardson"]
 
@@ -58,7 +58,7 @@ url = "yt://@HeatherCoxRichardson"
 
 [[podcasts]]
 name = "Jay Bird"
-path = "/media/podcasts/jay-bird"
+path = "/Podcasts/jay-bird"
 schedule = ["FREQ=WEEKLY;BYDAY=TU,TH,WE"]
 tags = ["youtube", "jay-bird"]
 
@@ -71,7 +71,7 @@ url = "yt://@jaybird160"
 
 [[podcasts]]
 name = "Last Week Tonight With John Oliver"
-path = "/media/podcasts/last-week-tonight-with-john-oliver"
+path = "/Podcasts/last-week-tonight-with-john-oliver"
 schedule = ["FREQ=WEEKLY;BYDAY=MO"]
 tags = ["youtube", "last-week-tonight-with-john-oliver"]
 
@@ -88,7 +88,7 @@ exclude = ["^s\\d{1,2}\\s*[-:]?\\s*e\\d{1,2}\\b"]
 
 [[podcasts]]
 name = "Lisa Sonni"
-path = "/media/podcasts/lisa-sonni"
+path = "/Podcasts/lisa-sonni"
 schedule = ["FREQ=WEEKLY;BYDAY=SA,WE,TH"]
 tags = ["youtube", "lisa-sonni"]
 
@@ -101,7 +101,7 @@ url = "yt://@lisasonni"
 
 [[podcasts]]
 name = "Legal Eagle"
-path = "/media/podcasts/legal-eagle"
+path = "/Podcasts/legal-eagle"
 schedule = ["FREQ=WEEKLY;BYDAY=FR,WE,MO"]
 tags = ["youtube", "legal-eagle"]
 
@@ -114,7 +114,7 @@ url = "yt://@LegalEagle"
 
 [[podcasts]]
 name = "Paul J Warburg"
-path = "/media/podcasts/paul-j-warburg"
+path = "/Podcasts/paul-j-warburg"
 schedule = ["FREQ=WEEKLY;BYDAY=SA,TH,FR"]
 tags = ["youtube", "paul-j-warburg"]
 
@@ -127,7 +127,7 @@ url = "yt://@PaulJWarburg"
 
 [[podcasts]]
 name = "YV Edit"
-path = "/media/podcasts/yv-edit"
+path = "/Podcasts/yv-edit"
 schedule = ["FREQ=WEEKLY;BYDAY=TH,SA,FR"]
 tags = ["youtube", "yv-edit"]
 

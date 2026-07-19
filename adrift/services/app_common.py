@@ -2,11 +2,10 @@
 import glob
 import os
 import random
+import tomllib
 from datetime import datetime, timedelta
 from pathlib import Path
 from typing import cast
-
-import tomllib
 
 from adrift.models import (
     FeedSource,

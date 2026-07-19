@@ -8,45 +8,41 @@ This module handles:
 
 from __future__ import annotations
 
+import logging
 import os
 import subprocess
 import sys
 from importlib import import_module
 from pathlib import Path
 
+logger = logging.getLogger(__name__)
+
 _EXTENSION_MODULE = "adrift_rust_alignment"
 _MANIFEST_PATH = "rust/adrift_rust_alignment/Cargo.toml"
+
+_compile_result: bool | None = None
 
 
 def can_load_rust_extension() -> bool:
     """Check if the Rust extension can be imported."""
     try:
         import_module(_EXTENSION_MODULE)
-        return True
     except ModuleNotFoundError:
         return False
+    else:
+        return True
 
 
 def should_skip_rust_compilation() -> bool:
     """Check if Rust compilation should be skipped."""
     skip_vars = ["ADRIFT_SKIP_RUST_COMPILE", "SKIP_RUST_COMPILE"]
-    for var in skip_vars:
-        if os.getenv(var, "").lower() in ("1", "true", "yes"):
-            return True
-    return False
+    return any(os.getenv(var, "").lower() in ("1", "true", "yes") for var in skip_vars)
 
 
-def try_compile_rust_extension() -> bool:
-    """Try to compile the Rust extension using maturin.
-
-    Returns True if compilation succeeded or extension is already available.
-    """
-    if can_load_rust_extension():
-        return True
-    if should_skip_rust_compilation() or not Path(_MANIFEST_PATH).exists():
-        return False
+def _run_maturin_compile() -> bool:
+    """Invoke maturin to build the extension; log and return the outcome."""
     try:
-        result = subprocess.run(
+        result = subprocess.run(  # noqa: S603
             [
                 sys.executable,
                 "-m",
@@ -59,10 +55,43 @@ def try_compile_rust_extension() -> bool:
             capture_output=True,
             text=True,
             timeout=300,
+            check=False,
         )
-        return result.returncode == 0 and can_load_rust_extension()
-    except (subprocess.TimeoutExpired, FileNotFoundError, OSError):
+        succeeded = result.returncode == 0 and can_load_rust_extension()
+        if not succeeded:
+            logger.warning(
+                "Rust alignment extension compile failed; falling back to Python. %s",
+                result.stderr.strip()[-2000:],
+            )
+    except (subprocess.TimeoutExpired, FileNotFoundError, OSError) as exc:
+        logger.warning(
+            "Rust alignment extension compile errored (%s); falling back to Python.", exc
+        )
         return False
+    else:
+        return succeeded
+
+
+def try_compile_rust_extension() -> bool:
+    """Try to compile the Rust extension using maturin.
+
+    Returns True if compilation succeeded or extension is already available.
+    The outcome is cached per-process so a failing compile is only attempted
+    once, instead of re-running the maturin subprocess on every call.
+    """
+    global _compile_result  # noqa: PLW0603
+    if _compile_result is not None:
+        return _compile_result
+    if can_load_rust_extension():
+        _compile_result = True
+        return True
+    if should_skip_rust_compilation() or not Path(_MANIFEST_PATH).exists():
+        _compile_result = False
+        return False
+
+    logger.info("Rust alignment extension not found; compiling via maturin...")
+    _compile_result = _run_maturin_compile()
+    return _compile_result
 
 
 def should_use_rust_backend() -> bool:
@@ -75,7 +104,21 @@ def should_use_rust_backend() -> bool:
     if explicit_backend:
         return explicit_backend == "rust"
 
-    if try_compile_rust_extension():
-        return True
+    return try_compile_rust_extension()
 
-    return False
+
+def ensure_rust_alignment_backend() -> bool:
+    """Guard called by CLI runners before the alignment stage.
+
+    Make sure the Rust extension is compiled if possible, logging which
+    engine will run.
+
+    Returns True if Rust will be used, False if callers should expect the
+    pure-Python fallback.
+    """
+    using_rust = should_use_rust_backend()
+    if using_rust:
+        logger.info("Alignment backend: Rust")
+    else:
+        logger.info("Alignment backend: Python (Rust unavailable)")
+    return using_rust

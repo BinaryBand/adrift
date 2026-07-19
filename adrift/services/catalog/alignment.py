@@ -11,17 +11,21 @@ import requests
 from diskcache import Cache
 from rapidfuzz import fuzz
 
-from adrift.models import AlignmentConfig, EpisodeData, RssEpisode
-from adrift.models.alignment_batch import (
+from adrift.core.models import AlignmentConfig, EpisodeData, RssEpisode
+from adrift.core.models.alignment_batch import (
     AlignmentBatch,
     AlignmentBatchConfig,
     AlignmentEpisodeRecord,
 )
-from adrift.utils.alignment_pairs import AlignmentResult, AlignmentScores, select_alignment_pairs
-from adrift.utils.profiler import profile, profile_block
-from adrift.utils.progress import Callback
-from adrift.utils.text import normalize_text
-from adrift.utils.title_normalization import normalize_title
+from adrift.core.util.alignment_pairs import (
+    AlignmentResult,
+    AlignmentScores,
+    select_alignment_pairs,
+)
+from adrift.core.util.profiler import profile, profile_block
+from adrift.core.util.progress import Callback
+from adrift.core.util.text import normalize_text
+from adrift.core.util.title_normalization import normalize_title
 
 StringSimilarityFn = Callable[[list[str], list[str]], list[list[float]]]
 
@@ -835,7 +839,7 @@ def _best_thumbnail(a: str | None, b: str | None) -> str | None:
     candidates = [url for url in (a, b) if url]
     if not candidates:
         return None
-    best = cast(str, max(candidates, key=_thumbnail_rank))
+    best = max(candidates, key=_thumbnail_rank)
     return _resolve_fragile_thumbnail(best, candidates)
 
 

@@ -1,0 +1,20 @@
+id: no-cross-layer-init-reexport
+language: python
+severity: error
+message: "Do not re-export symbols from a sibling adrift layer in __init__.py; import from the canonical source directly."
+note: >
+  Shim packages add indirection with no value. Relative imports (from .module)
+  for aggregation within your own package are always fine. Excluded by design:
+  adrift/adapters/__init__.py (registry with real logic), adrift/cli/__init__.py
+  (shared CLI constants and types), and adrift/core/models (pure data layer). To
+  add a new layer, append its name to the regex below.
+files:
+  - adrift/**/__init__.py
+ignores:
+  - adrift/__init__.py
+  - adrift/core/models/**/__init__.py
+  - adrift/adapters/__init__.py
+  - adrift/cli/__init__.py
+rule:
+  kind: import_from_statement
+  regex: '^from adrift\.(adapters|cli|core)\b'

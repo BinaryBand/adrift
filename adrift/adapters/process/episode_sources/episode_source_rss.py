@@ -7,6 +7,7 @@ import feedparser
 import requests
 from diskcache import Cache
 from feedparser import FeedParserDict
+from typing_extensions import override
 
 from adrift.adapters.process.cache_retry import RaceAwareCacheWrapper
 from adrift.adapters.process.episode_sources.rss_normalizer import (
@@ -15,11 +16,11 @@ from adrift.adapters.process.episode_sources.rss_normalizer import (
     entry_title_from_feedparser,
     episode_from_feedparser,
 )
-from adrift.models import FeedSource, RssChannel, RssEpisode
-from adrift.models.ports import EpisodeSourceFetchContext, EpisodeSourcePort
-from adrift.utils.progress import Callback
-from adrift.utils.regex import LINK_REGEX, re_compile
-from adrift.utils.schedule import rrule_occurrence_exists
+from adrift.core.models import FeedSource, RssChannel, RssEpisode
+from adrift.core.ports import EpisodeSourceFetchContext, EpisodeSourcePort
+from adrift.core.util.progress import Callback
+from adrift.core.util.regex import LINK_REGEX, re_compile
+from adrift.core.util.schedule import rrule_occurrence_exists
 
 _RSS_HTTP_CACHE_PREFIX = "rss:http:"
 _RSS_PARSED_CACHE_PREFIX = "rss:parsed:"
@@ -120,8 +121,7 @@ def get_rss_channel(rss_url: str) -> RssChannel:
     feed_str = _fetch_rss_feed_str(rss_url)
     feed: FeedParserDict = feedparser.parse(feed_str)
     if feed.bozo and hasattr(feed, "bozo_exception"):
-        issue = feed.get("bozo_exception")
-        print(f"WARNING: RSS feed may have issues: {issue}")
+        feed.get("bozo_exception")
     return channel_from_feedparser(feed.feed)
 
 
@@ -201,7 +201,8 @@ def get_rss_episodes(
 ) -> list[RssEpisode]:
     """Parse RSS feed and extract episode information for a podcast."""
     if not LINK_REGEX.match(url):
-        raise ValueError("Invalid RSS feed url or file path")
+        msg = "Invalid RSS feed url or file path"
+        raise ValueError(msg)
     r_rules = r_rules or []
     cache_key = _rss_http_cache_key(url, filter, r_rules)
     feed_str = _fetch_rss_feed_str(url, cache_key=cache_key)
@@ -213,7 +214,9 @@ def get_rss_episodes(
         return cached_episodes
     parsed = feedparser.parse(feed_str)
     raw_entries = getattr(parsed, "entries", [])
-    entries_list = cast(list[FeedParserDict], raw_entries) if isinstance(raw_entries, list) else []
+    entries_list = (
+        cast("list[FeedParserDict]", raw_entries) if isinstance(raw_entries, list) else []
+    )
     entries = _filter_feed_entries(entries_list, filter, r_rules)
     episodes = _parse_feed_entries(entries, callback)
     _store_cached_episodes(parsed_key, episodes)
@@ -223,6 +226,7 @@ def get_rss_episodes(
 class RssEpisodeSourceAdapter(EpisodeSourcePort):
     """Adapter for fetching episodes from RSS feeds."""
 
+    @override
     def fetch_episodes(
         self,
         source: FeedSource,
@@ -232,15 +236,18 @@ class RssEpisodeSourceAdapter(EpisodeSourcePort):
         resolved_context = context or EpisodeSourceFetchContext()
         url = source.url
         if not url:
-            raise ValueError("FeedSource URL is required for RSS episode fetching")
+            msg = "FeedSource URL is required for RSS episode fetching"
+            raise ValueError(msg)
 
         filter_regex = source.filters.to_regex() if source.filters else None
         r_rules = source.filters.r_rules if source.filters else None
         return get_rss_episodes(url, filter_regex, r_rules, resolved_context.callback)
 
+    @override
     def fetch_channel(self, source: FeedSource) -> RssChannel:
         """Fetch channel metadata from an RSS feed."""
         url = source.url
         if not url:
-            raise ValueError("FeedSource URL is required for RSS channel fetching")
+            msg = "FeedSource URL is required for RSS channel fetching"
+            raise ValueError(msg)
         return get_rss_channel(url)

@@ -157,34 +157,30 @@ def test_process_unmatched_skips_slug_collisions_with_matched_downloads(
         pairs=pairs,
     )
 
-    class _S3Stub:
+    class _StorageStub:
         def __init__(self) -> None:
             self.deleted: list[str] = []
 
         def exists(self, bucket: str, key_prefix: str) -> str | None:
             _ = bucket
-            return f"{key_prefix.split('/')[-1]}.opus"
+            return f"{key_prefix.rsplit('/', maxsplit=1)[-1]}.opus"
 
-        def get_client(self) -> SimpleNamespace:
-            return SimpleNamespace(delete_object=self._delete_object)
+        def delete(self, bucket: str, key: str) -> None:
+            _ = bucket
+            self.deleted.append(key)
 
-        def _delete_object(self, *, Bucket: str, Key: str) -> None:
-            _ = Bucket
-            self.deleted.append(Key)
-
-        def invalidate_file_map_cache(self, bucket: str, key: str) -> None:
-            _ = (bucket, key)
-
-    s3 = _S3Stub()
+    storage = _StorageStub()
     with (
         patch.object(
             cleanup_mod,
-            "_resolve_s3_key",
-            lambda s3, bucket, prefix, slug: f"{prefix}/{slug}.opus",
+            "_resolve_storage_key",
+            lambda storage, bucket, prefix, slug: f"{prefix}/{slug}.opus",
         ),
-        patch("adrift.services.download_client.s3_prefix", return_value=("bucket", "prefix")),
+        patch(
+            "adrift.core.services.download_client.storage_prefix", return_value=("bucket", "prefix")
+        ),
     ):
-        found, missing = cleanup_mod._process_unmatched(result, s3, dry_run=False)
+        found, missing = cleanup_mod._process_unmatched(result, storage, dry_run=False)
 
     matched_slugs = _matched_download_slugs(result)
     expected_deleted = [
@@ -195,4 +191,4 @@ def test_process_unmatched_skips_slug_collisions_with_matched_downloads(
 
     assert missing == 0
     assert found == len(expected_deleted)
-    assert s3.deleted == expected_deleted
+    assert storage.deleted == expected_deleted

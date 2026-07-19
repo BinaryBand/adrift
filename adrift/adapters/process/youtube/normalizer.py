@@ -2,17 +2,16 @@
 
 from __future__ import annotations
 
-from datetime import datetime, timezone
-from typing import TYPE_CHECKING, Any
+from datetime import UTC, datetime
+from collections.abc import Callable
+from typing import Any
 
-from adrift.utils.image import extract_image_from_ytdlp, extract_image_from_ytdlp_list
-from adrift.utils.progress import Callback
+from adrift.core.models import RssChannel, RssEpisode, YtDlpVideo
+from adrift.core.util.image import extract_image_from_ytdlp, extract_image_from_ytdlp_list
+from adrift.core.util.progress import Callback
 
 extract_image_url = extract_image_from_ytdlp
 extract_image_from_list = extract_image_from_ytdlp_list
-
-if TYPE_CHECKING:
-    from adrift.models import RssChannel, RssEpisode, YtDlpVideo
 
 _PROGRESS_HOOK_ERRORS = (OSError, RuntimeError, TypeError, ValueError)
 
@@ -21,26 +20,29 @@ _PROGRESS_HOOK_ERRORS = (OSError, RuntimeError, TypeError, ValueError)
 # ============================================================================
 
 
-def unix_timestamp_to_datetime(raw: Any) -> datetime | None:
+def unix_timestamp_to_datetime(raw: Any) -> datetime | None:  # noqa: ANN401
     """Convert unix timestamp (int, float, or numeric string) to datetime."""
     if isinstance(raw, (int, float)):
-        return datetime.fromtimestamp(float(raw), tz=timezone.utc)
+        return datetime.fromtimestamp(float(raw), tz=UTC)
     if isinstance(raw, str) and raw.isdigit():
-        return datetime.fromtimestamp(float(raw), tz=timezone.utc)
+        return datetime.fromtimestamp(float(raw), tz=UTC)
     return None
 
 
-def parse_upload_date_string(raw: Any) -> datetime | None:
+_UPLOAD_DATE_LENGTH = 8
+
+
+def parse_upload_date_string(raw: float | str | None) -> datetime | None:
     """Parse YYYYMMDD format string to datetime."""
-    if not isinstance(raw, str) or len(raw) != 8 or not raw.isdigit():
+    if not isinstance(raw, str) or len(raw) != _UPLOAD_DATE_LENGTH or not raw.isdigit():
         return None
     try:
-        return datetime.strptime(raw, "%Y%m%d").replace(tzinfo=timezone.utc)
+        return datetime.strptime(raw, "%Y%m%d").replace(tzinfo=UTC)
     except ValueError:
         return None
 
 
-def coerce_str(*values: Any) -> str:
+def coerce_str(*values: Any) -> str:  # noqa: ANN401
     """Return the first truthy value as a string, or empty string.
 
     Used to implement fallback chains for string fields in normalized conversions.
@@ -57,13 +59,10 @@ def ytdlp_pub_date(data: YtDlpVideo | dict[str, Any]) -> datetime | None:
     Accepts either a validated YtDlpVideo model or a raw dict; attempts
     to parse timestamp, release_timestamp, or upload_date in that order.
     """
-    from adrift.models import YtDlpVideo as YtDlpVideoModel
+    from adrift.core.models import YtDlpVideo as YtDlpVideoModel  # noqa: PLC0415
 
     mapping: dict[str, Any]
-    if isinstance(data, YtDlpVideoModel):
-        mapping = data.model_dump()
-    else:
-        mapping = data
+    mapping = data.model_dump() if isinstance(data, YtDlpVideoModel) else data
 
     for key in ("timestamp", "release_timestamp"):
         if dt := unix_timestamp_to_datetime(mapping.get(key)):
@@ -73,7 +72,7 @@ def ytdlp_pub_date(data: YtDlpVideo | dict[str, Any]) -> datetime | None:
 
 def ensure_ytdlp_model(data: YtDlpVideo | dict[str, Any]) -> YtDlpVideo:
     """Ensure data is a YtDlpVideo model; convert dict if needed."""
-    from adrift.models import YtDlpVideo as YtDlpVideoModel
+    from adrift.core.models import YtDlpVideo as YtDlpVideoModel  # noqa: PLC0415
 
     if isinstance(data, YtDlpVideoModel):
         return data
@@ -85,7 +84,7 @@ def ensure_ytdlp_model(data: YtDlpVideo | dict[str, Any]) -> YtDlpVideo:
 # ============================================================================
 
 
-def make_progress_hook(callback: Callback | None = None):
+def make_progress_hook(callback: Callback | None = None) -> Callable[[dict[str, Any]], None] | None:
     """Create a yt-dlp progress_hook callback that reports download progress.
 
     Returns a hook function that extracts progress tuples (current, total)
@@ -124,7 +123,7 @@ def extract_progress_update(download: dict[str, Any]) -> tuple[int, int | None] 
     return _fragment_progress_update(download)
 
 
-def _coerce_int(value: Any) -> int | None:
+def _coerce_int(value: float | bool | None) -> int | None:  # noqa: FBT001
     """Safely coerce a value to int, handling bool/float/int/None cases."""
     if isinstance(value, bool):
         return None
@@ -172,7 +171,7 @@ def _finished_progress_update(download: dict[str, Any]) -> tuple[int, int] | Non
 # ============================================================================
 
 
-def _extract_channel_image(data: Any) -> str:
+def _extract_channel_image(data: Any) -> str:  # noqa: ANN401
     """Extract image URL from avatar/thumbnail data (list or string)."""
     if not data:
         return ""
@@ -181,9 +180,9 @@ def _extract_channel_image(data: Any) -> str:
     return extract_image_url(data)
 
 
-def rss_channel_from_ytdlp(data: "YtDlpVideo | dict[str, Any]", url: str) -> "RssChannel":
+def rss_channel_from_ytdlp(data: YtDlpVideo | dict[str, Any], url: str) -> RssChannel:
     """Create RssChannel from a yt-dlp extract_info response or raw dict."""
-    from adrift.models import RssChannel
+    from adrift.core.models import RssChannel  # noqa: PLC0415
 
     model = ensure_ytdlp_model(data)
     return RssChannel(
@@ -199,9 +198,9 @@ def rss_channel_from_ytdlp(data: "YtDlpVideo | dict[str, Any]", url: str) -> "Rs
     )
 
 
-def rss_episode_from_ytdlp(data: "YtDlpVideo | dict[str, Any]", author: str) -> "RssEpisode":
+def rss_episode_from_ytdlp(data: YtDlpVideo | dict[str, Any], author: str) -> RssEpisode:
     """Create RssEpisode from a yt-dlp video entry dict or model."""
-    from adrift.models import RssEpisode
+    from adrift.core.models import RssEpisode  # noqa: PLC0415
 
     model = ensure_ytdlp_model(data)
     video_id = coerce_str(model.id)
@@ -216,5 +215,5 @@ def rss_episode_from_ytdlp(data: "YtDlpVideo | dict[str, Any]", author: str) -> 
         duration=model.duration,
         pub_date=ytdlp_pub_date(model),
     )
-    episode._availability = availability
+    episode._availability = availability  # noqa: SLF001
     return episode

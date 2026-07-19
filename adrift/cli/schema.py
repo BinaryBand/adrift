@@ -4,7 +4,7 @@ from typing import Annotated
 
 import typer
 
-from adrift.services.schema_service import compile_config_schema
+from adrift.core.services.schema_service import compile_config_schema
 
 app = typer.Typer(add_completion=False, no_args_is_help=True, help="Schema tooling commands.")
 
@@ -16,7 +16,7 @@ def compile_command(
         typer.Option("--output", "-o", help="Output JSON schema path."),
     ] = "adrift/models/podcasts.schema.json",
 ) -> None:
-    """Compile JSON Schema for config/*.toml and write it to disk."""
+    """Compile JSON Schema for static/config/*.toml and write it to disk."""
     out = compile_config_schema(output)
     typer.echo(f"Wrote schema: {out}")
 

@@ -1,0 +1,118 @@
+rules:
+  - id: adrift-root-scaffold-only
+    # ── Portability ────────────────────────────────────────────────────────────
+    # To add a new top-level layer: add it to paths.exclude AND update the
+    # message text. To port to a different project: replace "adrift" in
+    # paths.include/exclude with your root package directory name.
+    # ──────────────────────────────────────────────────────────────────────────
+    message: >-
+      Only these top-level packages are allowed directly under adrift/: adapters, cli,
+      models, services, utils. Move this module or update the scaffold policy.
+    severity: ERROR
+    languages: [python]
+    paths:
+      include:
+        - /adrift/**/*.py
+      exclude:
+        - /adrift/adapters/**/*.py
+        - /adrift/cli/**/*.py
+        - /adrift/models/**/*.py
+        - /adrift/services/**/*.py
+        - /adrift/utils/**/*.py
+        - /adrift/__init__.py
+    pattern-regex: ^\s*(from|import|def|class|@|[A-Za-z_][\w]*\s*=)
+
+  - id: tests-unit-mirror-adrift-top-level-shape
+    # ── Portability ────────────────────────────────────────────────────────────
+    # To add a new layer: add both the /tests/unit/<layer>/**/*.py and
+    # **/tests/unit/<layer>/**/*.py forms to paths.exclude (both are required
+    # for Semgrep to match correctly under absolute and relative invocation
+    # paths in CI). Update the message text to list the new layer.
+    # To port to a different project: replace "tests/unit" with your test root
+    # and mirror whatever top-level directories you expose in adrift-root-scaffold-only.
+    # ──────────────────────────────────────────────────────────────────────────
+    message: >-
+      Keep tests/unit aligned with adrift top-level layers only: adapters, cli,
+      models, services, utils, and the audio adapter test slice. Add a new
+      adrift layer first, then mirror it in tests/unit deliberately.
+    severity: ERROR
+    languages: [python]
+    paths:
+      include:
+        - /tests/unit/**/*.py
+        - "**/tests/unit/**/*.py"
+      exclude:
+        - /tests/unit/__init__.py
+        - "**/tests/unit/__init__.py"
+        - /tests/unit/conftest.py
+        - "**/tests/unit/conftest.py"
+        - /tests/unit/adapters/**/*.py
+        - "**/tests/unit/adapters/**/*.py"
+        - /tests/unit/cli/**/*.py
+        - "**/tests/unit/cli/**/*.py"
+        - /tests/unit/models/**/*.py
+        - "**/tests/unit/models/**/*.py"
+        - /tests/unit/services/**/*.py
+        - "**/tests/unit/services/**/*.py"
+        - /tests/unit/utils/**/*.py
+        - "**/tests/unit/utils/**/*.py"
+    pattern-regex: ^\s*(from|import|def|class|@|[A-Za-z_][\w]*\s*=)
+
+  - id: adrift-adapters-shape
+    # ── Portability ────────────────────────────────────────────────────────────
+    # To add a new adapter sub-package: add its glob to paths.exclude and
+    # update the message. To port to a different project: replace "adrift/adapters"
+    # in paths.include/exclude with your adapter package path, and list your
+    # stable sub-package names in the exclude globs and message.
+    # ──────────────────────────────────────────────────────────────────────────
+    message: >-
+      Keep adrift.adapters limited to the current stable shape: config, lint,
+      process, reporting, errors.py, and package init files.
+    severity: ERROR
+    languages: [python]
+    paths:
+      include:
+        - /adrift/adapters/**/*.py
+      exclude:
+        - /adrift/adapters/__init__.py
+        - /adrift/adapters/errors.py
+        - /adrift/adapters/config/**/*.py
+        - /adrift/adapters/lint/**/*.py
+        - /adrift/adapters/process/**/*.py
+        - /adrift/adapters/reporting/**/*.py
+    pattern-regex: ^\s*(from|import|def|class|@|[A-Za-z_][\w]*\s*=)
+
+  - id: no-cross-layer-init-reexport
+    # ── Portability ────────────────────────────────────────────────────────────
+    # To adopt in a different project:
+    #   1. Replace "adrift" with your root package name in the two patterns.
+    #   2. Update the $LAYER regex to list your project's top-level sub-packages.
+    #   3. Update paths.include / paths.exclude to match your directory layout.
+    # Semgrep cannot derive the current file's own package at match time, so the
+    # root package name and layer list must be hardcoded per project.
+    # ──────────────────────────────────────────────────────────────────────────
+    message: >-
+      This __init__.py imports from a sibling adrift layer and re-exports the
+      symbols. Consumers should import from the canonical source directly; shim
+      packages add indirection with no value. Relative imports (from .module)
+      for aggregation within your own package are always fine. Excluded by
+      design: adrift/adapters/__init__.py (registry with real logic) and
+      adrift/cli/__init__.py (shared CLI constants and types). To add a new
+      layer, append its name to the $LAYER regex below.
+    severity: ERROR
+    languages: [python]
+    paths:
+      include:
+        - /adrift/**/__init__.py
+      exclude:
+        - /adrift/__init__.py
+        - /adrift/models/**/__init__.py
+        - /adrift/adapters/__init__.py
+        - /adrift/cli/__init__.py
+    patterns:
+      - pattern-either:
+          - pattern: from adrift.$LAYER import $X
+          - pattern: from adrift.$LAYER.$M import $X
+      - metavariable-regex:
+          metavariable: $LAYER
+          regex: ^(adapters|cli|models|services|utils)$

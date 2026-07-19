@@ -1,59 +1,68 @@
-[tool.poetry]
+[build-system]
+# Sanctioned divergence from the scaffold standard's `uv_build`: adrift ships
+# an in-process PyO3 extension (rust/adrift_rust_alignment/) compiled via
+# maturin. uv_build is pure Python and cannot compile native code, so it
+# cannot replace hatchling here without giving up the in-process fast path.
+# See docs/.PLAN.md D3a.
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
 name = "adrift"
 version = "0.1.0"
 description = "Podcast source aggregation and reference alignment"
 authors = []
-package-mode = true
-packages = [{ include = "adrift" }]
+requires-python = ">=3.11,<4.0"
+dependencies = [
+    "attrs~=26.1.0",
+    "pydantic~=2.12.5",
+    "feedparser~=6.0.12",
+    "python-dotenv~=1.2.2",
+    "requests~=2.33.1",
+    "tqdm~=4.67.3",
+    "yt-dlp~=2026.3.17",
+    "rapidfuzz~=3.14.3",
+    "numpy~=2.4.4",
+    "unidecode~=1.4.0",
+    "cachetools~=7.0.5",
+    "diskcache~=5.6.3",
+    "yarl~=1.23.0",
+    "python-dateutil~=2.9.0.post0",
+    "rich~=15.0.0",
+    "typer>=0.24.1,<0.25.0",
+    "typing-extensions~=4.16.0",
+]
 
-[tool.poetry.scripts]
-adrift = "adrift.cli.root:main"
+[project.scripts]
+adrift = "adrift.cli.main:main"
 adrift-cleanup = "adrift.cli.cleanup:main"
 adrift-download = "adrift.cli.download:main"
 adrift-merge = "adrift.cli.merge:main"
 adrift-schema = "adrift.cli.schema:main"
 
-[tool.poetry.dependencies]
-python = ">=3.11,<4.0"
-attrs = "~=26.1.0"
-pydantic = "~=2.12.5"
-feedparser = "~=6.0.12"
-python-dotenv = "~=1.2.2"
-requests = "~=2.33.1"
-tqdm = "~=4.67.3"
-yt-dlp = "~=2026.3.17"
-rapidfuzz = "~=3.14.3"
-numpy = "~=2.4.4"
-unidecode = "~=1.4.0"
-cachetools = "~=7.0.5"
-diskcache = "~=5.6.3"
-yarl = "~=1.23.0"
-python-dateutil = "~=2.9.0.post0"
-boto3 = "~=1.42.91"
-rich = "~=15.0.0"
-typer = "^0.24.1"
-
-[tool.poetry.group.dev.dependencies]
-# Type stubs
-types-tqdm = "~=4.67.3.20260402"
-types-cachetools = "~=6.2.0.20260317"
-types-yt-dlp = "~=2026.3.17.20260402"
-types-python-dateutil = "~=2.9.0.20260402"
-boto3-stubs = { extras = ["s3"], version = "~=1.42.91" }
-# Linting & formatting
-ruff = "~=0.15.9"
-mypy = "~=1.20.0"
-# Testing
-pytest = "~=9.0.2"
-# Quality tools
-ty = "^0.0.32"
-lizard = "~=1.21.3"
-vulture = "~=2.16"
-semgrep = "<1.160.0"
-setuptools = ">=75.0,<81"
-pyinstrument = "^5.1.2"
-maturin = "^1.8.0"
-hypothesis = "^6.153.0"
+[dependency-groups]
+dev = [
+    # Type stubs
+    "types-tqdm~=4.67.3.20260402",
+    "types-cachetools~=6.2.0.20260317",
+    "types-yt-dlp~=2026.3.17.20260402",
+    # Linting & formatting -- pinned to the scaffold framework series (see
+    # docs/.PLAN.md Phase 1) so this project lints identically to a freshly
+    # scaffolded one.
+    "ruff==0.15.*",
+    "ty==0.0.59",
+    "pytest==9.1.*",
+    "import-linter==2.13.*",
+    "vulture==2.16.*",
+    # ast-grep-cli/lizard are kept until Phase 3 replaces tests/test_lint.py
+    # (which still shells out to both); D4/D5 retire them at that point.
+    "ast-grep-cli~=0.44.1",
+    "lizard~=1.21.3",
+    # Intentional extras retained per docs/.PLAN.md D3/D6.
+    "pyinstrument>=5.1.2,<6.0.0",
+    "maturin>=1.8.0,<2.0.0",
+    "hypothesis>=6.153.0,<7.0.0",
+]
 
 [tool.pytest.ini_options]
 addopts = "-m 'not slow'"
@@ -62,23 +71,58 @@ markers = [
     "perf: performance benchmarks (run via: RUN_PERF_TESTS=1 pytest tests/benchmarks/)",
 ]
 
-[tool.mypy]
-mypy_path = "typings"
-python_version = "3.11"
-ignore_missing_imports = false
-disallow_untyped_calls = false
-warn_unused_ignores = true
-show_error_codes = true
-
 [tool.ruff]
 line-length = 100
 
 [tool.ruff.lint]
-select = ["E", "F", "I"]
+# Strict by default: enable every stable rule, then subtract only the rules
+# that conflict with each other, conflict with the formatter, or that we have
+# a deliberate policy reason to drop. Every ignore below is justified inline so
+# the ruleset is auditable and identical across projects.
+select = ["ALL"]
+ignore = [
+    # Docstring rules that conflict with the google convention set below.
+    "D203",   # one-blank-line-before-class (conflicts with D211)
+    "D213",   # multi-line-summary-second-line (conflicts with D212)
+    # Rules that conflict with `ruff format`.
+    "COM812", # missing-trailing-comma
+    "ISC001", # single-line-implicit-string-concatenation
+    # Deliberate policy opt-outs.
+    "CPY001", # missing-copyright-notice -- not wanted on internal projects
+]
+
+[tool.ruff.lint.per-file-ignores]
+# Tests legitimately assert, shell out, touch private members, use magic
+# values, and skip docstrings/annotations.
+"tests/**" = ["S", "PLR2004", "ANN", "D", "INP001", "SLF001"]
+# The CLI layer is the one place print() is a legitimate output channel, and
+# Typer's idioms are intentional: callables as argument/option defaults (B008)
+# and boolean flags as parameters (FBT001/FBT002).
+"adrift/cli/**" = ["T20", "B008", "FBT001", "FBT002"]
+
+[tool.ruff.lint.flake8-type-checking]
+# adrift's domain models are pydantic; with `from __future__ import annotations`
+# pydantic resolves field annotations at runtime (model_rebuild), so imports
+# used only in those annotations must NOT be hoisted into `TYPE_CHECKING`.
+# Marking BaseModel as runtime-evaluated stops TC001-3 from breaking them.
+runtime-evaluated-base-classes = ["pydantic.BaseModel"]
+
+[tool.ruff.lint.pydocstyle]
+convention = "google"
+
+[tool.ruff.lint.mccabe]
+max-complexity = 8
+
+[tool.ruff.lint.pylint]
+max-args = 5
+max-branches = 10
+max-returns = 5
+max-statements = 40
 
 [tool.ty.environment]
-# `python` intentionally omitted so `ty` auto-detects the project's Python
-# environment (activated venv or environment specified by the caller).
+# Explicitly point at the project venv so `ty` resolves third-party packages
+# correctly regardless of the caller's VIRTUAL_ENV setting.
+python = ".venv/bin/python"
 python-version = "3.11"
 extra-paths = []
 root = ["."]
@@ -96,6 +140,30 @@ output-format = "full"
 [tool.ty.rules]
 # Enforce strict typing by default.
 all = "error"
+
+[tool.vulture]
+paths = ["adrift"]
+min_confidence = 80
+
+[tool.importlinter]
+root_package = "adrift"
+
+# Contract: exhaustive three-layer architecture -- cli > adapters > core.
+# Higher layers may import lower ones only. `exhaustive` requires every
+# top-level module under `adrift/` to belong to one of the declared layers
+# (or be listed in exhaustive_ignores).
+
+[[tool.importlinter.contracts]]
+name = "dependency-layering"
+type = "layers"
+containers = ["adrift"]
+layers = [
+    "cli",
+    "adapters",
+    "core",
+]
+exhaustive = true
+exhaustive_ignores = ["__main__"]
 
 [tool.maturin]
 bindings = "pyo3"

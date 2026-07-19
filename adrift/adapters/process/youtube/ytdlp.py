@@ -1,5 +1,4 @@
-"""
-cspell: words playliststart playlistend playlistreverse
+"""cspell: words playliststart playlistend playlistreverse
 YouTube Data Layer (yt-dlp) integration with typed interfaces.
 
 This module provides a clean, typed interface for fetching YouTube data via yt-dlp.
@@ -7,9 +6,10 @@ Similar to the SponsorBlock module, it uses Pydantic models for type safety.
 """
 
 import random
+from collections.abc import Callable
 from dataclasses import dataclass
-from datetime import datetime, timedelta, timezone
-from typing import Any, Callable, cast
+from datetime import UTC, datetime, timedelta
+from typing import Any, cast
 
 from dateutil import parser
 from pydantic import BaseModel, ValidationError, field_validator
@@ -18,10 +18,10 @@ from yt_dlp import YoutubeDL
 from adrift.adapters.process.youtube.auth import get_auth_ydl_opts, get_ydl_opts
 from adrift.adapters.process.youtube.error_utils import yt_dlp_retry_reason
 from adrift.adapters.process.youtube.normalizer import rss_episode_from_ytdlp
-from adrift.models import RssEpisode, YtDlpImage, YtDlpParams
-from adrift.models.ports import DiskCacheAdapter
-from adrift.utils.progress import Callback
-from adrift.utils.terminal import emit_error, emit_info, emit_warning
+from adrift.core.models import RssEpisode, YtDlpImage, YtDlpParams
+from adrift.core.ports import DiskCacheAdapter
+from adrift.core.util.progress import Callback
+from adrift.core.util.terminal import emit_error, emit_info, emit_warning
 
 # Constants
 _CACHE = DiskCacheAdapter(".cache/yt-dlp")
@@ -133,9 +133,9 @@ def _video_info_url(video_id: str) -> str:
 
 
 def _extract_info(url: str, opts: YtDlpParams | dict[str, Any]) -> dict[str, Any] | None:
-    with YoutubeDL(cast(Any, _ydl_opts_dict(opts))) as ydl:
+    with YoutubeDL(cast("Any", _ydl_opts_dict(opts))) as ydl:
         info = ydl.extract_info(url, download=False)
-        return cast(dict[str, Any], info) if info else None
+        return cast("dict[str, Any]", info) if info else None
 
 
 def _video_info_attempt_label(attempt_index: int, label: str, attempt_count: int) -> str:
@@ -343,12 +343,12 @@ def _fetch_channel_videos_raw(
     opts.playlistend = end
 
     try:
-        with YoutubeDL(cast(Any, _ydl_opts_dict(opts))) as ydl:
+        with YoutubeDL(cast("Any", _ydl_opts_dict(opts))) as ydl:
             channel_info = ydl.extract_info(url, download=False)
             if not channel_info:
                 return []
 
-            return cast(list[dict[str, Any]], channel_info.get("entries", []))
+            return cast("list[dict[str, Any]]", channel_info.get("entries", []))
     except _YTDLP_FETCH_ERRORS as e:
         emit_error(f"Failed to fetch videos from {url}: {e}")
         return []
@@ -360,7 +360,7 @@ YOUTUBE_RECENT_EPISODE_CHECK_FRESHNESS = timedelta(hours=1)
 
 
 def _utcnow() -> datetime:
-    return datetime.now(timezone.utc)
+    return datetime.now(UTC)
 
 
 def _parse_cached_timestamp(value: Any) -> datetime | None:
@@ -371,7 +371,7 @@ def _parse_cached_timestamp(value: Any) -> datetime | None:
     except ValueError:
         return None
     if parsed.tzinfo is None:
-        return parsed.replace(tzinfo=timezone.utc)
+        return parsed.replace(tzinfo=UTC)
     return parsed
 
 
@@ -382,16 +382,16 @@ def _load_cached_episode_bundle(
     if not isinstance(cached, dict):
         return {}, None, None
 
-    cached_payload = cast(dict[str, object], cached)
+    cached_payload = cast("dict[str, object]", cached)
     raw_episodes = cached_payload.get("episodes")
     if isinstance(raw_episodes, dict):
         return (
-            cast(dict[str, RssEpisode], raw_episodes),
+            cast("dict[str, RssEpisode]", raw_episodes),
             _parse_cached_timestamp(cached_payload.get("fetched_at")),
             _parse_cached_timestamp(cached_payload.get("head_checked_at")),
         )
 
-    return cast(dict[str, RssEpisode], cached_payload), None, None
+    return cast("dict[str, RssEpisode]", cached_payload), None, None
 
 
 def _episode_cache_is_fresh(fetched_at: datetime | None) -> bool:
@@ -434,7 +434,7 @@ def _fetch_video_batch(
     batch_index: int,
     batch_size: int | None,
 ) -> list[dict[str, Any]]:
-    emit_info(f"Fetching {author} videos {batch_index} (size={str(batch_size)})...")
+    emit_info(f"Fetching {author} videos {batch_index} (size={batch_size!s})...")
     return _fetch_channel_videos_raw(url, 1, end=batch_size, reverse=False)
 
 

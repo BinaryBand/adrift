@@ -1,0 +1,6 @@
+id: no-print
+language: python
+severity: error
+message: "Avoid using print(); use the logging module instead (logger.info/warning/error)."
+rule:
+  pattern: print(...)

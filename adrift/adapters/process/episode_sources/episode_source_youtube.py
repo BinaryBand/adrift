@@ -1,10 +1,13 @@
-from adrift.models import FeedSource, RssChannel, RssEpisode
-from adrift.models.ports import EpisodeSourceFetchContext, EpisodeSourcePort
+from typing_extensions import override
+
+from adrift.core.models import FeedSource, RssChannel, RssEpisode
+from adrift.core.ports import EpisodeSourceFetchContext, EpisodeSourcePort
 
 
 class YouTubeEpisodeSourceAdapter(EpisodeSourcePort):
     """Adapter for fetching episodes from YouTube channels."""
 
+    @override
     def fetch_episodes(
         self,
         source: FeedSource,
@@ -16,7 +19,8 @@ class YouTubeEpisodeSourceAdapter(EpisodeSourcePort):
         resolved_context = context or EpisodeSourceFetchContext()
         url = source.url
         if not url:
-            raise ValueError("FeedSource URL is required for YouTube episode fetching")
+            msg = "FeedSource URL is required for YouTube episode fetching"
+            raise ValueError(msg)
 
         filter_regex = source.filters.to_regex() if source.filters else None
         fetch_opts = YtFetchOptions(
@@ -28,12 +32,14 @@ class YouTubeEpisodeSourceAdapter(EpisodeSourcePort):
 
         return get_youtube_episodes(url, resolved_context.title, fetch_opts)
 
+    @override
     def fetch_channel(self, source: FeedSource) -> RssChannel:
         """Fetch channel metadata from a YouTube channel."""
         from adrift.adapters.process.youtube.metadata import get_youtube_channel
 
         url = source.url
         if not url:
-            raise ValueError("FeedSource URL is required for YouTube channel fetching")
+            msg = "FeedSource URL is required for YouTube channel fetching"
+            raise ValueError(msg)
         title = source.filters.to_regex() if source.filters else ""
         return get_youtube_channel(url, title or "")

@@ -136,7 +136,7 @@ class DownloadPipeline:
         for queue_item in self._deps.build_download_queue(episodes, config, self._runtime.ctx):
             if downloaded_total + planned >= self._runtime.options.max_downloads:
                 break
-            if queue_item.exists_on_s3:
+            if queue_item.exists_in_storage:
                 continue
             title = queue_item.episode.episode.title
             slug = normalize_title(config.name, title)
@@ -169,7 +169,7 @@ class DownloadPipeline:
         for queue_item in self._deps.build_download_queue(episodes, config, self._runtime.ctx):
             if downloaded_total + additional_downloads >= self._runtime.options.max_downloads:
                 break
-            if queue_item.exists_on_s3:
+            if queue_item.exists_in_storage:
                 continue
             try:
                 newly_uploaded = self._deps.download_and_upload(

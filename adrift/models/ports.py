@@ -5,10 +5,19 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Generic, Protocol, TypeVar, runtime_checkable
 
-from adrift.models import AlignmentConfig, FeedSource, PodcastConfig, RssChannel, RssEpisode
+from adrift.models import (
+    AlignmentConfig,
+    FeedSource,
+    MediaMetadata,
+    PodcastConfig,
+    RssChannel,
+    RssEpisode,
+    S3Metadata,
+)
 from adrift.models.alignment_batch import AlignmentBatch
 from adrift.models.output import EpisodeData
 from adrift.models.pipeline import ReferenceMatchTrace, SourceTrace
+from adrift.models.storage_options import UploadOptions
 
 AlignmentResult = tuple[list[tuple[int, int]], dict[tuple[int, int], float]]
 
@@ -105,23 +114,26 @@ class SecretProviderPort(Protocol):
     def get(self, key: str, default: str = "") -> str: ...
 
 
-@dataclass(frozen=True)
-class UploadRequest:
-    bucket: str
-    key: str
-    path: Path
-    metadata: dict[str, str] | None = None
-
-
 @runtime_checkable
 class StoragePort(Protocol):
-    def upload(self, request: UploadRequest) -> str: ...
+    def upload_file(
+        self,
+        bucket_key: tuple[str, str],
+        file_path: Path,
+        options: UploadOptions | S3Metadata | dict[str, object] | None = None,
+    ) -> str | None: ...
 
-    def download(self, bucket: str, key: str, dest: Path) -> None: ...
+    def exists(self, bucket: str, prefix: str, extension_agnostic: bool = True) -> str | None: ...
 
-    def exists(self, bucket: str, prefix: str) -> bool: ...
+    def get_file_list(
+        self, bucket: str, prefix: str, without_extensions: bool = False
+    ) -> list[str]: ...
 
-    def list_keys(self, bucket: str, prefix: str) -> list[str]: ...
+    def get_public_urls(self, bucket: str, prefix: str) -> list[str]: ...
+
+    def get_metadata(self, bucket: str, key: str) -> MediaMetadata | None: ...
+
+    def delete(self, bucket: str, key: str) -> None: ...
 
 
 class CachePort(Protocol[T]):
@@ -168,7 +180,7 @@ def require_secrets(provider: SecretProviderPort, keys: Sequence[str]) -> dict[s
     values = {key: provider.get(key, "") for key in keys}
     missing = [key for key, value in values.items() if _is_missing_or_placeholder(key, value)]
     if missing:
-        raise RuntimeError(f"Missing required S3 environment variables: {', '.join(missing)}")
+        raise RuntimeError(f"Missing required environment variables: {', '.join(missing)}")
     return values
 
 

@@ -3,9 +3,11 @@
 from __future__ import annotations
 
 import time
-from typing import Any
+from pathlib import Path
+from typing import TYPE_CHECKING, Any
 
-from adrift.models.ports import CachePort
+if TYPE_CHECKING:
+    from adrift.core.ports import CachePort
 
 _CACHE_RECREATE_ERRORS = (AttributeError, OSError, RuntimeError, TypeError, ValueError)
 
@@ -19,7 +21,9 @@ class RaceAwareCacheWrapper:
     recreation.
     """
 
-    def __init__(self, cache: CachePort[Any], max_attempts: int = 3, retry_delay: float = 0.05):
+    def __init__(
+        self, cache: CachePort[Any], max_attempts: int = 3, retry_delay: float = 0.05
+    ) -> None:
         """Initialize the wrapper.
 
         Args:
@@ -31,11 +35,11 @@ class RaceAwareCacheWrapper:
         self.max_attempts = max_attempts
         self.retry_delay = retry_delay
 
-    def get(self, key: str):
+    def get(self, key: str) -> Any:  # noqa: ANN401
         """Get a value from cache with no retry (reads don't race)."""
         return self.cache.get(key)
 
-    def set(self, key: str, value, expire: int | None = None) -> None:
+    def set(self, key: str, value: Any, expire: int | None = None) -> None:  # noqa: ANN401
         """Set a value in cache with retry on FileNotFoundError.
 
         Retries if parent directories are missing, recreating them as needed.
@@ -43,13 +47,14 @@ class RaceAwareCacheWrapper:
         for attempt in range(self.max_attempts):
             try:
                 self.cache.set(key, value, expire=expire)
-                return
             except FileNotFoundError:
                 self._recreate_cache_dir()
                 if attempt + 1 < self.max_attempts:
                     time.sleep(self.retry_delay)
                     continue
                 raise
+            else:
+                return
 
     def delete(self, key: str) -> None:
         """Delete a key from cache with no retry."""
@@ -58,8 +63,6 @@ class RaceAwareCacheWrapper:
     def _recreate_cache_dir(self) -> None:
         """Recreate the cache directory if it was removed by concurrent cleanup."""
         try:
-            from pathlib import Path
-
             cache_dir_raw = getattr(self.cache, "directory", None)
             if not isinstance(cache_dir_raw, str):
                 return

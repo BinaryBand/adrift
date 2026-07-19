@@ -4,18 +4,18 @@ import shutil
 from pathlib import Path
 from typing import Any
 
-from adrift.models import YtDlpParams
-from adrift.utils.terminal import emit_info, emit_warning
+from adrift.core.models import YtDlpParams
+from adrift.core.util.terminal import emit_info, emit_warning
 
 
 class _QuietYtDlpLogger:
-    def debug(self, msg: str) -> None:
+    def debug(self, _msg: str) -> None:
         return
 
-    def warning(self, msg: str) -> None:
+    def warning(self, _msg: str) -> None:
         return
 
-    def error(self, msg: str) -> None:
+    def error(self, _msg: str) -> None:
         return
 
 
@@ -31,7 +31,7 @@ def _node_path() -> str | None:
 
 
 def get_ydl_opts() -> YtDlpParams:
-    """Get basic yt-dlp options without authentication"""
+    """Get basic yt-dlp options without authentication."""
     return YtDlpParams.model_validate(
         {
             "quiet": True,

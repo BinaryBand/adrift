@@ -208,37 +208,3 @@ def create_run_ui(total: int, label: str) -> BaseRunUI:
     if not _rich_is_available():
         return TqdmRunUI(total, label)
     return RichRunUI(total, label)
-
-
-def _rich_is_available() -> bool:
-    return importlib.util.find_spec("rich") is not None
-
-
-def _build_rich_progress():
-    from rich.console import Console
-    from rich.progress import (
-        BarColumn,
-        MofNCompleteColumn,
-        Progress,
-        SpinnerColumn,
-        TaskProgressColumn,
-        TextColumn,
-        TimeElapsedColumn,
-    )
-    from rich.table import Column
-
-    return Progress(
-        SpinnerColumn(style="cyan"),
-        TextColumn("{task.description}", table_column=Column(ratio=3, min_width=24)),
-        BarColumn(bar_width=None),
-        TaskProgressColumn(),
-        MofNCompleteColumn(),
-        TimeElapsedColumn(),
-        console=Console(stderr=True),
-        transient=False,
-        expand=True,
-    )
-
-
-def build_merge_callbacks(ui: BaseRunUI) -> tuple[Callable[[str], None], Callback]:
-    return ui.stage_callback, ui.progress_callback

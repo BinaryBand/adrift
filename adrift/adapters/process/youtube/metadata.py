@@ -1,18 +1,19 @@
+import threading
 from dataclasses import dataclass, field
 from urllib.parse import urljoin
 
 from adrift.adapters.process.youtube import ytdlp
 from adrift.adapters.process.youtube.normalizer import rss_channel_from_ytdlp
-from adrift.models import RssChannel, RssEpisode
-from adrift.utils.progress import Callback
-from adrift.utils.regex import (
+from adrift.core.models import RssChannel, RssEpisode
+from adrift.core.util.progress import Callback
+from adrift.core.util.regex import (
     YOUTUBE_PLAYLIST_SHORTHAND_REGEX,
     YOUTUBE_PLAYLIST_URL,
     YT_CHANNEL,
     YT_CHANNEL_SHORTHAND,
     re_compile,
 )
-from adrift.utils.terminal import emit_info, emit_warning
+from adrift.core.util.terminal import emit_info, emit_warning
 
 _EPISODE_METADATA_ERRORS = (AttributeError, TypeError, ValueError)
 _VIDEO_INFO_FETCH_ERRORS = (OSError, RuntimeError, ValueError)
@@ -44,7 +45,8 @@ def _normalize_youtube_link(url: str) -> str:
     if YOUTUBE_PLAYLIST_URL.match(url) is not None:
         return url
 
-    raise ValueError("Invalid YouTube channel or playlist URL")
+    msg = "Invalid YouTube channel or playlist URL"
+    raise ValueError(msg)
 
 
 def _channel_to_rss(channel_info: ytdlp.ChannelInfo, url: str) -> RssChannel:
@@ -55,10 +57,10 @@ def _channel_to_rss(channel_info: ytdlp.ChannelInfo, url: str) -> RssChannel:
 def _get_youtube_channel(url: str) -> RssChannel:
     """Fetch YouTube channel and return as RssChannel."""
     if (channel_info := ytdlp.get_channel_info(url)) is not None:
-        channel = _channel_to_rss(channel_info, url)
-        return channel
+        return _channel_to_rss(channel_info, url)
 
-    raise ValueError(f"Failed to fetch YouTube channel info from {url}")
+    msg = f"Failed to fetch YouTube channel info from {url}"
+    raise ValueError(msg)
 
 
 def get_youtube_channel(url: str, author: str) -> RssChannel:
@@ -99,7 +101,6 @@ def _maybe_update_description(episode: RssEpisode, info: ytdlp.VideoInfo) -> Non
 
 def _fetch_video_info(video_id: str) -> ytdlp.VideoInfo | None:
     """Wrapper around ytdlp.get_video_info with centralized error handling."""
-
     try:
         return ytdlp.get_video_info(video_id)
     except _VIDEO_INFO_FETCH_ERRORS as e:
@@ -181,16 +182,29 @@ def _post_process_episodes(
     return episodes
 
 
+# Reference and download collection run in parallel threads; when a config lists
+# the same channel in both roles, identical fetches must serialize so the second
+# one hits the caches written by the first instead of re-scraping the channel.
+_CHANNEL_FETCH_LOCKS: dict[str, threading.Lock] = {}
+_CHANNEL_FETCH_LOCKS_GUARD = threading.Lock()
+
+
+def _channel_fetch_lock(normalized_url: str) -> threading.Lock:
+    with _CHANNEL_FETCH_LOCKS_GUARD:
+        return _CHANNEL_FETCH_LOCKS.setdefault(normalized_url, threading.Lock())
+
+
 def get_youtube_episodes(
     url: str, author: str, opts: YtFetchOptions | None = None
 ) -> list[RssEpisode]:
     """Fetch RSS episodes from a given URL."""
     fetch_opts = _coerce_fetch_options(opts)
     normalized_url = _normalize_youtube_link(url)
-    episodes = ytdlp.get_youtube_videos(
-        normalized_url,
-        author,
-        fetch_opts.callback,
-        refresh=fetch_opts.refresh,
-    )
-    return _post_process_episodes(episodes, url, author, fetch_opts)
+    with _channel_fetch_lock(normalized_url):
+        episodes = ytdlp.get_youtube_videos(
+            normalized_url,
+            author,
+            fetch_opts.callback,
+            refresh=fetch_opts.refresh,
+        )
+        return _post_process_episodes(episodes, url, author, fetch_opts)

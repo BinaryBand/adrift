@@ -1,17 +1,24 @@
+"""Prototype Rust-backed alignment implementation used as fallback."""
+
 from __future__ import annotations
 
-from adrift.models.alignment_batch import AlignmentBatch, AlignmentEpisodeRecord
-from adrift.utils.alignment_pairs import (
+from typing import TYPE_CHECKING
+
+from adrift.core.util.alignment_pairs import (
     AlignmentResult,
     AlignmentScores,
     score_alignment_pairs,
     select_alignment_pairs,
 )
 
+if TYPE_CHECKING:
+    from adrift.core.models.alignment_batch import AlignmentBatch, AlignmentEpisodeRecord
+
 
 def align_batch(
     batch: AlignmentBatch,
 ) -> AlignmentResult:
+    """Align a batch of episodes, returning matched pairs and scores."""
     scores = _score_pairs(batch)
     return select_alignment_pairs(scores, batch.config.match_tolerance), scores
 

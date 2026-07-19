@@ -1,0 +1,392 @@
+"""Tests for the new 4-signal alignment algorithm (SPECS.md §Stage 1-3)."""
+
+import unittest
+from datetime import datetime
+from unittest.mock import patch
+
+from adrift.core.models import AlignmentConfig
+from adrift.core.services.catalog import (
+    align_episodes,
+    align_episodes_impl,
+    merge_episode,
+    sim_date,
+)
+from adrift.core.services.catalog.alignment import _best_thumbnail
+from tests.unit.core.models.catalog._fixtures import dt as _dt
+from tests.unit.core.models.catalog._fixtures import ep as _ep
+
+_MORBID_ALIGNMENT = AlignmentConfig(extra_stopwords=["morbid"])
+
+
+# ---------------------------------------------------------------------------
+# sim_date
+# ---------------------------------------------------------------------------
+
+
+class TestSimDate(unittest.TestCase):
+    def test_none_inputs_return_zero(self):
+        assert sim_date(None, None) == 0.0
+        assert sim_date(_dt(2024, 1, 1), None) == 0.0
+        assert sim_date(None, _dt(2024, 1, 1)) == 0.0
+
+    def test_same_date(self):
+        d = _dt(2024, 6, 15)
+        assert sim_date(d, d) == 1.0
+
+    def test_within_2_days(self):
+        assert sim_date(_dt(2024, 1, 1), _dt(2024, 1, 3)) == 1.0
+        assert sim_date(_dt(2024, 1, 3), _dt(2024, 1, 1)) == 1.0
+
+    def test_within_10_days(self):
+        assert sim_date(_dt(2024, 1, 1), _dt(2024, 1, 8)) == 0.7
+        assert sim_date(_dt(2024, 1, 1), _dt(2024, 1, 11)) == 0.7
+
+    def test_within_35_days(self):
+        assert sim_date(_dt(2024, 1, 1), _dt(2024, 1, 20)) == 0.15
+        assert sim_date(_dt(2024, 1, 1), _dt(2024, 2, 5)) == 0.15
+
+    def test_beyond_35_days(self):
+        assert sim_date(_dt(2024, 1, 1), _dt(2024, 3, 1)) == 0.0
+
+    def test_mixed_naive_and_aware_dates(self):
+        aware = _dt(2024, 1, 1)
+        naive = datetime(2024, 1, 2)
+        assert sim_date(aware, naive) == 1.0
+        assert sim_date(naive, aware) == 1.0
+
+
+# ---------------------------------------------------------------------------
+# align_episodes
+# ---------------------------------------------------------------------------
+
+
+class TestAlignEpisodes(unittest.TestCase):
+    def test_exact_title_match(self):
+        ref = _ep(id="abc", title="Ep 1: Great Stuff", pub_date=_dt(2024, 1, 5))
+        dl = _ep(id="xyz", title="Ep 1: Great Stuff", pub_date=_dt(2024, 1, 5))
+        pairs = align_episodes([ref], [dl])
+        assert pairs == [(0, 0)]
+
+    def test_same_id_match(self):
+        """Identical IDs boost score even with a moderate date offset."""
+        ref = _ep(id="same_id", title="Episode", pub_date=_dt(2024, 1, 1))
+        dl = _ep(id="same_id", title="Episode", pub_date=_dt(2024, 1, 1))
+        pairs = align_episodes([ref], [dl])
+        assert pairs == [(0, 0)]
+
+    def test_no_match_below_threshold(self):
+        """Completely unrelated episodes should not match."""
+        ref = _ep(
+            id="a",
+            title="Science Explained: Quantum Tunneling",
+            pub_date=_dt(2024, 1, 1),
+        )
+        dl = _ep(id="b", title="Cooking Show: Best Pasta Recipes", pub_date=_dt(2024, 6, 1))
+        pairs = align_episodes([ref], [dl])
+        assert pairs == []
+
+    def test_greedy_prefers_best_pair(self):
+        """The highest-scoring pair is committed first; the second-best gets leftovers."""
+        ref1 = _ep(id="r1", title="Weekly Show Episode 1", pub_date=_dt(2024, 1, 7))
+        ref2 = _ep(id="r2", title="Weekly Show Episode 2", pub_date=_dt(2024, 1, 14))
+
+        dl1 = _ep(id="d1", title="Weekly Show Episode 1", pub_date=_dt(2024, 1, 7))
+        dl2 = _ep(id="d2", title="Weekly Show Episode 2", pub_date=_dt(2024, 1, 14))
+
+        pairs = align_episodes([ref1, ref2], [dl1, dl2])
+        assert (0, 0) in pairs
+        assert (1, 1) in pairs
+
+    def test_no_double_use(self):
+        """Each episode may appear in at most one matched pair."""
+        ref1 = _ep(id="r1", title="Episode 1: The Start", pub_date=_dt(2024, 1, 1))
+        ref2 = _ep(id="r2", title="Episode 1: The Start", pub_date=_dt(2024, 1, 1))
+        dl = _ep(id="d1", title="Episode 1: The Start", pub_date=_dt(2024, 1, 1))
+
+        pairs = align_episodes([ref1, ref2], [dl])
+        dl_indices = [d for _, d in pairs]
+        assert len(dl_indices) == len(set(dl_indices)), "Download episode used twice"
+
+    def test_normalized_titles_are_precomputed_once_per_episode(self):
+        refs = [
+            _ep(id="r1", title="Episode One", pub_date=_dt(2024, 1, 1)),
+            _ep(id="r2", title="Episode Two", pub_date=_dt(2024, 1, 2)),
+        ]
+        dls = [
+            _ep(id="d1", title="Episode One", pub_date=_dt(2024, 1, 1)),
+            _ep(id="d2", title="Episode Two", pub_date=_dt(2024, 1, 2)),
+            _ep(id="d3", title="Episode Three", pub_date=_dt(2024, 1, 3)),
+        ]
+
+        with patch(
+            "adrift.core.services.catalog.alignment._normalized_alignment_title"
+        ) as mocked_title:
+            mocked_title.side_effect = lambda show, episode: episode.title.lower()
+            align_episodes(refs, dls, "Example Show")
+
+        assert mocked_title.call_count == len(refs) + len(dls)
+
+    def test_listener_tales_number_mismatch_rejected(self):
+        ref = _ep(
+            id="r1",
+            title="Listener Tales 59: Australia & New Zealand Edition",
+            description="listener story batch",
+            pub_date=_dt(2024, 2, 1),
+        )
+        dl = _ep(
+            id="d1",
+            title="Listener Tales 109: 80s Edition",
+            description="listener story batch",
+            pub_date=_dt(2024, 2, 1),
+        )
+        assert align_episodes_impl([ref], [dl], "Morbid", _MORBID_ALIGNMENT) == []
+
+    def test_listener_tales_number_exact_match_allowed(self):
+        ref = _ep(
+            id="r1",
+            title="Listener Tales 92",
+            description="listener story batch",
+            pub_date=_dt(2024, 2, 1),
+        )
+        dl = _ep(
+            id="d1",
+            title="Listener Tales 92 | Morbid | Podcast",
+            description="listener story batch",
+            pub_date=_dt(2024, 2, 1),
+        )
+        assert align_episodes_impl([ref], [dl], "Morbid", _MORBID_ALIGNMENT) == [(0, 0)]
+
+    def test_part_number_mismatch_rejected(self):
+        ref = _ep(
+            id="r1",
+            title="Theodore Durrant The Demon in the Belfry Part 2",
+            description="historic case",
+            pub_date=_dt(2024, 2, 1),
+        )
+        dl = _ep(
+            id="d1",
+            title='Theodore Durrant "The Demon in the Belfry" | Part 1 | Morbid',
+            description="historic case",
+            pub_date=_dt(2024, 2, 1),
+        )
+        assert align_episodes_impl([ref], [dl], "Morbid", _MORBID_ALIGNMENT) == []
+
+    def test_volume_number_mismatch_rejected(self):
+        ref = _ep(
+            id="r1",
+            title="Spooky Lakes Vol. 1",
+            description="spooky segment",
+            pub_date=_dt(2024, 2, 1),
+        )
+        dl = _ep(
+            id="d1",
+            title="Spooky Lakes (Volume 2) | Morbid | Podcast",
+            description="spooky segment",
+            pub_date=_dt(2024, 2, 1),
+        )
+        assert align_episodes_impl([ref], [dl], "Morbid", _MORBID_ALIGNMENT) == []
+
+    def test_volume_number_mismatch_rejected_with_compact_dot_notation(self):
+        ref = _ep(
+            id="r1",
+            title="Spooky Games That Will Ruin Your Actual Life Vol.2",
+            description="spooky segment",
+            pub_date=_dt(2024, 2, 1),
+        )
+        dl = _ep(
+            id="d1",
+            title="Spooky Games That Will Ruin Your Actual Life Vol. 4 | Morbid | Podcast",
+            description="spooky segment",
+            pub_date=_dt(2024, 2, 1),
+        )
+        assert align_episodes_impl([ref], [dl], "Morbid", _MORBID_ALIGNMENT) == []
+
+    def test_episode_number_mismatch_rejected(self):
+        ref = _ep(
+            id="r1",
+            title="Episode 1: First Story",
+            description="first",
+            pub_date=_dt(2024, 2, 1),
+        )
+        dl = _ep(
+            id="d1",
+            title="Episode 2: Second Story",
+            description="second",
+            pub_date=_dt(2024, 2, 1),
+        )
+        assert align_episodes_impl([ref], [dl], "Morbid", _MORBID_ALIGNMENT) == []
+
+    def test_certainty_path_matches_despite_large_date_gap(self):
+        """Near-perfect titles match even with a 200-day date difference (YouTube backfill)."""
+        ref = _ep(
+            id="r1",
+            title="The Bermondsey Horror",
+            description="a case description",
+            pub_date=_dt(2022, 6, 1),
+        )
+        dl = _ep(
+            id="d1",
+            title="The Bermondsey Horror | Morbid: A True Crime Podcast",
+            description="a case description",
+            pub_date=_dt(2023, 1, 5),  # 218 days later
+        )
+        assert align_episodes_impl([ref], [dl], "Morbid", _MORBID_ALIGNMENT) == [(0, 0)]
+
+    def test_containment_bonus_helps_near_threshold_pair(self):
+        """Shorter title fully contained in longer title gets a boost over MATCH_TOLERANCE."""
+        ref = _ep(
+            id="r1",
+            title="Denise Huber Part 1",
+            description="cold case",
+            pub_date=_dt(2023, 1, 1),
+        )
+        dl = _ep(
+            id="d1",
+            title="The Disappearance of Denise Huber, Part 1 | Morbid | Podcast",
+            description="cold case",
+            pub_date=_dt(2023, 1, 2),
+        )
+        assert align_episodes_impl([ref], [dl], "Morbid", _MORBID_ALIGNMENT) == [(0, 0)]
+
+    def test_low_anchor_overlap_rejected(self):
+        ref = _ep(
+            id="r1",
+            title="The Hex House Murder",
+            description="same date and description should not force unrelated title match",
+            pub_date=_dt(2024, 2, 1),
+        )
+        dl = _ep(
+            id="d1",
+            title="Episode 753: The Hitman Murders",
+            description="same date and description should not force unrelated title match",
+            pub_date=_dt(2024, 2, 1),
+        )
+        assert align_episodes_impl([ref], [dl], "Morbid", _MORBID_ALIGNMENT) == []
+
+    def test_anchor_overlap_allows_match(self):
+        ref = _ep(
+            id="r1",
+            title="The Hex House Murder",
+            description="haunted house case",
+            pub_date=_dt(2024, 2, 1),
+        )
+        dl = _ep(
+            id="d1",
+            title="The Hex House Murder | Morbid | Podcast",
+            description="haunted house case",
+            pub_date=_dt(2024, 2, 1),
+        )
+        assert align_episodes_impl([ref], [dl], "Morbid", _MORBID_ALIGNMENT) == [(0, 0)]
+
+
+# ---------------------------------------------------------------------------
+# merge_episode
+# ---------------------------------------------------------------------------
+
+
+class TestMergeEpisode(unittest.TestCase):
+    def test_id_prefers_non_url(self):
+        ref = _ep(id="https://example.com/ep1")
+        dl = _ep(id="yt_abc123")
+        result = merge_episode(ref, dl)
+        assert result.id == "yt_abc123"
+
+    def test_id_keeps_ref_when_not_url(self):
+        ref = _ep(id="short_id")
+        dl = _ep(id="https://example.com/dl1")
+        result = merge_episode(ref, dl)
+        assert result.id == "short_id"
+
+    def test_id_prefers_dl_when_both_non_url(self):
+        """Download side (YouTube video ID) beats ref side (RSS GUID) per spec."""
+        ref = _ep(id="rss-guid-abc")
+        dl = _ep(id="dQw4w9WgXcQ")
+        result = merge_episode(ref, dl)
+        assert result.id == "dQw4w9WgXcQ"
+
+    def test_title_longest_wins(self):
+        ref = _ep(title="Episode 1")
+        dl = _ep(title="Episode 1: The Full Title With More Words")
+        result = merge_episode(ref, dl)
+        assert result.title == "Episode 1: The Full Title With More Words"
+
+    def test_upload_date_earliest_wins(self):
+        ref = _ep(pub_date=_dt(2024, 1, 5))
+        dl = _ep(pub_date=_dt(2024, 1, 1))
+        result = merge_episode(ref, dl)
+        assert result.upload_date == _dt(2024, 1, 1)
+
+    def test_description_longest_wins(self):
+        ref = _ep(description="Short description.")
+        dl = _ep(description="This is a much longer description with more detail and context.")
+        result = merge_episode(ref, dl)
+        assert result.description == dl.description
+
+    def test_source_is_union(self):
+        ref = _ep(content="https://rss.example.com/ep1.mp3")
+        dl = _ep(content="https://yt.example.com/watch?v=abc")
+        result = merge_episode(ref, dl)
+        assert len(result.source) == 2
+        assert "https://rss.example.com/ep1.mp3" in result.source
+        assert "https://yt.example.com/watch?v=abc" in result.source
+
+    def test_source_deduplicates(self):
+        same_url = "https://example.com/ep.mp3"
+        ref = _ep(content=same_url)
+        dl = _ep(content=same_url)
+        result = merge_episode(ref, dl)
+        assert len(result.source) == 1
+
+
+# ---------------------------------------------------------------------------
+# _best_thumbnail
+# ---------------------------------------------------------------------------
+
+
+@patch("adrift.core.services.catalog.alignment._thumbnail_url_exists", return_value=True)
+class TestBestThumbnail(unittest.TestCase):
+    def test_none_inputs(self, _exists):
+        assert _best_thumbnail(None, None) is None
+        assert _best_thumbnail("https://ex.com/thumb.jpg", None) == "https://ex.com/thumb.jpg"
+        assert _best_thumbnail(None, "https://ex.com/thumb.jpg") == "https://ex.com/thumb.jpg"
+
+    def test_maxres_beats_hq(self, _exists):
+        a = "https://img.youtube.com/vi/abc/maxresdefault.jpg"
+        b = "https://img.youtube.com/vi/abc/hqdefault.jpg"
+        assert _best_thumbnail(a, b) == a
+        assert _best_thumbnail(b, a) == a
+
+    def test_hq_beats_mq(self, _exists):
+        a = "https://img.youtube.com/vi/abc/hqdefault.jpg"
+        b = "https://img.youtube.com/vi/abc/mqdefault.jpg"
+        assert _best_thumbnail(a, b) == a
+
+    def test_equal_rank_returns_first(self, _exists):
+        a = "https://img.youtube.com/vi/abc/hqdefault.jpg"
+        b = "https://img.youtube.com/vi/xyz/hqdefault.jpg"
+        assert _best_thumbnail(a, b) == a
+
+
+class TestBestThumbnailFragileMaxres(unittest.TestCase):
+    """A maxresdefault URL that doesn't resolve must not break the feed."""
+
+    _MAXRES = "https://img.youtube.com/vi/abc/maxresdefault.jpg"
+    _RSS = "https://image.simplecastcdn.com/images/show/cover.jpg"
+
+    @patch("adrift.core.services.catalog.alignment._thumbnail_url_exists", return_value=False)
+    def test_broken_maxres_prefers_stable_rss_cover(self, _exists):
+        assert _best_thumbnail(self._RSS, self._MAXRES) == self._RSS
+
+    @patch("adrift.core.services.catalog.alignment._thumbnail_url_exists", return_value=False)
+    def test_broken_maxres_falls_back_to_hqdefault(self, _exists):
+        hq = "https://img.youtube.com/vi/abc/hqdefault.jpg"
+        # Only YouTube candidates available -> downgrade rather than break.
+        assert _best_thumbnail(self._MAXRES, hq) == hq
+
+    @patch("adrift.core.services.catalog.alignment._thumbnail_url_exists", return_value=True)
+    def test_existing_maxres_is_kept(self, _exists):
+        assert _best_thumbnail(self._RSS, self._MAXRES) == self._MAXRES
+
+
+if __name__ == "__main__":
+    unittest.main()

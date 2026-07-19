@@ -1,9 +1,18 @@
+"""Download CLI: fetch and upload podcast episodes."""
+
+from __future__ import annotations
+
 import random
 import sys
 import time
-from typing import Annotated
+from typing import TYPE_CHECKING, Annotated
 
 import typer
+
+if TYPE_CHECKING:
+    from adrift.core.models.podcast_config import PodcastConfig
+    from adrift.core.services.context import AppContext
+    from adrift.core.util.run_ui import BaseRunUI
 
 from adrift.cli import (
     IncludeConfigsOption,
@@ -12,8 +21,8 @@ from adrift.cli import (
     bootstrap_run_configs,
     build_cli,
 )
-from adrift.services.context import AppContext
-from adrift.services.download import (
+from adrift.cli.composition import build_app_context
+from adrift.core.services.download import (
     DownloadPipeline,
     DownloadPipelineDeps,
     DownloadPipelineRuntime,
@@ -26,18 +35,18 @@ DEFAULT_BOT_COOLDOWN = 60 * 60  # 1 hour
 
 def _build_pipeline(
     ctx: AppContext,
-    ui,
+    ui: BaseRunUI,
     pipeline_options: DownloadRunOptions,
 ) -> DownloadPipeline:
-    from adrift.services.catalog import MergeConfigOptions, merge_config
-    from adrift.services.download_enrich import enrich_with_sponsors
-    from adrift.services.download_process import (
-        BotDetectionError,
+    from adrift.adapters.process.youtube.downloader import BotDetectionError  # noqa: PLC0415
+    from adrift.core.services.catalog import MergeConfigOptions, merge_config  # noqa: PLC0415
+    from adrift.core.services.download_enrich import enrich_with_sponsors  # noqa: PLC0415
+    from adrift.core.services.download_process import (  # noqa: PLC0415
         build_download_queue,
         download_and_upload,
     )
-    from adrift.services.download_rss import update_rss
-    from adrift.utils.run_ui import build_merge_callbacks
+    from adrift.core.services.download_rss import update_rss  # noqa: PLC0415
+    from adrift.core.util.run_ui import build_merge_callbacks  # noqa: PLC0415
 
     # greedy one-to-one bipartite matching
     runtime = DownloadPipelineRuntime(ctx=ctx, ui=ui, options=pipeline_options)
@@ -47,6 +56,8 @@ def _build_pipeline(
             refresh_sources=refresh,
             on_stage=on_stage,
             callback=callback,
+            episode_source_factory=ctx.episode_source_factory,
+            alignment_provider=ctx.alignment_provider,
         ),
         enrich_with_sponsors=enrich_with_sponsors,
         build_download_queue=build_download_queue,
@@ -59,11 +70,11 @@ def _build_pipeline(
 
 
 def _run_pipeline(
-    configs,
+    configs: list[PodcastConfig],
     ctx: AppContext,
     pipeline_options: DownloadRunOptions,
 ) -> int:
-    from adrift.utils.run_ui import create_run_ui
+    from adrift.core.util.run_ui import create_run_ui  # noqa: PLC0415
 
     with create_run_ui(len(configs), "Downloading") as ui, ui.output_context():
         pipeline = _build_pipeline(ctx, ui, pipeline_options)
@@ -73,7 +84,7 @@ def _run_pipeline(
 def _sleep_on_bot_detection(bot_cooldown: int) -> None:
     sys.stderr.write(f"\nBot detection triggered - cooling down for {bot_cooldown}s\n")
     jitter = bot_cooldown * 0.1
-    wait_seconds = bot_cooldown + int((random.random() - 0.5) * jitter)
+    wait_seconds = bot_cooldown + int((random.random() - 0.5) * jitter)  # noqa: S311
     time.sleep(wait_seconds)
 
 
@@ -94,26 +105,26 @@ def _build_pipeline_options(
 
 
 def _run_with_bot_detection(
-    configs,
+    configs: list[PodcastConfig],
     ctx: AppContext,
     pipeline_options: DownloadRunOptions,
     bot_cooldown: int,
 ) -> int:
-    from adrift.services.download_process import BotDetectionError
+    from adrift.adapters.process.youtube.downloader import BotDetectionError  # noqa: PLC0415
 
     try:
         return _run_pipeline(configs, ctx, pipeline_options)
     except BotDetectionError:
         _sleep_on_bot_detection(bot_cooldown)
-        raise typer.Exit(code=1)
+        raise typer.Exit(code=1) from None
 
 
-def _run(
+def _run(  # noqa: PLR0913
     include: IncludeConfigsOption = None,
     skip_schedule_filter: SkipScheduleFilterOption = False,
     tags: TagsOption = None,
     dry_run: bool = typer.Option(
-        False,
+        False,  # noqa: FBT003
         help="Simulate a download run without downloading/uploading media or updating RSS.",
     ),
     skip_download: Annotated[
@@ -130,8 +141,12 @@ def _run(
         bool, typer.Option(help="Bypass fresh source caches and refetch source data.")
     ] = False,
 ) -> None:
-    configs, _ = bootstrap_run_configs(include, tags, skip_schedule_filter)
-    ctx = AppContext.from_env()
+    from adrift.adapters.process.alignment import ensure_rust_alignment_backend  # noqa: PLC0415
+
+    ensure_rust_alignment_backend()
+
+    configs, _ = bootstrap_run_configs(include, tags, skip_schedule_filter=skip_schedule_filter)
+    ctx = build_app_context()
     pipeline_options = _build_pipeline_options(
         dry_run,
         skip_download,

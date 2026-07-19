@@ -6,12 +6,12 @@ import tempfile
 from dataclasses import dataclass
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import TYPE_CHECKING, Any, cast
+from typing import TYPE_CHECKING
 
 from adrift.adapters.process.youtube.downloader import BotDetectionError, download_video
 from adrift.models import DownloadEpisode, MediaMetadata, PodcastConfig
 from adrift.services.download_cache import _existing_media_sources
-from adrift.services.download_client import s3_prefix
+from adrift.services.download_client import storage_prefix
 from adrift.services.download_upload import (
     _build_upload_request,
     _upload_episode_audio,
@@ -34,22 +34,18 @@ if TYPE_CHECKING:
 @dataclass(frozen=True)
 class DownloadQueueItem:
     episode: DownloadEpisode
-    exists_on_s3: bool
+    exists_in_storage: bool
 
 
 def _episode_slug(config: PodcastConfig, ep: DownloadEpisode) -> str:
     return normalize_title(config.name, ep.episode.title)
 
 
-def _s3_service(ctx: AppContext) -> Any:
-    return cast(Any, ctx.s3)
-
-
-def episode_exists_on_s3(ep: DownloadEpisode, config: PodcastConfig, ctx: AppContext) -> bool:
-    bucket, prefix = s3_prefix(config)
+def episode_exists_in_storage(ep: DownloadEpisode, config: PodcastConfig, ctx: AppContext) -> bool:
+    bucket, prefix = storage_prefix(config)
     cleaned_slug = _episode_slug(config, ep)
     key_prefix = f"{prefix}/{cleaned_slug}"
-    if _s3_service(ctx).exists(bucket, key_prefix) is not None:
+    if ctx.storage.exists(bucket, key_prefix) is not None:
         return True
     return _existing_media_sources(ctx, bucket, prefix, config.name).matches(ep, cleaned_slug)
 
@@ -60,7 +56,7 @@ def build_download_queue(
     queue = [
         DownloadQueueItem(
             episode=episode,
-            exists_on_s3=episode_exists_on_s3(episode, config, ctx),
+            exists_in_storage=episode_exists_in_storage(episode, config, ctx),
         )
         for episode in episodes
     ]
@@ -70,7 +66,7 @@ def build_download_queue(
 def _download_queue_sort_key(item: DownloadQueueItem) -> tuple[bool, float, str]:
     episode = item.episode.episode
     return (
-        item.exists_on_s3,
+        item.exists_in_storage,
         -_episode_sort_timestamp(episode.pub_date),
         episode.title,
     )
@@ -89,13 +85,13 @@ def download_and_upload(
     config: PodcastConfig,
     ctx: AppContext,
 ) -> bool:
-    """Download one episode, remove ads, convert to Opus, upload to S3.
+    """Download one episode, remove ads, convert to Opus, upload to storage.
 
-    Returns True if newly uploaded, False if already present on S3.
+    Returns True if newly uploaded, False if already present in storage.
     """
-    bucket, prefix = s3_prefix(config)
+    bucket, prefix = storage_prefix(config)
     key_prefix = f"{prefix}/{_episode_slug(config, ep)}"
-    if _s3_service(ctx).exists(bucket, key_prefix):
+    if ctx.storage.exists(bucket, key_prefix):
         return False
     with tempfile.TemporaryDirectory() as tmp:
         return process_in_tmpdir(ep, config, Path(tmp), ctx)
@@ -107,7 +103,7 @@ def process_in_tmpdir(
     tmp: Path,
     ctx: AppContext,
 ) -> bool:
-    bucket, prefix = s3_prefix(config)
+    bucket, prefix = storage_prefix(config)
     key_prefix = f"{prefix}/{_episode_slug(config, ep)}"
     audio = _download_episode_audio(ep, tmp, ctx)
     if audio is None:
@@ -140,7 +136,7 @@ def _upload_and_publish_completion(
     ctx.event_bus.publish(
         DownloadCompleted(
             episode=ep.episode,
-            s3_key=upload_request.key,
+            storage_key=upload_request.key,
             sponsors_removed=bool(ep.sponsor_segments),
         )
     )
@@ -194,7 +190,7 @@ __all__ = [
     "BotDetectionError",
     "DownloadQueueItem",
     "build_download_queue",
-    "episode_exists_on_s3",
+    "episode_exists_in_storage",
     "download_and_upload",
     "process_in_tmpdir",
 ]

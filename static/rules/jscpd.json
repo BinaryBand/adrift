@@ -1,0 +1,8 @@
+{
+  "format": "python",
+  "minTokens": 50,
+  "threshold": 0,
+  "languages": ["python"],
+  "reporters": ["console"],
+  "ignore": ["**/.venv/**", "**/typings/**", "**/tests/**"]
+}
