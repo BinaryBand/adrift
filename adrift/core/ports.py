@@ -10,26 +10,23 @@ from __future__ import annotations
 
 from collections.abc import Callable, Sequence
 from dataclasses import dataclass
-from typing import TYPE_CHECKING, Generic, Protocol, TypeVar, runtime_checkable
+from pathlib import Path
+from typing import Generic, Protocol, TypeVar, runtime_checkable
 
+from adrift.core.models import (
+    AlignmentConfig,
+    FeedSource,
+    MediaMetadata,
+    PodcastConfig,
+    RssChannel,
+    RssEpisode,
+    S3Metadata,
+)
+from adrift.core.models.alignment_batch import AlignmentBatch
+from adrift.core.models.output import EpisodeData
+from adrift.core.models.pipeline import ReferenceMatchTrace, SourceTrace
+from adrift.core.models.storage_options import UploadOptions
 from adrift.core.util.cache import UNPICKLE_ERRORS
-
-if TYPE_CHECKING:
-    from pathlib import Path
-
-    from adrift.core.models import (
-        AlignmentConfig,
-        FeedSource,
-        MediaMetadata,
-        PodcastConfig,
-        RssChannel,
-        RssEpisode,
-        S3Metadata,
-    )
-    from adrift.core.models.alignment_batch import AlignmentBatch
-    from adrift.core.models.output import EpisodeData
-    from adrift.core.models.pipeline import ReferenceMatchTrace, SourceTrace
-    from adrift.core.models.storage_options import UploadOptions
 
 AlignmentResult = tuple[list[tuple[int, int]], dict[tuple[int, int], float]]
 

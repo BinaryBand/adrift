@@ -4,13 +4,11 @@ from __future__ import annotations
 
 from collections.abc import Callable
 from importlib import import_module
-from typing import TYPE_CHECKING, cast
+from types import ModuleType
+from typing import cast
 
 from adrift.core.models.alignment_batch import AlignmentBatch
 from adrift.core.util.alignment_pairs import AlignmentResult
-
-if TYPE_CHECKING:
-    from types import ModuleType
 
 _EXTENSION_MODULE = "adrift_rust_alignment"
 _PROTOTYPE_MODULE = "adrift.adapters.process.alignment.rust_prototype"

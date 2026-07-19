@@ -5,14 +5,9 @@ from __future__ import annotations
 import random
 import sys
 import time
-from typing import TYPE_CHECKING, Annotated
+from typing import Annotated
 
 import typer
-
-if TYPE_CHECKING:
-    from adrift.core.models.podcast_config import PodcastConfig
-    from adrift.core.services.context import AppContext
-    from adrift.core.util.run_ui import BaseRunUI
 
 from adrift.cli import (
     IncludeConfigsOption,
@@ -22,12 +17,15 @@ from adrift.cli import (
     build_cli,
 )
 from adrift.cli.composition import build_app_context
+from adrift.core.models.podcast_config import PodcastConfig
+from adrift.core.services.context import AppContext
 from adrift.core.services.download import (
     DownloadPipeline,
     DownloadPipelineDeps,
     DownloadPipelineRuntime,
     DownloadRunOptions,
 )
+from adrift.core.util.run_ui import BaseRunUI
 
 DEFAULT_MAX_DOWNLOADS = 10
 DEFAULT_BOT_COOLDOWN = 60 * 60  # 1 hour

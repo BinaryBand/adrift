@@ -9,20 +9,18 @@ Testing is trivial: construct an AppContext with mock ports.
 
 from __future__ import annotations
 
+from collections.abc import Callable
 from dataclasses import dataclass, field
-from typing import TYPE_CHECKING, Any
+from typing import Any
 
-if TYPE_CHECKING:
-    from collections.abc import Callable
-
-    from adrift.core.ports import (
-        AlignmentBackendProviderPort,
-        CachePort,
-        EpisodeSourceFactoryPort,
-        SecretProviderPort,
-        StoragePort,
-        VideoDownloaderPort,
-    )
+from adrift.core.ports import (
+    AlignmentBackendProviderPort,
+    CachePort,
+    EpisodeSourceFactoryPort,
+    SecretProviderPort,
+    StoragePort,
+    VideoDownloaderPort,
+)
 
 
 @dataclass

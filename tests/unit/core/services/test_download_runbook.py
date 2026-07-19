@@ -1,6 +1,7 @@
 from types import SimpleNamespace
-from typing import TYPE_CHECKING, Any, cast
+from typing import Any, cast
 
+from adrift.core.models import PodcastConfig
 from adrift.core.services.download import DownloadRunOptions
 from tests.unit._fixtures import (
     _config,
@@ -10,9 +11,6 @@ from tests.unit._fixtures import (
     make_capture_ui,
     make_ui_emit_only,
 )
-
-if TYPE_CHECKING:
-    from adrift.core.models import PodcastConfig
 
 
 def test_download_episodes_skips_existing_and_counts_new_uploads() -> None:

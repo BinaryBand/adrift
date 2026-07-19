@@ -2,10 +2,8 @@
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, TypeVar
-
-if TYPE_CHECKING:
-    from collections.abc import Callable, Sequence
+from collections.abc import Callable, Sequence
+from typing import TypeVar
 
 AlignmentPair = tuple[int, int]
 AlignmentPairs = list[AlignmentPair]

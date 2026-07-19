@@ -87,6 +87,9 @@ ignore = [
     # Rules that conflict with `ruff format`.
     "COM812", # missing-trailing-comma
     "ISC001", # single-line-implicit-string-concatenation
+    # Rules that conflict with the ast-grep `no-type-checking-guard` policy.
+    # Imports must be at module level, never under `if TYPE_CHECKING:`.
+    "TC001", "TC002", "TC003",
     # Deliberate policy opt-outs.
     "CPY001", # missing-copyright-notice -- not wanted on internal projects
 ]

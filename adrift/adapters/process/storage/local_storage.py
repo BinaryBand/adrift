@@ -11,16 +11,14 @@ import json
 import os
 import tempfile
 from pathlib import Path
-from typing import TYPE_CHECKING, Any
+from typing import Any
 from urllib.parse import urljoin
 
 from pydantic import ValidationError
 
 from adrift.core.models import MediaMetadata, S3Metadata
 from adrift.core.models.storage_options import UploadOptions
-
-if TYPE_CHECKING:
-    from adrift.core.util.progress import Callback
+from adrift.core.util.progress import Callback
 
 _METADATA_SUFFIX = ".meta.json"
 _CHUNK_SIZE = 1024 * 1024

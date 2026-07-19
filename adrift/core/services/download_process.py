@@ -6,9 +6,10 @@ import tempfile
 from dataclasses import dataclass
 from datetime import UTC, datetime
 from pathlib import Path
-from typing import TYPE_CHECKING
 
 from adrift.core.models import DownloadEpisode, MediaMetadata, PodcastConfig
+from adrift.core.ports import Callback
+from adrift.core.services.context import AppContext
 from adrift.core.services.download_cache import _existing_media_sources
 from adrift.core.services.download_client import storage_prefix
 from adrift.core.services.download_upload import (
@@ -27,10 +28,6 @@ from adrift.core.services.web.rss import download_direct
 from adrift.core.services.web.sponsorblock import compute_ad_segments_expiry
 from adrift.core.util.crypto import sha256_file
 from adrift.core.util.title_normalization import normalize_title
-
-if TYPE_CHECKING:
-    from adrift.core.ports import Callback
-    from adrift.core.services.context import AppContext
 
 
 @dataclass(frozen=True)

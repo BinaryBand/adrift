@@ -5,7 +5,7 @@ from __future__ import annotations
 import sys
 from collections import defaultdict
 from pathlib import Path
-from typing import TYPE_CHECKING, Annotated, Any, cast
+from typing import Annotated, Any, cast
 
 import typer
 
@@ -16,9 +16,7 @@ from adrift.cli import (
     bootstrap_run_configs,
     build_cli,
 )
-
-if TYPE_CHECKING:
-    from adrift.core.services.context import AppContext
+from adrift.core.services.context import AppContext
 
 _AUDIO_EXTENSIONS = frozenset({".mp3", ".opus"})
 

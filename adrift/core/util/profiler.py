@@ -7,10 +7,7 @@ import sys
 from collections.abc import Callable, Generator
 from contextlib import contextmanager
 from time import perf_counter
-from typing import TYPE_CHECKING, Any, TypeVar, cast
-
-if TYPE_CHECKING:
-    from typing import TextIO
+from typing import Any, TextIO, TypeVar, cast
 
 F = TypeVar("F", bound=Callable[..., Any])
 

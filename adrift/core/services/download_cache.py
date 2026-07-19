@@ -4,15 +4,12 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from pathlib import Path
-from typing import TYPE_CHECKING
 
+from adrift.core.models import MediaMetadata
+from adrift.core.services.context import AppContext
 from adrift.core.services.download_client import prefixed_key
 from adrift.core.util.regex import YOUTUBE_VIDEO_REGEX
 from adrift.core.util.title_normalization import normalize_title
-
-if TYPE_CHECKING:
-    from adrift.core.models import MediaMetadata
-    from adrift.core.services.context import AppContext
 
 
 @dataclass(frozen=True)

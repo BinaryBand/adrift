@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, cast
+from typing import cast
 
 from adrift.core.models import (
     EpisodeData,
@@ -11,13 +11,11 @@ from adrift.core.models import (
     RssEpisode,
     SourceTrace,
 )
+from adrift.core.ports import Callback, EpisodeSourceFactoryPort, ScoredAlignmentBatchPort
 
 from .alignment import merge_episode
 from .collection import EpisodeFetchContext, _collect_episodes_with_traces
 from .merge_trace import _build_match_traces
-
-if TYPE_CHECKING:
-    from adrift.core.ports import Callback, EpisodeSourceFactoryPort, ScoredAlignmentBatchPort
 
 _TRACE_BUILD_ARITY = 5
 _EPISODE_MERGE_ARITY = 3

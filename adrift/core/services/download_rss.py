@@ -5,21 +5,17 @@ from __future__ import annotations
 import logging
 import tempfile
 from pathlib import Path
-from typing import TYPE_CHECKING
 
 import requests
 
 from adrift.core.models import PodcastConfig, RssChannel, RssEpisode
+from adrift.core.ports import EpisodeSourceFactoryPort
 from adrift.core.services.catalog import match, process_feeds
 from adrift.core.services.config import RCLONE_RC_PASSWORD, RCLONE_RC_URL, RCLONE_RC_USER
+from adrift.core.services.context import AppContext
 from adrift.core.services.download_client import storage_prefix
 from adrift.core.services.files.audio import is_audio
 from adrift.core.services.web.rss import podcast_to_rss
-
-if TYPE_CHECKING:
-    from adrift.core.ports import EpisodeSourceFactoryPort
-    from adrift.core.services.context import AppContext
-
 
 logger = logging.getLogger(__name__)
 _CHANNEL_FILL_ERRORS = (OSError, RuntimeError, TypeError, ValueError)

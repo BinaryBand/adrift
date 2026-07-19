@@ -2,12 +2,10 @@
 
 from __future__ import annotations
 
+from collections.abc import Iterator
 from contextlib import contextmanager
 from contextvars import ContextVar
-from typing import TYPE_CHECKING, Literal, Protocol
-
-if TYPE_CHECKING:
-    from collections.abc import Iterator
+from typing import Literal, Protocol
 
 Level = Literal["info", "warning", "error"]
 

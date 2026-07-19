@@ -2,19 +2,16 @@
 
 from __future__ import annotations
 
+from collections.abc import Callable
 from datetime import UTC, datetime
-from typing import TYPE_CHECKING, Any
+from typing import Any
 
+from adrift.core.models import RssChannel, RssEpisode, YtDlpVideo
 from adrift.core.util.image import extract_image_from_ytdlp, extract_image_from_ytdlp_list
+from adrift.core.util.progress import Callback
 
 extract_image_url = extract_image_from_ytdlp
 extract_image_from_list = extract_image_from_ytdlp_list
-
-if TYPE_CHECKING:
-    from collections.abc import Callable
-
-    from adrift.core.models import RssChannel, RssEpisode, YtDlpVideo
-    from adrift.core.util.progress import Callback
 
 _PROGRESS_HOOK_ERRORS = (OSError, RuntimeError, TypeError, ValueError)
 

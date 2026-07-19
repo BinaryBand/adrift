@@ -4,14 +4,12 @@ from __future__ import annotations
 
 import os
 import subprocess
+from collections.abc import Iterable
 from pathlib import Path
 from shutil import which
-from typing import TYPE_CHECKING, Any, ClassVar
+from typing import Any, ClassVar
 
 import pytest
-
-if TYPE_CHECKING:
-    from collections.abc import Iterable
 
 ROOT: Path = Path(__file__).resolve().parents[1]
 VENV_BIN = ROOT / ".venv" / "bin"

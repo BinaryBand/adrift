@@ -3,17 +3,15 @@
 from __future__ import annotations
 
 from datetime import UTC, datetime
-from typing import TYPE_CHECKING, cast
+from typing import cast
 
 from dateutil import parser
+from feedparser import FeedParserDict
 
 from adrift.core.models import RssChannel, RssEpisode
 from adrift.core.util.image import extract_image_from_feedparser
 from adrift.core.util.media import AUDIO_EXTENSIONS, parse_duration
 from adrift.core.util.regex import LINK_REGEX
-
-if TYPE_CHECKING:
-    from feedparser import FeedParserDict
 
 
 def _getattr_multi(obj: object, *fields: str, default: object = "") -> object:

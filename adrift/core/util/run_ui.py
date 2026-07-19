@@ -4,21 +4,16 @@ from __future__ import annotations
 
 import importlib.util
 import sys
+from collections.abc import Callable
 from contextlib import AbstractContextManager
-from typing import TYPE_CHECKING
+from types import TracebackType
 
+from rich.progress import Progress
 from tqdm import tqdm
 from typing_extensions import override
 
+from adrift.core.util.progress import Callback
 from adrift.core.util.terminal import Level, format_terminal_message, using_terminal_emitter
-
-if TYPE_CHECKING:
-    from collections.abc import Callable
-    from types import TracebackType
-
-    from rich.progress import Progress
-
-    from adrift.core.util.progress import Callback
 
 _PROGRESS_META_WIDTH = 38
 

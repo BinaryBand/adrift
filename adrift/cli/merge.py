@@ -4,9 +4,10 @@ from __future__ import annotations
 
 import json
 import sys
+from collections.abc import Iterator
 from pathlib import Path
 from time import perf_counter
-from typing import TYPE_CHECKING, Annotated, Any
+from typing import Annotated, Any
 
 import typer
 
@@ -17,19 +18,15 @@ from adrift.cli import (
     bootstrap_run_configs,
     build_cli,
 )
+from adrift.core.services.app_common import PodcastConfig
 from adrift.core.services.merge import MergeUseCase
-from adrift.core.util.profiler import disable_profiling, enable_profiling, print_profile_report
-
-if TYPE_CHECKING:
-    from collections.abc import Iterator
-
-    from adrift.core.services.app_common import PodcastConfig
 from adrift.core.services.merge_service import MergeRunOptions, MergeWriters
 from adrift.core.services.merge_service import format_duration as _format_duration
 from adrift.core.services.merge_service import write_json as service_write_json
 from adrift.core.services.merge_service import write_output_bundle as service_write_output_bundle
 from adrift.core.services.merge_service import write_report_file as service_write_report_file
 from adrift.core.services.merge_service import write_series_outputs as service_write_series_outputs
+from adrift.core.util.profiler import disable_profiling, enable_profiling, print_profile_report
 
 
 def _write_json(path: Path, payload: object) -> None:

@@ -8,14 +8,12 @@ from collections.abc import Callable, Sequence
 from dataclasses import dataclass
 from datetime import UTC, datetime
 from pathlib import Path
-from typing import TYPE_CHECKING, cast
+from typing import cast
 
-if TYPE_CHECKING:
-    from pydantic import BaseModel
+from pydantic import BaseModel
 
-    from adrift.core.models import MergeResult
-    from adrift.core.ports import AlignmentBackendProviderPort, EpisodeSourceFactoryPort
-
+from adrift.core.models import MergeResult
+from adrift.core.ports import AlignmentBackendProviderPort, EpisodeSourceFactoryPort
 
 JsonWriter = Callable[[Path, object], None]
 

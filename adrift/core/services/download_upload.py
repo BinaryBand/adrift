@@ -5,14 +5,11 @@ This module only builds upload requests and performs the final storage upload st
 
 from dataclasses import dataclass
 from pathlib import Path
-from typing import TYPE_CHECKING
 
 from adrift.core.models import MediaMetadata
 from adrift.core.models.storage_options import UploadOptions
+from adrift.core.services.context import AppContext
 from adrift.core.util.progress import Callback
-
-if TYPE_CHECKING:
-    from adrift.core.services.context import AppContext
 
 
 @dataclass(frozen=True)
