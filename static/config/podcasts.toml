@@ -85,49 +85,49 @@ pattern = "^.*?ep\\-*(\\d{1,3}[\\-a-z0-9]+)$"
 replacement = "\\1"
 
 
-[[podcasts]]
-name = "Financial Audit"
-path = "/Podcasts/financial-audit"
-schedule = ["FREQ=WEEKLY;BYDAY=FR,WE,SA"]
-tags = ["podcasts", "financial-audit"]
+# [[podcasts]]
+# name = "Financial Audit"
+# path = "/Podcasts/financial-audit"
+# schedule = ["FREQ=WEEKLY;BYDAY=FR,WE,SA"]
+# tags = ["podcasts", "financial-audit"]
 
-[[podcasts.references]]
-url = "https://feeds.megaphone.fm/ROOSTER4571910246"
-[podcasts.references.filters]
-exclude = [
-    "exclusive",
-    "post show",
-    "check up",
-    "hammer it out",
-    "behind the scenes",
-    "financial update",
-    "audit update",
-    "breaking down",
-    "member's financial",
-    "dating audit",
-    "fat & fatter",
-]
+# [[podcasts.references]]
+# url = "https://feeds.megaphone.fm/ROOSTER4571910246"
+# [podcasts.references.filters]
+# exclude = [
+#     "exclusive",
+#     "post show",
+#     "check up",
+#     "hammer it out",
+#     "behind the scenes",
+#     "financial update",
+#     "audit update",
+#     "breaking down",
+#     "member's financial",
+#     "dating audit",
+#     "fat & fatter",
+# ]
 
-[[podcasts.downloads]]
-url = "yt://@CalebHammer"
-[podcasts.downloads.filters]
-exclude = [
-    "exclusive",
-    "post show",
-    "check up",
-    "hammer it out",
-    "behind the scenes",
-    "financial update",
-    "audit update",
-    "breaking down",
-    "member's financial",
-    "dating audit",
-    "fat & fatter",
-]
+# [[podcasts.downloads]]
+# url = "yt://@CalebHammer"
+# [podcasts.downloads.filters]
+# exclude = [
+#     "exclusive",
+#     "post show",
+#     "check up",
+#     "hammer it out",
+#     "behind the scenes",
+#     "financial update",
+#     "audit update",
+#     "breaking down",
+#     "member's financial",
+#     "dating audit",
+#     "fat & fatter",
+# ]
 
-[podcasts.cleanup.title_normalization]
-suffix_patterns = ["(?i)\\| financial audit$"]
-slug_suffixes = ["Financial Audit"]
+# [podcasts.cleanup.title_normalization]
+# suffix_patterns = ["(?i)\\| financial audit$"]
+# slug_suffixes = ["Financial Audit"]
 
 
 [[podcasts]]
@@ -266,14 +266,14 @@ url = "https://feeds.megaphone.fm/QCD2422844292"
 url = "yt://#PLeskMkEaHJYfTMaKwmBWGq4NogX9FLF2J"
 
 
-[[podcasts]]
-name = "The Weekly Show with Jon Stewart"
-path = "/Podcasts/the-weekly-show-with-jon-stewart"
-schedule = ["FREQ=WEEKLY;BYDAY=WE,TH,FR"]
-tags = ["podcasts", "the-weekly-show-with-jon-stewart"]
+# [[podcasts]]
+# name = "The Weekly Show with Jon Stewart"
+# path = "/Podcasts/the-weekly-show-with-jon-stewart"
+# schedule = ["FREQ=WEEKLY;BYDAY=WE,TH,FR"]
+# tags = ["podcasts", "the-weekly-show-with-jon-stewart"]
 
-[[podcasts.references]]
-url = "https://feeds.megaphone.fm/BVLLC2163264914"
+# [[podcasts.references]]
+# url = "https://feeds.megaphone.fm/BVLLC2163264914"
 
-[[podcasts.downloads]]
-url = "yt://@WeeklyShowPodcast"
+# [[podcasts.downloads]]
+# url = "yt://@WeeklyShowPodcast"

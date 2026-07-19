@@ -17,30 +17,30 @@
 # cspell:disable
 
 
-[[podcasts]]
-name = "Alyssa Grenfell"
-path = "/Podcasts/alyssa-grenfell"
-schedule = ["FREQ=WEEKLY;BYDAY=FR,WE,MO"]
-tags = ["youtube", "alyssa-grenfell"]
+# [[podcasts]]
+# name = "Alyssa Grenfell"
+# path = "/Podcasts/alyssa-grenfell"
+# schedule = ["FREQ=WEEKLY;BYDAY=FR,WE,MO"]
+# tags = ["youtube", "alyssa-grenfell"]
 
-[[podcasts.references]]
-url = "yt://@alyssadgrenfell"
+# [[podcasts.references]]
+# url = "yt://@alyssadgrenfell"
 
-[[podcasts.downloads]]
-url = "yt://@alyssadgrenfell"
+# [[podcasts.downloads]]
+# url = "yt://@alyssadgrenfell"
 
 
-[[podcasts]]
-name = "Coffeezilla"
-path = "/Podcasts/coffeezilla"
-schedule = ["FREQ=WEEKLY;BYDAY=MO,TH,WE"]
-tags = ["youtube", "coffeezilla"]
+# [[podcasts]]
+# name = "Coffeezilla"
+# path = "/Podcasts/coffeezilla"
+# schedule = ["FREQ=WEEKLY;BYDAY=MO,TH,WE"]
+# tags = ["youtube", "coffeezilla"]
 
-[[podcasts.references]]
-url = "yt://@Coffeezilla"
+# [[podcasts.references]]
+# url = "yt://@Coffeezilla"
 
-[[podcasts.downloads]]
-url = "yt://@Coffeezilla"
+# [[podcasts.downloads]]
+# url = "yt://@Coffeezilla"
 
 
 [[podcasts]]
@@ -86,17 +86,17 @@ include = ["Last Week Tonight With John Oliver"]
 exclude = ["^s\\d{1,2}\\s*[-:]?\\s*e\\d{1,2}\\b"]
 
 
-[[podcasts]]
-name = "Lisa Sonni"
-path = "/Podcasts/lisa-sonni"
-schedule = ["FREQ=WEEKLY;BYDAY=SA,WE,TH"]
-tags = ["youtube", "lisa-sonni"]
+# [[podcasts]]
+# name = "Lisa Sonni"
+# path = "/Podcasts/lisa-sonni"
+# schedule = ["FREQ=WEEKLY;BYDAY=SA,WE,TH"]
+# tags = ["youtube", "lisa-sonni"]
 
-[[podcasts.references]]
-url = "yt://@lisasonni"
+# [[podcasts.references]]
+# url = "yt://@lisasonni"
 
-[[podcasts.downloads]]
-url = "yt://@lisasonni"
+# [[podcasts.downloads]]
+# url = "yt://@lisasonni"
 
 
 [[podcasts]]
@@ -112,29 +112,29 @@ url = "yt://@LegalEagle"
 url = "yt://@LegalEagle"
 
 
-[[podcasts]]
-name = "Paul J Warburg"
-path = "/Podcasts/paul-j-warburg"
-schedule = ["FREQ=WEEKLY;BYDAY=SA,TH,FR"]
-tags = ["youtube", "paul-j-warburg"]
+# [[podcasts]]
+# name = "Paul J Warburg"
+# path = "/Podcasts/paul-j-warburg"
+# schedule = ["FREQ=WEEKLY;BYDAY=SA,TH,FR"]
+# tags = ["youtube", "paul-j-warburg"]
 
-[[podcasts.references]]
-url = "yt://@PaulJWarburg"
+# [[podcasts.references]]
+# url = "yt://@PaulJWarburg"
 
-[[podcasts.downloads]]
-url = "yt://@PaulJWarburg"
+# [[podcasts.downloads]]
+# url = "yt://@PaulJWarburg"
 
 
-[[podcasts]]
-name = "YV Edit"
-path = "/Podcasts/yv-edit"
-schedule = ["FREQ=WEEKLY;BYDAY=TH,SA,FR"]
-tags = ["youtube", "yv-edit"]
+# [[podcasts]]
+# name = "YV Edit"
+# path = "/Podcasts/yv-edit"
+# schedule = ["FREQ=WEEKLY;BYDAY=TH,SA,FR"]
+# tags = ["youtube", "yv-edit"]
 
-[[podcasts.references]]
-url = "yt://@yv_edit"
-[podcasts.references.filters]
+# [[podcasts.references]]
+# url = "yt://@yv_edit"
+# [podcasts.references.filters]
 
-[[podcasts.downloads]]
-url = "yt://@yv_edit"
-[podcasts.downloads.filters]
+# [[podcasts.downloads]]
+# url = "yt://@yv_edit"
+# [podcasts.downloads.filters]
