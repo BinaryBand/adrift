@@ -8,8 +8,18 @@ use regex::Regex;
 
 // Month names that are not discriminating anchor tokens.
 const TEMPORAL_TOKENS: &[&str] = &[
-    "january", "february", "march", "april", "may", "june",
-    "july", "august", "september", "october", "november", "december",
+    "january",
+    "february",
+    "march",
+    "april",
+    "may",
+    "june",
+    "july",
+    "august",
+    "september",
+    "october",
+    "november",
+    "december",
 ];
 
 // ---------------------------------------------------------------------------
@@ -60,9 +70,8 @@ fn extract_patterns(config: &Bound<'_, PyAny>) -> PyResult<Vec<Regex>> {
     let raw: Vec<String> = config.getattr("numbered_marker_patterns")?.extract()?;
     raw.iter()
         .map(|p| {
-            Regex::new(p).map_err(|e| {
-                PyErr::new::<pyo3::exceptions::PyValueError, _>(e.to_string())
-            })
+            Regex::new(p)
+                .map_err(|e| PyErr::new::<pyo3::exceptions::PyValueError, _>(e.to_string()))
         })
         .collect()
 }
@@ -107,8 +116,16 @@ fn token_set_ratio(a: &str, b: &str) -> f64 {
     let mut db: Vec<&str> = sb.difference(&sa).copied().collect();
     db.sort_unstable();
     let si = inter.join(" ");
-    let sua = if da.is_empty() { si.clone() } else { format!("{si} {}", da.join(" ")) };
-    let sub_ = if db.is_empty() { si.clone() } else { format!("{si} {}", db.join(" ")) };
+    let sua = if da.is_empty() {
+        si.clone()
+    } else {
+        format!("{si} {}", da.join(" "))
+    };
+    let sub_ = if db.is_empty() {
+        si.clone()
+    } else {
+        format!("{si} {}", db.join(" "))
+    };
     let r1 = fuzz::ratio(si.chars(), sua.chars());
     let r2 = fuzz::ratio(si.chars(), sub_.chars());
     let r3 = fuzz::ratio(sua.chars(), sub_.chars());
@@ -205,12 +222,7 @@ fn has_number_mismatch(ref_title: &str, dl_title: &str, patterns: &[Regex]) -> b
     })
 }
 
-fn has_weak_anchor(
-    ref_title: &str,
-    dl_title: &str,
-    title_sim: f64,
-    sw: &HashSet<String>,
-) -> bool {
+fn has_weak_anchor(ref_title: &str, dl_title: &str, title_sim: f64, sw: &HashSet<String>) -> bool {
     let ra = anchor_set(ref_title, sw);
     let da = anchor_set(dl_title, sw);
     ra.intersection(&da).count() == 0 && title_sim < 0.75
@@ -223,15 +235,17 @@ fn reject_subset_rescue(
     title_sim: f64,
     has_desc: bool,
     has_date: bool,
-    stopwords: &HashSet<String>,
-    certainty_min: f64,
-    rescue_min: f64,
+    cfg: &BatchConfig,
 ) -> bool {
-    if !has_desc || !has_date || title_sim < rescue_min || title_sim >= certainty_min {
+    if !has_desc
+        || !has_date
+        || title_sim < cfg.metadata_rescue_subset_sim_min
+        || title_sim >= cfg.title_certainty_min
+    {
         return false;
     }
-    let ra = anchor_set(ref_title, stopwords);
-    let da = anchor_set(dl_title, stopwords);
+    let ra = anchor_set(ref_title, &cfg.stopwords);
+    let da = anchor_set(dl_title, &cfg.stopwords);
     match subset_extras(&ra, &da) {
         Some(ref tokens) if tokens.len() == 1 => is_discriminating(tokens),
         _ => false,
@@ -240,14 +254,22 @@ fn reject_subset_rescue(
 
 /// First-pass rejection: number mismatch and weak anchor.
 /// Mirrors `_should_reject_alignment`.
-fn should_reject(ref_ep: &EpisodeData, dl_ep: &EpisodeData, title_sim: f64, cfg: &BatchConfig) -> bool {
-    has_number_mismatch(&ref_ep.normalized_title, &dl_ep.normalized_title, &cfg.patterns)
-        || has_weak_anchor(
-            &ref_ep.normalized_title,
-            &dl_ep.normalized_title,
-            title_sim,
-            &cfg.stopwords,
-        )
+fn should_reject(
+    ref_ep: &EpisodeData,
+    dl_ep: &EpisodeData,
+    title_sim: f64,
+    cfg: &BatchConfig,
+) -> bool {
+    has_number_mismatch(
+        &ref_ep.normalized_title,
+        &dl_ep.normalized_title,
+        &cfg.patterns,
+    ) || has_weak_anchor(
+        &ref_ep.normalized_title,
+        &dl_ep.normalized_title,
+        title_sim,
+        &cfg.stopwords,
+    )
 }
 
 // ---------------------------------------------------------------------------
@@ -286,19 +308,38 @@ fn score_pair_sims(
     cfg: &BatchConfig,
 ) -> f64 {
     let desc_sim = if has_desc {
-        fuzzy_sim(&ref_ep.normalized_description, &dl_ep.normalized_description)
+        fuzzy_sim(
+            &ref_ep.normalized_description,
+            &dl_ep.normalized_description,
+        )
     } else {
         0.0
     };
     let ds = if include_date && has_date {
-        date_sim(ref_ep.pub_date_unix_s, dl_ep.pub_date_unix_s, &cfg.date_score_tiers)
+        date_sim(
+            ref_ep.pub_date_unix_s,
+            dl_ep.pub_date_unix_s,
+            &cfg.date_score_tiers,
+        )
     } else {
         0.0
     };
-    let base = weighted_base(title_sim, desc_sim, ds, cfg, has_desc, has_date, include_date);
+    let base = weighted_base(
+        title_sim,
+        desc_sim,
+        ds,
+        cfg,
+        has_desc,
+        has_date,
+        include_date,
+    );
     let ra = anchor_set(&ref_ep.normalized_title, &cfg.stopwords);
     let da = anchor_set(&dl_ep.normalized_title, &cfg.stopwords);
-    let bonus = if include_date && has_containment(&ra, &da) { cfg.containment_bonus } else { 0.0 };
+    let bonus = if include_date && has_containment(&ra, &da) {
+        cfg.containment_bonus
+    } else {
+        0.0
+    };
     (base + bonus).min(1.0)
 }
 
@@ -309,8 +350,8 @@ fn score_pair(ref_ep: &EpisodeData, dl_ep: &EpisodeData, cfg: &BatchConfig) -> f
         return 1.0;
     }
     let title_sim = fuzzy_sim(&ref_ep.normalized_title, &dl_ep.normalized_title);
-    let has_desc = !ref_ep.normalized_description.is_empty()
-        && !dl_ep.normalized_description.is_empty();
+    let has_desc =
+        !ref_ep.normalized_description.is_empty() && !dl_ep.normalized_description.is_empty();
     let has_date = ref_ep.pub_date_unix_s.is_some() && dl_ep.pub_date_unix_s.is_some();
 
     if should_reject(ref_ep, dl_ep, title_sim, cfg) {
@@ -330,14 +371,20 @@ fn score_pair(ref_ep: &EpisodeData, dl_ep: &EpisodeData, cfg: &BatchConfig) -> f
             title_sim,
             has_desc,
             has_date,
-            &cfg.stopwords,
-            cfg.title_certainty_min,
-            cfg.metadata_rescue_subset_sim_min,
+            cfg,
         ) {
             return 0.0;
         }
     }
-    score_pair_sims(ref_ep, dl_ep, title_sim, has_desc, has_date, include_date, cfg)
+    score_pair_sims(
+        ref_ep,
+        dl_ep,
+        title_sim,
+        has_desc,
+        has_date,
+        include_date,
+        cfg,
+    )
 }
 
 // ---------------------------------------------------------------------------
@@ -375,10 +422,14 @@ fn align_batch(py: Python<'_>, batch: &Bound<'_, PyAny>) -> PyResult<(Py<PyList>
     let ref_list: Vec<Bound<'_, PyAny>> = batch.getattr("references")?.extract()?;
     let dl_list: Vec<Bound<'_, PyAny>> = batch.getattr("downloads")?.extract()?;
 
-    let references: Vec<EpisodeData> =
-        ref_list.iter().map(extract_episode).collect::<PyResult<_>>()?;
-    let downloads: Vec<EpisodeData> =
-        dl_list.iter().map(extract_episode).collect::<PyResult<_>>()?;
+    let references: Vec<EpisodeData> = ref_list
+        .iter()
+        .map(extract_episode)
+        .collect::<PyResult<_>>()?;
+    let downloads: Vec<EpisodeData> = dl_list
+        .iter()
+        .map(extract_episode)
+        .collect::<PyResult<_>>()?;
 
     let n_refs = references.len();
     let n_dls = downloads.len();
@@ -390,7 +441,10 @@ fn align_batch(py: Python<'_>, batch: &Bound<'_, PyAny>) -> PyResult<(Py<PyList>
             .map(|idx| {
                 let r_idx = idx / n_dls;
                 let d_idx = idx % n_dls;
-                ((r_idx, d_idx), score_pair(&references[r_idx], &downloads[d_idx], &cfg))
+                (
+                    (r_idx, d_idx),
+                    score_pair(&references[r_idx], &downloads[d_idx], &cfg),
+                )
             })
             .collect()
     });

@@ -18,16 +18,26 @@ ROOT = Path(__file__).resolve().parents[1]
 RUST = ROOT / "rust"
 
 
+def _crate_dir() -> Path:
+    """Locate the cargo project root: rust/ itself, or its sole crate subdirectory."""
+    if (RUST / "Cargo.toml").exists():
+        return RUST
+    manifest = next(RUST.glob("*/Cargo.toml"), None)
+    if manifest is None:
+        pytest.fail("rust/ present but no Cargo.toml found in it or its subdirectories")
+    return manifest.parent
+
+
 def _rust_or_skip() -> Path:
     if not RUST.exists():
         pytest.skip("no rust/ tree")
     if shutil.which("cargo") is None:
         pytest.fail("rust/ present but cargo not on PATH; the Rust shape is unverifiable")
-    return RUST
+    return _crate_dir()
 
 
-def _run(cmd: list[str]) -> subprocess.CompletedProcess[str]:
-    return subprocess.run(cmd, capture_output=True, text=True, cwd=RUST, check=False)
+def _run(cmd: list[str], cwd: Path) -> subprocess.CompletedProcess[str]:
+    return subprocess.run(cmd, capture_output=True, text=True, cwd=cwd, check=False)
 
 
 def test_rust_location() -> None:
@@ -46,8 +56,8 @@ def test_rust_location() -> None:
 
 def test_rust_format() -> None:
     """cargo fmt --check must report no reformats needed."""
-    _rust_or_skip()
-    result = _run(["cargo", "fmt", "--all", "--", "--check"])
+    crate = _rust_or_skip()
+    result = _run(["cargo", "fmt", "--all", "--", "--check"], crate)
     assert result.returncode == 0, (
         f"cargo fmt --check failed (exit {result.returncode}):\n\n{result.stdout}\n{result.stderr}"
     )
@@ -55,8 +65,10 @@ def test_rust_format() -> None:
 
 def test_rust_clippy() -> None:
     """cargo clippy must produce zero warnings."""
-    _rust_or_skip()
-    result = _run(["cargo", "clippy", "--all-targets", "--all-features", "--", "-D", "warnings"])
+    crate = _rust_or_skip()
+    result = _run(
+        ["cargo", "clippy", "--all-targets", "--all-features", "--", "-D", "warnings"], crate
+    )
     assert result.returncode == 0, (
         f"cargo clippy failed (exit {result.returncode}):\n\n{result.stdout}\n{result.stderr}"
     )
@@ -64,8 +76,8 @@ def test_rust_clippy() -> None:
 
 def test_rust_test() -> None:
     """cargo test must pass."""
-    _rust_or_skip()
-    result = _run(["cargo", "test"])
+    crate = _rust_or_skip()
+    result = _run(["cargo", "test"], crate)
     assert result.returncode == 0, (
         f"cargo test failed (exit {result.returncode}):\n\n{result.stdout}\n{result.stderr}"
     )
