@@ -1,8 +1,0 @@
-id: no-subprocess-shell
-language: python
-severity: warning
-message: "Avoid passing shell=True to subprocess calls."
-rule:
-  any:
-    - pattern: subprocess.run($ARGS, shell=True)
-    - pattern: subprocess.Popen($ARGS, shell=True)
