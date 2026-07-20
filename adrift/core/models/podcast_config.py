@@ -190,7 +190,11 @@ def ensure_feed_source(source: FeedSource | dict[str, Any]) -> FeedSource:
         raise TypeError(msg)
     payload = dict(source)
     payload["filters"] = ensure_source_filter(payload.get("filters"))
-    return _ensure_model(payload, FeedSource)
+    # FeedSource only accepts url + filters — strip anything else silently
+    # so misplaced fields (e.g. name, path from a TOML authoring mistake)
+    # don't trigger a ValidationError.
+    clean = {k: v for k, v in payload.items() if k in ("url", "filters")}
+    return _ensure_model(clean, FeedSource)
 
 
 def ensure_podcast_config(podcast: PodcastConfig | dict[str, Any]) -> PodcastConfig:

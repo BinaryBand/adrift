@@ -8,6 +8,7 @@ from adrift.core.models import AlignmentConfig
 from adrift.core.services.catalog import (
     align_episodes,
     align_episodes_impl,
+    match,
     merge_episode,
     sim_date,
 )
@@ -386,6 +387,42 @@ class TestBestThumbnailFragileMaxres(unittest.TestCase):
     @patch("adrift.core.services.catalog.alignment._thumbnail_url_exists", return_value=True)
     def test_existing_maxres_is_kept(self, _exists):  # noqa: PT019
         assert _best_thumbnail(self._RSS, self._MAXRES) == self._MAXRES
+
+
+class TestMatchStorageFilenames(unittest.TestCase):
+    """Filename-to-title matching used by download_rss.update_rss.
+
+    Unlike align_episodes this step has only filenames to work with -- no pub
+    dates or descriptions -- so the structured-number guard is the only thing
+    stopping a shared subtitle from attaching the wrong audio file.
+    """
+
+    def test_number_mismatch_does_not_attach_wrong_audio(self):
+        # "80s Tales" appears in both, and outscores tolerance on text alone.
+        files = ["80s-tales-listener-tales-108"]
+        titles = ["Listener Tales 109: 80s Tales!"]
+        assert match(files, titles, "Morbid") == []
+
+    def test_truncated_number_does_not_steal_longer_episodes_file(self):
+        # "Listener Tales 7" must not claim episode 72's file: doing so both
+        # mislabels the audio and orphans 72, dropping it from the feed.
+        files = ["listener-tales-72-morbid"]
+        titles = ["Listener Tales 7"]
+        assert match(files, titles, "Morbid") == []
+
+    def test_exact_number_still_matches(self):
+        files = ["episode-769-listener-tales-108-90s-tales"]
+        titles = ["Listener Tales 108: 90s Tales!"]
+        assert match(files, titles, "Morbid") == [(0, 0)]
+
+    def test_alignment_tolerance_is_honoured(self):
+        # A truncated filename against a long reference title scores ~0.60:
+        # below the 0.75 default, reachable with a per-podcast override.
+        files = ["listener-tales-72-morbid"]
+        titles = ["Listener Tales 72: Dream, Astral Projections & Alternate Dimensions"]
+        assert match(files, titles, "Morbid") == []
+        lenient = AlignmentConfig(match_tolerance=0.55)
+        assert match(files, titles, "Morbid", alignment=lenient) == [(0, 0)]
 
 
 if __name__ == "__main__":

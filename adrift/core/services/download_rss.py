@@ -76,7 +76,7 @@ def _match_to_storage(
 
     file_names = [Path(f).stem for f in files]
     titles = [ep.title for ep in episodes]
-    pairs = match(file_names, titles, config.name)
+    pairs = match(file_names, titles, config.name, alignment=config.alignment)
     return _apply_pairs(files, episodes, pairs)
 
 

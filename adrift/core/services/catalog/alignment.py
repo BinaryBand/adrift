@@ -122,10 +122,11 @@ def match(
     episodes: list[str],
     title: str,
     callback: Callback | None = None,
+    alignment: AlignmentConfig | None = None,
 ) -> list[tuple[int, int]]:
     """Match file names to episode titles using fuzzy similarity."""
     files_clean, episodes_clean = _prepare_match_inputs(files, episodes, title)
-    return _score_match_pairs(files_clean, episodes_clean, callback)
+    return _score_match_pairs(files_clean, episodes_clean, callback, _coerce_alignment(alignment))
 
 
 def _prepare_match_inputs(
@@ -143,17 +144,23 @@ def _score_match_pairs(
     files_clean: list[str],
     episodes_clean: list[str],
     callback: Callback | None = None,
+    alignment: AlignmentConfig = _DEFAULT_ALIGNMENT,
 ) -> list[tuple[int, int]]:
     scores: dict[tuple[int, int], float] = {}
     total = len(files_clean)
     for f_idx, file_name in enumerate(files_clean):
         for e_idx, episode_name in enumerate(episodes_clean):
-            scores[(f_idx, e_idx)] = _similarity_clean(file_name, episode_name)
+            # A differing episode number (e.g. "listener tales 108" vs 109) is a
+            # hard reject: without pub dates or descriptions to weigh, a shared
+            # subtitle otherwise scores high enough to attach the wrong audio.
+            mismatched = _has_structured_number_mismatch(file_name, episode_name)
+            score = 0.0 if mismatched else _similarity_clean(file_name, episode_name)
+            scores[(f_idx, e_idx)] = score
         if callback:
             callback(f_idx + 1, total)
 
     matches = _select_unique_matches(scores)
-    return _filter_tolerated_matches(matches, scores, _DEFAULT_ALIGNMENT.match_tolerance)
+    return _filter_tolerated_matches(matches, scores, alignment.match_tolerance)
 
 
 def _select_unique_matches(
