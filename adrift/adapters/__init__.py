@@ -114,10 +114,13 @@ def get_secret_provider_adapter(
 
 def _make_local_storage() -> StoragePort:
     from adrift.adapters.process.storage.local_storage import LocalFilesystemStorage  # noqa: I001, PLC0415
+    from adrift.core.services.mount_guard import ensure_rclone_pcloud_mount  # noqa: PLC0415
 
     # STORAGE_ROOT: root for storage writes (<root>/<bucket>/<key>); in
     # production an rclone mount point synced and served outside this app.
-    return LocalFilesystemStorage(Path(os.getenv("STORAGE_ROOT", "./storage")))
+    storage_root = Path(os.getenv("STORAGE_ROOT", "./storage"))
+    ensure_rclone_pcloud_mount(storage_root)
+    return LocalFilesystemStorage(storage_root)
 
 
 _STORAGE_REGISTRY: dict[str, Callable[[], StoragePort]] = {

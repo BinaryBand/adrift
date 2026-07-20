@@ -169,9 +169,19 @@ def bootstrap_run_configs(
     """Load env, resolve include/tags defaults, and return configs + output dir."""
     import dotenv  # noqa: PLC0415 -- defer python-dotenv import to CLI bootstrap
 
+    from adrift.core.services.mount_guard import (  # noqa: PLC0415 — defer to avoid import cycles
+        ensure_rclone_pcloud_mount,
+    )
+
     normalized_include = include or _DF_TARGETS
     normalized_tags = tags or []
     normalized_output_dir = output_dir or _DEFAULT_OUTPUT_DIR
+    # Only guard when output_dir was explicitly requested and non-empty
+    # (merge CLI with --output-dir).  The download CLI does not use
+    # output_dir and passes None / "".
+    if output_dir:
+        ensure_rclone_pcloud_mount(normalized_output_dir, env_var="ADRIFT_OUTPUT_DIR")
+
     dotenv.load_dotenv()
     configs = load_podcast_configs(
         normalized_include, normalized_tags, skip_schedule_filter=skip_schedule_filter

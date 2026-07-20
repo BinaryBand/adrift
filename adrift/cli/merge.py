@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import os
 import sys
 from collections.abc import Iterator
 from pathlib import Path
@@ -128,8 +129,8 @@ def _run(  # noqa: PLR0913
     ] = False,
     output_dir: Annotated[
         str,
-        typer.Option(help="Root directory for output bundles (default: downloads/)."),
-    ] = "",
+        typer.Option(help="Root directory for output bundles (env: ADRIFT_OUTPUT_DIR)."),
+    ] = os.getenv("ADRIFT_OUTPUT_DIR", ""),
     output_file: Annotated[
         str | None,
         typer.Option(help="Write the cumulative JSON report to this file."),

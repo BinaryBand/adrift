@@ -4,6 +4,8 @@ from datetime import UTC, datetime
 from pathlib import Path
 from unittest.mock import patch
 
+import pytest
+
 from adrift.cli import merge as merge_mod
 from adrift.core.models import EpisodeData, FeedSource, MergeResult, PodcastConfig
 from adrift.core.services import app_common
@@ -15,6 +17,12 @@ from tests.unit._fixtures import (
     sample_merge_result,
     sample_refs_downloads,
 )
+
+
+@pytest.fixture(autouse=True)
+def _allow_local_writes(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Tests use tmp_path — bypass the rclone pCloud mount guard."""
+    monkeypatch.setenv("ADRIFT_ALLOW_LOCAL_WRITES", "1")
 
 
 def test_write_series_outputs_creates_expected_layout(tmp_path: Path) -> None:
