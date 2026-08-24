@@ -123,7 +123,45 @@ def _apply_repo_cookiefile(opts: YtDlpParams) -> bool:
     )
 
 
+# Locations yt-dlp searches for a Firefox profile. If none of them holds a
+# cookie database there are no browser cookies to read, and pointing yt-dlp at
+# them anyway aborts the whole attempt instead of proceeding unauthenticated.
+_FIREFOX_PROFILE_DIRS = (
+    "~/.mozilla/firefox",
+    "~/.config/mozilla/firefox",
+    "~/snap/firefox/common/.mozilla/firefox",
+    "~/.var/app/org.mozilla.firefox/.mozilla/firefox",
+    "~/.var/app/org.mozilla.firefox/config/mozilla/firefox",
+)
+
+
+def _firefox_profile_available() -> bool:
+    """Return True if a Firefox cookie database exists on this host.
+
+    The profile directory alone is not enough: a Firefox install that has never
+    run leaves behind crash-report folders but no ``cookies.sqlite``.
+    """
+    for directory in _FIREFOX_PROFILE_DIRS:
+        root = Path(directory).expanduser()
+        if not root.is_dir():
+            continue
+        if (root / "cookies.sqlite").is_file():
+            return True
+        if any(root.glob("*/cookies.sqlite")):
+            return True
+    return False
+
+
 def _apply_browser_fallback(opts: YtDlpParams, prefer_native: bool) -> None:  # noqa: FBT001
+    if not _firefox_profile_available():
+        # Leave cookies unset. The attempt still gets the Node JS runtime and
+        # the relaxed extractor args, which is enough for public videos.
+        # Setting cookiesfrombrowser here would fail the attempt outright, and
+        # that failure is not classified retryable, so it would abort the whole
+        # ladder before the alternate player clients ever get a turn.
+        emit_warning("No Firefox profile found; continuing without browser cookies")
+        return
+
     if prefer_native:
         opts.cookiesfrombrowser = ("firefox",)
         emit_info("Using Firefox browser cookies via yt-dlp browser fallback")
@@ -133,6 +171,10 @@ def _apply_browser_fallback(opts: YtDlpParams, prefer_native: bool) -> None:  # 
     if cookies_file is not None:
         opts.cookiefile = str(cookies_file)
         emit_info(f"Using exported Firefox cookies file: {cookies_file}")
+        return
+
+    if not _firefox_profile_available():
+        emit_warning("Export failed and no Firefox profile found; continuing without cookies")
         return
 
     opts.cookiesfrombrowser = ("firefox",)

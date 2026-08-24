@@ -68,3 +68,49 @@ def test_download_video_exhausts_attempts_on_persistent_403(
 
     assert result is None
     assert len(calls) == len(downloader._DOWNLOAD_ATTEMPTS)
+
+
+def test_cookie_source_error_is_retryable() -> None:
+    """A missing cookie store is a host fault, so later rungs must still run."""
+    error = YtDlpDownloadError(
+        "ERROR: could not find firefox cookies database in '/home/diot/.mozilla/firefox'"
+    )
+
+    assert downloader._is_cookie_source_error(error) is True
+    assert downloader._should_retry_attempt(error, 0) is True
+
+
+def test_unrelated_error_is_not_a_cookie_source_error() -> None:
+    error = YtDlpDownloadError("ERROR: Video unavailable")
+
+    assert downloader._is_cookie_source_error(error) is False
+
+
+def test_download_video_continues_past_a_cookie_store_failure(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """The regression: attempt 3 died on cookies and rungs 4+ never ran."""
+    calls: list[int] = []
+    audio_path = tmp_path / "dQw4w9WgXcQ.m4a"
+
+    def _forbidden_then_cookie_failure_then_success(*args: object, **kwargs: object) -> Path:
+        del args, kwargs
+        calls.append(1)
+        if len(calls) <= 2:
+            msg = "ERROR: unable to download video data: HTTP Error 403: Forbidden"
+            raise YtDlpDownloadError(msg)
+        if len(calls) == 3:
+            msg = "ERROR: could not find firefox cookies database in '/home/diot/.mozilla/firefox'"
+            raise YtDlpDownloadError(msg)
+        return audio_path
+
+    monkeypatch.setattr(
+        downloader, "_run_download_attempt", _forbidden_then_cookie_failure_then_success
+    )
+    result = downloader.download_video(
+        "https://www.youtube.com/watch?v=dQw4w9WgXcQ",
+        tmp_path,
+    )
+
+    assert result == audio_path
+    assert len(calls) == 4

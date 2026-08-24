@@ -20,7 +20,7 @@ dependencies = [
     "python-dotenv~=1.2.2",
     "requests~=2.33.1",
     "tqdm~=4.67.3",
-    "yt-dlp~=2026.3.17",
+    "yt-dlp~=2026.8.19",
     "rapidfuzz~=3.14.3",
     "numpy~=2.4.4",
     "unidecode~=1.4.0",
@@ -45,7 +45,7 @@ dev = [
     # Type stubs
     "types-tqdm~=4.67.3.20260402",
     "types-cachetools~=6.2.0.20260317",
-    "types-yt-dlp~=2026.3.17.20260402",
+    "types-yt-dlp~=2026.8.19.20260824",
     # Linting & formatting -- pinned to the scaffold framework series (see
     # docs/.PLAN.md Phase 1) so this project lints identically to a freshly
     # scaffolded one.

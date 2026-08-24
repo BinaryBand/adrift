@@ -85,6 +85,9 @@ def _is_terminal_download_reason(error: Exception) -> bool:
 
 
 _PLAYER_CLIENTS_STUB_FALLBACK = ["tv_embedded", "web"]
+# The mobile clients expose audio-only formats that need no signature
+# deciphering, so they keep working when the default web formats come back 403.
+_PLAYER_CLIENTS_AUDIO_FALLBACK = ["android", "mweb"]
 _AUDIO_FORMATS_FALLBACK = "bestaudio/best"
 
 # Each entry is (authenticated, player_clients, format_selector).
@@ -96,6 +99,7 @@ _DOWNLOAD_ATTEMPTS: list[tuple[bool, list[str] | None, str | None]] = [
     (False, None, None),
     (True, None, _AUDIO_FORMATS_FALLBACK),
     (True, None, None),
+    (True, _PLAYER_CLIENTS_AUDIO_FALLBACK, _AUDIO_FORMATS_FALLBACK),
     (True, _PLAYER_CLIENTS_STUB_FALLBACK, None),
 ]
 
@@ -207,7 +211,11 @@ def _run_download_attempt(
 def _should_retry_attempt(error: Exception, attempt_index: int) -> bool:
     if _is_terminal_download_reason(error):
         return False
-    retryable = _is_unavailable_format_error(error) or _is_forbidden_download_error(error)
+    retryable = (
+        _is_unavailable_format_error(error)
+        or _is_forbidden_download_error(error)
+        or _is_cookie_source_error(error)
+    )
     return retryable and attempt_index < len(_DOWNLOAD_ATTEMPTS) - 1
 
 
@@ -256,6 +264,18 @@ def _is_forbidden_download_error(error: Exception) -> bool:
     # Stale signed googlevideo URLs or a client/cookie mismatch surface as 403;
     # the later attempts (auth, alternate player clients) usually clear it.
     return "HTTP Error 403" in str(error)
+
+
+def _is_cookie_source_error(error: Exception) -> bool:
+    """Return True for an unreadable or absent browser cookie store.
+
+    That is a problem with this host, not with the video, so the remaining
+    attempts (alternate player clients) can still succeed. Without this the
+    ladder aborts on the first authenticated rung and never reaches them.
+    """
+    err_str = str(error).lower()
+    markers = ("cookies database", "could not copy", "unsupported browser")
+    return "cookie" in err_str and any(marker in err_str for marker in markers)
 
 
 def _retry_reason(error: Exception) -> str:

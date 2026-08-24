@@ -88,24 +88,40 @@ def _parse_single_podcast(podcast: dict[str, Any], rules: dict[str, _ShowRule]) 
     )
 
 
-_CONFIG_PATH = pathlib.Path("static/config") / "podcasts.toml"
+_CONFIG_DIR = pathlib.Path("static/config")
+_CONFIG_LOAD_ERRORS = (OSError, tomllib.TOMLDecodeError)
+
+
+def _config_paths() -> list[pathlib.Path]:
+    """Return every podcast config file, not just ``podcasts.toml``.
+
+    Shows are split across several TOML files (``youtube.toml`` and friends);
+    reading only one of them silently drops the cleanup rules defined in the
+    others. The rest of the codebase already globs -- see the
+    ``static/config/*.toml`` targets in core/services/app_common.py.
+    """
+    try:
+        return sorted(_CONFIG_DIR.glob("*.toml"))
+    except OSError:
+        return []
 
 
 def _load_show_rules() -> dict[str, _ShowRule]:
-    try:
-        with _CONFIG_PATH.open("rb") as f:
-            config = tomllib.load(f)
-    except FileNotFoundError:
-        return {}
-
     rules: dict[str, _ShowRule] = {}
-    podcasts = config.get("podcasts")
-    if not isinstance(podcasts, list):
-        return rules
+    for path in _config_paths():
+        try:
+            with path.open("rb") as f:
+                config = tomllib.load(f)
+        except _CONFIG_LOAD_ERRORS:
+            continue
 
-    for podcast in podcasts:
-        if isinstance(podcast, dict):
-            _parse_single_podcast(podcast, rules)
+        podcasts = config.get("podcasts")
+        if not isinstance(podcasts, list):
+            continue
+
+        for podcast in podcasts:
+            if isinstance(podcast, dict):
+                _parse_single_podcast(podcast, rules)
 
     return rules
 
@@ -114,10 +130,15 @@ _SHOW_RULES = _load_show_rules()
 
 
 def _config_mtime() -> float:
-    try:
-        return _CONFIG_PATH.stat().st_mtime
-    except OSError:
-        return 0.0
+    # max() over every config file, not just one: the disk cache keys off this,
+    # so a single-path mtime goes stale when only youtube.toml changes.
+    mtimes: list[float] = []
+    for path in _config_paths():
+        try:
+            mtimes.append(path.stat().st_mtime)
+        except OSError:
+            continue
+    return max(mtimes, default=0.0)
 
 
 def _invalidate_title_cache_if_stale() -> None:
